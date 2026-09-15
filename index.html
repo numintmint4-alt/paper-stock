@@ -90,8 +90,20 @@ th{background:#f1f5f9;font-weight:600}
 .chart-box h3{margin:0 0 12px;font-size:15px}
 canvas{max-height:340px}
 .hint{font-size:12px;color:#64748b;margin:4px 0 8px 0}
-.preview-box{max-height:400px;overflow:auto;border:1px solid #cbd5e1;border-radius:8px;margin:10px 0}
-@media print{.nav,.filters,button,.no-print{display:none!important}.card{box-shadow:none;padding:0}body{background:#fff}.container{padding:0}.report-wrap{max-height:none;overflow:visible}}
+
+/* ===== พิมพ์: A4 แนวนอนเป็นค่าเริ่มต้น ===== */
+@media print {
+  @page { size: A4 landscape; margin: 8mm; }
+  .nav,.filters,button,.no-print{display:none!important}
+  .card{box-shadow:none;padding:0}
+  body{background:#fff}
+  .container{padding:0;max-width:100%}
+  .report-wrap{max-height:none;overflow:visible}
+  .report-table{font-size:9px}
+  .report-table th,.report-table td{padding:2px 3px}
+  .report-head{margin-bottom:6px;padding-bottom:6px}
+}
+
 @media (max-width:640px){.form-grid{grid-template-columns:1fr}.nav{height:auto;padding:10px}}
 </style>
 </head>
@@ -132,15 +144,14 @@ canvas{max-height:340px}
           <div class="report-doc">FQ-ษ6-06-04/4 rev.01</div>
         </div>
         <div class="filters no-print">
-          <label>จาก <input type="date" id="qFrom"></label>
-          <label>ถึง <input type="date" id="qTo"></label>
+          <label>เดือน <input type="month" id="qMonth"></label>
           <label>Grade <select id="qGrade"><option value="">ทั้งหมด</option></select></label>
           <label>Gram <select id="qGram"><option value="">ทั้งหมด</option></select></label>
           <span style="font-size:13px;margin-left:8px">แสดง:</span>
           <label><input type="radio" name="mode" value="sum" checked> ยอดรวม</label>
           <label><input type="radio" name="mode" value="max"> สูงสุดต่อวัน</label>
           <button class="primary" onclick="renderMatrix()">ค้นหา</button>
-          <button onclick="window.print()">🖨 พิมพ์</button>
+          <button onclick="window.print()">🖨 พิมพ์ (A4 แนวนอน)</button>
         </div>
         <div id="matrixBody"></div>
       </div>
@@ -237,14 +248,13 @@ canvas{max-height:340px}
 </div>
 
 <div class="modal-bg" id="modalMaster">
-  <div class="modal" style="max-width:720px">
+  <div class="modal" style="max-width:600px">
     <h3 id="masterFormTitle">เพิ่ม Master Data</h3>
     <div id="masterFormError"></div>
     <div class="form-grid">
       <label>Grade <input id="fGrade"></label>
       <label>Gram <input id="fGram" type="number"></label>
       <label>Size <input id="fSize" type="number"></label>
-      <label>Weight/mm/Inc <input id="fWMI" type="number"></label>
       <label>Item Code <input id="fItem"></label>
       <label>Std Weight (kg) <input id="fWeight" type="number" step="0.01"></label>
     </div>
@@ -302,6 +312,7 @@ let currentUser = null;
 let currentProfile = null;
 let masterCache = [];
 let usageCache = [];
+let matrixRange = { from: '', to: '' };
 
 // ================= HELPERS =================
 const $ = id => document.getElementById(id);
@@ -313,16 +324,27 @@ function closeModal(id) { $(id).classList.remove('show'); }
 function showMsg(elId, html, type = 'ok') { $(elId).innerHTML = `<div class="msg ${type}">${html}</div>`; }
 const isAdmin = () => currentProfile?.role === 'admin';
 
+function currentMonthStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;
+}
 function currentMonthRange() {
   const d = new Date(), y = d.getFullYear(), m = d.getMonth();
   return { from: `${y}-${pad(m+1)}-01`, to: `${y}-${pad(m+1)}-${pad(new Date(y, m+1, 0).getDate())}` };
 }
-function thaiPeriod(from, to) {
-  if (!from || !to) return '(ทั้งหมด)';
-  const [fy, fm] = from.split('-').map(Number);
-  const [ty, tm] = to.split('-').map(Number);
-  if (fy === ty && fm === tm) return `เดือน ${THAI_MONTHS[fm-1]} ${fy + 543}`;
-  return `${from} ถึง ${to}`;
+function getMonthRange(monthStr) {
+  if (!monthStr) return { from: '', to: '' };
+  const [y, m] = monthStr.split('-').map(Number);
+  const lastDay = new Date(y, m, 0).getDate();
+  return {
+    from: `${y}-${pad(m)}-01`,
+    to:   `${y}-${pad(m)}-${pad(lastDay)}`
+  };
+}
+function thaiMonthTitle(monthStr) {
+  if (!monthStr) return '(ทั้งหมด)';
+  const [y, m] = monthStr.split('-').map(Number);
+  return `เดือน ${THAI_MONTHS[m-1]} ${y + 543}`;
 }
 
 // ✅ แปลงวันที่ — รองรับ Excel number, ISO, DD/MM/YYYY
@@ -344,7 +366,6 @@ function toISODate(v) {
   return s.slice(0, 10);
 }
 
-// หาค่าจากคอลัมน์ที่ยอมรับชื่อหลายแบบ
 function findColumn(row, aliases) {
   const keys = Object.keys(row);
   for (const alias of aliases) {
@@ -356,17 +377,21 @@ function findColumn(row, aliases) {
   return undefined;
 }
 
+function numOrNull(v) {
+  if (v === undefined || v === null || v === '') return null;
+  const n = Number(v);
+  return isNaN(n) ? null : n;
+}
+
 // ================= COLUMN ALIASES =================
 const MASTER_COLS = {
   grade:         ['grade', 'เกรด'],
   gram:          ['gram', 'แกรม'],
   size:          ['size', 'ขนาด'],
-  weight_mm_inc: ['weight_mm_inc', 'weight/mm/inc.', 'weight/mm/inc', 'weight_mm', 'weight/mm'],
   item_code:     ['item_code', 'item', 'รายการ'],
   std_weight_kg: ['std_weight_kg', 'std_weight', 'น้ำหนัก', 'weight_kg', 'weight']
 };
 
-// ✅ ปรับให้ตรงกับไฟล์ Usage Records.xlsx จริง
 const USAGE_COLS = {
   usage_date:        ['doc_date', 'usage_date', 'date', 'วันที่', 'วันที'],
   grade:             ['grade', 'เกรด', 'gradegram', 'grade_gram', 'เกรดแกรม'],
@@ -378,20 +403,34 @@ const USAGE_COLS = {
   roll_for_customer: ['roll_for_customer', 'customer', 'ลูกค้า']
 };
 
-// สร้าง item_code จาก grade + width (เช่น CA112 + 54 → CA112-54)
-function buildItemCode(gradegram, width) {
-  const gg = String(gradegram).trim().toUpperCase();
-  const w  = String(width).trim();
-  const direct = `${gg}-${w}`;
-  if (masterCache.find(m => m.item_code === direct)) return direct;
-  // fallback: ลอง padded เป็น 3 หลัก
-  const m = gg.match(/^([A-Z]+)(\d+)$/);
+// ✅ หา item_code ที่ match กับ Master ด้วยหลายรูปแบบ
+function findItemCode(grade, width) {
+  const g = String(grade).trim().toUpperCase();
+  const w = String(width).trim();
+  const patterns = [];
+
+  // grade ตรง ๆ + width หลายแบบ
+  patterns.push(`${g}-${w}`);
+  patterns.push(`${g}-${w.padStart(2, '0')}`);
+  patterns.push(`${g}-${w.padStart(3, '0')}`);
+  patterns.push(`${g}/${w}`);
+  patterns.push(`${g}_${w}`);
+
+  // grade padded (เช่น CA5 → CA005)
+  const m = g.match(/^([A-Z]+)(\d+)$/);
   if (m) {
-    const padded = m[1] + m[2].padStart(3, '0');
-    const code = `${padded}-${w}`;
+    const p = m[1] + m[2].padStart(3, '0');
+    patterns.push(`${p}-${w}`);
+    patterns.push(`${p}-${w.padStart(2, '0')}`);
+    patterns.push(`${p}-${w.padStart(3, '0')}`);
+    patterns.push(`${p}/${w}`);
+    patterns.push(`${p}_${w}`);
+  }
+
+  for (const code of patterns) {
     if (masterCache.find(x => x.item_code === code)) return code;
   }
-  return direct;
+  return null;
 }
 
 // ================= AUTH =================
@@ -504,9 +543,11 @@ function populateFilterDropdowns() {
 
 // ================= MATRIX =================
 async function renderMatrix() {
-  const q = { from: $('qFrom').value, to: $('qTo').value, grade: $('qGrade').value, gram: $('qGram').value };
+  const monthVal = $('qMonth').value;
+  matrixRange = getMonthRange(monthVal);
+  const q = { from: matrixRange.from, to: matrixRange.to, grade: $('qGrade').value, gram: $('qGram').value };
   const mode = document.querySelector('input[name="mode"]:checked').value;
-  $('reportTitle').innerHTML = `ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ<br>ประจำ ${thaiPeriod(q.from, q.to)}`;
+  $('reportTitle').innerHTML = `ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ<br>ประจำ ${thaiMonthTitle(monthVal)}`;
 
   const usage = await loadUsage(q);
   const mByCode = {}; masterCache.forEach(m => mByCode[m.item_code] = m);
@@ -581,7 +622,7 @@ async function openDrill(grade, gram, size) {
   $('drillTitle').innerHTML = `รายละเอียด: ${m.item_code} <span style="font-weight:400;color:#64748b;font-size:14px">(Grade ${grade} · Gram ${gram} · Size ${size})</span>`;
   openModal('modalDrill');
 
-  const q = { from: $('qFrom').value, to: $('qTo').value };
+  const q = { from: matrixRange.from, to: matrixRange.to };
   const usage = await loadUsage(q);
   const filtered = usage.filter(u => u.item_code === m.item_code);
   const byDate = {};
@@ -670,11 +711,11 @@ function exportSummary() {
 function renderMaster() {
   const q = ($('masterSearch').value || '').toLowerCase();
   const rows = masterCache.filter(r => !q || (r.grade + r.gram + r.size + r.item_code).toLowerCase().includes(q));
-  let html = '<div style="max-height:550px;overflow:auto"><table><thead><tr><th>#</th><th>Grade</th><th>Gram</th><th>Size</th><th>Weight/mm/Inc</th><th>Item Code</th><th>Std Weight</th><th></th></tr></thead><tbody>';
-  if (!rows.length) html += '<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:20px">ไม่มีข้อมูล</td></tr>';
+  let html = '<div style="max-height:550px;overflow:auto"><table><thead><tr><th>#</th><th>Grade</th><th>Gram</th><th>Size</th><th>Item Code</th><th>Std Weight</th><th></th></tr></thead><tbody>';
+  if (!rows.length) html += '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:20px">ไม่มีข้อมูล</td></tr>';
   rows.forEach((r, i) => {
     html += `<tr><td>${i+1}</td><td>${r.grade}</td><td>${r.gram}</td><td>${r.size}</td>
-      <td>${r.weight_mm_inc||'-'}</td><td>${r.item_code}</td><td>${Number(r.std_weight_kg).toFixed(2)}</td>
+      <td>${r.item_code}</td><td>${Number(r.std_weight_kg).toFixed(2)}</td>
       <td class="admin-only">${isAdmin() ? `<button onclick="editMaster(${r.id})">แก้ไข</button> <button class="danger" onclick="delMaster(${r.id})">ลบ</button>` : '-'}</td></tr>`;
   });
   html += '</tbody></table></div>';
@@ -685,10 +726,10 @@ function openMasterForm(row) {
   editingMasterId = row ? row.id : null;
   $('masterFormTitle').textContent = row ? 'แก้ไข Master Data' : 'เพิ่ม Master Data';
   $('masterFormError').innerHTML = '';
-  ['Grade','Gram','Size','WMI','Item','Weight'].forEach(k => $('f'+k).value = '');
+  ['Grade','Gram','Size','Item','Weight'].forEach(k => $('f'+k).value = '');
   if (row) {
     $('fGrade').value = row.grade; $('fGram').value = row.gram; $('fSize').value = row.size;
-    $('fWMI').value = row.weight_mm_inc || ''; $('fItem').value = row.item_code;
+    $('fItem').value = row.item_code;
     $('fWeight').value = row.std_weight_kg;
   }
   openModal('modalMaster');
@@ -699,7 +740,6 @@ async function saveMaster() {
   const grade = $('fGrade').value.trim();
   const gram = Number($('fGram').value);
   const size = Number($('fSize').value);
-  const weight_mm_inc = $('fWMI').value ? Number($('fWMI').value) : null;
   const item_code = $('fItem').value.trim();
   const std_weight_kg = Number($('fWeight').value);
   if (!grade || !gram || !size || !item_code || !std_weight_kg) {
@@ -707,7 +747,7 @@ async function saveMaster() {
   }
   const dup = masterCache.find(r => r.grade === grade && r.gram === gram && r.size === size && r.id !== editingMasterId);
   if (dup) { $('masterFormError').innerHTML = `<div class="msg err">⚠ ซ้ำกับ ${dup.item_code} (${dup.std_weight_kg} kg)</div>`; return; }
-  const payload = { grade, gram, size, weight_mm_inc, item_code, std_weight_kg };
+  const payload = { grade, gram, size, item_code, std_weight_kg };
   let error;
   if (editingMasterId) ({ error } = await supabase.from('paper_specs').update(payload).eq('id', editingMasterId));
   else ({ error } = await supabase.from('paper_specs').insert(payload));
@@ -730,7 +770,7 @@ async function clearMaster() {
 function exportMaster() {
   if (!masterCache.length) return alert('ไม่มีข้อมูล');
   const data = masterCache.map(r => ({
-    grade: r.grade, gram: r.gram, size: r.size, weight_mm_inc: r.weight_mm_inc || '',
+    grade: r.grade, gram: r.gram, size: r.size,
     item_code: r.item_code, std_weight_kg: r.std_weight_kg
   }));
   const ws = XLSX.utils.json_to_sheet(data);
@@ -749,14 +789,12 @@ function importMaster(ev) {
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
       let add = 0, upd = 0, err = 0;
       const errors = [];
-      const seenKeys = new Set();  // ✅ กันซ้ำภายในไฟล์เดียวกัน
+      const seenKeys = new Set();
 
       for (const row of rows) {
         const grade = String(findColumn(row, MASTER_COLS.grade) || '').trim();
         const gram = Number(findColumn(row, MASTER_COLS.gram));
         const size = Number(findColumn(row, MASTER_COLS.size));
-        const wmiRaw = findColumn(row, MASTER_COLS.weight_mm_inc);
-        const weight_mm_inc = wmiRaw ? Number(wmiRaw) : null;
         const item_code = String(findColumn(row, MASTER_COLS.item_code) || '').trim();
         const std_weight_kg = Number(findColumn(row, MASTER_COLS.std_weight_kg));
         if (!grade || !gram || !size || !item_code || !std_weight_kg) {
@@ -770,10 +808,10 @@ function importMaster(ev) {
 
         const existing = masterCache.find(x => x.grade === grade && x.gram === gram && x.size === size);
         if (existing) {
-          const { error } = await supabase.from('paper_specs').update({ weight_mm_inc, item_code, std_weight_kg }).eq('id', existing.id);
+          const { error } = await supabase.from('paper_specs').update({ item_code, std_weight_kg }).eq('id', existing.id);
           if (error) { err++; errors.push(`${item_code}: ${error.message}`); } else upd++;
         } else {
-          const { error } = await supabase.from('paper_specs').insert({ grade, gram, size, weight_mm_inc, item_code, std_weight_kg });
+          const { error } = await supabase.from('paper_specs').insert({ grade, gram, size, item_code, std_weight_kg });
           if (error) { err++; errors.push(`${item_code}: ${error.message}`); } else add++;
         }
       }
@@ -887,13 +925,14 @@ function importUsage(ev) {
         const used_kgs = Number(findColumn(row, USAGE_COLS.used_kgs));
 
         if (!usage_date || !gradegram || !width || isNaN(used_kgs)) {
-          errors.push(`แถว ${rowNo}: ข้อมูลไม่ครบ (date=${usage_date}, grade=${gradegram}, width=${width}, used=${used_kgs})`);
+          errors.push(`แถว ${rowNo}: ข้อมูลไม่ครบ`);
           return;
         }
-        const item_code = buildItemCode(gradegram, width);
-        if (!masterCache.find(x => x.item_code === item_code)) {
-          notFound.add(item_code);
-          errors.push(`แถว ${rowNo}: ไม่พบ ${item_code} ใน Master`);
+        // ✅ match item_code หลายรูปแบบ
+        const item_code = findItemCode(gradegram, width);
+        if (!item_code) {
+          notFound.add(`${gradegram}-${width}`);
+          errors.push(`แถว ${rowNo}: ไม่พบ ${gradegram}-${width} ใน Master`);
           return;
         }
         payload.push({
@@ -927,7 +966,6 @@ function importUsage(ev) {
       else if (errors.length <= 5) html += '<br>' + errors.join('<br>');
       showMsg('importUsageMsg', html, errors.length ? 'err' : 'ok');
 
-      // ✅ refresh ตาราง
       await renderUsage();
     } catch (ex) { showMsg('importUsageMsg', 'อ่านไฟล์ไม่สำเร็จ: ' + ex.message, 'err'); }
   };
@@ -1092,9 +1130,11 @@ async function renderDashboard() {
 
 // ================= INIT =================
 (function init() {
+  // Matrix: default = เดือนปัจจุบัน
+  if ($('qMonth')) $('qMonth').value = currentMonthStr();
   const r = currentMonthRange();
-  ['qFrom','sFrom','dFrom','uFrom'].forEach(id => { if ($(id)) $(id).value = r.from; });
-  ['qTo','sTo','dTo','uTo'].forEach(id => { if ($(id)) $(id).value = r.to; });
+  ['sFrom','dFrom','uFrom'].forEach(id => { if ($(id)) $(id).value = r.from; });
+  ['sTo','dTo','uTo'].forEach(id => { if ($(id)) $(id).value = r.to; });
   document.querySelectorAll('.modal-bg').forEach(el => {
     el.onclick = e => { if (e.target === el) el.classList.remove('show'); };
   });
