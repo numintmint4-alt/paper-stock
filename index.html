@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ระบบ Stock ม้วนกระดาษ</title>
+<title>ระบบ Stock ม้วนกระดาษ V3</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -44,6 +44,7 @@ button{padding:7px 14px;border-radius:6px;border:1px solid #cbd5e1;background:#f
 button:hover{background:#f1f5f9}
 button.primary:hover{background:#1d4ed8}
 button.danger:hover{background:#b91c1c}
+button:disabled{opacity:.5;cursor:not-allowed}
 input,select{padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px}
 .filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
 .filters label{font-size:13px;display:flex;gap:5px;align-items:center}
@@ -56,6 +57,7 @@ th,td{border:1px solid #e2e8f0;padding:6px 8px;text-align:left}
 th{background:#f1f5f9;font-weight:600}
 .report-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1e293b;padding-bottom:10px;margin-bottom:10px;gap:16px}
 .report-title{text-align:center;flex:1;font-weight:600;font-size:16px;line-height:1.5}
+.report-subtitle{text-align:center;font-size:13px;color:#64748b;font-weight:400;margin-top:4px}
 .report-doc{font-size:12px;color:#475569;white-space:nowrap}
 .report-wrap{overflow:auto;max-height:72vh}
 .report-table{font-size:12px;table-layout:auto}
@@ -91,7 +93,11 @@ th{background:#f1f5f9;font-weight:600}
 canvas{max-height:340px}
 .hint{font-size:12px;color:#64748b;margin:4px 0 8px 0}
 
-/* ===== พิมพ์: A4 แนวนอนเป็นค่าเริ่มต้น ===== */
+/* Progress bar */
+.progress-wrap{background:#e2e8f0;border-radius:8px;height:24px;overflow:hidden;margin:10px 0;position:relative}
+.progress-bar{background:linear-gradient(90deg,#2563eb,#3b82f6);height:100%;width:0;transition:width .3s ease}
+.progress-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#1e293b}
+
 @media print {
   @page { size: A4 landscape; margin: 8mm; }
   .nav,.filters,button,.no-print{display:none!important}
@@ -103,7 +109,6 @@ canvas{max-height:340px}
   .report-table th,.report-table td{padding:2px 3px}
   .report-head{margin-bottom:6px;padding-bottom:6px}
 }
-
 @media (max-width:640px){.form-grid{grid-template-columns:1fr}.nav{height:auto;padding:10px}}
 </style>
 </head>
@@ -112,7 +117,7 @@ canvas{max-height:340px}
 <div id="loginScreen" class="login-wrap">
   <div class="login-card">
     <h1>📦 ระบบ Stock ม้วนกระดาษ</h1>
-    <p>กรุณาเข้าสู่ระบบ</p>
+    <p>กรุณาเข้าสู่ระบบ (V3)</p>
     <label>ชื่อผู้ใช้<input id="loginUser" autocomplete="username" placeholder="เช่น sukanya"></label>
     <label>รหัสผ่าน<input id="loginPass" type="password" autocomplete="current-password" placeholder="••••••"></label>
     <button id="loginBtn">เข้าสู่ระบบ</button>
@@ -128,7 +133,7 @@ canvas{max-height:340px}
     <button data-tab="dashboard">Dashboard</button>
     <button data-tab="master">Master Data</button>
     <button data-tab="rolluse" class="admin-only">Roll Paper Use</button>
-    <button data-tab="users" class="admin-only">ผู้ใช้</button>
+    <button data-tab="users" class="admin-only" id="navUsers">ผู้ใช้</button>
     <span class="spacer"></span>
     <span class="user-badge" id="userBadge"></span>
     <button class="logout" id="logoutBtn">ออกจากระบบ</button>
@@ -136,20 +141,28 @@ canvas{max-height:340px}
 
   <div class="container">
 
+    <!-- ========== MATRIX ========== -->
     <div id="tab-matrix">
       <div class="card">
         <div class="report-head">
           <div></div>
-          <div class="report-title" id="reportTitle">ตารางควบคุมระดับ Stock ม้วนกระดาษปกติ<br>ประจำเดือน</div>
+          <div class="report-title" id="reportTitle">ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ<br>ประจำเดือน</div>
           <div class="report-doc">FQ-ษ6-06-04/4 rev.01</div>
         </div>
         <div class="filters no-print">
-          <label>เดือน <input type="month" id="qMonth"></label>
+          <label>เดือนรายงาน <input type="month" id="qReportMonth"></label>
+          <label>ย้อนหลัง
+            <select id="qMonthsBack">
+              <option value="3" selected>3 เดือน</option>
+              <option value="4">4 เดือน</option>
+              <option value="6">6 เดือน</option>
+            </select>
+          </label>
           <label>Grade <select id="qGrade"><option value="">ทั้งหมด</option></select></label>
           <label>Gram <select id="qGram"><option value="">ทั้งหมด</option></select></label>
           <span style="font-size:13px;margin-left:8px">แสดง:</span>
-          <label><input type="radio" name="mode" value="sum" checked> ยอดรวม</label>
-          <label><input type="radio" name="mode" value="max"> สูงสุดต่อวัน</label>
+          <label><input type="radio" name="mode" value="max" checked> ยอดสูงสุดต่อวัน</label>
+          <label><input type="radio" name="mode" value="sum"> ยอดรวมทั้งช่วง</label>
           <button class="primary" onclick="renderMatrix()">ค้นหา</button>
           <button onclick="window.print()">🖨 พิมพ์ (A4 แนวนอน)</button>
         </div>
@@ -157,6 +170,7 @@ canvas{max-height:340px}
       </div>
     </div>
 
+    <!-- ========== SUMMARY ========== -->
     <div id="tab-summary" class="hidden">
       <div class="card">
         <h2>Summary — จำนวนม้วนสูงสุดต่อ Item</h2>
@@ -171,6 +185,7 @@ canvas{max-height:340px}
       </div>
     </div>
 
+    <!-- ========== DASHBOARD ========== -->
     <div id="tab-dashboard" class="hidden">
       <div class="card">
         <h2>Dashboard</h2>
@@ -196,10 +211,11 @@ canvas{max-height:340px}
       </div>
     </div>
 
+    <!-- ========== MASTER ========== -->
     <div id="tab-master" class="hidden">
       <div class="card">
         <h2>Master Data — Grade / Gram / Size</h2>
-        <p class="hint">คีย์ไม่ซ้ำ: <b>grade + gram + size</b> — ถ้าซ้ำระบบจะแจ้งเตือน</p>
+        <p class="hint">คีย์ไม่ซ้ำ: <b>grade + gram + size</b> — ถ้าซ้ำระบบจะอัปเดตให้อัตโนมัติ</p>
         <div class="filters">
           <input id="masterSearch" placeholder="ค้นหา..." style="width:250px" oninput="renderMaster()">
           <button class="primary admin-only" onclick="openMasterForm()">+ เพิ่มรายการ</button>
@@ -209,10 +225,12 @@ canvas{max-height:340px}
           <button class="danger admin-only" onclick="clearMaster()">ลบทั้งหมด</button>
         </div>
         <div id="importMasterMsg"></div>
+        <div id="masterProgress" class="hidden"></div>
         <div id="masterBody"></div>
       </div>
     </div>
 
+    <!-- ========== ROLL PAPER USE ========== -->
     <div id="tab-rolluse" class="hidden">
       <div class="card">
         <h2>Roll Paper Use — บันทึกการใช้ม้วนกระดาษ</h2>
@@ -225,13 +243,16 @@ canvas{max-height:340px}
           <button class="primary admin-only" onclick="document.getElementById('fileUsage').click()">📥 Import Excel</button>
           <input type="file" id="fileUsage" accept=".xlsx,.xls" class="hidden" onchange="importUsage(event)">
           <button onclick="exportUsage()">📤 Export Excel</button>
-          <button class="danger admin-only" onclick="clearUsage()">ลบทั้งหมด</button>
+          <button class="danger admin-only" onclick="openDeleteMonth()">🗑 ลบตามเดือน</button>
+          <button class="danger admin-only" onclick="clearUsage()">🗑 ลบทั้งหมด</button>
         </div>
         <div id="importUsageMsg"></div>
+        <div id="usageProgress" class="hidden"></div>
         <div id="usageBody"></div>
       </div>
     </div>
 
+    <!-- ========== USERS ========== -->
     <div id="tab-users" class="hidden">
       <div class="card">
         <h2>จัดการผู้ใช้</h2>
@@ -247,6 +268,7 @@ canvas{max-height:340px}
   </div>
 </div>
 
+<!-- ========== MODALS ========== -->
 <div class="modal-bg" id="modalMaster">
   <div class="modal" style="max-width:600px">
     <h3 id="masterFormTitle">เพิ่ม Master Data</h3>
@@ -292,6 +314,21 @@ canvas{max-height:340px}
   </div>
 </div>
 
+<div class="modal-bg" id="modalDeleteMonth">
+  <div class="modal" style="max-width:520px">
+    <h3>🗑 ลบ Usage ตามเดือน</h3>
+    <p class="hint">เลือกเดือนที่ต้องการลบ — ระบบจะลบเฉพาะ usage_records ที่มี usage_date ในเดือนนั้น</p>
+    <div id="deleteMonthMsg"></div>
+    <div class="form-grid" style="grid-template-columns:1fr">
+      <label>เลือกเดือน <input type="month" id="delMonth"></label>
+    </div>
+    <div class="form-actions">
+      <button onclick="closeModal('modalDeleteMonth')">ยกเลิก</button>
+      <button class="danger" onclick="confirmDeleteMonth()">ลบเดือนนี้</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ═══════════════════════════════════════════════
 //  ⚙️  แก้ 3 ค่าตรงนี้
@@ -306,6 +343,7 @@ if (SUPABASE_URL.includes('xxxxx')) {
   throw new Error('Config not set');
 }
 
+const HAS_EDGE_FUNCTION = !EDGE_FUNCTION_URL.includes('xxxxx');
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentUser = null;
@@ -318,6 +356,7 @@ let matrixRange = { from: '', to: '' };
 const $ = id => document.getElementById(id);
 const pad = n => String(n).padStart(2, '0');
 const THAI_MONTHS = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+const THAI_MONTHS_SHORT = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 
 function openModal(id) { $(id).classList.add('show'); }
 function closeModal(id) { $(id).classList.remove('show'); }
@@ -332,19 +371,34 @@ function currentMonthRange() {
   const d = new Date(), y = d.getFullYear(), m = d.getMonth();
   return { from: `${y}-${pad(m+1)}-01`, to: `${y}-${pad(m+1)}-${pad(new Date(y, m+1, 0).getDate())}` };
 }
-function getMonthRange(monthStr) {
-  if (!monthStr) return { from: '', to: '' };
-  const [y, m] = monthStr.split('-').map(Number);
-  const lastDay = new Date(y, m, 0).getDate();
+
+// ✅ ช่วงเดือนรายงาน: report_month = "2026-09" → { from: "2026-06-01", to: "2026-08-31" }
+function reportMonthRange(reportMonthStr, monthsBack = 3) {
+  if (!reportMonthStr) return { from: '', to: '' };
+  const [y, m] = reportMonthStr.split('-').map(Number);
+
+  // to = last day of (m - 1)
+  const toDate = new Date(y, m - 1, 0); // day 0 of month (m-1 index) → last day of previous month
+
+  // from = first day of (m - monthsBack)
+  let fromM = m - monthsBack;
+  let fromY = y;
+  while (fromM <= 0) { fromM += 12; fromY -= 1; }
+
   return {
-    from: `${y}-${pad(m)}-01`,
-    to:   `${y}-${pad(m)}-${pad(lastDay)}`
+    from: `${fromY}-${pad(fromM)}-01`,
+    to:   `${toDate.getFullYear()}-${pad(toDate.getMonth()+1)}-${pad(toDate.getDate())}`
   };
 }
+
 function thaiMonthTitle(monthStr) {
   if (!monthStr) return '(ทั้งหมด)';
   const [y, m] = monthStr.split('-').map(Number);
   return `เดือน ${THAI_MONTHS[m-1]} ${y + 543}`;
+}
+function thaiMonthShort(monthStr) {
+  const [y, m] = monthStr.split('-').map(Number);
+  return `${THAI_MONTHS_SHORT[m-1]} ${String(y+543).slice(-2)}`;
 }
 
 // ✅ แปลงวันที่ — รองรับ Excel number, ISO, DD/MM/YYYY
@@ -383,6 +437,24 @@ function numOrNull(v) {
   return isNaN(n) ? null : n;
 }
 
+// ═══════════════════════════════════════════════
+// ✅ PAGINATION — ดึงข้อมูลทั้งหมดแบบแบ่งหน้า
+// ═══════════════════════════════════════════════
+async function fetchAllRows(buildQuery, pageSize = 1000, onProgress = null) {
+  const all = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await buildQuery().range(from, from + pageSize - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    all.push(...data);
+    if (onProgress) onProgress(all.length);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return all;
+}
+
 // ================= COLUMN ALIASES =================
 const MASTER_COLS = {
   grade:         ['grade', 'เกรด'],
@@ -403,20 +475,16 @@ const USAGE_COLS = {
   roll_for_customer: ['roll_for_customer', 'customer', 'ลูกค้า']
 };
 
-// ✅ หา item_code ที่ match กับ Master ด้วยหลายรูปแบบ
 function findItemCode(grade, width) {
   const g = String(grade).trim().toUpperCase();
   const w = String(width).trim();
   const patterns = [];
-
-  // grade ตรง ๆ + width หลายแบบ
   patterns.push(`${g}-${w}`);
   patterns.push(`${g}-${w.padStart(2, '0')}`);
   patterns.push(`${g}-${w.padStart(3, '0')}`);
   patterns.push(`${g}/${w}`);
   patterns.push(`${g}_${w}`);
 
-  // grade padded (เช่น CA5 → CA005)
   const m = g.match(/^([A-Z]+)(\d+)$/);
   if (m) {
     const p = m[1] + m[2].padStart(3, '0');
@@ -431,6 +499,23 @@ function findItemCode(grade, width) {
     if (masterCache.find(x => x.item_code === code)) return code;
   }
   return null;
+}
+
+// ================= PROGRESS =================
+function showProgress(elId, current, total, label = '') {
+  const el = $(elId);
+  el.classList.remove('hidden');
+  const pct = total > 0 ? Math.round(current / total * 100) : 0;
+  el.innerHTML = `
+    <div class="progress-wrap">
+      <div class="progress-bar" style="width:${pct}%"></div>
+      <div class="progress-text">${label || `กำลังประมวลผล... ${current.toLocaleString()} / ${total.toLocaleString()} (${pct}%)`}</div>
+    </div>`;
+}
+function hideProgress(elId) {
+  const el = $(elId);
+  el.classList.add('hidden');
+  el.innerHTML = '';
 }
 
 // ================= AUTH =================
@@ -454,6 +539,12 @@ function showApp() {
   $('app').classList.remove('hidden');
   $('userBadge').textContent = (currentProfile?.full_name || currentUser.email) + ' · ' + (isAdmin() ? 'Admin' : 'User');
   document.querySelectorAll('.admin-only').forEach(el => el.classList.toggle('hidden', !isAdmin()));
+
+  // ✅ ซ่อนแท็บผู้ใช้ ถ้า config ไม่ครบ
+  if (!HAS_EDGE_FUNCTION) {
+    $('navUsers').classList.add('hidden');
+    $('tab-users').classList.add('hidden');
+  }
   refreshAll();
 }
 
@@ -494,40 +585,45 @@ document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
     if (t === 'dashboard') renderDashboard();
     if (t === 'master') renderMaster();
     if (t === 'rolluse') renderUsage();
-    if (t === 'users') loadUsers();
+    if (t === 'users' && HAS_EDGE_FUNCTION) loadUsers();
   };
 });
 
-// ================= DATA =================
-async function loadMaster() {
-  const { data, error } = await supabase.from('paper_specs').select('*').order('grade').order('gram').order('size');
-  if (error) { console.error(error); return []; }
-  masterCache = data || [];
+// ================= DATA (pagination) =================
+async function loadMaster(onProgress = null) {
+  masterCache = await fetchAllRows(
+    () => supabase.from('paper_specs').select('*').order('grade').order('gram').order('size'),
+    1000, onProgress
+  );
   return masterCache;
 }
+
 async function loadUsage(filters) {
-  let q = supabase.from('usage_records').select('*');
-  if (filters.from) q = q.gte('usage_date', filters.from);
-  if (filters.to) q = q.lte('usage_date', filters.to);
-  const { data, error } = await q;
-  if (error) { console.error(error); return []; }
-  let rows = data || [];
+  const rows = await fetchAllRows(() => {
+    let q = supabase.from('usage_records').select('*');
+    if (filters.from) q = q.gte('usage_date', filters.from);
+    if (filters.to)   q = q.lte('usage_date', filters.to);
+    return q;
+  });
+  let out = rows;
   if (filters.grade || filters.gram) {
     const mByCode = {}; masterCache.forEach(m => mByCode[m.item_code] = m);
-    rows = rows.filter(u => {
+    out = rows.filter(u => {
       const m = mByCode[u.item_code]; if (!m) return false;
       if (filters.grade && m.grade !== filters.grade) return false;
       if (filters.gram && String(m.gram) !== String(filters.gram)) return false;
       return true;
     });
   }
-  return rows;
+  return out;
 }
+
 async function refreshAll() {
   await loadMaster();
   populateFilterDropdowns();
   renderMatrix();
 }
+
 function populateFilterDropdowns() {
   const grades = [...new Set(masterCache.map(r => r.grade))].sort();
   const grams  = [...new Set(masterCache.map(r => r.gram))].sort((a,b)=>a-b);
@@ -543,11 +639,23 @@ function populateFilterDropdowns() {
 
 // ================= MATRIX =================
 async function renderMatrix() {
-  const monthVal = $('qMonth').value;
-  matrixRange = getMonthRange(monthVal);
+  const reportMonth = $('qReportMonth').value;
+  const monthsBack  = Number($('qMonthsBack').value) || 3;
+  matrixRange = reportMonthRange(reportMonth, monthsBack);
+
   const q = { from: matrixRange.from, to: matrixRange.to, grade: $('qGrade').value, gram: $('qGram').value };
   const mode = document.querySelector('input[name="mode"]:checked').value;
-  $('reportTitle').innerHTML = `ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ<br>ประจำ ${thaiMonthTitle(monthVal)}`;
+
+  const fromShort = matrixRange.from ? thaiMonthShort(matrixRange.from.slice(0,7)) : '-';
+  const toShort   = matrixRange.to   ? thaiMonthShort(matrixRange.to.slice(0,7))   : '-';
+
+  $('reportTitle').innerHTML = `
+    ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ<br>
+    ประจำ ${thaiMonthTitle(reportMonth)}
+    <div class="report-subtitle">(ยอดสูงสุดต่อวัน · ย้อนหลัง ${monthsBack} เดือน: ${fromShort} – ${toShort})</div>
+  `;
+
+  $('matrixBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลดข้อมูล...</p>';
 
   const usage = await loadUsage(q);
   const mByCode = {}; masterCache.forEach(m => mByCode[m.item_code] = m);
@@ -590,7 +698,7 @@ async function renderMatrix() {
   const colKeys = [...colSet].sort((a,b) => a - b);
 
   if (!rowKeys.length) {
-    $('matrixBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่มีข้อมูล — กรุณา Import Master และ Usage ก่อน</p>';
+    $('matrixBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่มีข้อมูลในช่วงที่เลือก — กรุณา Import Master และ Usage ก่อน</p>';
     return;
   }
 
@@ -612,7 +720,7 @@ async function renderMatrix() {
   html += '<tr class="total-row"><td class="grade-col">Total</td>';
   colKeys.forEach(s => html += `<td>${Number(colTotals[s] || 0).toFixed(2)}</td>`);
   html += `<td class="total-col">${Number(grand).toFixed(2)}</td></tr></tbody></table></div>`;
-  html += '<div class="report-foot">แสดงเป็นจำนวนม้วน · ทศนิยม 2 ตำแหน่ง · อิง std_weight_kg จาก Master</div>';
+  html += `<div class="report-foot">แสดงเป็นจำนวนม้วน · ทศนิยม 2 ตำแหน่ง · อิง std_weight_kg จาก Master · โหมด: ${mode === 'max' ? 'ยอดสูงสุดต่อวัน' : 'ยอดรวมทั้งช่วง'}</div>`;
   $('matrixBody').innerHTML = html;
 }
 
@@ -654,6 +762,7 @@ function toggleDate(d) { $('rec-'+d).classList.toggle('hidden'); }
 
 // ================= SUMMARY =================
 async function renderSummary() {
+  $('summaryBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
   const q = { from: $('sFrom').value, to: $('sTo').value, grade: $('sGrade').value };
   const usage = await loadUsage(q);
   const mByCode = {}; masterCache.forEach(m => mByCode[m.item_code] = m);
@@ -719,6 +828,7 @@ function renderMaster() {
       <td class="admin-only">${isAdmin() ? `<button onclick="editMaster(${r.id})">แก้ไข</button> <button class="danger" onclick="delMaster(${r.id})">ลบ</button>` : '-'}</td></tr>`;
   });
   html += '</tbody></table></div>';
+  html += `<div style="margin-top:8px;font-size:13px;color:#64748b">แสดง ${rows.length} / ${masterCache.length} แถว</div>`;
   $('masterBody').innerHTML = html;
 }
 let editingMasterId = null;
@@ -779,47 +889,65 @@ function exportMaster() {
   XLSX.writeFile(wb, `master_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
-// ================= IMPORT MASTER =================
+// ================= IMPORT MASTER (RPC + Progress) =================
 function importMaster(ev) {
   const f = ev.target.files[0]; if (!f) return;
   const r = new FileReader();
   r.onload = async e => {
     try {
+      showProgress('masterProgress', 0, 1, 'กำลังอ่านไฟล์...');
       const wb = XLSX.read(e.target.result, { type: 'array' });
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-      let add = 0, upd = 0, err = 0;
+      showProgress('masterProgress', 0, rows.length, `อ่านได้ ${rows.length} แถว กำลังตรวจสอบ...`);
+
+      const payload = [];
       const errors = [];
       const seenKeys = new Set();
 
-      for (const row of rows) {
+      rows.forEach((row, i) => {
         const grade = String(findColumn(row, MASTER_COLS.grade) || '').trim();
         const gram = Number(findColumn(row, MASTER_COLS.gram));
         const size = Number(findColumn(row, MASTER_COLS.size));
         const item_code = String(findColumn(row, MASTER_COLS.item_code) || '').trim();
         const std_weight_kg = Number(findColumn(row, MASTER_COLS.std_weight_kg));
+
         if (!grade || !gram || !size || !item_code || !std_weight_kg) {
-          err++; errors.push(`ข้ามแถว: ${item_code||'(ว่าง)'} — ข้อมูลไม่ครบ`); continue;
+          errors.push(`แถว ${i+2}: ข้อมูลไม่ครบ`);
+          return;
         }
         const key = `${grade}|${gram}|${size}`;
         if (seenKeys.has(key)) {
-          err++; errors.push(`${item_code}: ซ้ำในไฟล์เดียวกัน`); continue;
+          errors.push(`แถว ${i+2} (${item_code}): ซ้ำในไฟล์`);
+          return;
         }
         seenKeys.add(key);
+        payload.push({ grade, gram, size, item_code, std_weight_kg });
+      });
 
-        const existing = masterCache.find(x => x.grade === grade && x.gram === gram && x.size === size);
-        if (existing) {
-          const { error } = await supabase.from('paper_specs').update({ item_code, std_weight_kg }).eq('id', existing.id);
-          if (error) { err++; errors.push(`${item_code}: ${error.message}`); } else upd++;
-        } else {
-          const { error } = await supabase.from('paper_specs').insert({ grade, gram, size, item_code, std_weight_kg });
-          if (error) { err++; errors.push(`${item_code}: ${error.message}`); } else add++;
-        }
+      if (!payload.length) {
+        hideProgress('masterProgress');
+        showMsg('importMasterMsg', `⚠ ไม่มีแถวที่บันทึกได้ (ทั้งหมด ${rows.length})<br>${errors.slice(0,5).join('<br>')}`, 'err');
+        return;
       }
-      let html = `✅ Master: เพิ่ม ${add} · อัปเดต ${upd}` + (err ? ` · ⚠ ผิดพลาด ${err}` : '');
+
+      showProgress('masterProgress', 0, 1, `กำลังบันทึก ${payload.length} แถว (transaction)...`);
+      const { data, error } = await supabase.rpc('import_master_batch', { rows: payload });
+      if (error) {
+        hideProgress('masterProgress');
+        showMsg('importMasterMsg', '❌ บันทึกไม่สำเร็จ: ' + error.message + '<br>(ไม่มีข้อมูลเข้า — rollback แล้ว)', 'err');
+        return;
+      }
+
+      hideProgress('masterProgress');
+      let html = `✅ Master: เพิ่ม ${data.added} · อัปเดต ${data.updated}` + (errors.length ? ` · ⚠ ข้าม ${errors.length}` : '');
       if (errors.length) html += '<br><br>ตัวอย่าง:<br>' + errors.slice(0, 8).join('<br>');
-      showMsg('importMasterMsg', html, err ? 'err' : 'ok');
+      showMsg('importMasterMsg', html, errors.length ? 'err' : 'ok');
+
       await loadMaster(); populateFilterDropdowns(); renderMaster();
-    } catch (ex) { showMsg('importMasterMsg', 'อ่านไฟล์ไม่สำเร็จ: ' + ex.message, 'err'); }
+    } catch (ex) {
+      hideProgress('masterProgress');
+      showMsg('importMasterMsg', 'อ่านไฟล์ไม่สำเร็จ: ' + ex.message, 'err');
+    }
   };
   r.readAsArrayBuffer(f);
   ev.target.value = '';
@@ -827,18 +955,18 @@ function importMaster(ev) {
 
 // ================= USAGE VIEW =================
 async function loadUsageTable(filters = {}) {
-  let q = supabase.from('usage_records').select('*').order('usage_date', { ascending: false }).limit(5000);
-  if (filters.from) q = q.gte('usage_date', filters.from);
-  if (filters.to)   q = q.lte('usage_date', filters.to);
-  const { data, error } = await q;
-  if (error) { console.error(error); return []; }
-  usageCache = data || [];
+  $('usageBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
+  const rows = await fetchAllRows(() => {
+    let q = supabase.from('usage_records').select('*').order('usage_date', { ascending: false });
+    if (filters.from) q = q.gte('usage_date', filters.from);
+    if (filters.to)   q = q.lte('usage_date', filters.to);
+    return q;
+  });
+  usageCache = rows;
   return usageCache;
 }
 
 async function renderUsage() {
-  const body = $('usageBody');
-  body.innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
   await loadUsageTable({
     from: $('uFrom').value || null,
     to:   $('uTo').value   || null
@@ -861,7 +989,7 @@ function drawUsageTable() {
   if (!rows.length) {
     html += '<tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:20px">ไม่มีข้อมูล</td></tr>';
   }
-  rows.forEach((r, i) => {
+  rows.slice(0, 3000).forEach((r, i) => {
     html += `<tr>
       <td>${i+1}</td>
       <td>${r.usage_date || '-'}</td>
@@ -876,7 +1004,7 @@ function drawUsageTable() {
     </tr>`;
   });
   html += '</tbody></table></div>';
-  html += `<div style="margin-top:8px;font-size:13px;color:#64748b">แสดง ${rows.length} / ${usageCache.length} แถว</div>`;
+  html += `<div style="margin-top:8px;font-size:13px;color:#64748b">แสดง ${Math.min(rows.length, 3000)} / ${usageCache.length} แถว ${usageCache.length > 3000 ? '(แสดง 3,000 แรก — ค้นหาเพื่อกรอง)' : ''}</div>`;
   $('usageBody').innerHTML = html;
 }
 
@@ -905,69 +1033,79 @@ async function delUsage(id) {
   drawUsageTable();
 }
 
-// ================= IMPORT USAGE =================
+// ================= IMPORT USAGE (RPC + Progress) =================
 function importUsage(ev) {
   const f = ev.target.files[0]; if (!f) return;
   const r = new FileReader();
   r.onload = async e => {
     try {
+      showProgress('usageProgress', 0, 1, 'กำลังอ่านไฟล์...');
       const wb = XLSX.read(e.target.result, { type: 'array' });
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+      showProgress('usageProgress', 0, rows.length, `อ่านได้ ${rows.length} แถว กำลังตรวจสอบ...`);
+
       const payload = [];
       const errors = [];
       const notFound = new Set();
 
       rows.forEach((row, i) => {
-        const rowNo = i + 2;
         const usage_date = toISODate(findColumn(row, USAGE_COLS.usage_date));
-        const gradegram = String(findColumn(row, USAGE_COLS.grade) || '').trim();
-        const width = Number(findColumn(row, USAGE_COLS.width));
-        const used_kgs = Number(findColumn(row, USAGE_COLS.used_kgs));
+        const gradegram  = String(findColumn(row, USAGE_COLS.grade) || '').trim();
+        const width      = Number(findColumn(row, USAGE_COLS.width));
+        const used_kgs   = Number(findColumn(row, USAGE_COLS.used_kgs));
 
         if (!usage_date || !gradegram || !width || isNaN(used_kgs)) {
-          errors.push(`แถว ${rowNo}: ข้อมูลไม่ครบ`);
+          errors.push(`แถว ${i+2}: ข้อมูลไม่ครบ`);
           return;
         }
-        // ✅ match item_code หลายรูปแบบ
         const item_code = findItemCode(gradegram, width);
         if (!item_code) {
           notFound.add(`${gradegram}-${width}`);
-          errors.push(`แถว ${rowNo}: ไม่พบ ${gradegram}-${width} ใน Master`);
+          errors.push(`แถว ${i+2}: ไม่พบ ${gradegram}-${width} ใน Master`);
           return;
         }
         payload.push({
           usage_date, item_code, used_kgs,
-          doc_no: findColumn(row, USAGE_COLS.doc_no) || null,
-          job_no: findColumn(row, USAGE_COLS.job_no) || null,
-          remark: findColumn(row, USAGE_COLS.remark) || null,
-          roll_for_customer: findColumn(row, USAGE_COLS.roll_for_customer) || null,
+          doc_no: findColumn(row, USAGE_COLS.doc_no) || '',
+          job_no: findColumn(row, USAGE_COLS.job_no) || '',
+          remark: findColumn(row, USAGE_COLS.remark) || '',
+          roll_for_customer: findColumn(row, USAGE_COLS.roll_for_customer) || '',
           created_by: currentUser.id
         });
       });
 
       if (!payload.length) {
+        hideProgress('usageProgress');
         let m = `⚠ ไม่มีแถวที่บันทึกได้ (ทั้งหมด ${rows.length} แถว)`;
         if (notFound.size) m += `<br><br>ไม่พบใน Master: ${[...notFound].slice(0, 20).join(', ')}${notFound.size > 20 ? ' ...' : ''}`;
         if (errors.length) m += '<br><br>' + errors.slice(0, 8).join('<br>');
         showMsg('importUsageMsg', m, 'err'); return;
       }
 
-      let inserted = 0;
-      const batchSize = 500;
-      for (let i = 0; i < payload.length; i += batchSize) {
-        const { error } = await supabase.from('usage_records').insert(payload.slice(i, i + batchSize));
-        if (error) { showMsg('importUsageMsg', 'บันทึกไม่สำเร็จ: ' + error.message, 'err'); return; }
-        inserted += Math.min(batchSize, payload.length - i);
+      const batchId = crypto.randomUUID();
+      showProgress('usageProgress', 0, 1, `กำลังบันทึก ${payload.length} แถว (transaction)...`);
+      const { data, error } = await supabase.rpc('import_usage_batch', {
+        rows: payload,
+        batch_id: batchId
+      });
+      if (error) {
+        hideProgress('usageProgress');
+        showMsg('importUsageMsg', '❌ บันทึกไม่สำเร็จ: ' + error.message + '<br>(ไม่มีข้อมูลเข้า — rollback แล้ว)', 'err');
+        return;
       }
 
-      let html = `✅ Usage: เพิ่ม ${inserted} แถว (จากทั้งหมด ${rows.length})`;
+      hideProgress('usageProgress');
+      let html = `✅ Usage: เพิ่ม ${data.inserted} แถว (จากทั้งหมด ${rows.length})`;
       if (errors.length) html += ` · ⚠ ข้าม ${errors.length} แถว`;
       if (notFound.size) html += `<br><br>ไม่พบใน Master: ${[...notFound].slice(0, 20).join(', ')}${notFound.size > 20 ? ' ...' : ''}`;
       else if (errors.length <= 5) html += '<br>' + errors.join('<br>');
       showMsg('importUsageMsg', html, errors.length ? 'err' : 'ok');
 
       await renderUsage();
-    } catch (ex) { showMsg('importUsageMsg', 'อ่านไฟล์ไม่สำเร็จ: ' + ex.message, 'err'); }
+    } catch (ex) {
+      hideProgress('usageProgress');
+      showMsg('importUsageMsg', 'อ่านไฟล์ไม่สำเร็จ: ' + ex.message, 'err');
+    }
   };
   r.readAsArrayBuffer(f);
   ev.target.value = '';
@@ -981,7 +1119,30 @@ async function clearUsage() {
   await renderUsage();
 }
 
-// ================= USERS =================
+// ================= DELETE BY MONTH =================
+function openDeleteMonth() {
+  $('delMonth').value = currentMonthStr();
+  $('deleteMonthMsg').innerHTML = '';
+  openModal('modalDeleteMonth');
+}
+async function confirmDeleteMonth() {
+  const m = $('delMonth').value;
+  if (!m) return;
+  const [y, mo] = m.split('-').map(Number);
+  const fromShort = thaiMonthShort(m);
+  if (!confirm(`ยืนยันลบ usage_records ทั้งหมดของเดือน ${fromShort}?`)) return;
+
+  $('deleteMonthMsg').innerHTML = '<div class="msg info">กำลังลบ...</div>';
+  const { data, error } = await supabase.rpc('delete_usage_by_month', { p_year: y, p_month: mo });
+  if (error) {
+    $('deleteMonthMsg').innerHTML = `<div class="msg err">ลบไม่สำเร็จ: ${error.message}</div>`;
+    return;
+  }
+  $('deleteMonthMsg').innerHTML = `<div class="msg ok">✅ ลบ ${data.deleted} แถว ของเดือน ${fromShort} แล้ว</div>`;
+  setTimeout(() => { closeModal('modalDeleteMonth'); renderUsage(); }, 1500);
+}
+
+// ================= USERS (เฉพาะเมื่อตั้งค่า Edge Function) =================
 async function callAdmin(action, payload = {}) {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('ไม่ได้ login');
@@ -996,7 +1157,7 @@ async function callAdmin(action, payload = {}) {
 }
 
 async function loadUsers() {
-  if (!isAdmin()) return;
+  if (!isAdmin() || !HAS_EDGE_FUNCTION) return;
   $('usersBody').innerHTML = '<p>กำลังโหลด...</p>';
   try {
     const { users } = await callAdmin('list');
@@ -1063,6 +1224,7 @@ async function delUser(id, username) {
 // ================= DASHBOARD =================
 let charts = {};
 async function renderDashboard() {
+  $('kpiRolls').textContent = '...';
   const q = { from: $('dFrom').value, to: $('dTo').value };
   const usage = await loadUsage(q);
   const mByCode = {}; masterCache.forEach(m => mByCode[m.item_code] = m);
@@ -1089,7 +1251,7 @@ async function renderDashboard() {
   const monthKeys = Object.keys(monthly).sort();
   const monthLabels = monthKeys.map(k => {
     const [y, mo] = k.split('-');
-    return `${THAI_MONTHS[Number(mo)-1].slice(0,3)} ${String(Number(y)+543).slice(-2)}`;
+    return `${THAI_MONTHS_SHORT[Number(mo)-1]} ${String(Number(y)+543).slice(-2)}`;
   });
 
   const itemRolls = {};
@@ -1130,8 +1292,7 @@ async function renderDashboard() {
 
 // ================= INIT =================
 (function init() {
-  // Matrix: default = เดือนปัจจุบัน
-  if ($('qMonth')) $('qMonth').value = currentMonthStr();
+  if ($('qReportMonth')) $('qReportMonth').value = currentMonthStr();
   const r = currentMonthRange();
   ['sFrom','dFrom','uFrom'].forEach(id => { if ($(id)) $(id).value = r.from; });
   ['sTo','dTo','uTo'].forEach(id => { if ($(id)) $(id).value = r.to; });
