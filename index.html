@@ -115,7 +115,7 @@ canvas{max-height:340px}
     <button data-tab="summary">Summary</button>
     <button data-tab="dashboard">Dashboard</button>
     <button data-tab="master">Master Data</button>
-    <button data-tab="import" class="admin-only">Import</button>
+    <button data-tab="rolluse" class="admin-only">Roll Paper Use</button>
     <button data-tab="users" class="admin-only">ผู้ใช้</button>
     <span class="spacer"></span>
     <span class="user-badge" id="userBadge"></span>
@@ -192,41 +192,32 @@ canvas{max-height:340px}
         <div class="filters">
           <input id="masterSearch" placeholder="ค้นหา..." style="width:250px" oninput="renderMaster()">
           <button class="primary admin-only" onclick="openMasterForm()">+ เพิ่มรายการ</button>
-          <button onclick="exportMaster()">📥 Export Excel</button>
+          <button class="primary admin-only" onclick="document.getElementById('fileMaster').click()">📥 Import Excel</button>
+          <input type="file" id="fileMaster" accept=".xlsx,.xls" class="hidden" onchange="importMaster(event)">
+          <button onclick="exportMaster()">📤 Export Excel</button>
           <button class="danger admin-only" onclick="clearMaster()">ลบทั้งหมด</button>
         </div>
+        <div id="importMasterMsg"></div>
         <div id="masterBody"></div>
       </div>
     </div>
 
-    <div id="tab-import" class="hidden">
+    <div id="tab-rolluse" class="hidden">
       <div class="card">
-        <h2>Import Excel</h2>
-        <div id="importMsg"></div>
-
-        <h3>1) Master Data</h3>
-        <p class="hint">
-          รองรับหัวคอลัมน์จากไฟล์ <code>ตารางน้ำหนัก.xlsx</code> ได้เลย:<br>
-          <code>เกรด, แกรม, ขนาด, รายการ, น้ำหนัก, Weight/mm/Inc.</code><br>
-          หรือภาษาอังกฤษ: <code>grade, gram, size, item_code, std_weight_kg, weight_mm_inc</code>
-        </p>
-        <input type="file" id="fileMaster" accept=".xlsx,.xls" onchange="importMaster(event)">
-
-        <hr style="margin:24px 0">
-
-        <h3>2) Usage Records</h3>
-        <p class="hint">
-          รองรับหัวคอลัมน์:<br>
-          <code>วันที่</code> หรือ <code>usage_date</code>, 
-          <code>gradegram</code> (เช่น CA112), 
-          <code>width</code> (เช่น 54), 
-          <code>used_kgs</code>, 
-          <code>doc_no</code>, <code>roll_for_customer</code>
-        </p>
-        <input type="file" id="fileUsage" accept=".xlsx,.xls" onchange="importUsage(event)">
-        <div style="margin-top:16px">
-          <button class="danger admin-only" onclick="clearUsage()">ลบ Usage ทั้งหมด</button>
+        <h2>Roll Paper Use — บันทึกการใช้ม้วนกระดาษ</h2>
+        <p class="hint">ข้อมูลจากไฟล์ Usage Records — กด Import เพื่ออัปโหลดข้อมูลใหม่</p>
+        <div class="filters">
+          <input id="usageSearch" placeholder="ค้นหา..." style="width:220px" oninput="drawUsageTable()">
+          <label>จาก <input type="date" id="uFrom"></label>
+          <label>ถึง <input type="date" id="uTo"></label>
+          <button class="primary" onclick="renderUsage()">ค้นหา</button>
+          <button class="primary admin-only" onclick="document.getElementById('fileUsage').click()">📥 Import Excel</button>
+          <input type="file" id="fileUsage" accept=".xlsx,.xls" class="hidden" onchange="importUsage(event)">
+          <button onclick="exportUsage()">📤 Export Excel</button>
+          <button class="danger admin-only" onclick="clearUsage()">ลบทั้งหมด</button>
         </div>
+        <div id="importUsageMsg"></div>
+        <div id="usageBody"></div>
       </div>
     </div>
 
@@ -295,12 +286,12 @@ canvas{max-height:340px}
 // ═══════════════════════════════════════════════
 //  ⚙️  แก้ 3 ค่าตรงนี้
 // ═══════════════════════════════════════════════
-const SUPABASE_URL      = 'https://gwwgycbqzdjlijsuxahx.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_rMoUE6tUsQZHnJu2ULDxFg_4NAiw6wg';
-const EDGE_FUNCTION_URL = 'https://gwwgycbqzdjlijsuxahx.supabase.co/functions/v1/admin-users';
+const SUPABASE_URL      = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
+const SUPABASE_ANON_KEY = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
+const EDGE_FUNCTION_URL = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
 // ═══════════════════════════════════════════════
 
-if (SUPABASE_URL.includes('PASTE_')) {
+if (SUPABASE_URL.includes('xxxxx')) {
   document.body.innerHTML = '<div style="padding:40px;font-family:sans-serif;color:#dc2626;background:#fee2e2;border-radius:8px;max-width:600px;margin:40px auto"><h2>⚠️ ยังไม่ได้ตั้งค่า</h2><p>กรุณาแก้ 3 ค่าด้านบนสุดของ script</p></div>';
   throw new Error('Config not set');
 }
@@ -310,6 +301,7 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentUser = null;
 let currentProfile = null;
 let masterCache = [];
+let usageCache = [];
 
 // ================= HELPERS =================
 const $ = id => document.getElementById(id);
@@ -374,9 +366,10 @@ const MASTER_COLS = {
   std_weight_kg: ['std_weight_kg', 'std_weight', 'น้ำหนัก', 'weight_kg', 'weight']
 };
 
+// ✅ ปรับให้ตรงกับไฟล์ Usage Records.xlsx จริง
 const USAGE_COLS = {
-  usage_date:        ['usage_date', 'date', 'วันที่', 'วันที'],
-  gradegram:         ['gradegram', 'grade_gram', 'grade', 'เกรดแกรม', 'เกรด'],
+  usage_date:        ['doc_date', 'usage_date', 'date', 'วันที่', 'วันที'],
+  grade:             ['grade', 'เกรด', 'gradegram', 'grade_gram', 'เกรดแกรม'],
   width:             ['width', 'size', 'ขนาด', 'width_mm'],
   used_kgs:          ['used_kgs', 'used_kg', 'used', 'ใช้ไป', 'ใช้(kg)'],
   doc_no:            ['doc_no', 'doc'],
@@ -385,13 +378,14 @@ const USAGE_COLS = {
   roll_for_customer: ['roll_for_customer', 'customer', 'ลูกค้า']
 };
 
-// สร้าง item_code จาก gradegram + width
+// สร้าง item_code จาก grade + width (เช่น CA112 + 54 → CA112-54)
 function buildItemCode(gradegram, width) {
-  const gg = String(gradegram).trim();
+  const gg = String(gradegram).trim().toUpperCase();
   const w  = String(width).trim();
   const direct = `${gg}-${w}`;
   if (masterCache.find(m => m.item_code === direct)) return direct;
-  const m = gg.match(/^([A-Za-z]+)(\d+)$/);
+  // fallback: ลอง padded เป็น 3 หลัก
+  const m = gg.match(/^([A-Z]+)(\d+)$/);
   if (m) {
     const padded = m[1] + m[2].padStart(3, '0');
     const code = `${padded}-${w}`;
@@ -452,7 +446,7 @@ document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
   btn.onclick = () => {
     document.querySelectorAll('.nav button[data-tab]').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    ['matrix','summary','dashboard','master','import','users'].forEach(t => {
+    ['matrix','summary','dashboard','master','rolluse','users'].forEach(t => {
       $('tab-'+t).classList.toggle('hidden', t !== btn.dataset.tab);
     });
     const t = btn.dataset.tab;
@@ -460,6 +454,7 @@ document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
     if (t === 'summary') renderSummary();
     if (t === 'dashboard') renderDashboard();
     if (t === 'master') renderMaster();
+    if (t === 'rolluse') renderUsage();
     if (t === 'users') loadUsers();
   };
 });
@@ -744,7 +739,7 @@ function exportMaster() {
   XLSX.writeFile(wb, `master_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
-// ================= IMPORT =================
+// ================= IMPORT MASTER =================
 function importMaster(ev) {
   const f = ev.target.files[0]; if (!f) return;
   const r = new FileReader();
@@ -754,6 +749,8 @@ function importMaster(ev) {
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
       let add = 0, upd = 0, err = 0;
       const errors = [];
+      const seenKeys = new Set();  // ✅ กันซ้ำภายในไฟล์เดียวกัน
+
       for (const row of rows) {
         const grade = String(findColumn(row, MASTER_COLS.grade) || '').trim();
         const gram = Number(findColumn(row, MASTER_COLS.gram));
@@ -765,6 +762,12 @@ function importMaster(ev) {
         if (!grade || !gram || !size || !item_code || !std_weight_kg) {
           err++; errors.push(`ข้ามแถว: ${item_code||'(ว่าง)'} — ข้อมูลไม่ครบ`); continue;
         }
+        const key = `${grade}|${gram}|${size}`;
+        if (seenKeys.has(key)) {
+          err++; errors.push(`${item_code}: ซ้ำในไฟล์เดียวกัน`); continue;
+        }
+        seenKeys.add(key);
+
         const existing = masterCache.find(x => x.grade === grade && x.gram === gram && x.size === size);
         if (existing) {
           const { error } = await supabase.from('paper_specs').update({ weight_mm_inc, item_code, std_weight_kg }).eq('id', existing.id);
@@ -776,14 +779,95 @@ function importMaster(ev) {
       }
       let html = `✅ Master: เพิ่ม ${add} · อัปเดต ${upd}` + (err ? ` · ⚠ ผิดพลาด ${err}` : '');
       if (errors.length) html += '<br><br>ตัวอย่าง:<br>' + errors.slice(0, 8).join('<br>');
-      showMsg('importMsg', html, err ? 'err' : 'ok');
-      await loadMaster(); populateFilterDropdowns();
-    } catch (ex) { showMsg('importMsg', 'อ่านไฟล์ไม่สำเร็จ: ' + ex.message, 'err'); }
+      showMsg('importMasterMsg', html, err ? 'err' : 'ok');
+      await loadMaster(); populateFilterDropdowns(); renderMaster();
+    } catch (ex) { showMsg('importMasterMsg', 'อ่านไฟล์ไม่สำเร็จ: ' + ex.message, 'err'); }
   };
   r.readAsArrayBuffer(f);
   ev.target.value = '';
 }
 
+// ================= USAGE VIEW =================
+async function loadUsageTable(filters = {}) {
+  let q = supabase.from('usage_records').select('*').order('usage_date', { ascending: false }).limit(5000);
+  if (filters.from) q = q.gte('usage_date', filters.from);
+  if (filters.to)   q = q.lte('usage_date', filters.to);
+  const { data, error } = await q;
+  if (error) { console.error(error); return []; }
+  usageCache = data || [];
+  return usageCache;
+}
+
+async function renderUsage() {
+  const body = $('usageBody');
+  body.innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
+  await loadUsageTable({
+    from: $('uFrom').value || null,
+    to:   $('uTo').value   || null
+  });
+  drawUsageTable();
+}
+
+function drawUsageTable() {
+  const q = ($('usageSearch').value || '').toLowerCase();
+  const rows = usageCache.filter(r =>
+    !q || [r.usage_date, r.item_code, r.doc_no, r.job_no, r.roll_for_customer, r.remark]
+      .some(v => String(v || '').toLowerCase().includes(q))
+  );
+
+  let html = '<div style="max-height:600px;overflow:auto"><table><thead><tr>' +
+    '<th>#</th><th>วันที่</th><th>Item Code</th><th>kg ที่ใช้</th>' +
+    '<th>Doc No</th><th>Job No</th><th>ลูกค้า</th><th>หมายเหตุ</th>' +
+    '<th class="admin-only"></th></tr></thead><tbody>';
+
+  if (!rows.length) {
+    html += '<tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:20px">ไม่มีข้อมูล</td></tr>';
+  }
+  rows.forEach((r, i) => {
+    html += `<tr>
+      <td>${i+1}</td>
+      <td>${r.usage_date || '-'}</td>
+      <td>${r.item_code || '-'}</td>
+      <td style="text-align:right">${Number(r.used_kgs || 0).toFixed(2)}</td>
+      <td>${r.doc_no || '-'}</td>
+      <td>${r.job_no || '-'}</td>
+      <td>${r.roll_for_customer || '-'}</td>
+      <td>${r.remark || '-'}</td>
+      <td class="admin-only">${isAdmin()
+        ? `<button class="danger" onclick="delUsage(${r.id})">ลบ</button>` : '-'}</td>
+    </tr>`;
+  });
+  html += '</tbody></table></div>';
+  html += `<div style="margin-top:8px;font-size:13px;color:#64748b">แสดง ${rows.length} / ${usageCache.length} แถว</div>`;
+  $('usageBody').innerHTML = html;
+}
+
+function exportUsage() {
+  if (!usageCache.length) return alert('ไม่มีข้อมูล');
+  const data = usageCache.map(r => ({
+    'วันที่': r.usage_date,
+    'Item Code': r.item_code,
+    'kg ที่ใช้': r.used_kgs,
+    'Doc No': r.doc_no || '',
+    'Job No': r.job_no || '',
+    'ลูกค้า': r.roll_for_customer || '',
+    'หมายเหตุ': r.remark || ''
+  }));
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Usage');
+  XLSX.writeFile(wb, `usage_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+async function delUsage(id) {
+  if (!confirm('ยืนยันลบรายการนี้?')) return;
+  const { error } = await supabase.from('usage_records').delete().eq('id', id);
+  if (error) return alert(error.message);
+  usageCache = usageCache.filter(r => r.id !== id);
+  drawUsageTable();
+}
+
+// ================= IMPORT USAGE =================
 function importUsage(ev) {
   const f = ev.target.files[0]; if (!f) return;
   const r = new FileReader();
@@ -798,12 +882,13 @@ function importUsage(ev) {
       rows.forEach((row, i) => {
         const rowNo = i + 2;
         const usage_date = toISODate(findColumn(row, USAGE_COLS.usage_date));
-        const gradegram = String(findColumn(row, USAGE_COLS.gradegram) || '').trim();
+        const gradegram = String(findColumn(row, USAGE_COLS.grade) || '').trim();
         const width = Number(findColumn(row, USAGE_COLS.width));
         const used_kgs = Number(findColumn(row, USAGE_COLS.used_kgs));
 
-        if (!usage_date || !gradegram || !width || !used_kgs) {
-          errors.push(`แถว ${rowNo}: ข้อมูลไม่ครบ`); return;
+        if (!usage_date || !gradegram || !width || isNaN(used_kgs)) {
+          errors.push(`แถว ${rowNo}: ข้อมูลไม่ครบ (date=${usage_date}, grade=${gradegram}, width=${width}, used=${used_kgs})`);
+          return;
         }
         const item_code = buildItemCode(gradegram, width);
         if (!masterCache.find(x => x.item_code === item_code)) {
@@ -823,16 +908,16 @@ function importUsage(ev) {
 
       if (!payload.length) {
         let m = `⚠ ไม่มีแถวที่บันทึกได้ (ทั้งหมด ${rows.length} แถว)`;
-        if (notFound.size) m += `<br>ไม่พบใน Master: ${[...notFound].slice(0, 20).join(', ')}${notFound.size > 20 ? ' ...' : ''}`;
+        if (notFound.size) m += `<br><br>ไม่พบใน Master: ${[...notFound].slice(0, 20).join(', ')}${notFound.size > 20 ? ' ...' : ''}`;
         if (errors.length) m += '<br><br>' + errors.slice(0, 8).join('<br>');
-        showMsg('importMsg', m, 'err'); return;
+        showMsg('importUsageMsg', m, 'err'); return;
       }
 
       let inserted = 0;
       const batchSize = 500;
       for (let i = 0; i < payload.length; i += batchSize) {
         const { error } = await supabase.from('usage_records').insert(payload.slice(i, i + batchSize));
-        if (error) { showMsg('importMsg', 'บันทึกไม่สำเร็จ: ' + error.message, 'err'); return; }
+        if (error) { showMsg('importUsageMsg', 'บันทึกไม่สำเร็จ: ' + error.message, 'err'); return; }
         inserted += Math.min(batchSize, payload.length - i);
       }
 
@@ -840,8 +925,11 @@ function importUsage(ev) {
       if (errors.length) html += ` · ⚠ ข้าม ${errors.length} แถว`;
       if (notFound.size) html += `<br><br>ไม่พบใน Master: ${[...notFound].slice(0, 20).join(', ')}${notFound.size > 20 ? ' ...' : ''}`;
       else if (errors.length <= 5) html += '<br>' + errors.join('<br>');
-      showMsg('importMsg', html, errors.length ? 'err' : 'ok');
-    } catch (ex) { showMsg('importMsg', 'อ่านไฟล์ไม่สำเร็จ: ' + ex.message, 'err'); }
+      showMsg('importUsageMsg', html, errors.length ? 'err' : 'ok');
+
+      // ✅ refresh ตาราง
+      await renderUsage();
+    } catch (ex) { showMsg('importUsageMsg', 'อ่านไฟล์ไม่สำเร็จ: ' + ex.message, 'err'); }
   };
   r.readAsArrayBuffer(f);
   ev.target.value = '';
@@ -851,7 +939,8 @@ async function clearUsage() {
   if (!confirm('ลบ Usage ทั้งหมด? (ต้องเป็น admin)')) return;
   const { error } = await supabase.from('usage_records').delete().neq('id', 0);
   if (error) return alert(error.message);
-  showMsg('importMsg', 'ลบ Usage ทั้งหมดแล้ว', 'ok');
+  showMsg('importUsageMsg', 'ลบ Usage ทั้งหมดแล้ว', 'ok');
+  await renderUsage();
 }
 
 // ================= USERS =================
@@ -1004,8 +1093,8 @@ async function renderDashboard() {
 // ================= INIT =================
 (function init() {
   const r = currentMonthRange();
-  ['qFrom','sFrom','dFrom'].forEach(id => { if ($(id)) $(id).value = r.from; });
-  ['qTo','sTo','dTo'].forEach(id => { if ($(id)) $(id).value = r.to; });
+  ['qFrom','sFrom','dFrom','uFrom'].forEach(id => { if ($(id)) $(id).value = r.from; });
+  ['qTo','sTo','dTo','uTo'].forEach(id => { if ($(id)) $(id).value = r.to; });
   document.querySelectorAll('.modal-bg').forEach(el => {
     el.onclick = e => { if (e.target === el) el.classList.remove('show'); };
   });
