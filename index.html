@@ -9,135 +9,105 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
-* { box-sizing: border-box; }
-body { margin:0; font-family:'Sarabun',sans-serif; background:#f5f6fa; color:#222; }
-.hidden { display:none !important; }
-
-/* ==== LOGIN ==== */
-.login-wrap { min-height:100vh; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,#1e293b,#334155); }
-.login-card { background:#fff; padding:40px 36px; border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,.3); width:380px; max-width:92vw; }
-.login-card h1 { margin:0 0 6px; font-size:22px; color:#1e293b; }
-.login-card p { margin:0 0 24px; font-size:13px; color:#64748b; }
-.login-card label { display:block; margin-bottom:14px; font-size:13px; color:#475569; font-weight:600; }
-.login-card input { display:block; width:100%; margin-top:5px; padding:10px 12px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:15px; font-family:inherit; }
-.login-card input:focus { outline:none; border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,.15); }
-.login-card button { width:100%; padding:11px; background:#2563eb; color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer; font-family:inherit; }
-.login-card button:hover { background:#1d4ed8; }
-.login-card button:disabled { background:#94a3b8; cursor:not-allowed; }
-.login-msg { margin-top:14px; padding:10px; border-radius:8px; font-size:13px; text-align:center; }
-.login-msg.err { background:#fee2e2; color:#dc2626; }
-.login-msg.ok { background:#dcfce7; color:#166534; }
-
-/* ==== NAV ==== */
-.nav { background:#1e293b; color:#fff; display:flex; gap:4px; align-items:center; height:56px; padding:0 20px; flex-wrap:wrap; position:sticky; top:0; z-index:50; }
-.nav strong { margin-right:16px; font-size:15px; }
-.nav button { color:#cbd5e1; background:none; border:none; padding:8px 14px; border-radius:6px; cursor:pointer; font-size:14px; font-family:inherit; }
-.nav button:hover { color:#fff; background:#334155; }
-.nav button.active { background:#334155; color:#fff; }
-.nav .spacer { flex:1; }
-.nav .user-badge { font-size:13px; padding:5px 12px; background:#334155; border-radius:20px; }
-.nav .logout { padding:6px 12px; background:#dc2626; color:#fff; border-radius:6px; font-size:13px; }
-
-/* ==== LAYOUT ==== */
-.container { max-width:1500px; margin:auto; padding:20px; }
-.card { background:#fff; border-radius:10px; padding:20px; box-shadow:0 1px 3px rgba(0,0,0,.08); margin-bottom:16px; }
-h2 { margin-top:0; font-size:19px; }
-h3 { font-size:16px; }
-
-/* ==== COMPONENTS ==== */
-button.primary { background:#2563eb; color:#fff; border-color:#2563eb; }
-button.danger { background:#dc2626; color:#fff; border-color:#dc2626; }
-button, input, select { font-family:inherit; font-size:14px; }
-button { padding:7px 14px; border-radius:6px; border:1px solid #cbd5e1; background:#fff; cursor:pointer; }
-button:hover { background:#f1f5f9; }
-button.primary:hover { background:#1d4ed8; }
-button.danger:hover { background:#b91c1c; }
-input, select { padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; }
-.filters { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:14px; }
-.filters label { font-size:13px; display:flex; gap:5px; align-items:center; }
-.msg { padding:10px 14px; border-radius:8px; margin:10px 0; font-size:14px; }
-.msg.err { background:#fee2e2; color:#dc2626; }
-.msg.ok { background:#dcfce7; color:#166534; }
-.msg.info { background:#dbeafe; color:#1e40af; }
-
-/* ==== TABLE ==== */
-table { border-collapse:collapse; width:100%; font-size:13px; }
-th, td { border:1px solid #e2e8f0; padding:6px 8px; text-align:left; }
-th { background:#f1f5f9; font-weight:600; }
-
-/* ==== REPORT ==== */
-.report-head { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #1e293b; padding-bottom:10px; margin-bottom:10px; gap:16px; }
-.report-title { text-align:center; flex:1; font-weight:600; font-size:16px; line-height:1.5; }
-.report-doc { font-size:12px; color:#475569; white-space:nowrap; }
-.report-wrap { overflow:auto; max-height:72vh; }
-.report-table { font-size:12px; table-layout:auto; }
-.report-table th, .report-table td { border:1px solid #94a3b8; padding:3px 6px; text-align:center; white-space:nowrap; }
-.report-table thead th { background:#e2e8f0; position:sticky; top:0; z-index:2; }
-.report-table .grade-col { background:#f1f5f9; font-weight:600; text-align:left; padding-left:10px; min-width:75px; position:sticky; left:0; z-index:1; }
-.report-table thead .grade-col { z-index:3; }
-.report-table td.empty { color:#cbd5e1; }
-.report-table td.clickable { cursor:pointer; background:#fffbeb; }
-.report-table td.clickable:hover { background:#fde68a; }
-.report-table .total-col { background:#e0e7ff; font-weight:600; }
-.report-table .total-row td { background:#cbd5e1; font-weight:700; }
-.report-table .total-row .total-col { background:#a5b4fc; }
-.report-foot { margin-top:10px; font-size:12px; color:#64748b; text-align:right; }
-
-/* ==== MODAL ==== */
-.modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.5); display:none; align-items:center; justify-content:center; z-index:100; padding:16px; }
-.modal-bg.show { display:flex; }
-.modal { background:#fff; border-radius:10px; padding:22px; max-width:1100px; width:100%; max-height:88vh; overflow:auto; }
-.modal h3 { margin:0 0 12px; }
-.modal-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:10px; }
-.form-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-.form-grid label { font-size:13px; display:block; color:#475569; font-weight:600; }
-.form-grid input, .form-grid select { display:block; width:100%; margin-top:4px; }
-.form-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:16px; }
-
-/* ==== DASHBOARD ==== */
-.dash-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:14px; }
-.kpi { background:linear-gradient(135deg,#2563eb,#1e40af); color:#fff; padding:18px; border-radius:10px; }
-.kpi.green { background:linear-gradient(135deg,#059669,#047857); }
-.kpi.amber { background:linear-gradient(135deg,#d97706,#b45309); }
-.kpi.purple { background:linear-gradient(135deg,#7c3aed,#5b21b6); }
-.kpi .label { font-size:13px; opacity:.9; }
-.kpi .value { font-size:28px; font-weight:700; margin-top:6px; }
-.chart-box { background:#fff; padding:16px; border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,.08); }
-.chart-box h3 { margin:0 0 12px; font-size:15px; }
-canvas { max-height:340px; }
-
-@media print {
-  .nav, .filters, button, .no-print { display:none !important; }
-  .card { box-shadow:none; padding:0; }
-  body { background:#fff; }
-  .container { padding:0; }
-  .report-wrap { max-height:none; overflow:visible; }
-}
-@media (max-width:640px) {
-  .form-grid { grid-template-columns:1fr; }
-  .nav { height:auto; padding:10px; }
-}
+*{box-sizing:border-box}
+body{margin:0;font-family:'Sarabun',sans-serif;background:#f5f6fa;color:#222}
+.hidden{display:none!important}
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1e293b,#334155)}
+.login-card{background:#fff;padding:40px 36px;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);width:380px;max-width:92vw}
+.login-card h1{margin:0 0 6px;font-size:22px;color:#1e293b}
+.login-card p{margin:0 0 24px;font-size:13px;color:#64748b}
+.login-card label{display:block;margin-bottom:14px;font-size:13px;color:#475569;font-weight:600}
+.login-card input{display:block;width:100%;margin-top:5px;padding:10px 12px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:15px;font-family:inherit}
+.login-card input:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.15)}
+.login-card button{width:100%;padding:11px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit}
+.login-card button:hover{background:#1d4ed8}
+.login-card button:disabled{background:#94a3b8;cursor:not-allowed}
+.login-msg{margin-top:14px;padding:10px;border-radius:8px;font-size:13px;text-align:center}
+.login-msg.err{background:#fee2e2;color:#dc2626}
+.login-msg.ok{background:#dcfce7;color:#166534}
+.nav{background:#1e293b;color:#fff;display:flex;gap:4px;align-items:center;height:56px;padding:0 20px;flex-wrap:wrap;position:sticky;top:0;z-index:50}
+.nav strong{margin-right:16px;font-size:15px}
+.nav button{color:#cbd5e1;background:none;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:14px;font-family:inherit}
+.nav button:hover{color:#fff;background:#334155}
+.nav button.active{background:#334155;color:#fff}
+.nav .spacer{flex:1}
+.nav .user-badge{font-size:13px;padding:5px 12px;background:#334155;border-radius:20px}
+.nav .logout{padding:6px 12px;background:#dc2626;color:#fff;border-radius:6px;font-size:13px}
+.container{max-width:1500px;margin:auto;padding:20px}
+.card{background:#fff;border-radius:10px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:16px}
+h2{margin-top:0;font-size:19px}
+h3{font-size:16px}
+button.primary{background:#2563eb;color:#fff;border-color:#2563eb}
+button.danger{background:#dc2626;color:#fff;border-color:#dc2626}
+button,input,select{font-family:inherit;font-size:14px}
+button{padding:7px 14px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;cursor:pointer}
+button:hover{background:#f1f5f9}
+button.primary:hover{background:#1d4ed8}
+button.danger:hover{background:#b91c1c}
+input,select{padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px}
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.filters label{font-size:13px;display:flex;gap:5px;align-items:center}
+.msg{padding:10px 14px;border-radius:8px;margin:10px 0;font-size:14px;line-height:1.6}
+.msg.err{background:#fee2e2;color:#dc2626}
+.msg.ok{background:#dcfce7;color:#166534}
+.msg.info{background:#dbeafe;color:#1e40af}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{border:1px solid #e2e8f0;padding:6px 8px;text-align:left}
+th{background:#f1f5f9;font-weight:600}
+.report-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1e293b;padding-bottom:10px;margin-bottom:10px;gap:16px}
+.report-title{text-align:center;flex:1;font-weight:600;font-size:16px;line-height:1.5}
+.report-doc{font-size:12px;color:#475569;white-space:nowrap}
+.report-wrap{overflow:auto;max-height:72vh}
+.report-table{font-size:12px;table-layout:auto}
+.report-table th,.report-table td{border:1px solid #94a3b8;padding:3px 6px;text-align:center;white-space:nowrap}
+.report-table thead th{background:#e2e8f0;position:sticky;top:0;z-index:2}
+.report-table .grade-col{background:#f1f5f9;font-weight:600;text-align:left;padding-left:10px;min-width:75px;position:sticky;left:0;z-index:1}
+.report-table thead .grade-col{z-index:3}
+.report-table td.empty{color:#cbd5e1}
+.report-table td.clickable{cursor:pointer;background:#fffbeb}
+.report-table td.clickable:hover{background:#fde68a}
+.report-table .total-col{background:#e0e7ff;font-weight:600}
+.report-table .total-row td{background:#cbd5e1;font-weight:700}
+.report-table .total-row .total-col{background:#a5b4fc}
+.report-foot{margin-top:10px;font-size:12px;color:#64748b;text-align:right}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:100;padding:16px}
+.modal-bg.show{display:flex}
+.modal{background:#fff;border-radius:10px;padding:22px;max-width:1100px;width:100%;max-height:88vh;overflow:auto}
+.modal h3{margin:0 0 12px}
+.modal-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-grid label{font-size:13px;display:block;color:#475569;font-weight:600}
+.form-grid input,.form-grid select{display:block;width:100%;margin-top:4px}
+.form-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+.dash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.kpi{background:linear-gradient(135deg,#2563eb,#1e40af);color:#fff;padding:18px;border-radius:10px}
+.kpi.green{background:linear-gradient(135deg,#059669,#047857)}
+.kpi.amber{background:linear-gradient(135deg,#d97706,#b45309)}
+.kpi.purple{background:linear-gradient(135deg,#7c3aed,#5b21b6)}
+.kpi .label{font-size:13px;opacity:.9}
+.kpi .value{font-size:28px;font-weight:700;margin-top:6px}
+.chart-box{background:#fff;padding:16px;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.chart-box h3{margin:0 0 12px;font-size:15px}
+canvas{max-height:340px}
+.hint{font-size:12px;color:#64748b;margin:4px 0 8px 0}
+.preview-box{max-height:400px;overflow:auto;border:1px solid #cbd5e1;border-radius:8px;margin:10px 0}
+@media print{.nav,.filters,button,.no-print{display:none!important}.card{box-shadow:none;padding:0}body{background:#fff}.container{padding:0}.report-wrap{max-height:none;overflow:visible}}
+@media (max-width:640px){.form-grid{grid-template-columns:1fr}.nav{height:auto;padding:10px}}
 </style>
 </head>
 <body>
 
-<!-- ================= LOGIN ================= -->
 <div id="loginScreen" class="login-wrap">
   <div class="login-card">
     <h1>📦 ระบบ Stock ม้วนกระดาษ</h1>
     <p>กรุณาเข้าสู่ระบบ</p>
-    <label>ชื่อผู้ใช้
-      <input id="loginUser" autocomplete="username" placeholder="เช่น Sukanya">
-    </label>
-    <label>รหัสผ่าน
-      <input id="loginPass" type="password" autocomplete="current-password" placeholder="••••••">
-    </label>
+    <label>ชื่อผู้ใช้<input id="loginUser" autocomplete="username" placeholder="เช่น sukanya"></label>
+    <label>รหัสผ่าน<input id="loginPass" type="password" autocomplete="current-password" placeholder="••••••"></label>
     <button id="loginBtn">เข้าสู่ระบบ</button>
     <div id="loginMsg" class="login-msg hidden"></div>
   </div>
 </div>
 
-<!-- ================= APP ================= -->
 <div id="app" class="hidden">
   <nav class="nav">
     <strong>📦 Stock ม้วนกระดาษ</strong>
@@ -154,7 +124,6 @@ canvas { max-height:340px; }
 
   <div class="container">
 
-    <!-- ========== MATRIX ========== -->
     <div id="tab-matrix">
       <div class="card">
         <div class="report-head">
@@ -162,7 +131,6 @@ canvas { max-height:340px; }
           <div class="report-title" id="reportTitle">ตารางควบคุมระดับ Stock ม้วนกระดาษปกติ<br>ประจำเดือน</div>
           <div class="report-doc">FQ-ษ6-06-04/4 rev.01</div>
         </div>
-
         <div class="filters no-print">
           <label>จาก <input type="date" id="qFrom"></label>
           <label>ถึง <input type="date" id="qTo"></label>
@@ -174,12 +142,10 @@ canvas { max-height:340px; }
           <button class="primary" onclick="renderMatrix()">ค้นหา</button>
           <button onclick="window.print()">🖨 พิมพ์</button>
         </div>
-
         <div id="matrixBody"></div>
       </div>
     </div>
 
-    <!-- ========== SUMMARY ========== -->
     <div id="tab-summary" class="hidden">
       <div class="card">
         <h2>Summary — จำนวนม้วนสูงสุดต่อ Item</h2>
@@ -194,7 +160,6 @@ canvas { max-height:340px; }
       </div>
     </div>
 
-    <!-- ========== DASHBOARD ========== -->
     <div id="tab-dashboard" class="hidden">
       <div class="card">
         <h2>Dashboard</h2>
@@ -203,37 +168,27 @@ canvas { max-height:340px; }
           <label>ถึง <input type="date" id="dTo"></label>
           <button class="primary" onclick="renderDashboard()">ค้นหา</button>
         </div>
-
         <div class="dash-grid" style="margin-bottom:16px">
           <div class="kpi"><div class="label">ม้วนรวมทั้งช่วง</div><div class="value" id="kpiRolls">-</div></div>
           <div class="kpi green"><div class="label">kg รวมทั้งช่วง</div><div class="value" id="kpiKgs">-</div></div>
           <div class="kpi amber"><div class="label">จำนวนรายการ</div><div class="value" id="kpiItems">-</div></div>
           <div class="kpi purple"><div class="label">จำนวนวัน</div><div class="value" id="kpiDays">-</div></div>
         </div>
-
         <div class="chart-box" style="margin-bottom:16px">
           <h3>📈 แนวโน้มการใช้รายเดือน (ม้วน)</h3>
           <canvas id="chartMonthly"></canvas>
         </div>
-
         <div class="dash-grid">
-          <div class="chart-box">
-            <h3>🏆 Top 10 Item ที่ใช้มากสุด (ม้วน)</h3>
-            <canvas id="chartTop"></canvas>
-          </div>
-          <div class="chart-box">
-            <h3>📊 เปรียบเทียบตาม Grade (ม้วน)</h3>
-            <canvas id="chartGrade"></canvas>
-          </div>
+          <div class="chart-box"><h3>🏆 Top 10 Item ที่ใช้มากสุด (ม้วน)</h3><canvas id="chartTop"></canvas></div>
+          <div class="chart-box"><h3>📊 เปรียบเทียบตาม Grade (ม้วน)</h3><canvas id="chartGrade"></canvas></div>
         </div>
       </div>
     </div>
 
-    <!-- ========== MASTER ========== -->
     <div id="tab-master" class="hidden">
       <div class="card">
         <h2>Master Data — Grade / Gram / Size</h2>
-        <p style="font-size:13px;color:#64748b">คีย์ไม่ซ้ำ: <b>grade + gram + size</b> — ถ้าซ้ำระบบจะแจ้งเตือน</p>
+        <p class="hint">คีย์ไม่ซ้ำ: <b>grade + gram + size</b> — ถ้าซ้ำระบบจะแจ้งเตือน</p>
         <div class="filters">
           <input id="masterSearch" placeholder="ค้นหา..." style="width:250px" oninput="renderMaster()">
           <button class="primary admin-only" onclick="openMasterForm()">+ เพิ่มรายการ</button>
@@ -244,34 +199,37 @@ canvas { max-height:340px; }
       </div>
     </div>
 
-    <!-- ========== IMPORT ========== -->
     <div id="tab-import" class="hidden">
       <div class="card">
         <h2>Import Excel</h2>
         <div id="importMsg"></div>
 
         <h3>1) Master Data</h3>
-        <p style="font-size:13px;color:#64748b">
-          คอลัมน์: <code>grade, gram, size, weight_mm_inc, item_code, std_weight_kg</code><br>
-          ซ้ำ → ระบบจะอัปเดตทับ
+        <p class="hint">
+          รองรับหัวคอลัมน์จากไฟล์ <code>ตารางน้ำหนัก.xlsx</code> ได้เลย:<br>
+          <code>เกรด, แกรม, ขนาด, รายการ, น้ำหนัก, Weight/mm/Inc.</code><br>
+          หรือภาษาอังกฤษ: <code>grade, gram, size, item_code, std_weight_kg, weight_mm_inc</code>
         </p>
         <input type="file" id="fileMaster" accept=".xlsx,.xls" onchange="importMaster(event)">
 
         <hr style="margin:24px 0">
 
         <h3>2) Usage Records</h3>
-        <p style="font-size:13px;color:#64748b">
-          คอลัมน์: <code>usage_date, item_code, used_kgs</code><br>
-          เสริม: <code>doc_no, job_no, remark</code>
+        <p class="hint">
+          รองรับหัวคอลัมน์:<br>
+          <code>วันที่</code> หรือ <code>usage_date</code>, 
+          <code>gradegram</code> (เช่น CA112), 
+          <code>width</code> (เช่น 54), 
+          <code>used_kgs</code>, 
+          <code>doc_no</code>, <code>roll_for_customer</code>
         </p>
         <input type="file" id="fileUsage" accept=".xlsx,.xls" onchange="importUsage(event)">
         <div style="margin-top:16px">
-          <button class="danger" onclick="clearUsage()">ลบ Usage ทั้งหมด</button>
+          <button class="danger admin-only" onclick="clearUsage()">ลบ Usage ทั้งหมด</button>
         </div>
       </div>
     </div>
 
-    <!-- ========== USERS ========== -->
     <div id="tab-users" class="hidden">
       <div class="card">
         <h2>จัดการผู้ใช้</h2>
@@ -287,7 +245,6 @@ canvas { max-height:340px; }
   </div>
 </div>
 
-<!-- ================= MODALS ================= -->
 <div class="modal-bg" id="modalMaster">
   <div class="modal" style="max-width:720px">
     <h3 id="masterFormTitle">เพิ่ม Master Data</h3>
@@ -334,19 +291,17 @@ canvas { max-height:340px; }
   </div>
 </div>
 
-<!-- ================= SCRIPT ================= -->
 <script>
 // ═══════════════════════════════════════════════
-//  ⚙️ ตั้งค่า — แก้ 3 ค่าตรงนี้
+//  ⚙️  แก้ 3 ค่าตรงนี้
 // ═══════════════════════════════════════════════
-const SUPABASE_URL      = 'https://gwwgycbqzdjlijsuxahx.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_rMoUE6tUsQZHnJu2ULDxFg_4NAiw6wg';
-const EDGE_FUNCTION_URL = 'https://gwwgycbqzdjlijsuxahx.supabase.co/functions/v1/admin-users';
+const SUPABASE_URL      = 'PASTE_YOUR_SUPABASE_URL_HERE';
+const SUPABASE_ANON_KEY = 'PASTE_YOUR_ANON_KEY_HERE';
+const EDGE_FUNCTION_URL = 'PASTE_YOUR_EDGE_FUNCTION_URL_HERE';
 // ═══════════════════════════════════════════════
 
 if (SUPABASE_URL.includes('PASTE_')) {
-  document.body.innerHTML = '<div style="padding:40px;font-family:sans-serif;color:#dc2626;background:#fee2e2;border-radius:8px;max-width:600px;margin:40px auto">' +
-    '<h2>⚠️ ยังไม่ได้ตั้งค่า</h2><p>กรุณาแก้ไข 3 ค่าด้านบนสุดของ &lt;script&gt; ในไฟล์ index.html</p></div>';
+  document.body.innerHTML = '<div style="padding:40px;font-family:sans-serif;color:#dc2626;background:#fee2e2;border-radius:8px;max-width:600px;margin:40px auto"><h2>⚠️ ยังไม่ได้ตั้งค่า</h2><p>กรุณาแก้ 3 ค่าด้านบนสุดของ script</p></div>';
   throw new Error('Config not set');
 }
 
@@ -358,13 +313,13 @@ let masterCache = [];
 
 // ================= HELPERS =================
 const $ = id => document.getElementById(id);
-const pad = n => String(n).padStart(2,'0');
-const fmt2 = v => (v == null || isNaN(v)) ? '-' : Number(v).toFixed(2);
+const pad = n => String(n).padStart(2, '0');
 const THAI_MONTHS = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
 
 function openModal(id) { $(id).classList.add('show'); }
 function closeModal(id) { $(id).classList.remove('show'); }
-function showMsg(elId, html, type='ok') { $(elId).innerHTML = `<div class="msg ${type}">${html}</div>`; }
+function showMsg(elId, html, type = 'ok') { $(elId).innerHTML = `<div class="msg ${type}">${html}</div>`; }
+const isAdmin = () => currentProfile?.role === 'admin';
 
 function currentMonthRange() {
   const d = new Date(), y = d.getFullYear(), m = d.getMonth();
@@ -377,6 +332,8 @@ function thaiPeriod(from, to) {
   if (fy === ty && fm === tm) return `เดือน ${THAI_MONTHS[fm-1]} ${fy + 543}`;
   return `${from} ถึง ${to}`;
 }
+
+// ✅ แปลงวันที่ — รองรับ Excel number, ISO, DD/MM/YYYY
 function toISODate(v) {
   if (v == null || v === '') return '';
   if (typeof v === 'number') {
@@ -384,24 +341,64 @@ function toISODate(v) {
     return d.toISOString().slice(0, 10);
   }
   if (v instanceof Date) {
-    const y = v.getFullYear();
-    const m = String(v.getMonth() + 1).padStart(2, '0');
-    const d = String(v.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
+    return `${v.getFullYear()}-${pad(v.getMonth()+1)}-${pad(v.getDate())}`;
   }
   const s = String(v).trim();
   if (!s) return '';
-  // DD/MM/YYYY (รูปแบบไทย)
-  let m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-  if (m) return `${m[3]}-${String(m[2]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`;
-  // YYYY-MM-DD
-  m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
-  if (m) return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+  let m = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/);
+  if (m) return `${m[3]}-${pad(m[2])}-${pad(m[1])}`;
+  m = s.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/);
+  if (m) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
   return s.slice(0, 10);
 }
-  return '';
+
+// หาค่าจากคอลัมน์ที่ยอมรับชื่อหลายแบบ
+function findColumn(row, aliases) {
+  const keys = Object.keys(row);
+  for (const alias of aliases) {
+    const lower = String(alias).toLowerCase().trim();
+    for (const k of keys) {
+      if (String(k).toLowerCase().trim() === lower) return row[k];
+    }
+  }
+  return undefined;
 }
-const isAdmin = () => currentProfile?.role === 'admin';
+
+// ================= COLUMN ALIASES =================
+const MASTER_COLS = {
+  grade:         ['grade', 'เกรด'],
+  gram:          ['gram', 'แกรม'],
+  size:          ['size', 'ขนาด'],
+  weight_mm_inc: ['weight_mm_inc', 'weight/mm/inc.', 'weight/mm/inc', 'weight_mm', 'weight/mm'],
+  item_code:     ['item_code', 'item', 'รายการ'],
+  std_weight_kg: ['std_weight_kg', 'std_weight', 'น้ำหนัก', 'weight_kg', 'weight']
+};
+
+const USAGE_COLS = {
+  usage_date:        ['usage_date', 'date', 'วันที่', 'วันที'],
+  gradegram:         ['gradegram', 'grade_gram', 'grade', 'เกรดแกรม', 'เกรด'],
+  width:             ['width', 'size', 'ขนาด', 'width_mm'],
+  used_kgs:          ['used_kgs', 'used_kg', 'used', 'ใช้ไป', 'ใช้(kg)'],
+  doc_no:            ['doc_no', 'doc'],
+  job_no:            ['job_no', 'job'],
+  remark:            ['remark', 'หมายเหตุ', 'note'],
+  roll_for_customer: ['roll_for_customer', 'customer', 'ลูกค้า']
+};
+
+// สร้าง item_code จาก gradegram + width
+function buildItemCode(gradegram, width) {
+  const gg = String(gradegram).trim();
+  const w  = String(width).trim();
+  const direct = `${gg}-${w}`;
+  if (masterCache.find(m => m.item_code === direct)) return direct;
+  const m = gg.match(/^([A-Za-z]+)(\d+)$/);
+  if (m) {
+    const padded = m[1] + m[2].padStart(3, '0');
+    const code = `${padded}-${w}`;
+    if (masterCache.find(x => x.item_code === code)) return code;
+  }
+  return direct;
+}
 
 // ================= AUTH =================
 async function initSession() {
@@ -414,26 +411,16 @@ async function initSession() {
     showLogin();
   }
 }
-
 async function loadProfile() {
-  const { data, error } = await supabase
-    .from('profiles').select('*').eq('id', currentUser.id).single();
-  if (error) { console.error(error); currentProfile = { role: 'user', full_name: currentUser.email }; return; }
-  currentProfile = data;
+  const { data } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
+  currentProfile = data || { role: 'user', full_name: currentUser.email };
 }
-
-function showLogin() {
-  $('loginScreen').classList.remove('hidden');
-  $('app').classList.add('hidden');
-}
+function showLogin() { $('loginScreen').classList.remove('hidden'); $('app').classList.add('hidden'); }
 function showApp() {
   $('loginScreen').classList.add('hidden');
   $('app').classList.remove('hidden');
-  const badge = (currentProfile?.full_name || currentUser.email) + ' · ' + (isAdmin() ? 'Admin' : 'User');
-  $('userBadge').textContent = badge;
-  document.querySelectorAll('.admin-only').forEach(el => {
-    el.classList.toggle('hidden', !isAdmin());
-  });
+  $('userBadge').textContent = (currentProfile?.full_name || currentUser.email) + ' · ' + (isAdmin() ? 'Admin' : 'User');
+  document.querySelectorAll('.admin-only').forEach(el => el.classList.toggle('hidden', !isAdmin()));
   refreshAll();
 }
 
@@ -442,40 +429,22 @@ $('loginBtn').onclick = async () => {
   const password = $('loginPass').value;
   const msg = $('loginMsg');
   msg.className = 'login-msg hidden';
-
-  if (!username || !password) {
-    msg.className = 'login-msg err';
-    msg.textContent = 'กรอกชื่อผู้ใช้และรหัสผ่าน';
-    return;
-  }
-  $('loginBtn').disabled = true;
-  $('loginBtn').textContent = 'กำลังเข้าสู่ระบบ...';
-
-  const email = username + '@paper.local';
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
-  $('loginBtn').disabled = false;
-  $('loginBtn').textContent = 'เข้าสู่ระบบ';
-
-  if (error) {
-    msg.className = 'login-msg err';
-    msg.textContent = 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
-    return;
-  }
+  if (!username || !password) { msg.className='login-msg err'; msg.textContent='กรอกชื่อผู้ใช้และรหัสผ่าน'; return; }
+  $('loginBtn').disabled = true; $('loginBtn').textContent = 'กำลังเข้าสู่ระบบ...';
+  const { data, error } = await supabase.auth.signInWithPassword({ email: username + '@paper.local', password });
+  $('loginBtn').disabled = false; $('loginBtn').textContent = 'เข้าสู่ระบบ';
+  if (error) { msg.className='login-msg err'; msg.textContent='ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'; return; }
   currentUser = data.user;
   await loadProfile();
   $('loginPass').value = '';
   showApp();
 };
-
 $('loginPass').addEventListener('keypress', e => { if (e.key === 'Enter') $('loginBtn').click(); });
 $('loginUser').addEventListener('keypress', e => { if (e.key === 'Enter') $('loginPass').focus(); });
-
 $('logoutBtn').onclick = async () => {
   if (!confirm('ออกจากระบบ?')) return;
   await supabase.auth.signOut();
-  currentUser = null; currentProfile = null;
-  showLogin();
+  currentUser = null; currentProfile = null; showLogin();
 };
 
 // ================= TABS =================
@@ -495,14 +464,13 @@ document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
   };
 });
 
-// ================= DATA LOADING =================
+// ================= DATA =================
 async function loadMaster() {
   const { data, error } = await supabase.from('paper_specs').select('*').order('grade').order('gram').order('size');
   if (error) { console.error(error); return []; }
   masterCache = data || [];
   return masterCache;
 }
-
 async function loadUsage(filters) {
   let q = supabase.from('usage_records').select('*');
   if (filters.from) q = q.gte('usage_date', filters.from);
@@ -510,7 +478,6 @@ async function loadUsage(filters) {
   const { data, error } = await q;
   if (error) { console.error(error); return []; }
   let rows = data || [];
-
   if (filters.grade || filters.gram) {
     const mByCode = {}; masterCache.forEach(m => mByCode[m.item_code] = m);
     rows = rows.filter(u => {
@@ -522,16 +489,14 @@ async function loadUsage(filters) {
   }
   return rows;
 }
-
 async function refreshAll() {
   await loadMaster();
   populateFilterDropdowns();
   renderMatrix();
 }
-
 function populateFilterDropdowns() {
   const grades = [...new Set(masterCache.map(r => r.grade))].sort();
-  const grams = [...new Set(masterCache.map(r => r.gram))].sort((a,b)=>a-b);
+  const grams  = [...new Set(masterCache.map(r => r.gram))].sort((a,b)=>a-b);
   ['qGrade','sGrade'].forEach(id => {
     const el = $(id); const v = el.value;
     el.innerHTML = '<option value="">ทั้งหมด</option>' + grades.map(g => `<option>${g}</option>`).join('');
@@ -559,12 +524,12 @@ async function renderMatrix() {
 
   const perItem = {};
   Object.entries(daily).forEach(([k, kg]) => {
-    const item_code = k.split('|')[0];
-    const m = mByCode[item_code]; if (!m) return;
+    const code = k.split('|')[0];
+    const m = mByCode[code]; if (!m) return;
     const rolls = kg / Number(m.std_weight_kg);
-    if (!perItem[item_code]) perItem[item_code] = { total: 0, max: 0 };
-    perItem[item_code].total += rolls;
-    if (rolls > perItem[item_code].max) perItem[item_code].max = rolls;
+    if (!perItem[code]) perItem[code] = { total: 0, max: 0 };
+    perItem[code].total += rolls;
+    if (rolls > perItem[code].max) perItem[code].max = rolls;
   });
 
   const rowSet = new Map(), colSet = new Set(), cells = {}, rowTotals = {}, colTotals = {};
@@ -593,8 +558,7 @@ async function renderMatrix() {
     return;
   }
 
-  let html = '<div class="report-wrap"><table class="report-table"><thead><tr>';
-  html += '<th class="grade-col">grade</th>';
+  let html = '<div class="report-wrap"><table class="report-table"><thead><tr><th class="grade-col">grade</th>';
   colKeys.forEach(s => html += `<th>${s}</th>`);
   html += '<th class="total-col">Total</th></tr></thead><tbody>';
 
@@ -609,13 +573,10 @@ async function renderMatrix() {
     });
     html += `<td class="total-col">${Number(rowTotals[rk]).toFixed(2)}</td></tr>`;
   });
-
   html += '<tr class="total-row"><td class="grade-col">Total</td>';
   colKeys.forEach(s => html += `<td>${Number(colTotals[s] || 0).toFixed(2)}</td>`);
-  html += `<td class="total-col">${Number(grand).toFixed(2)}</td></tr>`;
-  html += '</tbody></table></div>';
+  html += `<td class="total-col">${Number(grand).toFixed(2)}</td></tr></tbody></table></div>`;
   html += '<div class="report-foot">แสดงเป็นจำนวนม้วน · ทศนิยม 2 ตำแหน่ง · อิง std_weight_kg จาก Master</div>';
-
   $('matrixBody').innerHTML = html;
 }
 
@@ -628,15 +589,14 @@ async function openDrill(grade, gram, size) {
   const q = { from: $('qFrom').value, to: $('qTo').value };
   const usage = await loadUsage(q);
   const filtered = usage.filter(u => u.item_code === m.item_code);
-
   const byDate = {};
   filtered.forEach(u => {
     if (!byDate[u.usage_date]) byDate[u.usage_date] = { kg: 0, records: [] };
     byDate[u.usage_date].kg += Number(u.used_kgs);
     byDate[u.usage_date].records.push(u);
   });
-
   const dates = Object.keys(byDate).sort();
+
   let html = '<table><thead><tr><th>วันที่</th><th>kg รวม</th><th>Std Weight</th><th>จำนวนม้วน</th><th>รายการ</th><th></th></tr></thead><tbody>';
   if (!dates.length) html += '<tr><td colspan="6" style="text-align:center;color:#94a3b8">ไม่มีข้อมูล</td></tr>';
   dates.forEach(d => {
@@ -667,16 +627,15 @@ async function renderSummary() {
     const key = u.item_code + '|' + u.usage_date;
     daily[key] = (daily[key] || 0) + Number(u.used_kgs);
   });
-
   const perItem = {};
   Object.entries(daily).forEach(([k, kg]) => {
-    const [item_code, date] = k.split('|');
-    const m = mByCode[item_code]; if (!m) return;
+    const [code, date] = k.split('|');
+    const m = mByCode[code]; if (!m) return;
     const rolls = kg / Number(m.std_weight_kg);
-    if (!perItem[item_code]) perItem[item_code] = { total: 0, max: 0, maxDate: '', maxKg: 0, days: new Set() };
-    perItem[item_code].total += rolls;
-    perItem[item_code].days.add(date);
-    if (rolls > perItem[item_code].max) { perItem[item_code].max = rolls; perItem[item_code].maxDate = date; perItem[item_code].maxKg = kg; }
+    if (!perItem[code]) perItem[code] = { total: 0, max: 0, maxDate: '', maxKg: 0, days: new Set() };
+    perItem[code].total += rolls;
+    perItem[code].days.add(date);
+    if (rolls > perItem[code].max) { perItem[code].max = rolls; perItem[code].maxDate = date; perItem[code].maxKg = kg; }
   });
 
   const rows = Object.entries(perItem).map(([code, v]) => ({ ...mByCode[code], ...v }))
@@ -694,10 +653,9 @@ async function renderSummary() {
   $('summaryBody').innerHTML = html;
   window._lastSummary = rows;
 }
-
 function exportSummary() {
   const rows = window._lastSummary || [];
-  if (!rows.length) return alert('ไม่มีข้อมูลให้ export');
+  if (!rows.length) return alert('ไม่มีข้อมูล');
   const data = rows.map(r => ({
     Grade: r.grade, Gram: r.gram, Size: r.size, 'Item Code': r.item_code,
     'Std Weight': Number(r.std_weight_kg).toFixed(2),
@@ -727,7 +685,6 @@ function renderMaster() {
   html += '</tbody></table></div>';
   $('masterBody').innerHTML = html;
 }
-
 let editingMasterId = null;
 function openMasterForm(row) {
   editingMasterId = row ? row.id : null;
@@ -750,45 +707,30 @@ async function saveMaster() {
   const weight_mm_inc = $('fWMI').value ? Number($('fWMI').value) : null;
   const item_code = $('fItem').value.trim();
   const std_weight_kg = Number($('fWeight').value);
-
   if (!grade || !gram || !size || !item_code || !std_weight_kg) {
-    $('masterFormError').innerHTML = '<div class="msg err">กรอกให้ครบ (std_weight ต้อง > 0)</div>';
-    return;
+    $('masterFormError').innerHTML = '<div class="msg err">กรอกให้ครบ (std_weight ต้อง > 0)</div>'; return;
   }
   const dup = masterCache.find(r => r.grade === grade && r.gram === gram && r.size === size && r.id !== editingMasterId);
-  if (dup) {
-    $('masterFormError').innerHTML = `<div class="msg err">⚠ ซ้ำกับ <b>${dup.item_code}</b> (${dup.std_weight_kg} kg)</div>`;
-    return;
-  }
-
+  if (dup) { $('masterFormError').innerHTML = `<div class="msg err">⚠ ซ้ำกับ ${dup.item_code} (${dup.std_weight_kg} kg)</div>`; return; }
   const payload = { grade, gram, size, weight_mm_inc, item_code, std_weight_kg };
   let error;
-  if (editingMasterId) {
-    ({ error } = await supabase.from('paper_specs').update(payload).eq('id', editingMasterId));
-  } else {
-    ({ error } = await supabase.from('paper_specs').insert(payload));
-  }
+  if (editingMasterId) ({ error } = await supabase.from('paper_specs').update(payload).eq('id', editingMasterId));
+  else ({ error } = await supabase.from('paper_specs').insert(payload));
   if (error) { $('masterFormError').innerHTML = `<div class="msg err">${error.message}</div>`; return; }
   closeModal('modalMaster');
-  await loadMaster();
-  populateFilterDropdowns();
-  renderMaster();
+  await loadMaster(); populateFilterDropdowns(); renderMaster();
 }
-
 async function delMaster(id) {
   if (!confirm('ยืนยันลบ?')) return;
   const { error } = await supabase.from('paper_specs').delete().eq('id', id);
   if (error) return alert(error.message);
-  await loadMaster();
-  renderMaster();
+  await loadMaster(); renderMaster();
 }
 async function clearMaster() {
   if (!confirm('ลบ Master Data ทั้งหมด?')) return;
   const { error } = await supabase.from('paper_specs').delete().neq('id', 0);
   if (error) return alert(error.message);
-  await loadMaster();
-  populateFilterDropdowns();
-  renderMaster();
+  await loadMaster(); populateFilterDropdowns(); renderMaster();
 }
 function exportMaster() {
   if (!masterCache.length) return alert('ไม่มีข้อมูล');
@@ -803,58 +745,6 @@ function exportMaster() {
 }
 
 // ================= IMPORT =================
-
-// Helper: หาค่าจากคอลัมน์ที่ยอมรับชื่อหลายแบบ
-function findColumn(row, aliases) {
-  const keys = Object.keys(row);
-  for (const alias of aliases) {
-    const lower = String(alias).toLowerCase().trim();
-    for (const k of keys) {
-      if (String(k).toLowerCase().trim() === lower) return row[k];
-    }
-  }
-  return undefined;
-}
-
-// ชื่อคอลัมน์ที่ยอมรับ — Master
-const MASTER_COLS = {
-  grade:         ['grade', 'เกรด'],
-  gram:          ['gram', 'แกรม'],
-  size:          ['size', 'ขนาด'],
-  weight_mm_inc: ['weight_mm_inc', 'weight/mm/inc.', 'weight/mm/inc', 'weight_mm'],
-  item_code:     ['item_code', 'item', 'รายการ'],
-  std_weight_kg: ['std_weight_kg', 'std_weight', 'น้ำหนัก', 'weight_kg', 'weight']
-};
-
-// ชื่อคอลัมน์ที่ยอมรับ — Usage
-const USAGE_COLS = {
-  usage_date:        ['usage_date', 'date', 'วันที่', 'วันที'],
-  gradegram:         ['gradegram', 'grade_gram', 'grade', 'เกรดแกรม', 'เกรด'],
-  width:             ['width', 'size', 'ขนาด', 'width_mm'],
-  used_kgs:          ['used_kgs', 'used_kg', 'used', 'ใช้ไป', 'ใช้ (kg)'],
-  doc_no:            ['doc_no', 'doc'],
-  job_no:            ['job_no', 'job'],
-  remark:            ['remark', 'หมายเหตุ', 'note'],
-  roll_for_customer: ['roll_for_customer', 'customer', 'ลูกค้า']
-};
-
-// สร้าง item_code จาก gradegram + width
-function buildItemCode(gradegram, width) {
-  const gg = String(gradegram).trim();
-  const w = String(width).trim();
-  const direct = `${gg}-${w}`;
-  if (masterCache.find(m => m.item_code === direct)) return direct;
-  // เผื่อ gram 2 หลักต้องเติม 0 เช่น CA97 → CA097
-  const m = gg.match(/^([A-Za-z]+)(\d+)$/);
-  if (m) {
-    const padded = m[1] + m[2].padStart(3, '0');
-    const code = `${padded}-${w}`;
-    if (masterCache.find(x => x.item_code === code)) return code;
-  }
-  return direct;
-}
-
-// -------- Import Master --------
 function importMaster(ev) {
   const f = ev.target.files[0]; if (!f) return;
   const r = new FileReader();
@@ -872,37 +762,28 @@ function importMaster(ev) {
         const weight_mm_inc = wmiRaw ? Number(wmiRaw) : null;
         const item_code = String(findColumn(row, MASTER_COLS.item_code) || '').trim();
         const std_weight_kg = Number(findColumn(row, MASTER_COLS.std_weight_kg));
-
         if (!grade || !gram || !size || !item_code || !std_weight_kg) {
-          err++; errors.push(`แถว ${add+upd+err}: ข้อมูลไม่ครบ`);
-          continue;
+          err++; errors.push(`ข้ามแถว: ${item_code||'(ว่าง)'} — ข้อมูลไม่ครบ`); continue;
         }
         const existing = masterCache.find(x => x.grade === grade && x.gram === gram && x.size === size);
         if (existing) {
-          const { error } = await supabase.from('paper_specs')
-            .update({ weight_mm_inc, item_code, std_weight_kg }).eq('id', existing.id);
-          if (error) { err++; errors.push(`แถว ${item_code}: ${error.message}`); } else upd++;
+          const { error } = await supabase.from('paper_specs').update({ weight_mm_inc, item_code, std_weight_kg }).eq('id', existing.id);
+          if (error) { err++; errors.push(`${item_code}: ${error.message}`); } else upd++;
         } else {
-          const { error } = await supabase.from('paper_specs')
-            .insert({ grade, gram, size, weight_mm_inc, item_code, std_weight_kg });
-          if (error) { err++; errors.push(`แถว ${item_code}: ${error.message}`); } else add++;
+          const { error } = await supabase.from('paper_specs').insert({ grade, gram, size, weight_mm_inc, item_code, std_weight_kg });
+          if (error) { err++; errors.push(`${item_code}: ${error.message}`); } else add++;
         }
       }
-      let html = `✅ Master: เพิ่ม ${add} · อัปเดต ${upd}`;
-      if (err) html += ` · ⚠ ผิดพลาด ${err}`;
+      let html = `✅ Master: เพิ่ม ${add} · อัปเดต ${upd}` + (err ? ` · ⚠ ผิดพลาด ${err}` : '');
+      if (errors.length) html += '<br><br>ตัวอย่าง:<br>' + errors.slice(0, 8).join('<br>');
       showMsg('importMsg', html, err ? 'err' : 'ok');
-      if (errors.length) {
-        showMsg('importMsg', html + '<br><br>ตัวอย่าง error:<br>' + errors.slice(0, 5).join('<br>'), 'err');
-      }
-      await loadMaster();
-      populateFilterDropdowns();
+      await loadMaster(); populateFilterDropdowns();
     } catch (ex) { showMsg('importMsg', 'อ่านไฟล์ไม่สำเร็จ: ' + ex.message, 'err'); }
   };
   r.readAsArrayBuffer(f);
   ev.target.value = '';
 }
 
-// -------- Import Usage --------
 function importUsage(ev) {
   const f = ev.target.files[0]; if (!f) return;
   const r = new FileReader();
@@ -910,34 +791,28 @@ function importUsage(ev) {
     try {
       const wb = XLSX.read(e.target.result, { type: 'array' });
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-
       const payload = [];
       const errors = [];
       const notFound = new Set();
 
       rows.forEach((row, i) => {
         const rowNo = i + 2;
-        const dateRaw = findColumn(row, USAGE_COLS.usage_date);
-        const usage_date = toISODate(dateRaw);
+        const usage_date = toISODate(findColumn(row, USAGE_COLS.usage_date));
         const gradegram = String(findColumn(row, USAGE_COLS.gradegram) || '').trim();
         const width = Number(findColumn(row, USAGE_COLS.width));
         const used_kgs = Number(findColumn(row, USAGE_COLS.used_kgs));
 
         if (!usage_date || !gradegram || !width || !used_kgs) {
-          errors.push(`แถว ${rowNo}: ข้อมูลไม่ครบ (date=${usage_date||'-'}, gradegram=${gradegram||'-'}, width=${width||'-'}, used=${used_kgs||'-'})`);
-          return;
+          errors.push(`แถว ${rowNo}: ข้อมูลไม่ครบ`); return;
         }
         const item_code = buildItemCode(gradegram, width);
-        const exists = masterCache.find(x => x.item_code === item_code);
-        if (!exists) {
+        if (!masterCache.find(x => x.item_code === item_code)) {
           notFound.add(item_code);
           errors.push(`แถว ${rowNo}: ไม่พบ ${item_code} ใน Master`);
           return;
         }
         payload.push({
-          usage_date,
-          item_code,
-          used_kgs,
+          usage_date, item_code, used_kgs,
           doc_no: findColumn(row, USAGE_COLS.doc_no) || null,
           job_no: findColumn(row, USAGE_COLS.job_no) || null,
           remark: findColumn(row, USAGE_COLS.remark) || null,
@@ -948,37 +823,30 @@ function importUsage(ev) {
 
       if (!payload.length) {
         let m = `⚠ ไม่มีแถวที่บันทึกได้ (ทั้งหมด ${rows.length} แถว)`;
-        if (notFound.size) m += `<br>ไม่พบใน Master: ${[...notFound].slice(0, 15).join(', ')}${notFound.size > 15 ? ' ...' : ''}`;
-        if (errors.length) m += '<br><br>ตัวอย่าง error:<br>' + errors.slice(0, 5).join('<br>');
-        showMsg('importMsg', m, 'err');
-        return;
+        if (notFound.size) m += `<br>ไม่พบใน Master: ${[...notFound].slice(0, 20).join(', ')}${notFound.size > 20 ? ' ...' : ''}`;
+        if (errors.length) m += '<br><br>' + errors.slice(0, 8).join('<br>');
+        showMsg('importMsg', m, 'err'); return;
       }
 
-      // insert เป็นชุดละ 500
       let inserted = 0;
       const batchSize = 500;
       for (let i = 0; i < payload.length; i += batchSize) {
-        const batch = payload.slice(i, i + batchSize);
-        const { error } = await supabase.from('usage_records').insert(batch);
+        const { error } = await supabase.from('usage_records').insert(payload.slice(i, i + batchSize));
         if (error) { showMsg('importMsg', 'บันทึกไม่สำเร็จ: ' + error.message, 'err'); return; }
-        inserted += batch.length;
+        inserted += Math.min(batchSize, payload.length - i);
       }
 
       let html = `✅ Usage: เพิ่ม ${inserted} แถว (จากทั้งหมด ${rows.length})`;
       if (errors.length) html += ` · ⚠ ข้าม ${errors.length} แถว`;
+      if (notFound.size) html += `<br><br>ไม่พบใน Master: ${[...notFound].slice(0, 20).join(', ')}${notFound.size > 20 ? ' ...' : ''}`;
+      else if (errors.length <= 5) html += '<br>' + errors.join('<br>');
       showMsg('importMsg', html, errors.length ? 'err' : 'ok');
-      if (notFound.size) {
-        showMsg('importMsg', html + `<br><br>ไม่พบใน Master: ${[...notFound].slice(0, 20).join(', ')}${notFound.size > 20 ? ' ...' : ''}`, 'err');
-      } else if (errors.length && errors.length <= 5) {
-        showMsg('importMsg', html + '<br>' + errors.join('<br>'), 'err');
-      }
     } catch (ex) { showMsg('importMsg', 'อ่านไฟล์ไม่สำเร็จ: ' + ex.message, 'err'); }
   };
   r.readAsArrayBuffer(f);
   ev.target.value = '';
 }
 
-// -------- Clear Usage --------
 async function clearUsage() {
   if (!confirm('ลบ Usage ทั้งหมด? (ต้องเป็น admin)')) return;
   const { error } = await supabase.from('usage_records').delete().neq('id', 0);
@@ -986,7 +854,7 @@ async function clearUsage() {
   showMsg('importMsg', 'ลบ Usage ทั้งหมดแล้ว', 'ok');
 }
 
-// ================= USERS (via Edge Function) =================
+// ================= USERS =================
 async function callAdmin(action, payload = {}) {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('ไม่ได้ login');
@@ -1008,14 +876,10 @@ async function loadUsers() {
     let html = '<table><thead><tr><th>#</th><th>ชื่อผู้ใช้</th><th>ชื่อ-นามสกุล</th><th>สิทธิ์</th><th>เข้าใช้ล่าสุด</th><th></th></tr></thead><tbody>';
     users.forEach((u, i) => {
       const last = u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString('th-TH') : '-';
-      html += `<tr>
-        <td>${i+1}</td>
-        <td><b>${u.username}</b></td>
-        <td>${u.full_name || '-'}</td>
+      html += `<tr><td>${i+1}</td><td><b>${u.username}</b></td><td>${u.full_name || '-'}</td>
         <td><span style="padding:2px 8px;border-radius:10px;font-size:12px;background:${u.role==='admin'?'#dbeafe':'#e0e7ff'};color:${u.role==='admin'?'#1e40af':'#3730a3'}">${u.role}</span></td>
         <td>${last}</td>
-        <td>
-          <button onclick='openChangeRole(${JSON.stringify(u)})'>เปลี่ยน Role</button>
+        <td><button onclick='openChangeRole(${JSON.stringify(u)})'>เปลี่ยน Role</button>
           <button onclick='openResetPass(${JSON.stringify(u)})'>Reset รหัส</button>
           ${u.id !== currentUser.id ? `<button class="danger" onclick="delUser('${u.id}','${u.username}')">ลบ</button>` : ''}
         </td></tr>`;
@@ -1027,11 +891,7 @@ async function loadUsers() {
     $('usersBody').innerHTML = '';
   }
 }
-
-let editingUserId = null;
 function openUserForm() {
-  editingUserId = null;
-  $('userFormTitle').textContent = 'เพิ่มผู้ใช้ใหม่';
   ['uName','uFullName','uPassword'].forEach(k => $(k).value = '');
   $('uRole').value = 'user';
   $('userFormError').innerHTML = '';
@@ -1047,28 +907,23 @@ async function saveUser() {
     closeModal('modalUser');
     showMsg('usersMsg', `✅ สร้างผู้ใช้ ${username} สำเร็จ`, 'ok');
     loadUsers();
-  } catch (e) {
-    $('userFormError').innerHTML = `<div class="msg err">${e.message}</div>`;
-  }
+  } catch (e) { $('userFormError').innerHTML = `<div class="msg err">${e.message}</div>`; }
 }
-
 function openChangeRole(u) {
   const newRole = prompt(`เปลี่ยน role ของ "${u.username}" เป็น (admin/user):`, u.role);
   if (!newRole || !['admin','user'].includes(newRole)) return;
   const newName = prompt('ชื่อ-นามสกุล:', u.full_name || u.username) || u.full_name;
   callAdmin('updateRole', { id: u.id, role: newRole, full_name: newName })
-    .then(() => { showMsg('usersMsg', `✅ เปลี่ยน role ของ ${u.username} เป็น ${newRole}`, 'ok'); loadUsers(); })
+    .then(() => { showMsg('usersMsg', `✅ เปลี่ยน role เป็น ${newRole}`, 'ok'); loadUsers(); })
     .catch(e => showMsg('usersMsg', 'ผิดพลาด: ' + e.message, 'err'));
 }
-
 function openResetPass(u) {
   const newPass = prompt(`รหัสผ่านใหม่สำหรับ "${u.username}" (อย่างน้อย 6 ตัว):`);
   if (!newPass || newPass.length < 6) return;
   callAdmin('resetPassword', { id: u.id, password: newPass })
-    .then(() => showMsg('usersMsg', `✅ เปลี่ยนรหัสผ่านของ ${u.username} แล้ว`, 'ok'))
+    .then(() => showMsg('usersMsg', `✅ เปลี่ยนรหัสของ ${u.username} แล้ว`, 'ok'))
     .catch(e => showMsg('usersMsg', 'ผิดพลาด: ' + e.message, 'err'));
 }
-
 async function delUser(id, username) {
   if (!confirm(`ลบผู้ใช้ "${username}" ถาวร?`)) return;
   try {
@@ -1101,9 +956,8 @@ async function renderDashboard() {
   const monthly = {};
   usage.forEach(u => {
     const m = mByCode[u.item_code]; if (!m) return;
-    const month = u.usage_date.slice(0,7);
-    const rolls = Number(u.used_kgs) / Number(m.std_weight_kg);
-    monthly[month] = (monthly[month] || 0) + rolls;
+    const month = u.usage_date.slice(0, 7);
+    monthly[month] = (monthly[month] || 0) + Number(u.used_kgs) / Number(m.std_weight_kg);
   });
   const monthKeys = Object.keys(monthly).sort();
   const monthLabels = monthKeys.map(k => {
@@ -1114,16 +968,14 @@ async function renderDashboard() {
   const itemRolls = {};
   usage.forEach(u => {
     const m = mByCode[u.item_code]; if (!m) return;
-    const rolls = Number(u.used_kgs) / Number(m.std_weight_kg);
-    itemRolls[u.item_code] = (itemRolls[u.item_code] || 0) + rolls;
+    itemRolls[u.item_code] = (itemRolls[u.item_code] || 0) + Number(u.used_kgs) / Number(m.std_weight_kg);
   });
-  const top10 = Object.entries(itemRolls).sort((a,b) => b[1] - a[1]).slice(0,10);
+  const top10 = Object.entries(itemRolls).sort((a,b) => b[1] - a[1]).slice(0, 10);
 
   const gradeRolls = {};
   usage.forEach(u => {
     const m = mByCode[u.item_code]; if (!m) return;
-    const rolls = Number(u.used_kgs) / Number(m.std_weight_kg);
-    gradeRolls[m.grade] = (gradeRolls[m.grade] || 0) + rolls;
+    gradeRolls[m.grade] = (gradeRolls[m.grade] || 0) + Number(u.used_kgs) / Number(m.std_weight_kg);
   });
   const gradeLabels = Object.keys(gradeRolls).sort();
   const gradeData = gradeLabels.map(g => gradeRolls[g]);
@@ -1132,39 +984,19 @@ async function renderDashboard() {
 
   charts.monthly = new Chart($('chartMonthly'), {
     type: 'line',
-    data: {
-      labels: monthLabels,
-      datasets: [{
-        label: 'ม้วน',
-        data: monthKeys.map(k => monthly[k]),
-        borderColor: '#2563eb',
-        backgroundColor: 'rgba(37,99,235,.1)',
-        fill: true,
-        tension: 0.3,
-        pointRadius: 5,
-        pointBackgroundColor: '#2563eb'
-      }]
-    },
-    options: { responsive: true, plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true } } }
+    data: { labels: monthLabels, datasets: [{ label: 'ม้วน', data: monthKeys.map(k => monthly[k]),
+      borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,.1)', fill: true, tension: 0.3,
+      pointRadius: 5, pointBackgroundColor: '#2563eb' }] },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
   });
-
   charts.top = new Chart($('chartTop'), {
     type: 'bar',
-    data: {
-      labels: top10.map(t => t[0]),
-      datasets: [{ label: 'ม้วน', data: top10.map(t => t[1]), backgroundColor: '#059669' }]
-    },
-    options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } },
-      scales: { x: { beginAtZero: true } } }
+    data: { labels: top10.map(t => t[0]), datasets: [{ label: 'ม้วน', data: top10.map(t => t[1]), backgroundColor: '#059669' }] },
+    options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } } }
   });
-
   charts.grade = new Chart($('chartGrade'), {
     type: 'doughnut',
-    data: {
-      labels: gradeLabels,
-      datasets: [{ data: gradeData, backgroundColor: ['#2563eb','#059669','#d97706','#7c3aed','#dc2626','#0891b2','#65a30d'] }]
-    },
+    data: { labels: gradeLabels, datasets: [{ data: gradeData, backgroundColor: ['#2563eb','#059669','#d97706','#7c3aed','#dc2626','#0891b2','#65a30d'] }] },
     options: { responsive: true }
   });
 }
@@ -1174,11 +1006,9 @@ async function renderDashboard() {
   const r = currentMonthRange();
   ['qFrom','sFrom','dFrom'].forEach(id => { if ($(id)) $(id).value = r.from; });
   ['qTo','sTo','dTo'].forEach(id => { if ($(id)) $(id).value = r.to; });
-
   document.querySelectorAll('.modal-bg').forEach(el => {
     el.onclick = e => { if (e.target === el) el.classList.remove('show'); };
   });
-
   initSession();
 })();
 </script>
