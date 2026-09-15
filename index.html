@@ -790,6 +790,58 @@ function exportMaster() {
 }
 
 // ================= IMPORT =================
+
+// Helper: หาค่าจากคอลัมน์ที่ยอมรับชื่อหลายแบบ
+function findColumn(row, aliases) {
+  const keys = Object.keys(row);
+  for (const alias of aliases) {
+    const lower = String(alias).toLowerCase().trim();
+    for (const k of keys) {
+      if (String(k).toLowerCase().trim() === lower) return row[k];
+    }
+  }
+  return undefined;
+}
+
+// ชื่อคอลัมน์ที่ยอมรับ — Master
+const MASTER_COLS = {
+  grade:         ['grade', 'เกรด'],
+  gram:          ['gram', 'แกรม'],
+  size:          ['size', 'ขนาด'],
+  weight_mm_inc: ['weight_mm_inc', 'weight/mm/inc.', 'weight/mm/inc', 'weight_mm'],
+  item_code:     ['item_code', 'item', 'รายการ'],
+  std_weight_kg: ['std_weight_kg', 'std_weight', 'น้ำหนัก', 'weight_kg', 'weight']
+};
+
+// ชื่อคอลัมน์ที่ยอมรับ — Usage
+const USAGE_COLS = {
+  usage_date:        ['usage_date', 'date', 'วันที่', 'วันที'],
+  gradegram:         ['gradegram', 'grade_gram', 'grade', 'เกรดแกรม', 'เกรด'],
+  width:             ['width', 'size', 'ขนาด', 'width_mm'],
+  used_kgs:          ['used_kgs', 'used_kg', 'used', 'ใช้ไป', 'ใช้ (kg)'],
+  doc_no:            ['doc_no', 'doc'],
+  job_no:            ['job_no', 'job'],
+  remark:            ['remark', 'หมายเหตุ', 'note'],
+  roll_for_customer: ['roll_for_customer', 'customer', 'ลูกค้า']
+};
+
+// สร้าง item_code จาก gradegram + width
+function buildItemCode(gradegram, width) {
+  const gg = String(gradegram).trim();
+  const w = String(width).trim();
+  const direct = `${gg}-${w}`;
+  if (masterCache.find(m => m.item_code === direct)) return direct;
+  // เผื่อ gram 2 หลักต้องเติม 0 เช่น CA97 → CA097
+  const m = gg.match(/^([A-Za-z]+)(\d+)$/);
+  if (m) {
+    const padded = m[1] + m[2].padStart(3, '0');
+    const code = `${padded}-${w}`;
+    if (masterCache.find(x => x.item_code === code)) return code;
+  }
+  return direct;
+}
+
+// -------- Import Master --------
 function importMaster(ev) {
   const f = ev.target.files[0]; if (!f) return;
   const r = new FileReader();
@@ -798,24 +850,37 @@ function importMaster(ev) {
       const wb = XLSX.read(e.target.result, { type: 'array' });
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
       let add = 0, upd = 0, err = 0;
-      const existing = masterCache;
+      const errors = [];
       for (const row of rows) {
-        const grade = String(row.grade || '').trim();
-        const gram = Number(row.gram), size = Number(row.size);
-        const weight_mm_inc = row.weight_mm_inc ? Number(row.weight_mm_inc) : null;
-        const item_code = String(row.item_code || '').trim();
-        const std_weight_kg = Number(row.std_weight_kg);
-        if (!grade || !gram || !size || !item_code || !std_weight_kg) { err++; continue; }
-        const ex = existing.find(r => r.grade === grade && r.gram === gram && r.size === size);
-        if (ex) {
-          const { error } = await supabase.from('paper_specs').update({ weight_mm_inc, item_code, std_weight_kg }).eq('id', ex.id);
-          if (error) err++; else upd++;
+        const grade = String(findColumn(row, MASTER_COLS.grade) || '').trim();
+        const gram = Number(findColumn(row, MASTER_COLS.gram));
+        const size = Number(findColumn(row, MASTER_COLS.size));
+        const wmiRaw = findColumn(row, MASTER_COLS.weight_mm_inc);
+        const weight_mm_inc = wmiRaw ? Number(wmiRaw) : null;
+        const item_code = String(findColumn(row, MASTER_COLS.item_code) || '').trim();
+        const std_weight_kg = Number(findColumn(row, MASTER_COLS.std_weight_kg));
+
+        if (!grade || !gram || !size || !item_code || !std_weight_kg) {
+          err++; errors.push(`แถว ${add+upd+err}: ข้อมูลไม่ครบ`);
+          continue;
+        }
+        const existing = masterCache.find(x => x.grade === grade && x.gram === gram && x.size === size);
+        if (existing) {
+          const { error } = await supabase.from('paper_specs')
+            .update({ weight_mm_inc, item_code, std_weight_kg }).eq('id', existing.id);
+          if (error) { err++; errors.push(`แถว ${item_code}: ${error.message}`); } else upd++;
         } else {
-          const { error } = await supabase.from('paper_specs').insert({ grade, gram, size, weight_mm_inc, item_code, std_weight_kg });
-          if (error) err++; else add++;
+          const { error } = await supabase.from('paper_specs')
+            .insert({ grade, gram, size, weight_mm_inc, item_code, std_weight_kg });
+          if (error) { err++; errors.push(`แถว ${item_code}: ${error.message}`); } else add++;
         }
       }
-      showMsg('importMsg', `✅ Master: เพิ่ม ${add} · อัปเดต ${upd}${err ? ` · ⚠ ผิดพลาด ${err}` : ''}`, err ? 'err' : 'ok');
+      let html = `✅ Master: เพิ่ม ${add} · อัปเดต ${upd}`;
+      if (err) html += ` · ⚠ ผิดพลาด ${err}`;
+      showMsg('importMsg', html, err ? 'err' : 'ok');
+      if (errors.length) {
+        showMsg('importMsg', html + '<br><br>ตัวอย่าง error:<br>' + errors.slice(0, 5).join('<br>'), 'err');
+      }
       await loadMaster();
       populateFilterDropdowns();
     } catch (ex) { showMsg('importMsg', 'อ่านไฟล์ไม่สำเร็จ: ' + ex.message, 'err'); }
@@ -824,6 +889,7 @@ function importMaster(ev) {
   ev.target.value = '';
 }
 
+// -------- Import Usage --------
 function importUsage(ev) {
   const f = ev.target.files[0]; if (!f) return;
   const r = new FileReader();
@@ -831,34 +897,80 @@ function importUsage(ev) {
     try {
       const wb = XLSX.read(e.target.result, { type: 'array' });
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+
       const payload = [];
-      let err = 0;
-      rows.forEach(row => {
-        const usage_date = toISODate(row.usage_date);
-        const item_code = String(row.item_code || '').trim();
-        const used_kgs = Number(row.used_kgs);
-        if (!usage_date || !item_code || !used_kgs) { err++; return; }
+      const errors = [];
+      const notFound = new Set();
+
+      rows.forEach((row, i) => {
+        const rowNo = i + 2;
+        const dateRaw = findColumn(row, USAGE_COLS.usage_date);
+        const usage_date = toISODate(dateRaw);
+        const gradegram = String(findColumn(row, USAGE_COLS.gradegram) || '').trim();
+        const width = Number(findColumn(row, USAGE_COLS.width));
+        const used_kgs = Number(findColumn(row, USAGE_COLS.used_kgs));
+
+        if (!usage_date || !gradegram || !width || !used_kgs) {
+          errors.push(`แถว ${rowNo}: ข้อมูลไม่ครบ (date=${usage_date||'-'}, gradegram=${gradegram||'-'}, width=${width||'-'}, used=${used_kgs||'-'})`);
+          return;
+        }
+        const item_code = buildItemCode(gradegram, width);
+        const exists = masterCache.find(x => x.item_code === item_code);
+        if (!exists) {
+          notFound.add(item_code);
+          errors.push(`แถว ${rowNo}: ไม่พบ ${item_code} ใน Master`);
+          return;
+        }
         payload.push({
-          usage_date, item_code, used_kgs,
-          doc_no: row.doc_no || null, job_no: row.job_no || null, remark: row.remark || null,
+          usage_date,
+          item_code,
+          used_kgs,
+          doc_no: findColumn(row, USAGE_COLS.doc_no) || null,
+          job_no: findColumn(row, USAGE_COLS.job_no) || null,
+          remark: findColumn(row, USAGE_COLS.remark) || null,
+          roll_for_customer: findColumn(row, USAGE_COLS.roll_for_customer) || null,
           created_by: currentUser.id
         });
       });
-      if (!payload.length) { showMsg('importMsg', `⚠ ไม่มีแถวที่ใช้ได้`, 'err'); return; }
-      const { error } = await supabase.from('usage_records').insert(payload);
-      if (error) { showMsg('importMsg', 'บันทึกไม่สำเร็จ: ' + error.message, 'err'); return; }
-      showMsg('importMsg', `✅ Usage: เพิ่ม ${payload.length} แถว${err ? ` · ⚠ ผิดพลาด ${err}` : ''}`, 'ok');
+
+      if (!payload.length) {
+        let m = `⚠ ไม่มีแถวที่บันทึกได้ (ทั้งหมด ${rows.length} แถว)`;
+        if (notFound.size) m += `<br>ไม่พบใน Master: ${[...notFound].slice(0, 15).join(', ')}${notFound.size > 15 ? ' ...' : ''}`;
+        if (errors.length) m += '<br><br>ตัวอย่าง error:<br>' + errors.slice(0, 5).join('<br>');
+        showMsg('importMsg', m, 'err');
+        return;
+      }
+
+      // insert เป็นชุดละ 500
+      let inserted = 0;
+      const batchSize = 500;
+      for (let i = 0; i < payload.length; i += batchSize) {
+        const batch = payload.slice(i, i + batchSize);
+        const { error } = await supabase.from('usage_records').insert(batch);
+        if (error) { showMsg('importMsg', 'บันทึกไม่สำเร็จ: ' + error.message, 'err'); return; }
+        inserted += batch.length;
+      }
+
+      let html = `✅ Usage: เพิ่ม ${inserted} แถว (จากทั้งหมด ${rows.length})`;
+      if (errors.length) html += ` · ⚠ ข้าม ${errors.length} แถว`;
+      showMsg('importMsg', html, errors.length ? 'err' : 'ok');
+      if (notFound.size) {
+        showMsg('importMsg', html + `<br><br>ไม่พบใน Master: ${[...notFound].slice(0, 20).join(', ')}${notFound.size > 20 ? ' ...' : ''}`, 'err');
+      } else if (errors.length && errors.length <= 5) {
+        showMsg('importMsg', html + '<br>' + errors.join('<br>'), 'err');
+      }
     } catch (ex) { showMsg('importMsg', 'อ่านไฟล์ไม่สำเร็จ: ' + ex.message, 'err'); }
   };
   r.readAsArrayBuffer(f);
   ev.target.value = '';
 }
 
+// -------- Clear Usage --------
 async function clearUsage() {
   if (!confirm('ลบ Usage ทั้งหมด? (ต้องเป็น admin)')) return;
   const { error } = await supabase.from('usage_records').delete().neq('id', 0);
   if (error) return alert(error.message);
-  showMsg('importMsg', 'ลบ Usage แล้ว', 'ok');
+  showMsg('importMsg', 'ลบ Usage ทั้งหมดแล้ว', 'ok');
 }
 
 // ================= USERS (via Edge Function) =================
