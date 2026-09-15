@@ -378,14 +378,27 @@ function thaiPeriod(from, to) {
   return `${from} ถึง ${to}`;
 }
 function toISODate(v) {
-  if (!v) return '';
-  if (typeof v === 'number') return new Date(Date.UTC(1899,11,30) + v*86400000).toISOString().slice(0,10);
-  if (v instanceof Date) return v.toISOString().slice(0,10);
-  if (typeof v === 'string') {
-    const m = v.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-    if (m) return `${m[3]}-${pad(m[2])}-${pad(m[1])}`;
-    return v.slice(0,10);
+  if (v == null || v === '') return '';
+  if (typeof v === 'number') {
+    const d = new Date(Date.UTC(1899, 11, 30) + v * 86400000);
+    return d.toISOString().slice(0, 10);
   }
+  if (v instanceof Date) {
+    const y = v.getFullYear();
+    const m = String(v.getMonth() + 1).padStart(2, '0');
+    const d = String(v.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  const s = String(v).trim();
+  if (!s) return '';
+  // DD/MM/YYYY (รูปแบบไทย)
+  let m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if (m) return `${m[3]}-${String(m[2]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`;
+  // YYYY-MM-DD
+  m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  if (m) return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+  return s.slice(0, 10);
+}
   return '';
 }
 const isAdmin = () => currentProfile?.role === 'admin';
