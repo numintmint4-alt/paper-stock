@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK ม้วนกระดาษ V5 — app.js
+//  STOCK ม้วนกระดาษ V6 — app.js
 //  ⚙️ แก้ 3 ค่าด้านล่างก่อนใช้งาน
 // ═══════════════════════════════════════════════════════════════
 const SUPABASE_URL      = 'https://gwwgycbqzdjlijsuxahx.supabase.co';
@@ -264,12 +264,11 @@ async function loadMaster(onProgress = null) {
 
 async function refreshAll() {
   await loadMaster();
-  await loadGradeFilter();   // ✅ เพิ่ม
+  await loadGradeFilter();   // ✅ V6
   renderMatrix();
 }
-// ============================================================
-// V6 — GRADE FILTER (Matrix)
-// ============================================================
+
+// ================= V6 — GRADE FILTER =================
 async function loadGradeFilter() {
   const sel = $('qGradeFilter');
   if (!sel) return;
@@ -280,24 +279,24 @@ async function loadGradeFilter() {
   // เก็บค่าที่เคยเลือกไว้
   const prevSelected = Array.from(sel.selectedOptions).map(o => o.value);
 
-  sel.innerHTML = grades.map(g => 
+  sel.innerHTML = grades.map(g =>
     `<option value="${g}"${prevSelected.includes(g) ? ' selected' : ''}>${g}</option>`
   ).join('');
 }
 
-// ดึงเกรดที่เลือก
 function getSelectedGrades() {
   const sel = $('qGradeFilter');
   if (!sel) return [];
   return Array.from(sel.selectedOptions).map(o => o.value);
 }
+
 // ================= MATRIX =================
 async function renderMatrix() {
   const reportMonth = $('qReportMonth').value;
   const monthsBack  = Number($('qMonthsBack').value) || 3;
   matrixRange = reportMonthRange(reportMonth, monthsBack);
 
-  const mode = document.querySelector('input[name="mode"]:checked').value; // 'actual' | 'full'
+  const mode = document.querySelector('input[name="mode"]:checked').value;
   const customer = $('qCustomer').value;
 
   const fromShort = matrixRange.from ? thaiMonthShort(matrixRange.from.slice(0,7)) : '-';
@@ -306,10 +305,16 @@ async function renderMatrix() {
                     customer === GENERAL_CUSTOMER ? ' · ลูกค้า: ทั่วไป' : ` · ลูกค้า: ${customer}`;
   const modeLabel = mode === 'full' ? 'ม้วนเต็ม (ปัดขึ้น)' : 'ใช้จริง';
 
+  // ✅ V6: แสดงเกรดที่เลือกใน subtitle
+  const selectedGrades = getSelectedGrades();
+  const gradeLabel = selectedGrades.length > 0
+    ? ` · เกรด: ${selectedGrades.join(', ')}`
+    : '';
+
   $('reportTitle').innerHTML = `
     ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ<br>
     ประจำ ${thaiMonthTitle(reportMonth)}
-    <div class="report-subtitle">(${modeLabel} · ย้อนหลัง ${monthsBack} เดือน: ${fromShort} – ${toShort}${custLabel})</div>
+    <div class="report-subtitle">(${modeLabel} · ย้อนหลัง ${monthsBack} เดือน: ${fromShort} – ${toShort}${custLabel}${gradeLabel})</div>
   `;
 
   $('matrixBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลดข้อมูล...</p>';
@@ -360,9 +365,9 @@ async function renderMatrix() {
 
     let rolls;
     if (mode === 'full') {
-      rolls = Math.ceil(kg / std);   // ✅ โหมดม้วนเต็ม: ปัดขึ้นที่ระดับวัน
+      rolls = Math.ceil(kg / std);
     } else {
-      rolls = kg / std;               // โหมดใช้จริง
+      rolls = kg / std;
     }
 
     if (!perItem[code]) perItem[code] = { total: 0, max: 0 };
@@ -378,7 +383,7 @@ async function renderMatrix() {
     const rk = m.grade + '|' + m.gram;
     rowSet.set(rk, m);
     colSet.add(m.size);
-    const finalVal = v.max;   // แสดง "ยอดสูงสุดต่อวัน"
+    const finalVal = v.max;
 
     const k = rk + '|' + m.size;
     cells[k] = (cells[k] || 0) + finalVal;
@@ -387,69 +392,67 @@ async function renderMatrix() {
     grand += finalVal;
   });
 
-  // ✅ V6: Filter เกรด
-const selectedGrades = getSelectedGrades();
-
-let rowKeys = [...rowSet.keys()].sort((a,b) => {
-  const [ga, ma] = a.split('|'), [gb, mb] = b.split('|');
-  return ga.localeCompare(gb) || Number(ma) - Number(mb);
-});
-
-// ถ้ามีการเลือกเกรด → filter
-if (selectedGrades.length > 0) {
-  rowKeys = rowKeys.filter(rk => {
-    const grade = rk.split('|')[0];
-    return selectedGrades.includes(grade);
+  // ✅ V6: Sort rowKeys + Filter เกรด
+  let rowKeys = [...rowSet.keys()].sort((a,b) => {
+    const [ga, ma] = a.split('|'), [gb, mb] = b.split('|');
+    return ga.localeCompare(gb) || Number(ma) - Number(mb);
   });
+
+  // ✅ V6: ถ้ามีการเลือกเกรด → filter rowKeys
+  if (selectedGrades.length > 0) {
+    rowKeys = rowKeys.filter(rk => selectedGrades.includes(rk.split('|')[0]));
+  }
+
+  // ✅ V6: คำนวณ colKeys2, rowTotals2, colTotals2, grand2 ใหม่จาก rowKeys ที่ filter แล้ว
+  const colSet2 = new Set();
+  const rowTotals2 = {};
+  const colTotals2 = {};
+  let grand2 = 0;
+
+  rowKeys.forEach(rk => {
+    const m = rowSet.get(rk);
+    if (!m) return;
+    colSet2.add(m.size);
+
+    colSet.forEach(s => {
+      const v = cells[rk + '|' + s];
+      if (v) {
+        rowTotals2[rk] = (rowTotals2[rk] || 0) + v;
+        colTotals2[s] = (colTotals2[s] || 0) + v;
+        grand2 += v;
+      }
+    });
+  });
+
+  const colKeys2 = [...colSet2].sort((a,b) => a - b);
+
+  if (!rowKeys.length) {
+    $('matrixBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่มีข้อมูลในช่วงที่เลือก</p>';
+    return;
+  }
+
+  // ✅ V6: Render HTML — ใช้ colKeys2, rowTotals2, colTotals2, grand2
+  let html = '<div class="report-wrap"><table class="report-table"><thead><tr><th class="grade-col">grade</th>';
+  colKeys2.forEach(s => html += `<th>${s}</th>`);
+  html += '<th class="total-col">Total</th></tr></thead><tbody>';
+
+  rowKeys.forEach(rk => {
+    const [g, gr] = rk.split('|');
+    html += '<tr>';
+    html += `<td class="grade-col">${g}${gr}</td>`;
+    colKeys2.forEach(s => {
+      const v = cells[rk + '|' + s];
+      if (!v) html += '<td class="empty">-</td>';
+      else html += `<td class="clickable" onclick="openDrill('${g}','${gr}',${s})">${Number(v).toFixed(2)}</td>`;
+    });
+    html += `<td class="total-col">${Number(rowTotals2[rk] || 0).toFixed(2)}</td></tr>`;
+  });
+  html += '<tr class="total-row"><td class="grade-col">Total</td>';
+  colKeys2.forEach(s => html += `<td>${Number(colTotals2[s] || 0).toFixed(2)}</td>`);
+  html += `<td class="total-col">${Number(grand2).toFixed(2)}</td></tr></tbody></table></div>`;
+  html += `<div class="report-foot">แสดงเป็นจำนวนม้วน · โหมด: ${modeLabel} · ยอดสูงสุดต่อวัน</div>`;
+  $('matrixBody').innerHTML = html;
 }
-
-// ✅ คำนวณ colKeys, rowTotals, colTotals ใหม่จาก rowKeys ที่ filter แล้ว
-const colSet2 = new Set();
-const rowTotals2 = {};
-const colTotals2 = {};
-let grand2 = 0;
-
-rowKeys.forEach(rk => {
-  const m = rowSet.get(rk);
-  colSet2.add(m.size);
-  
-  colKeys.forEach(s => {
-    const v = cells[rk + '|' + s];
-    if (v) {
-      rowTotals2[rk] = (rowTotals2[rk] || 0) + v;
-      colTotals2[s] = (colTotals2[s] || 0) + v;
-      grand2 += v;
-    }
-  });
-});
-
-const colKeys2 = [...colSet2].sort((a,b) => a - b);
-
-if (!rowKeys.length) {
-  $('matrixBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่มีข้อมูลในช่วงที่เลือก</p>';
-  return;
-}
-
- let html = '<div class="report-wrap"><table class="report-table"><thead><tr><th class="grade-col">grade</th>';
-colKeys2.forEach(s => html += `<th>${s}</th>`);   // ✅ ใช้ colKeys2
-html += '<th class="total-col">Total</th></tr></thead><tbody>';
-
-rowKeys.forEach(rk => {
-  const [g, gr] = rk.split('|');
-  html += '<tr>';
-  html += `<td class="grade-col">${g}${gr}</td>`;
-  colKeys2.forEach(s => {                         // ✅ ใช้ colKeys2
-    const v = cells[rk + '|' + s];
-    if (!v) html += '<td class="empty">-</td>';
-    else html += `<td class="clickable" onclick="openDrill('${g}','${gr}',${s})">${Number(v).toFixed(2)}</td>`;
-  });
-  html += `<td class="total-col">${Number(rowTotals2[rk] || 0).toFixed(2)}</td></tr>`;  // ✅ ใช้ rowTotals2
-});
-html += '<tr class="total-row"><td class="grade-col">Total</td>';
-colKeys2.forEach(s => html += `<td>${Number(colTotals2[s] || 0).toFixed(2)}</td>`);      // ✅ ใช้ colTotals2
-html += `<td class="total-col">${Number(grand2).toFixed(2)}</td></tr></tbody></table></div>`;  // ✅ ใช้ grand2
-html += `<div class="report-foot">แสดงเป็นจำนวนม้วน · โหมด: ${modeLabel} · ยอดสูงสุดต่อวัน</div>`;
-$('matrixBody').innerHTML = html;
 
 // ================= DRILL MODAL =================
 async function openDrill(grade, gram, size) {
@@ -835,9 +838,6 @@ function importUsage(ev) {
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
       showProgress('usageProgress', 0, rows.length, `อ่านได้ ${rows.length} แถว กำลังเตรียมข้อมูล...`);
 
-      // ─────────────────────────────────────────────
-      // STEP 1: แปลงข้อมูลทั้งหมดเป็น payload
-      // ─────────────────────────────────────────────
       const payload = [];
       rows.forEach((row) => {
         const usage_date = toISODate(findColumn(row, USAGE_COLS.doc_date));
@@ -875,15 +875,11 @@ function importUsage(ev) {
         });
       });
 
-      // ─────────────────────────────────────────────
-      // STEP 2: แบ่งเป็นชุดละ 500 แถว
-      // ─────────────────────────────────────────────
       const CHUNK_SIZE = 500;
       const batchId = crypto.randomUUID();
       const totalChunks = Math.ceil(payload.length / CHUNK_SIZE);
 
       let sumTotal = 0, sumValid = 0, sumInvalid = 0;
-      let failedChunks = [];
 
       for (let i = 0; i < payload.length; i += CHUNK_SIZE) {
         const chunk = payload.slice(i, i + CHUNK_SIZE);
@@ -902,8 +898,6 @@ function importUsage(ev) {
         });
 
         if (error) {
-          failedChunks.push(`ชุด ${chunkNo}: ${error.message}`);
-          // ⚠️ หยุดทันทีถ้ามี error
           hideProgress('usageProgress');
           showMsg('importUsageMsg',
             `❌ บันทึกชุดที่ ${chunkNo}/${totalChunks} ไม่สำเร็จ<br>
@@ -920,9 +914,6 @@ function importUsage(ev) {
         sumInvalid += data.invalid || 0;
       }
 
-      // ─────────────────────────────────────────────
-      // STEP 3: แสดงผลสรุป
-      // ─────────────────────────────────────────────
       hideProgress('usageProgress');
       let html = `✅ ทั้งหมด ${sumTotal} แถว · 
         <b style="color:#166534">ผ่าน ${sumValid}</b> · 
@@ -940,7 +931,7 @@ function importUsage(ev) {
   ev.target.value = '';
 }
 
-// ================= DELETE BY MONTH (V5) =================
+// ================= DELETE BY MONTH =================
 function openDeleteMonth() {
   $('delMonth').value = currentMonthStr();
   $('deleteMonthMsg').innerHTML = '';
@@ -992,7 +983,7 @@ async function confirmDeleteMonth() {
   setTimeout(() => { closeModal('modalDeleteMonth'); renderLatestBatch(); }, 2000);
 }
 
-// ================= ARCHIVE (V5) =================
+// ================= ARCHIVE =================
 async function previewArchive() {
   $('archiveMsg').innerHTML = '<div class="msg info">กำลังตรวจสอบ...</div>';
   const { data, error } = await supabase.rpc('count_archivable_usage');
