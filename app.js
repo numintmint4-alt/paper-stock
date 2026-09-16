@@ -402,12 +402,45 @@ if (selectedGrades.length > 0) {
     return selectedGrades.includes(grade);
   });
 }
-  const colKeys = [...colSet].sort((a,b) => a - b);
+ // ✅ V6: Filter เกรด
+const selectedGrades = getSelectedGrades();
 
-  if (!rowKeys.length) {
-    $('matrixBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่มีข้อมูลในช่วงที่เลือก</p>';
-    return;
-  }
+let rowKeys = [...rowSet.keys()].sort((a,b) => {
+  const [ga, ma] = a.split('|'), [gb, mb] = b.split('|');
+  return ga.localeCompare(gb) || Number(ma) - Number(mb);
+});
+
+// ถ้ามีการเลือกเกรด → filter rowKeys
+if (selectedGrades.length > 0) {
+  rowKeys = rowKeys.filter(rk => selectedGrades.includes(rk.split('|')[0]));
+}
+
+// ✅ คำนวณ colKeys, rowTotals, colTotals ใหม่จาก rowKeys ที่ filter แล้ว
+const colSet2 = new Set();
+const rowTotals2 = {};
+const colTotals2 = {};
+let grand2 = 0;
+
+rowKeys.forEach(rk => {
+  const m = rowSet.get(rk);
+  colSet2.add(m.size);
+  
+  colKeys.forEach(s => {
+    const v = cells[rk + '|' + s];
+    if (v) {
+      rowTotals2[rk] = (rowTotals2[rk] || 0) + v;
+      colTotals2[s] = (colTotals2[s] || 0) + v;
+      grand2 += v;
+    }
+  });
+});
+
+const colKeys2 = [...colSet2].sort((a,b) => a - b);
+
+if (!rowKeys.length) {
+  $('matrixBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่มีข้อมูลในช่วงที่เลือก</p>';
+  return;
+}
 
   let html = '<div class="report-wrap"><table class="report-table"><thead><tr><th class="grade-col">grade</th>';
   colKeys.forEach(s => html += `<th>${s}</th>`);
