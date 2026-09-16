@@ -266,7 +266,30 @@ async function refreshAll() {
   await loadMaster();
   renderMatrix();
 }
+// ============================================================
+// V6 — GRADE FILTER (Matrix)
+// ============================================================
+async function loadGradeFilter() {
+  const sel = $('qGradeFilter');
+  if (!sel) return;
 
+  // unique grade จาก masterCache
+  const grades = [...new Set(masterCache.map(m => m.grade))].sort();
+
+  // เก็บค่าที่เคยเลือกไว้
+  const prevSelected = Array.from(sel.selectedOptions).map(o => o.value);
+
+  sel.innerHTML = grades.map(g => 
+    `<option value="${g}"${prevSelected.includes(g) ? ' selected' : ''}>${g}</option>`
+  ).join('');
+}
+
+// ดึงเกรดที่เลือก
+function getSelectedGrades() {
+  const sel = $('qGradeFilter');
+  if (!sel) return [];
+  return Array.from(sel.selectedOptions).map(o => o.value);
+}
 // ================= MATRIX =================
 async function renderMatrix() {
   const reportMonth = $('qReportMonth').value;
