@@ -48,14 +48,14 @@ input,select{padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px}
 .filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
 .filters label{font-size:13px;display:flex;gap:5px;align-items:center}
 
-/* ========== V6: GRADEGRAMS FILTER (checkbox) ========== */
+/* ========== GRADE FILTER (checkbox) ========== */
 .grade-filter-wrap{position:relative;display:flex;gap:6px;align-items:center}
 .grade-filter-box{position:relative}
 .grade-filter-btn{display:flex;justify-content:space-between;align-items:center;gap:8px;min-width:200px;padding:7px 12px;background:#fff;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;font-size:13px;font-family:inherit}
 .grade-filter-btn:hover{background:#f8fafc}
 .grade-filter-btn .arrow{font-size:10px;color:#64748b;transition:transform .2s}
 .grade-filter-btn.open .arrow{transform:rotate(180deg)}
-#gradeFilterLabel{font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px}
+.grade-filter-btn span:first-child{font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px}
 
 .grade-dropdown{position:absolute;top:100%;left:0;margin-top:4px;min-width:240px;max-width:340px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 8px 20px rgba(0,0,0,.15);z-index:100;overflow:hidden}
 .grade-actions{display:flex;gap:6px;padding:8px;background:#f8fafc;border-bottom:1px solid #e2e8f0}
@@ -72,24 +72,25 @@ input,select{padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px}
 .msg.err{background:#fee2e2;color:#dc2626}
 .msg.ok{background:#dcfce7;color:#166534}
 .msg.info{background:#dbeafe;color:#1e40af}
+.msg.warn{background:#fef3c7;color:#b45309}
 
 /* ========== TABLE (general) ========== */
 table{border-collapse:collapse;width:100%;font-size:13px}
 th,td{border:1px solid #e2e8f0;padding:6px 8px;text-align:left}
 th{background:#f1f5f9;font-weight:600}
 
-/* ========== REPORT / MATRIX ========== */
+/* ========== REPORT / MATRIX (ทุกหน้า) ========== */
 .report-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1e293b;padding-bottom:10px;margin-bottom:10px;gap:16px}
 .report-title{text-align:center;flex:1;font-weight:600;font-size:16px;line-height:1.5}
 .report-subtitle{text-align:center;font-size:13px;color:#64748b;font-weight:400;margin-top:4px}
 .report-doc{font-size:12px;color:#475569;white-space:nowrap}
 
-/* V6: Matrix เต็มหน้า ไม่มี scroll ในกรอบ */
+/* Report wrap — Matrix เต็มหน้า */
 .report-wrap{overflow-x:auto;overflow-y:visible;width:100%}
 .report-table{font-size:12px;table-layout:auto;width:100%}
 .report-table th,.report-table td{border:1px solid #94a3b8;padding:3px 6px;text-align:center;white-space:nowrap}
 .report-table thead th{background:#e2e8f0;position:sticky;top:0;z-index:5}
-.report-table .grade-col{background:#f1f5f9;font-weight:600;text-align:left;padding-left:10px;min-width:75px;position:sticky;left:0;z-index:4}
+.report-table .grade-col{background:#f1f5f9;font-weight:600;text-align:left;padding-left:10px;min-width:90px;position:sticky;left:0;z-index:4}
 .report-table thead .grade-col{z-index:6}
 .report-table td.empty{color:#cbd5e1}
 .report-table td.clickable{cursor:pointer;background:#fffbeb}
@@ -98,6 +99,45 @@ th{background:#f1f5f9;font-weight:600}
 .report-table .total-row td{background:#cbd5e1;font-weight:700}
 .report-table .total-row .total-col{background:#a5b4fc}
 .report-foot{margin-top:10px;font-size:12px;color:#64748b;text-align:right}
+
+/* Cell ที่มี (เต็ม+เศษ) */
+.report-table td .cell-content{display:flex;flex-direction:column;align-items:center;gap:2px}
+.report-table td .cell-main{font-weight:700;color:#1e293b;font-size:13px}
+.report-table td .cell-sub{font-size:10px;color:#64748b}
+
+/* ========== STOCK BALANCE HIGHLIGHT ========== */
+.stock-full{color:#166534;font-weight:700}
+.stock-scrap{color:#b45309;font-weight:700}
+.stock-customer{color:#7c3aed;font-weight:700}
+
+/* ========== SUPPLIER SUMMARY ========== */
+.supplier-summary{margin:14px 0;padding:14px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0}
+.supplier-summary h4{margin:0 0 10px;font-size:14px;color:#1e293b}
+.supplier-summary table{font-size:13px;width:auto;min-width:400px}
+.supplier-summary th{background:#1e293b;color:#fff;padding:8px 12px}
+.supplier-summary td{padding:6px 12px;text-align:right}
+.supplier-summary td:first-child{text-align:left;font-weight:600}
+.supplier-summary tr.total-row td{background:#cbd5e1;font-weight:700}
+
+/* ========== ROLL ALERT ========== */
+.alert-summary{margin:14px 0;padding:14px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;display:flex;gap:24px;flex-wrap:wrap}
+.alert-summary .item{padding:8px 16px;border-radius:8px;font-weight:600;font-size:14px}
+.alert-summary .item.red{background:#fee2e2;color:#dc2626}
+.alert-summary .item.yellow{background:#fef3c7;color:#b45309}
+.alert-summary .item.green{background:#dcfce7;color:#166534}
+
+/* Alert table */
+.alert-table{font-size:13px;width:100%}
+.alert-table th{background:#1e293b;color:#fff;padding:10px;text-align:center;position:sticky;top:0;z-index:2}
+.alert-table td{padding:8px 10px;text-align:center;border:1px solid #e2e8f0}
+.alert-table td.grade-col{text-align:left;font-weight:600;background:#f1f5f9;position:sticky;left:0;z-index:1}
+.alert-table tr.status-red{background:#fee2e2}
+.alert-table tr.status-red td.grade-col{background:#fecaca}
+.alert-table tr.status-yellow{background:#fef3c7}
+.alert-table tr.status-yellow td.grade-col{background:#fde68a}
+.alert-table tr.status-green{background:#f0fdf4}
+.alert-table tr.status-green td.grade-col{background:#dcfce7}
+.alert-table .shortage-col{font-weight:700;color:#dc2626;font-size:15px}
 
 /* ========== MODAL ========== */
 .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:100;padding:16px}
@@ -137,6 +177,19 @@ th{background:#f1f5f9;font-weight:600}
 .badge.ok{background:#dcfce7;color:#166534}
 .badge.bad{background:#fee2e2;color:#991b1b}
 
+/* ========== DETAIL MODAL ========== */
+#stockDetailBody table,
+#receiveDetailBody table,
+#summaryDetailBody table{font-size:12px;width:100%}
+#stockDetailBody th,
+#receiveDetailBody th,
+#summaryDetailBody th{background:#1e293b;color:#fff;padding:8px 10px;position:sticky;top:0;z-index:2}
+#stockDetailBody td,
+#receiveDetailBody td,
+#summaryDetailBody td{padding:6px 10px;border:1px solid #e2e8f0}
+#stockDetailBody tr.full-row{background:#dcfce7}
+#stockDetailBody tr.scrap-row{background:#fef3c7}
+
 /* ========== PRINT ========== */
 @media print {
   @page { size: A4 landscape; margin: 8mm; }
@@ -149,6 +202,8 @@ th{background:#f1f5f9;font-weight:600}
   .report-table th,.report-table td{padding:2px 3px}
   .report-table thead th,
   .report-table .grade-col{position:static}
+  .alert-table th,
+  .alert-table td.grade-col{position:static}
 }
 
 /* ========== MOBILE ========== */
@@ -156,135 +211,5 @@ th{background:#f1f5f9;font-weight:600}
   .form-grid{grid-template-columns:1fr}
   .nav{height:auto;padding:10px}
   .grade-filter-box{min-width:160px}
-}
-/* ============================================================
-   V6 ส่วนที่ 4: หน้า Stock คงเหลือ
-   ============================================================ */
-
-/* Stock Report — คล้าย Matrix */
-#tab-stock .report-wrap {
-    overflow-x: auto;
-    overflow-y: visible;
-    width: 100%;
-}
-
-#tab-stock .report-table {
-    font-size: 12px;
-    table-layout: auto;
-    width: 100%;
-}
-
-#tab-stock .report-table th,
-#tab-stock .report-table td {
-    border: 1px solid #94a3b8;
-    padding: 4px 6px;
-    text-align: center;
-    white-space: nowrap;
-}
-
-#tab-stock .report-table thead th {
-    background: #e2e8f0;
-    position: sticky;
-    top: 0;
-    z-index: 5;
-}
-
-#tab-stock .report-table .grade-col {
-    background: #f1f5f9;
-    font-weight: 600;
-    text-align: left;
-    padding-left: 10px;
-    min-width: 90px;
-    position: sticky;
-    left: 0;
-    z-index: 4;
-}
-
-#tab-stock .report-table thead .grade-col {
-    z-index: 6;
-}
-
-#tab-stock .report-table td.empty {
-    color: #cbd5e1;
-}
-
-#tab-stock .report-table td.clickable {
-    cursor: pointer;
-    background: #fffbeb;
-}
-
-#tab-stock .report-table td.clickable:hover {
-    background: #fde68a;
-}
-
-/* Cell แสดง (เต็ม+เศษ) */
-#tab-stock .report-table td .cell-content {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-}
-
-#tab-stock .report-table td .cell-main {
-    font-weight: 700;
-    color: #1e293b;
-    font-size: 13px;
-}
-
-#tab-stock .report-table td .cell-sub {
-    font-size: 10px;
-    color: #64748b;
-}
-
-#tab-stock .report-table .total-col {
-    background: #e0e7ff;
-    font-weight: 600;
-}
-
-#tab-stock .report-table .total-row td {
-    background: #cbd5e1;
-    font-weight: 700;
-}
-
-#tab-stock .report-table .total-row .total-col {
-    background: #a5b4fc;
-}
-
-/* Stock Detail Modal */
-#stockDetailBody table {
-    font-size: 12px;
-    width: 100%;
-}
-
-#stockDetailBody th {
-    background: #1e293b;
-    color: #fff;
-    padding: 8px 10px;
-    position: sticky;
-    top: 0;
-    z-index: 2;
-}
-
-#stockDetailBody td {
-    padding: 6px 10px;
-    border: 1px solid #e2e8f0;
-}
-
-#stockDetailBody tr.full-row {
-    background: #dcfce7;
-}
-
-#stockDetailBody tr.scrap-row {
-    background: #fef3c7;
-}
-
-/* Print */
-@media print {
-    #tab-stock .report-wrap {
-        overflow: visible;
-    }
-    #tab-stock .report-table thead th,
-    #tab-stock .report-table .grade-col {
-        position: static;
-    }
+  .alert-table{font-size:11px}
 }
