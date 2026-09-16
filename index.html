@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ระบบ Stock ม้วนกระดาษ V5</title>
+<title>ระบบ Stock ม้วนกระดาษ V6</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -15,7 +15,7 @@
 <div id="loginScreen" class="login-wrap">
   <div class="login-card">
     <h1>📦 ระบบ Stock ม้วนกระดาษ</h1>
-    <p>กรุณาเข้าสู่ระบบ (V5)</p>
+    <p>กรุณาเข้าสู่ระบบ (V6)</p>
     <label>ชื่อผู้ใช้<input id="loginUser" autocomplete="username" placeholder="เช่น sukanya"></label>
     <label>รหัสผ่าน<input id="loginPass" type="password" autocomplete="current-password" placeholder="••••••"></label>
     <button id="loginBtn">เข้าสู่ระบบ</button>
@@ -45,6 +45,7 @@
           <div class="report-title" id="reportTitle">ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ<br>ประจำเดือน</div>
           <div class="report-doc">FQ-ษ6-06-04/4 rev.01</div>
         </div>
+
         <div class="filters no-print">
           <label>เดือนรายงาน <input type="month" id="qReportMonth"></label>
           <label>ย้อนหลัง
@@ -55,17 +56,24 @@
             </select>
           </label>
           <label>ลูกค้า <select id="qCustomer"><option value="">ทั้งหมด</option></select></label>
-          <label>เกรด
-  <select id="qGradeFilter" multiple size="1" title="เลือกได้หลายเกรด (Ctrl+Click)">
-    <!-- โหลดจาก Master Data -->
-  </select>
-</label>
+
+          <!-- ✅ V6: Gradegrams Filter (search + multi-select) -->
+          <label class="grade-filter-wrap">
+            Gradegrams
+            <div class="grade-filter-box" id="gradeFilterBox">
+              <div class="grade-chips" id="gradeChips"></div>
+              <input type="text" id="gradeSearch" placeholder="พิมพ์เพื่อค้นหา เช่น KA" autocomplete="off">
+              <div class="grade-dropdown hidden" id="gradeDropdown"></div>
+            </div>
+          </label>
+
           <span style="font-size:13px;margin-left:8px">แสดง:</span>
           <label><input type="radio" name="mode" value="actual" checked> ใช้จริง</label>
           <label><input type="radio" name="mode" value="full"> ม้วนเต็ม</label>
           <button class="primary" onclick="renderMatrix()">ค้นหา</button>
           <button onclick="window.print()">🖨 พิมพ์ (A4 แนวนอน)</button>
         </div>
+
         <div id="matrixBody"></div>
       </div>
     </div>
@@ -104,7 +112,7 @@
         <!-- Master -->
         <div class="acc-item">
           <div class="acc-head" onclick="toggleAcc(this, 'accMaster')">
-            <span>📋 Master Data — Grade / Gram / Size</span>
+            <span>📋 Master Data — Gradegrams / Gram / Size</span>
             <span class="arrow">▶</span>
           </div>
           <div class="acc-body hidden" id="accMaster">
@@ -143,7 +151,7 @@
           </div>
         </div>
 
-        <!-- Archive (ใหม่ V5) -->
+        <!-- Archive -->
         <div class="acc-item">
           <div class="acc-head" onclick="toggleAcc(this, 'accArchive')">
             <span>📦 Archive ข้อมูลเก่า (เก่ากว่า 2 ปี)</span>
@@ -191,7 +199,7 @@
     <h3 id="masterFormTitle">เพิ่ม Master Data</h3>
     <div id="masterFormError"></div>
     <div class="form-grid">
-      <label>Grade <input id="fGrade"></label>
+      <label>Gradegrams <input id="fGrade"></label>
       <label>Gram <input id="fGram" type="number"></label>
       <label>Size <input id="fSize" type="number"></label>
       <label>Item Code <input id="fItem"></label>
@@ -233,7 +241,7 @@
   </div>
 </div>
 
-<!-- Delete Month (V5 — มีคำเตือน + Export) -->
+<!-- Delete Month -->
 <div class="modal-bg" id="modalDeleteMonth">
   <div class="modal" style="max-width:560px">
     <h3>🗑 ลบ Usage ตามเดือน</h3>
