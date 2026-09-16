@@ -27,10 +27,13 @@
 <div id="app" class="hidden">
   <nav class="nav">
     <strong>📦 Stock ม้วนกระดาษ</strong>
-    <button data-tab="matrix" class="active">Matrix</button>
-<button data-tab="stock">Stock</button>
-<button data-tab="data">Data</button>
-<button data-tab="settings">⚙ ตั้งค่า</button>
+    <button data-tab="matrix" class="active">Stock Level</button>
+    <button data-tab="stock">Stock</button>
+    <button data-tab="summary">Summary</button>
+    <button data-tab="receive">Receive</button>
+    <button data-tab="alert">Alert</button>
+    <button data-tab="data">Data</button>
+    <button data-tab="settings">⚙ ตั้งค่า</button>
     <span class="spacer"></span>
     <span class="user-badge" id="userBadge"></span>
     <button class="logout" id="logoutBtn">ออกจากระบบ</button>
@@ -38,7 +41,7 @@
 
   <div class="container">
 
-    <!-- ========== MATRIX ========== -->
+    <!-- ========== TAB 1: STOCK LEVEL (Matrix เดิม) ========== -->
     <div id="tab-matrix">
       <div class="card">
         <div class="report-head">
@@ -58,25 +61,22 @@
           </label>
           <label>ลูกค้า <select id="qCustomer"><option value="">ทั้งหมด</option></select></label>
 
-          <!-- ✅ V6: Gradegrams Filter (search + multi-select) -->
           <label class="grade-filter-wrap">
-  Gradegrams
-  <div class="grade-filter-box" id="gradeFilterBox">
-    <button type="button" class="grade-filter-btn" id="gradeFilterBtn">
-      <span id="gradeFilterLabel">ทั้งหมด</span>
-      <span class="arrow">▼</span>
-    </button>
-    <div class="grade-dropdown hidden" id="gradeDropdown">
-      <div class="grade-actions">
-        <button type="button" onclick="selectAllGrades()">✓ เลือกทั้งหมด</button>
-        <button type="button" onclick="clearAllGrades()">✗ ล้างทั้งหมด</button>
-      </div>
-      <div class="grade-list" id="gradeList">
-        <!-- checkbox จะถูก render ที่นี่ -->
-      </div>
-    </div>
-  </div>
-</label>
+            Gradegrams
+            <div class="grade-filter-box" id="gradeFilterBox">
+              <button type="button" class="grade-filter-btn" id="gradeFilterBtn">
+                <span id="gradeFilterLabel">ทั้งหมด</span>
+                <span class="arrow">▼</span>
+              </button>
+              <div class="grade-dropdown hidden" id="gradeDropdown">
+                <div class="grade-actions">
+                  <button type="button" onclick="selectAllGrades()">✓ เลือกทั้งหมด</button>
+                  <button type="button" onclick="clearAllGrades()">✗ ล้างทั้งหมด</button>
+                </div>
+                <div class="grade-list" id="gradeList"></div>
+              </div>
+            </div>
+          </label>
 
           <span style="font-size:13px;margin-left:8px">แสดง:</span>
           <label><input type="radio" name="mode" value="actual" checked> ใช้จริง</label>
@@ -84,91 +84,271 @@
           <button class="primary" onclick="renderMatrix()">ค้นหา</button>
           <button onclick="window.print()">🖨 พิมพ์ (A4 แนวนอน)</button>
         </div>
-
         <div id="matrixBody"></div>
       </div>
     </div>
-<!-- ========== STOCK คงเหลือ ========== -->
-<div id="tab-stock" class="hidden">
-  <div class="card">
-    <div class="report-head">
-      <div></div>
-      <div class="report-title" id="stockReportTitle">
-        รายงาน Stock คงเหลือ ม้วนกระดาษ<br>
-        ประจำวันที่
-      </div>
-      <div class="report-doc">FQ-ษ6-06-05 rev.01</div>
-    </div>
 
-    <div class="filters no-print">
-      <label>📅 วันที่ Stock
-        <input type="date" id="stockDate">
-      </label>
-
-      <label class="grade-filter-wrap">
-        Gradegrams
-        <div class="grade-filter-box" id="stockGradeFilterBox">
-          <button type="button" class="grade-filter-btn" id="stockGradeFilterBtn">
-            <span id="stockGradeFilterLabel">ทั้งหมด</span>
-            <span class="arrow">▼</span>
-          </button>
-          <div class="grade-dropdown hidden" id="stockGradeDropdown">
-            <div class="grade-actions">
-              <button type="button" onclick="selectAllStockGrades()">✓ เลือกทั้งหมด</button>
-              <button type="button" onclick="clearAllStockGrades()">✗ ล้างทั้งหมด</button>
-            </div>
-            <div class="grade-list" id="stockGradeList"></div>
+    <!-- ========== TAB 2: STOCK คงเหลือ ========== -->
+    <div id="tab-stock" class="hidden">
+      <div class="card">
+        <div class="report-head">
+          <div></div>
+          <div class="report-title" id="stockReportTitle">
+            รายงาน Stock คงเหลือ ม้วนกระดาษ<br>ประจำวันที่
           </div>
+          <div class="report-doc">FQ-ษ6-06-05 rev.01</div>
         </div>
-      </label>
 
-      <label>ลูกค้า
-        <select id="stockCustomer">
-          <option value="">ทั้งหมด</option>
-        </select>
-      </label>
+        <div class="filters no-print">
+          <label>📅 วันที่ Stock <input type="date" id="stockDate"></label>
 
-      <label>Location
-        <select id="stockLoc">
-          <option value="">ทั้งหมด</option>
-          <option value="LOC1">LOC1</option>
-          <option value="LOCF">LOCF</option>
-        </select>
-      </label>
+          <label class="grade-filter-wrap">
+            Gradegrams
+            <div class="grade-filter-box" id="stockGradeFilterBox">
+              <button type="button" class="grade-filter-btn" id="stockGradeFilterBtn">
+                <span id="stockGradeFilterLabel">ทั้งหมด</span>
+                <span class="arrow">▼</span>
+              </button>
+              <div class="grade-dropdown hidden" id="stockGradeDropdown">
+                <div class="grade-actions">
+                  <button type="button" onclick="selectAllStockGrades()">✓ เลือกทั้งหมด</button>
+                  <button type="button" onclick="clearAllStockGrades()">✗ ล้างทั้งหมด</button>
+                </div>
+                <div class="grade-list" id="stockGradeList"></div>
+              </div>
+            </div>
+          </label>
 
-      <label>สถานะม้วน
-        <select id="stockRollStatus">
-          <option value="all">ทั้งหมด</option>
-          <option value="full">ม้วนเต็ม</option>
-          <option value="scrap">ม้วนเศษ</option>
-        </select>
-      </label>
+          <label>ลูกค้า <select id="stockCustomer"><option value="">ทั้งหมด</option></select></label>
 
-      <button class="primary" onclick="renderStockMatrix()">🔍 ค้นหา</button>
-      <button class="admin-only" onclick="document.getElementById('fileStock').click()">📥 Import Excel</button>
-      <input type="file" id="fileStock" accept=".xlsx,.xls" class="hidden" onchange="importStock(event)">
-      <button onclick="window.print()">🖨 พิมพ์ (A4 แนวนอน)</button>
+          <label>Location
+            <select id="stockLoc">
+              <option value="">ทั้งหมด</option>
+              <option value="LOC1">LOC1</option>
+              <option value="LOCF">LOCF</option>
+            </select>
+          </label>
+
+          <label>สถานะม้วน
+            <select id="stockRollStatus">
+              <option value="all">ทั้งหมด</option>
+              <option value="full">ม้วนเต็ม</option>
+              <option value="scrap">ม้วนเศษ</option>
+            </select>
+          </label>
+
+          <button class="primary" onclick="renderStockMatrix()">🔍 ค้นหา</button>
+          <button class="admin-only" onclick="openStockImportModal()">📥 Import Excel</button>
+          <input type="file" id="fileStock" accept=".xlsx,.xls" class="hidden" onchange="importStock(event)">
+          <button onclick="window.print()">🖨 พิมพ์ (A4 แนวนอน)</button>
+        </div>
+
+        <div id="stockImportMsg"></div>
+        <div id="stockProgress" class="hidden"></div>
+
+        <div id="stockBody"></div>
+      </div>
     </div>
 
-    <div id="stockImportMsg"></div>
-    <div id="stockProgress" class="hidden"></div>
+    <!-- ========== TAB 3: SUMMARY (Receive Summary) ========== -->
+    <div id="tab-summary" class="hidden">
+      <div class="card">
+        <div class="report-head">
+          <div></div>
+          <div class="report-title" id="summaryReportTitle">
+            ตารางสรุปรายการสั่งเข้า<br>ประจำวันที่
+          </div>
+          <div class="report-doc">FQ-ษ6-06-06 rev.01</div>
+        </div>
 
-    <div id="stockBody"></div>
-  </div>
-</div>
+        <div class="filters no-print">
+          <label>📅 วันที่รับเข้า <input type="date" id="summaryDate"></label>
 
-<!-- ========== STOCK DETAIL MODAL ========== -->
-<div class="modal-bg" id="modalStockDetail">
-  <div class="modal" style="max-width:900px">
-    <div class="modal-head">
-      <h3 id="stockDetailTitle">รายละเอียด SN</h3>
-      <button onclick="closeModal('modalStockDetail')">ปิด</button>
+          <label class="grade-filter-wrap">
+            Gradegrams
+            <div class="grade-filter-box" id="summaryGradeFilterBox">
+              <button type="button" class="grade-filter-btn" id="summaryGradeFilterBtn">
+                <span id="summaryGradeFilterLabel">ทั้งหมด</span>
+                <span class="arrow">▼</span>
+              </button>
+              <div class="grade-dropdown hidden" id="summaryGradeDropdown">
+                <div class="grade-actions">
+                  <button type="button" onclick="selectAllSummaryGrades()">✓ เลือกทั้งหมด</button>
+                  <button type="button" onclick="clearAllSummaryGrades()">✗ ล้างทั้งหมด</button>
+                </div>
+                <div class="grade-list" id="summaryGradeList"></div>
+              </div>
+            </div>
+          </label>
+
+          <label>FSC
+            <select id="summaryFsc">
+              <option value="all">ทั้งหมด</option>
+              <option value="fsc">FSC (มี F)</option>
+              <option value="non_fsc">Non-FSC</option>
+            </select>
+          </label>
+
+          <label>หมายเหตุ
+            <select id="summaryRemark">
+              <option value="">ทั้งหมด</option>
+              <option value="ปั้ม F">ปั้ม F</option>
+              <option value="ปั้ม BT">ปั้ม BT</option>
+              <option value="ปั้ม KTP">ปั้ม KTP</option>
+              <option value="NC">NC</option>
+            </select>
+          </label>
+
+          <label>โหมด
+            <select id="summaryMode">
+              <option value="qty">จำนวน (Quantity)</option>
+              <option value="kg">KG รวม</option>
+              <option value="both">ทั้ง 2</option>
+            </select>
+          </label>
+
+          <button class="primary" onclick="renderSummary()">🔍 ค้นหา</button>
+          <button onclick="window.print()">🖨 พิมพ์ (A4 แนวนอน)</button>
+        </div>
+
+        <div id="summaryBody"></div>
+      </div>
     </div>
-    <div id="stockDetailBody"></div>
-  </div>
-</div>
-    
-    <!-- ========== DATA ========== -->
+
+    <!-- ========== TAB 4: RECEIVE (Roll Receive) ========== -->
+    <div id="tab-receive" class="hidden">
+      <div class="card">
+        <div class="report-head">
+          <div></div>
+          <div class="report-title" id="receiveReportTitle">
+            รายการรับม้วนกระดาษเข้าคลัง<br>ประจำวันที่
+          </div>
+          <div class="report-doc">FQ-ษ6-06-07 rev.01</div>
+        </div>
+
+        <div class="filters no-print">
+          <label>📅 วันที่รับเข้า <input type="date" id="receiveDate"></label>
+
+          <label class="grade-filter-wrap">
+            Gradegrams
+            <div class="grade-filter-box" id="receiveGradeFilterBox">
+              <button type="button" class="grade-filter-btn" id="receiveGradeFilterBtn">
+                <span id="receiveGradeFilterLabel">ทั้งหมด</span>
+                <span class="arrow">▼</span>
+              </button>
+              <div class="grade-dropdown hidden" id="receiveGradeDropdown">
+                <div class="grade-actions">
+                  <button type="button" onclick="selectAllReceiveGrades()">✓ เลือกทั้งหมด</button>
+                  <button type="button" onclick="clearAllReceiveGrades()">✗ ล้างทั้งหมด</button>
+                </div>
+                <div class="grade-list" id="receiveGradeList"></div>
+              </div>
+            </div>
+          </label>
+
+          <label>Supplier
+            <select id="receiveSupplier">
+              <option value="">ทั้งหมด</option>
+              <option value="EKP">EKP</option>
+              <option value="MKP">MKP</option>
+              <option value="SCK">SCK</option>
+            </select>
+          </label>
+
+          <label>FSC
+            <select id="receiveFsc">
+              <option value="all">ทั้งหมด</option>
+              <option value="fsc">FSC (มี F)</option>
+              <option value="non_fsc">Non-FSC</option>
+            </select>
+          </label>
+
+          <label>หมายเหตุ
+            <select id="receiveRemark">
+              <option value="">ทั้งหมด</option>
+              <option value="ปั้ม F">ปั้ม F</option>
+              <option value="ปั้ม BT">ปั้ม BT</option>
+              <option value="ปั้ม KTP">ปั้ม KTP</option>
+              <option value="NC">NC</option>
+            </select>
+          </label>
+
+          <label>โหมด
+            <select id="receiveMode">
+              <option value="matrix">ตาราง Matrix</option>
+              <option value="list">ตารางรายการ</option>
+            </select>
+          </label>
+
+          <button class="primary" onclick="renderReceive()">🔍 ค้นหา</button>
+          <button class="admin-only" onclick="openReceiveImportModal()">📥 Import Excel</button>
+          <input type="file" id="fileReceive" accept=".xlsx,.xls" class="hidden" onchange="importReceive(event)">
+          <button onclick="window.print()">🖨 พิมพ์ (A4 แนวนอน)</button>
+        </div>
+
+        <div id="receiveImportMsg"></div>
+        <div id="receiveProgress" class="hidden"></div>
+
+        <div id="receiveBody"></div>
+      </div>
+    </div>
+
+    <!-- ========== TAB 5: ALERT ========== -->
+    <div id="tab-alert" class="hidden">
+      <div class="card">
+        <div class="report-head">
+          <div></div>
+          <div class="report-title" id="alertReportTitle">
+            🚨 แจ้งเตือนสั่งซื้อ (Roll Alert)<br>ประจำวันที่
+          </div>
+          <div class="report-doc">FQ-ษ6-06-08 rev.01</div>
+        </div>
+
+        <div class="filters no-print">
+          <label>📅 วันที่วิเคราะห์ <input type="date" id="alertDate"></label>
+
+          <label>📅 Stock ณ วันที่ <input type="date" id="alertStockDate"></label>
+
+          <label>📅 Receive วันที่ <input type="date" id="alertReceiveDate"></label>
+
+          <label>Demand จาก Stock Level
+            <select id="alertMonths">
+              <option value="3">3 เดือนย้อนหลัง</option>
+              <option value="1">1 เดือน</option>
+              <option value="6">6 เดือน</option>
+            </select>
+          </label>
+
+          <label class="grade-filter-wrap">
+            Gradegrams
+            <div class="grade-filter-box" id="alertGradeFilterBox">
+              <button type="button" class="grade-filter-btn" id="alertGradeFilterBtn">
+                <span id="alertGradeFilterLabel">ทั้งหมด</span>
+                <span class="arrow">▼</span>
+              </button>
+              <div class="grade-dropdown hidden" id="alertGradeDropdown">
+                <div class="grade-actions">
+                  <button type="button" onclick="selectAllAlertGrades()">✓ เลือกทั้งหมด</button>
+                  <button type="button" onclick="clearAllAlertGrades()">✗ ล้างทั้งหมด</button>
+                </div>
+                <div class="grade-list" id="alertGradeList"></div>
+              </div>
+            </div>
+          </label>
+
+          <label><input type="checkbox" id="alertIncludeCustomer"> รวมม้วนลูกค้า</label>
+          <label><input type="checkbox" id="alertOnlyShortage" checked> แสดงเฉพาะที่ต้องสั่ง</label>
+
+          <button class="primary" onclick="renderAlert()">🔍 วิเคราะห์</button>
+          <button onclick="exportAlert()">📤 Export Excel</button>
+          <button onclick="window.print()">🖨 พิมพ์</button>
+        </div>
+
+        <div id="alertBody"></div>
+      </div>
+    </div>
+
+    <!-- ========== TAB 6: DATA ========== -->
     <div id="tab-data" class="hidden">
       <div class="card">
         <h2>Data — ทุกคอลัมน์จาก Excel</h2>
@@ -193,7 +373,7 @@
       </div>
     </div>
 
-    <!-- ========== SETTINGS ========== -->
+    <!-- ========== TAB 7: SETTINGS ========== -->
     <div id="tab-settings" class="hidden">
       <div class="card">
         <h2>⚙ ตั้งค่า</h2>
@@ -313,6 +493,71 @@
   </div>
 </div>
 
+<!-- Stock Detail -->
+<div class="modal-bg" id="modalStockDetail">
+  <div class="modal" style="max-width:900px">
+    <div class="modal-head">
+      <h3 id="stockDetailTitle">รายละเอียด SN</h3>
+      <button onclick="closeModal('modalStockDetail')">ปิด</button>
+    </div>
+    <div id="stockDetailBody"></div>
+  </div>
+</div>
+
+<!-- Stock Import -->
+<div class="modal-bg" id="modalStockImport">
+  <div class="modal" style="max-width:480px">
+    <h3>📥 Import Stock คงเหลือ</h3>
+    <div id="stockImportError"></div>
+    <div class="form-grid" style="grid-template-columns:1fr">
+      <label>วันที่ Stock คงเหลือ <input type="date" id="stockImportDate"></label>
+    </div>
+    <div class="hint">ค่าเริ่มต้น = เมื่อวาน (Stock คงเหลือจากการใช้งานเมื่อวาน)</div>
+    <div class="form-actions">
+      <button onclick="closeModal('modalStockImport')">ยกเลิก</button>
+      <button class="primary" onclick="document.getElementById('fileStock').click()">เลือกไฟล์ Excel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Receive Import -->
+<div class="modal-bg" id="modalReceiveImport">
+  <div class="modal" style="max-width:480px">
+    <h3>📥 Import Roll Receive</h3>
+    <div id="receiveImportError"></div>
+    <div class="form-grid" style="grid-template-columns:1fr">
+      <label>วันที่รับเข้า <input type="date" id="receiveImportDate"></label>
+    </div>
+    <div class="hint">ค่าเริ่มต้น = วันนี้</div>
+    <div class="form-actions">
+      <button onclick="closeModal('modalReceiveImport')">ยกเลิก</button>
+      <button class="primary" onclick="document.getElementById('fileReceive').click()">เลือกไฟล์ Excel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Receive Detail -->
+<div class="modal-bg" id="modalReceiveDetail">
+  <div class="modal" style="max-width:1000px">
+    <div class="modal-head">
+      <h3 id="receiveDetailTitle">รายละเอียด PO</h3>
+      <button onclick="closeModal('modalReceiveDetail')">ปิด</button>
+    </div>
+    <div id="receiveDetailBody"></div>
+  </div>
+</div>
+
+<!-- Summary Detail -->
+<div class="modal-bg" id="modalSummaryDetail">
+  <div class="modal" style="max-width:1000px">
+    <div class="modal-head">
+      <h3 id="summaryDetailTitle">รายละเอียด PO</h3>
+      <button onclick="closeModal('modalSummaryDetail')">ปิด</button>
+    </div>
+    <div id="summaryDetailBody"></div>
+  </div>
+</div>
+
 <!-- User Form -->
 <div class="modal-bg" id="modalUser">
   <div class="modal" style="max-width:520px">
@@ -351,24 +596,12 @@
     </div>
   </div>
 </div>
-<!-- Stock Import Modal -->
-<div class="modal-bg" id="modalStockImport">
-  <div class="modal" style="max-width:480px">
-    <h3>📥 Import Stock คงเหลือ</h3>
-    <div id="stockImportError"></div>
-    <div class="form-grid" style="grid-template-columns:1fr">
-      <label>วันที่ Stock คงเหลือ
-        <input type="date" id="stockImportDate">
-      </label>
-    </div>
-    <div class="hint">ค่าเริ่มต้น = เมื่อวาน (Stock คงเหลือจากการใช้งานเมื่อวาน)</div>
-    <div class="form-actions">
-      <button onclick="closeModal('modalStockImport')">ยกเลิก</button>
-      <button class="primary" onclick="confirmStockImport()">เลือกไฟล์ Excel</button>
-    </div>
-  </div>
-</div>
-  
+
+<!-- Load Scripts -->
 <script src="app.js"></script>
+<script src="stock.js"></script>
+<script src="receive.js"></script>
+<script src="summary.js"></script>
+<script src="alert.js"></script>
 </body>
 </html>
