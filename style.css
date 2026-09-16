@@ -133,3 +133,77 @@ th{background:#f1f5f9;font-weight:600}
   .form-grid{grid-template-columns:1fr}
   .nav{height:auto;padding:10px}
 }
+/* ============================================================
+   V6 — MATRIX FULL PAGE + GRADE FILTER
+   ============================================================ */
+
+/* Matrix — เต็มหน้าจอ */
+#tab-matrix .card {
+    padding: 12px 16px;
+}
+
+/* Filter bar — sticky */
+#tab-matrix .filters {
+    position: sticky;
+    top: 56px;              /* ใต้ nav */
+    background: #fff;
+    z-index: 30;
+    padding: 10px 0;
+    border-bottom: 1px solid #e2e8f0;
+    margin-bottom: 8px;
+}
+
+/* Report wrap — ขยายเต็ม ไม่ scroll ในกรอบ */
+#tab-matrix .report-wrap {
+    max-height: none;        /* ยกเลิก max-height เดิม */
+    overflow-x: auto;        /* scroll แนวนอน */
+    overflow-y: visible;     /* ไม่ scroll แนวตั้ง */
+    width: 100%;
+}
+
+/* ตาราง Matrix */
+#tab-matrix .report-table {
+    font-size: 12px;
+    width: 100%;
+}
+
+/* Header sticky */
+#tab-matrix .report-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: #e2e8f0;
+}
+
+/* คอลัมน์แรก (grade) — sticky left */
+#tab-matrix .report-table .grade-col {
+    position: sticky;
+    left: 0;
+    z-index: 4;
+    background: #f1f5f9;
+}
+
+#tab-matrix .report-table thead .grade-col {
+    z-index: 6;
+}
+
+/* Grade Filter — multi-select */
+#qGradeFilter {
+    min-width: 200px;
+    max-width: 320px;
+    height: auto;
+    padding: 4px;
+}
+
+#qGradeFilter option {
+    padding: 4px 8px;
+    font-size: 13px;
+}
+
+/* Print — ไม่มี sticky */
+@media print {
+    #tab-matrix .filters { position: static; }
+    #tab-matrix .report-wrap { overflow: visible; max-height: none; }
+    #tab-matrix .report-table thead th,
+    #tab-matrix .report-table .grade-col { position: static; }
+}
