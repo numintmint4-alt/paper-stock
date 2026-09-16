@@ -157,3 +157,134 @@ th{background:#f1f5f9;font-weight:600}
   .nav{height:auto;padding:10px}
   .grade-filter-box{min-width:160px}
 }
+/* ============================================================
+   V6 ส่วนที่ 4: หน้า Stock คงเหลือ
+   ============================================================ */
+
+/* Stock Report — คล้าย Matrix */
+#tab-stock .report-wrap {
+    overflow-x: auto;
+    overflow-y: visible;
+    width: 100%;
+}
+
+#tab-stock .report-table {
+    font-size: 12px;
+    table-layout: auto;
+    width: 100%;
+}
+
+#tab-stock .report-table th,
+#tab-stock .report-table td {
+    border: 1px solid #94a3b8;
+    padding: 4px 6px;
+    text-align: center;
+    white-space: nowrap;
+}
+
+#tab-stock .report-table thead th {
+    background: #e2e8f0;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+}
+
+#tab-stock .report-table .grade-col {
+    background: #f1f5f9;
+    font-weight: 600;
+    text-align: left;
+    padding-left: 10px;
+    min-width: 90px;
+    position: sticky;
+    left: 0;
+    z-index: 4;
+}
+
+#tab-stock .report-table thead .grade-col {
+    z-index: 6;
+}
+
+#tab-stock .report-table td.empty {
+    color: #cbd5e1;
+}
+
+#tab-stock .report-table td.clickable {
+    cursor: pointer;
+    background: #fffbeb;
+}
+
+#tab-stock .report-table td.clickable:hover {
+    background: #fde68a;
+}
+
+/* Cell แสดง (เต็ม+เศษ) */
+#tab-stock .report-table td .cell-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+#tab-stock .report-table td .cell-main {
+    font-weight: 700;
+    color: #1e293b;
+    font-size: 13px;
+}
+
+#tab-stock .report-table td .cell-sub {
+    font-size: 10px;
+    color: #64748b;
+}
+
+#tab-stock .report-table .total-col {
+    background: #e0e7ff;
+    font-weight: 600;
+}
+
+#tab-stock .report-table .total-row td {
+    background: #cbd5e1;
+    font-weight: 700;
+}
+
+#tab-stock .report-table .total-row .total-col {
+    background: #a5b4fc;
+}
+
+/* Stock Detail Modal */
+#stockDetailBody table {
+    font-size: 12px;
+    width: 100%;
+}
+
+#stockDetailBody th {
+    background: #1e293b;
+    color: #fff;
+    padding: 8px 10px;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+#stockDetailBody td {
+    padding: 6px 10px;
+    border: 1px solid #e2e8f0;
+}
+
+#stockDetailBody tr.full-row {
+    background: #dcfce7;
+}
+
+#stockDetailBody tr.scrap-row {
+    background: #fef3c7;
+}
+
+/* Print */
+@media print {
+    #tab-stock .report-wrap {
+        overflow: visible;
+    }
+    #tab-stock .report-table thead th,
+    #tab-stock .report-table .grade-col {
+        position: static;
+    }
+}
