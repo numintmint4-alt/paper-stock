@@ -268,147 +268,108 @@ async function refreshAll() {
   renderMatrix();
 }
 
-// ================= V6 — GRADEGRAMS FILTER (search + multi-select) =================
+// ================= V6 — GRADEGRAMS FILTER (checkbox) =================
 let selectedGrades = [];        // เกรดที่เลือก
 let allGradesList = [];         // เกรดทั้งหมด
-let activeDropdownIndex = -1;   // สำหรับ keyboard navigate
 
 // โหลดรายการเกรดทั้งหมด
 async function loadGradeFilter() {
-  // unique grade จาก masterCache
   allGradesList = [...new Set(masterCache.map(m => m.grade))].sort();
 
-  // render chips + input
-  renderGradeChips();
+  renderGradeList();
+  updateGradeFilterLabel();
 
-  const input = $('gradeSearch');
+  const btn = $('gradeFilterBtn');
   const dropdown = $('gradeDropdown');
   const box = $('gradeFilterBox');
 
-  if (!input || !dropdown || !box) return;
+  if (!btn || !dropdown || !box) return;
 
-  // เปิด dropdown เมื่อ focus
-  input.addEventListener('focus', () => {
-    showGradeDropdown('');
-  });
-
-  // พิมพ์ค้นหา
-  input.addEventListener('input', (e) => {
-    showGradeDropdown(e.target.value);
-  });
-
-  // keyboard navigate
-  input.addEventListener('keydown', (e) => {
-    const items = dropdown.querySelectorAll('.item');
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      activeDropdownIndex = Math.min(activeDropdownIndex + 1, items.length - 1);
-      updateActiveItem(items);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      activeDropdownIndex = Math.max(activeDropdownIndex - 1, 0);
-      updateActiveItem(items);
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      if (activeDropdownIndex >= 0 && items[activeDropdownIndex]) {
-        items[activeDropdownIndex].click();
-      }
-    } else if (e.key === 'Backspace' && input.value === '' && selectedGrades.length > 0) {
-      // ลบ chip ล่าสุด
-      selectedGrades.pop();
-      renderGradeChips();
-    } else if (e.key === 'Escape') {
-      hideGradeDropdown();
+  // toggle dropdown
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isHidden = dropdown.classList.contains('hidden');
+    if (isHidden) {
+      dropdown.classList.remove('hidden');
+      btn.classList.add('open');
+    } else {
+      dropdown.classList.add('hidden');
+      btn.classList.remove('open');
     }
   });
 
   // ปิด dropdown เมื่อคลิกนอก
   document.addEventListener('click', (e) => {
-    if (!box.contains(e.target)) hideGradeDropdown();
-  });
-
-  // คลิกที่ box → focus input
-  box.addEventListener('click', (e) => {
-    if (e.target === box) input.focus();
-  });
-}
-
-// แสดง dropdown
-function showGradeDropdown(query) {
-  const dropdown = $('gradeDropdown');
-  const q = String(query || '').trim().toUpperCase();
-
-  const available = allGradesList.filter(g => !selectedGrades.includes(g));
-  const filtered = q ? available.filter(g => g.toUpperCase().includes(q)) : available;
-
-  if (!filtered.length) {
-    dropdown.innerHTML = '<div class="empty">ไม่พบเกรดที่ตรงกัน</div>';
-  } else {
-    dropdown.innerHTML = filtered.map((g, i) =>
-      `<div class="item" data-grade="${esc(g)}" data-index="${i}">${esc(g)}</div>`
-    ).join('');
-  }
-
-  dropdown.classList.remove('hidden');
-  activeDropdownIndex = -1;
-
-  // คลิกที่ item
-  dropdown.querySelectorAll('.item').forEach(el => {
-    el.addEventListener('click', () => {
-      addGrade(el.dataset.grade);
-    });
-  });
-}
-
-// อัปเดต active item (keyboard)
-function updateActiveItem(items) {
-  items.forEach((el, i) => {
-    el.classList.toggle('active', i === activeDropdownIndex);
-    if (i === activeDropdownIndex) {
-      el.scrollIntoView({ block: 'nearest' });
+    if (!box.contains(e.target)) {
+      dropdown.classList.add('hidden');
+      btn.classList.remove('open');
     }
   });
 }
 
-// ซ่อน dropdown
-function hideGradeDropdown() {
-  const dropdown = $('gradeDropdown');
-  if (dropdown) dropdown.classList.add('hidden');
-  activeDropdownIndex = -1;
-}
+// render checkbox list
+function renderGradeList() {
+  const list = $('gradeList');
+  if (!list) return;
 
-// เพิ่มเกรด
-function addGrade(grade) {
-  if (!grade || selectedGrades.includes(grade)) return;
-  selectedGrades.push(grade);
-  renderGradeChips();
+  if (!allGradesList.length) {
+    list.innerHTML = '<div style="padding:10px;text-align:center;color:#94a3b8;font-size:13px">ไม่มีข้อมูลเกรด</div>';
+    return;
+  }
 
-  // clear input
-  const input = $('gradeSearch');
-  if (input) { input.value = ''; input.focus(); }
+  list.innerHTML = allGradesList.map(g => {
+    const checked = selectedGrades.includes(g);
+    return `<label class="item ${checked ? 'checked' : ''}" data-grade="${esc(g)}">
+      <input type="checkbox" ${checked ? 'checked' : ''}>
+      <span>${esc(g)}</span>
+    </label>`;
+  }).join('');
 
-  // refresh dropdown
-  showGradeDropdown('');
-}
-
-// ลบเกรด
-function removeGrade(grade) {
-  selectedGrades = selectedGrades.filter(g => g !== grade);
-  renderGradeChips();
-}
-
-// render chips
-function renderGradeChips() {
-  const chips = $('gradeChips');
-  if (!chips) return;
-  chips.innerHTML = selectedGrades.map(g =>
-    `<span class="grade-chip" data-grade="${esc(g)}">${esc(g)} <span class="x">×</span></span>`
-  ).join('');
-
-  // คลิก chip → ลบ
-  chips.querySelectorAll('.grade-chip').forEach(el => {
-    el.addEventListener('click', () => removeGrade(el.dataset.grade));
+  // ผูก event
+  list.querySelectorAll('.item').forEach(el => {
+    const cb = el.querySelector('input[type="checkbox"]');
+    cb.addEventListener('change', () => {
+      const grade = el.dataset.grade;
+      if (cb.checked) {
+        if (!selectedGrades.includes(grade)) selectedGrades.push(grade);
+      } else {
+        selectedGrades = selectedGrades.filter(g => g !== grade);
+      }
+      el.classList.toggle('checked', cb.checked);
+      updateGradeFilterLabel();
+    });
   });
+}
+
+// อัปเดต label บนปุ่ม
+function updateGradeFilterLabel() {
+  const label = $('gradeFilterLabel');
+  if (!label) return;
+
+  if (selectedGrades.length === 0) {
+    label.textContent = 'ทั้งหมด';
+    label.style.color = '#1e293b';
+  } else if (selectedGrades.length === 1) {
+    label.textContent = selectedGrades[0];
+    label.style.color = '#1e40af';
+  } else {
+    label.textContent = `เลือก ${selectedGrades.length} เกรด`;
+    label.style.color = '#1e40af';
+  }
+}
+
+// เลือกทั้งหมด
+function selectAllGrades() {
+  selectedGrades = [...allGradesList];
+  renderGradeList();
+  updateGradeFilterLabel();
+}
+
+// ล้างทั้งหมด
+function clearAllGrades() {
+  selectedGrades = [];
+  renderGradeList();
+  updateGradeFilterLabel();
 }
 
 // ดึงเกรดที่เลือก
