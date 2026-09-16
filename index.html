@@ -3,128 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ระบบ Stock ม้วนกระดาษ V4</title>
+<title>ระบบ Stock ม้วนกระดาษ V5</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<style>
-*{box-sizing:border-box}
-body{margin:0;font-family:'Sarabun',sans-serif;background:#f5f6fa;color:#222}
-.hidden{display:none!important}
-.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1e293b,#334155)}
-.login-card{background:#fff;padding:40px 36px;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);width:380px;max-width:92vw}
-.login-card h1{margin:0 0 6px;font-size:22px;color:#1e293b}
-.login-card p{margin:0 0 24px;font-size:13px;color:#64748b}
-.login-card label{display:block;margin-bottom:14px;font-size:13px;color:#475569;font-weight:600}
-.login-card input{display:block;width:100%;margin-top:5px;padding:10px 12px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:15px;font-family:inherit}
-.login-card input:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.15)}
-.login-card button{width:100%;padding:11px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit}
-.login-card button:hover{background:#1d4ed8}
-.login-card button:disabled{background:#94a3b8;cursor:not-allowed}
-.login-msg{margin-top:14px;padding:10px;border-radius:8px;font-size:13px;text-align:center}
-.login-msg.err{background:#fee2e2;color:#dc2626}
-.login-msg.ok{background:#dcfce7;color:#166534}
-.nav{background:#1e293b;color:#fff;display:flex;gap:4px;align-items:center;height:56px;padding:0 20px;flex-wrap:wrap;position:sticky;top:0;z-index:50}
-.nav strong{margin-right:16px;font-size:15px}
-.nav button{color:#cbd5e1;background:none;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:14px;font-family:inherit}
-.nav button:hover{color:#fff;background:#334155}
-.nav button.active{background:#334155;color:#fff}
-.nav .spacer{flex:1}
-.nav .user-badge{font-size:13px;padding:5px 12px;background:#334155;border-radius:20px}
-.nav .logout{padding:6px 12px;background:#dc2626;color:#fff;border-radius:6px;font-size:13px}
-.container{max-width:1600px;margin:auto;padding:20px}
-.card{background:#fff;border-radius:10px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:16px}
-h2{margin-top:0;font-size:19px}
-h3{font-size:16px}
-button.primary{background:#2563eb;color:#fff;border-color:#2563eb}
-button.danger{background:#dc2626;color:#fff;border-color:#dc2626}
-button,input,select{font-family:inherit;font-size:14px}
-button{padding:7px 14px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;cursor:pointer}
-button:hover{background:#f1f5f9}
-button.primary:hover{background:#1d4ed8}
-button.danger:hover{background:#b91c1c}
-button:disabled{opacity:.5;cursor:not-allowed}
-input,select{padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px}
-.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
-.filters label{font-size:13px;display:flex;gap:5px;align-items:center}
-.msg{padding:10px 14px;border-radius:8px;margin:10px 0;font-size:14px;line-height:1.6}
-.msg.err{background:#fee2e2;color:#dc2626}
-.msg.ok{background:#dcfce7;color:#166534}
-.msg.info{background:#dbeafe;color:#1e40af}
-table{border-collapse:collapse;width:100%;font-size:13px}
-th,td{border:1px solid #e2e8f0;padding:6px 8px;text-align:left}
-th{background:#f1f5f9;font-weight:600}
-.report-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1e293b;padding-bottom:10px;margin-bottom:10px;gap:16px}
-.report-title{text-align:center;flex:1;font-weight:600;font-size:16px;line-height:1.5}
-.report-subtitle{text-align:center;font-size:13px;color:#64748b;font-weight:400;margin-top:4px}
-.report-doc{font-size:12px;color:#475569;white-space:nowrap}
-.report-wrap{overflow:auto;max-height:72vh}
-.report-table{font-size:12px;table-layout:auto}
-.report-table th,.report-table td{border:1px solid #94a3b8;padding:3px 6px;text-align:center;white-space:nowrap}
-.report-table thead th{background:#e2e8f0;position:sticky;top:0;z-index:2}
-.report-table .grade-col{background:#f1f5f9;font-weight:600;text-align:left;padding-left:10px;min-width:75px;position:sticky;left:0;z-index:1}
-.report-table thead .grade-col{z-index:3}
-.report-table td.empty{color:#cbd5e1}
-.report-table td.clickable{cursor:pointer;background:#fffbeb}
-.report-table td.clickable:hover{background:#fde68a}
-.report-table .total-col{background:#e0e7ff;font-weight:600}
-.report-table .total-row td{background:#cbd5e1;font-weight:700}
-.report-table .total-row .total-col{background:#a5b4fc}
-.report-foot{margin-top:10px;font-size:12px;color:#64748b;text-align:right}
-.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:100;padding:16px}
-.modal-bg.show{display:flex}
-.modal{background:#fff;border-radius:10px;padding:22px;max-width:1400px;width:100%;max-height:88vh;overflow:auto}
-.modal h3{margin:0 0 12px}
-.modal-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
-.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.form-grid label{font-size:13px;display:block;color:#475569;font-weight:600}
-.form-grid input,.form-grid select{display:block;width:100%;margin-top:4px}
-.form-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
-.hint{font-size:12px;color:#64748b;margin:4px 0 8px 0}
-
-/* Accordion */
-.acc-item{border:1px solid #e2e8f0;border-radius:10px;margin-bottom:10px;overflow:hidden}
-.acc-head{background:#f1f5f9;padding:14px 18px;cursor:pointer;font-weight:600;display:flex;justify-content:space-between;align-items:center;user-select:none}
-.acc-head:hover{background:#e2e8f0}
-.acc-head .arrow{transition:transform .2s}
-.acc-head.open .arrow{transform:rotate(90deg)}
-.acc-body{padding:16px 18px}
-
-/* Progress */
-.progress-wrap{background:#e2e8f0;border-radius:8px;height:24px;overflow:hidden;margin:10px 0;position:relative}
-.progress-bar{background:linear-gradient(90deg,#2563eb,#3b82f6);height:100%;width:0;transition:width .3s ease}
-.progress-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#1e293b}
-
-/* Data table */
-.data-scroll{overflow:auto;max-height:70vh;border:1px solid #e2e8f0;border-radius:8px}
-.data-table{font-size:12px;table-layout:auto;width:max-content;min-width:100%}
-.data-table th{background:#1e293b;color:#fff;position:sticky;top:0;z-index:2;padding:8px 10px;white-space:nowrap}
-.data-table td{padding:6px 10px;white-space:nowrap;border:1px solid #e2e8f0}
-.data-table tr.invalid{background:#fee2e2}
-.data-table tr.invalid td{color:#991b1b}
-.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
-.badge.ok{background:#dcfce7;color:#166534}
-.badge.bad{background:#fee2e2;color:#991b1b}
-
-@media print {
-  @page { size: A4 landscape; margin: 8mm; }
-  .nav,.filters,button,.no-print{display:none!important}
-  .card{box-shadow:none;padding:0}
-  body{background:#fff}
-  .container{padding:0;max-width:100%}
-  .report-wrap{max-height:none;overflow:visible}
-  .report-table{font-size:9px}
-  .report-table th,.report-table td{padding:2px 3px}
-}
-@media (max-width:640px){.form-grid{grid-template-columns:1fr}.nav{height:auto;padding:10px}}
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 
+<!-- ==================== LOGIN ==================== -->
 <div id="loginScreen" class="login-wrap">
   <div class="login-card">
     <h1>📦 ระบบ Stock ม้วนกระดาษ</h1>
-    <p>กรุณาเข้าสู่ระบบ (V4)</p>
+    <p>กรุณาเข้าสู่ระบบ (V5)</p>
     <label>ชื่อผู้ใช้<input id="loginUser" autocomplete="username" placeholder="เช่น sukanya"></label>
     <label>รหัสผ่าน<input id="loginPass" type="password" autocomplete="current-password" placeholder="••••••"></label>
     <button id="loginBtn">เข้าสู่ระบบ</button>
@@ -132,6 +23,7 @@ th{background:#f1f5f9;font-weight:600}
   </div>
 </div>
 
+<!-- ==================== APP ==================== -->
 <div id="app" class="hidden">
   <nav class="nav">
     <strong>📦 Stock ม้วนกระดาษ</strong>
@@ -162,12 +54,10 @@ th{background:#f1f5f9;font-weight:600}
               <option value="6">6 เดือน</option>
             </select>
           </label>
-          <label>Grade <select id="qGrade"><option value="">ทั้งหมด</option></select></label>
-          <label>Gram <select id="qGram"><option value="">ทั้งหมด</option></select></label>
           <label>ลูกค้า <select id="qCustomer"><option value="">ทั้งหมด</option></select></label>
           <span style="font-size:13px;margin-left:8px">แสดง:</span>
-          <label><input type="radio" name="mode" value="max" checked> ยอดสูงสุดต่อวัน</label>
-          <label><input type="radio" name="mode" value="sum"> ยอดรวมทั้งช่วง</label>
+          <label><input type="radio" name="mode" value="actual" checked> ใช้จริง</label>
+          <label><input type="radio" name="mode" value="full"> ม้วนเต็ม</label>
           <button class="primary" onclick="renderMatrix()">ค้นหา</button>
           <button onclick="window.print()">🖨 พิมพ์ (A4 แนวนอน)</button>
         </div>
@@ -200,13 +90,13 @@ th{background:#f1f5f9;font-weight:600}
       </div>
     </div>
 
-    <!-- ========== SETTINGS (Accordion) ========== -->
+    <!-- ========== SETTINGS ========== -->
     <div id="tab-settings" class="hidden">
       <div class="card">
         <h2>⚙ ตั้งค่า</h2>
         <p class="hint">กดหัวข้อเพื่อเปิด/ปิด</p>
 
-        <!-- Accordion 1: Master -->
+        <!-- Master -->
         <div class="acc-item">
           <div class="acc-head" onclick="toggleAcc(this, 'accMaster')">
             <span>📋 Master Data — Grade / Gram / Size</span>
@@ -228,7 +118,7 @@ th{background:#f1f5f9;font-weight:600}
           </div>
         </div>
 
-        <!-- Accordion 2: Roll Paper Use -->
+        <!-- Roll Paper Use -->
         <div class="acc-item">
           <div class="acc-head" onclick="toggleAcc(this, 'accRolluse')">
             <span>📥 Roll Paper Use — Import & ตรวจสอบข้อมูล</span>
@@ -248,7 +138,25 @@ th{background:#f1f5f9;font-weight:600}
           </div>
         </div>
 
-        <!-- Accordion 3: Users -->
+        <!-- Archive (ใหม่ V5) -->
+        <div class="acc-item">
+          <div class="acc-head" onclick="toggleAcc(this, 'accArchive')">
+            <span>📦 Archive ข้อมูลเก่า (เก่ากว่า 2 ปี)</span>
+            <span class="arrow">▶</span>
+          </div>
+          <div class="acc-body hidden" id="accArchive">
+            <p class="hint">ย้ายข้อมูลที่เก่ากว่า <b>2 ปี</b> จากตาราง <b>usage_records</b> ไปเก็บใน <b>usage_records_archive</b> · ข้อมูลจะไม่แสดงใน Matrix อีก</p>
+            <div class="filters">
+              <button class="primary" onclick="previewArchive()">🔍 ดูจำนวนที่พร้อม Archive</button>
+              <button class="primary" onclick="runArchive()">📦 ย้ายไป Archive</button>
+              <button onclick="loadArchiveStats()">📊 ดูสถิติ Archive</button>
+            </div>
+            <div id="archiveMsg"></div>
+            <div id="archiveStats"></div>
+          </div>
+        </div>
+
+        <!-- Users -->
         <div class="acc-item" id="accUsersWrap">
           <div class="acc-head" onclick="toggleAcc(this, 'accUsers')">
             <span>👥 ผู้ใช้</span>
@@ -270,7 +178,9 @@ th{background:#f1f5f9;font-weight:600}
   </div>
 </div>
 
-<!-- ========== MODALS ========== -->
+<!-- ==================== MODALS ==================== -->
+
+<!-- Master Form -->
 <div class="modal-bg" id="modalMaster">
   <div class="modal" style="max-width:600px">
     <h3 id="masterFormTitle">เพิ่ม Master Data</h3>
@@ -289,6 +199,7 @@ th{background:#f1f5f9;font-weight:600}
   </div>
 </div>
 
+<!-- Drill -->
 <div class="modal-bg" id="modalDrill">
   <div class="modal">
     <div class="modal-head">
@@ -299,6 +210,7 @@ th{background:#f1f5f9;font-weight:600}
   </div>
 </div>
 
+<!-- User Form -->
 <div class="modal-bg" id="modalUser">
   <div class="modal" style="max-width:520px">
     <h3 id="userFormTitle">เพิ่มผู้ใช้ใหม่</h3>
@@ -316,1001 +228,27 @@ th{background:#f1f5f9;font-weight:600}
   </div>
 </div>
 
+<!-- Delete Month (V5 — มีคำเตือน + Export) -->
 <div class="modal-bg" id="modalDeleteMonth">
-  <div class="modal" style="max-width:520px">
+  <div class="modal" style="max-width:560px">
     <h3>🗑 ลบ Usage ตามเดือน</h3>
-    <p class="hint">ลบทั้ง <b>usage_records</b> และ <b>usage_records_raw</b> ของเดือนที่เลือก</p>
+    <div class="msg err" style="margin:12px 0">
+      ⚠️ <b>คำเตือน:</b> การลบจะลบทั้ง <b>usage_records</b> และ <b>usage_records_raw</b><br>
+      → Data tab จะหายไปด้วย · <b>ไม่สามารถกู้คืนได้</b><br>
+      → แนะนำให้ <b>Export Excel ก่อนลบ</b>
+    </div>
     <div id="deleteMonthMsg"></div>
     <div class="form-grid" style="grid-template-columns:1fr">
       <label>เลือกเดือน <input type="month" id="delMonth"></label>
     </div>
     <div class="form-actions">
       <button onclick="closeModal('modalDeleteMonth')">ยกเลิก</button>
+      <button onclick="exportMonthBeforeDelete()">📤 Export ก่อนลบ</button>
       <button class="danger" onclick="confirmDeleteMonth()">ลบเดือนนี้</button>
     </div>
   </div>
 </div>
 
-<script>
-// ═══════════════════════════════════════════════
-//  ⚙️  แก้ 3 ค่าตรงนี้
-// ═══════════════════════════════════════════════
-const SUPABASE_URL      = 'https://gwwgycbqzdjlijsuxahx.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_rMoUE6tUsQZHnJu2ULDxFg_4NAiw6wg';
-const EDGE_FUNCTION_URL = 'https://gwwgycbqzdjlijsuxahx.supabase.co/functions/v1/admin-users';
-// ═══════════════════════════════════════════════
-
-if (SUPABASE_URL.includes('xxxxx')) {
-  document.body.innerHTML = '<div style="padding:40px;font-family:sans-serif;color:#dc2626;background:#fee2e2;border-radius:8px;max-width:600px;margin:40px auto"><h2>⚠️ ยังไม่ได้ตั้งค่า</h2><p>กรุณาแก้ 3 ค่าด้านบนสุดของ script</p></div>';
-  throw new Error('Config not set');
-}
-
-const HAS_EDGE_FUNCTION = !EDGE_FUNCTION_URL.includes('xxxxx');
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-let currentUser = null;
-let currentProfile = null;
-let masterCache = [];
-let dataCache = [];
-let matrixRange = { from: '', to: '' };
-
-// ================= HELPERS =================
-const $ = id => document.getElementById(id);
-const pad = n => String(n).padStart(2, '0');
-const THAI_MONTHS = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
-const THAI_MONTHS_SHORT = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-
-function openModal(id) { $(id).classList.add('show'); }
-function closeModal(id) { $(id).classList.remove('show'); }
-function showMsg(elId, html, type = 'ok') { $(elId).innerHTML = `<div class="msg ${type}">${html}</div>`; }
-const isAdmin = () => currentProfile?.role === 'admin';
-const GENERAL_CUSTOMER = '__GENERAL__';
-
-function currentMonthStr() {
-  const d = new Date();
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;
-}
-function currentMonthRange() {
-  const d = new Date(), y = d.getFullYear(), m = d.getMonth();
-  return { from: `${y}-${pad(m+1)}-01`, to: `${y}-${pad(m+1)}-${pad(new Date(y, m+1, 0).getDate())}` };
-}
-function reportMonthRange(reportMonthStr, monthsBack = 3) {
-  if (!reportMonthStr) return { from: '', to: '' };
-  const [y, m] = reportMonthStr.split('-').map(Number);
-  const toDate = new Date(y, m - 1, 0);
-  let fromM = m - monthsBack, fromY = y;
-  while (fromM <= 0) { fromM += 12; fromY -= 1; }
-  return {
-    from: `${fromY}-${pad(fromM)}-01`,
-    to:   `${toDate.getFullYear()}-${pad(toDate.getMonth()+1)}-${pad(toDate.getDate())}`
-  };
-}
-function thaiMonthTitle(monthStr) {
-  if (!monthStr) return '(ทั้งหมด)';
-  const [y, m] = monthStr.split('-').map(Number);
-  return `เดือน ${THAI_MONTHS[m-1]} ${y + 543}`;
-}
-function thaiMonthShort(monthStr) {
-  if (!monthStr) return '-';
-  const [y, m] = monthStr.split('-').map(Number);
-  return `${THAI_MONTHS_SHORT[m-1]} ${String(y+543).slice(-2)}`;
-}
-function toISODate(v) {
-  if (v == null || v === '') return '';
-  if (typeof v === 'number') {
-    const d = new Date(Date.UTC(1899, 11, 30) + v * 86400000);
-    return d.toISOString().slice(0, 10);
-  }
-  if (v instanceof Date) return `${v.getFullYear()}-${pad(v.getMonth()+1)}-${pad(v.getDate())}`;
-  const s = String(v).trim();
-  if (!s) return '';
-  let m = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/);
-  if (m) return `${m[3]}-${pad(m[2])}-${pad(m[1])}`;
-  m = s.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/);
-  if (m) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
-  return s.slice(0, 10);
-}
-function findColumn(row, aliases) {
-  const keys = Object.keys(row);
-  for (const alias of aliases) {
-    const lower = String(alias).toLowerCase().trim();
-    for (const k of keys) {
-      if (String(k).toLowerCase().trim() === lower) return row[k];
-    }
-  }
-  return undefined;
-}
-function esc(s) {
-  if (s == null) return '';
-  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-
-// ================= PAGINATION =================
-async function fetchAllRows(buildQuery, pageSize = 1000, onProgress = null) {
-  const all = [];
-  let from = 0;
-  while (true) {
-    const { data, error } = await buildQuery().range(from, from + pageSize - 1);
-    if (error) throw error;
-    if (!data || data.length === 0) break;
-    all.push(...data);
-    if (onProgress) onProgress(all.length);
-    if (data.length < pageSize) break;
-    from += pageSize;
-  }
-  return all;
-}
-
-// ================= COLUMN ALIASES =================
-const MASTER_COLS = {
-  grade:         ['grade', 'เกรด'],
-  gram:          ['gram', 'แกรม'],
-  size:          ['size', 'ขนาด'],
-  item_code:     ['item_code', 'item', 'รายการ'],
-  std_weight_kg: ['std_weight_kg', 'std_weight', 'น้ำหนัก', 'weight_kg', 'weight']
-};
-
-// 21 คอลัมน์จาก Excel จริง
-const USAGE_COLS = {
-  plant_code:        ['plant_code'],
-  plant_desc:        ['plant_desc'],
-  corrugator_no:     ['corrugator_no'],
-  doc_date:          ['doc_date'],
-  doc_shift:         ['doc_shift'],
-  doc_no:            ['doc_no'],
-  stand:             ['stand'],
-  isn:               ['isn'],
-  roll_ssn:          ['roll_ssn'],
-  grade:             ['grade', 'gradegram', 'grade_gram'],
-  width:             ['width'],
-  quality:           ['quality'],
-  supplier:          ['supplier'],
-  dimeter:           ['dimeter'],
-  kgs:               ['kgs'],
-  return_dimeter:    ['return_dimeter'],
-  return_kgs:        ['return_kgs'],
-  used_kgs:          ['used_kgs'],
-  roll_for_customer: ['roll_for_customer'],
-  loc:               ['loc'],
-  warehouse_no:      ['warehouse_no']
-};
-
-function findItemCode(grade, width) {
-  const g = String(grade).trim().toUpperCase();
-  const w = String(width).trim();
-  const patterns = [];
-  patterns.push(`${g}-${w}`);
-  patterns.push(`${g}-${w.padStart(2, '0')}`);
-  patterns.push(`${g}-${w.padStart(3, '0')}`);
-  patterns.push(`${g}/${w}`);
-  patterns.push(`${g}_${w}`);
-  const m = g.match(/^([A-Z]+)(\d+)$/);
-  if (m) {
-    const p = m[1] + m[2].padStart(3, '0');
-    patterns.push(`${p}-${w}`);
-    patterns.push(`${p}-${w.padStart(2, '0')}`);
-    patterns.push(`${p}-${w.padStart(3, '0')}`);
-    patterns.push(`${p}/${w}`);
-    patterns.push(`${p}_${w}`);
-  }
-  for (const code of patterns) {
-    if (masterCache.find(x => x.item_code === code)) return code;
-  }
-  return null;
-}
-
-// ================= PROGRESS =================
-function showProgress(elId, current, total, label = '') {
-  const el = $(elId);
-  el.classList.remove('hidden');
-  const pct = total > 0 ? Math.round(current / total * 100) : 0;
-  el.innerHTML = `
-    <div class="progress-wrap">
-      <div class="progress-bar" style="width:${pct}%"></div>
-      <div class="progress-text">${label || `กำลังประมวลผล... ${current.toLocaleString()} / ${total.toLocaleString()} (${pct}%)`}</div>
-    </div>`;
-}
-function hideProgress(elId) {
-  const el = $(elId);
-  el.classList.add('hidden');
-  el.innerHTML = '';
-}
-
-// ================= ACCORDION =================
-function toggleAcc(head, bodyId) {
-  const body = $(bodyId);
-  const isOpen = !body.classList.contains('hidden');
-  if (isOpen) {
-    body.classList.add('hidden');
-    head.classList.remove('open');
-  } else {
-    body.classList.remove('hidden');
-    head.classList.add('open');
-    if (bodyId === 'accMaster') renderMaster();
-    if (bodyId === 'accRolluse') renderLatestBatch();
-    if (bodyId === 'accUsers' && HAS_EDGE_FUNCTION) loadUsers();
-  }
-}
-
-// ================= AUTH =================
-async function initSession() {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session) {
-    currentUser = session.user;
-    await loadProfile();
-    showApp();
-  } else showLogin();
-}
-async function loadProfile() {
-  const { data } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
-  currentProfile = data || { role: 'user', full_name: currentUser.email };
-}
-function showLogin() { $('loginScreen').classList.remove('hidden'); $('app').classList.add('hidden'); }
-function showApp() {
-  $('loginScreen').classList.add('hidden');
-  $('app').classList.remove('hidden');
-  $('userBadge').textContent = (currentProfile?.full_name || currentUser.email) + ' · ' + (isAdmin() ? 'Admin' : 'User');
-  document.querySelectorAll('.admin-only').forEach(el => el.classList.toggle('hidden', !isAdmin()));
-  if (!HAS_EDGE_FUNCTION) $('accUsersWrap').classList.add('hidden');
-  refreshAll();
-}
-
-$('loginBtn').onclick = async () => {
-  const username = $('loginUser').value.trim().toLowerCase();
-  const password = $('loginPass').value;
-  const msg = $('loginMsg');
-  msg.className = 'login-msg hidden';
-  if (!username || !password) { msg.className='login-msg err'; msg.textContent='กรอกชื่อผู้ใช้และรหัสผ่าน'; return; }
-  $('loginBtn').disabled = true; $('loginBtn').textContent = 'กำลังเข้าสู่ระบบ...';
-  const { data, error } = await supabase.auth.signInWithPassword({ email: username + '@paper.local', password });
-  $('loginBtn').disabled = false; $('loginBtn').textContent = 'เข้าสู่ระบบ';
-  if (error) { msg.className='login-msg err'; msg.textContent='ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'; return; }
-  currentUser = data.user;
-  await loadProfile();
-  $('loginPass').value = '';
-  showApp();
-};
-$('loginPass').addEventListener('keypress', e => { if (e.key === 'Enter') $('loginBtn').click(); });
-$('loginUser').addEventListener('keypress', e => { if (e.key === 'Enter') $('loginPass').focus(); });
-$('logoutBtn').onclick = async () => {
-  if (!confirm('ออกจากระบบ?')) return;
-  await supabase.auth.signOut();
-  currentUser = null; currentProfile = null; showLogin();
-};
-
-// ================= TABS =================
-document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
-  btn.onclick = () => {
-    document.querySelectorAll('.nav button[data-tab]').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    ['matrix','data','settings'].forEach(t => $('tab-'+t).classList.toggle('hidden', t !== btn.dataset.tab));
-    const t = btn.dataset.tab;
-    if (t === 'matrix') renderMatrix();
-    if (t === 'data') renderData();
-  };
-});
-
-// ================= DATA =================
-async function loadMaster(onProgress = null) {
-  masterCache = await fetchAllRows(
-    () => supabase.from('paper_specs').select('*').order('grade').order('gram').order('size'),
-    1000, onProgress
-  );
-  return masterCache;
-}
-
-async function refreshAll() {
-  await loadMaster();
-  populateFilterDropdowns();
-  renderMatrix();
-}
-
-function populateFilterDropdowns() {
-  const grades = [...new Set(masterCache.map(r => r.grade))].sort();
-  const grams  = [...new Set(masterCache.map(r => r.gram))].sort((a,b)=>a-b);
-  const qG = $('qGrade'); const v = qG.value;
-  qG.innerHTML = '<option value="">ทั้งหมด</option>' + grades.map(g => `<option>${g}</option>`).join('');
-  qG.value = v;
-  const qGr = $('qGram'); const vg = qGr.value;
-  qGr.innerHTML = '<option value="">ทั้งหมด</option>' + grams.map(g => `<option>${g}</option>`).join('');
-  qGr.value = vg;
-}
-
-// ================= MATRIX =================
-async function renderMatrix() {
-  const reportMonth = $('qReportMonth').value;
-  const monthsBack  = Number($('qMonthsBack').value) || 3;
-  matrixRange = reportMonthRange(reportMonth, monthsBack);
-
-  const mode = document.querySelector('input[name="mode"]:checked').value;
-  const grade = $('qGrade').value;
-  const gram = $('qGram').value;
-  const customer = $('qCustomer').value;
-
-  const fromShort = matrixRange.from ? thaiMonthShort(matrixRange.from.slice(0,7)) : '-';
-  const toShort   = matrixRange.to   ? thaiMonthShort(matrixRange.to.slice(0,7))   : '-';
-  const custLabel = customer === '' ? '' :
-                    customer === GENERAL_CUSTOMER ? ' · ลูกค้า: ทั่วไป' : ` · ลูกค้า: ${customer}`;
-
-  $('reportTitle').innerHTML = `
-    ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ<br>
-    ประจำ ${thaiMonthTitle(reportMonth)}
-    <div class="report-subtitle">(ยอดสูงสุดต่อวัน · ย้อนหลัง ${monthsBack} เดือน: ${fromShort} – ${toShort}${custLabel})</div>
-  `;
-
-  $('matrixBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลดข้อมูล...</p>';
-
-  const allUsage = await fetchAllRows(() => {
-    let q = supabase.from('usage_records').select('*');
-    if (matrixRange.from) q = q.gte('usage_date', matrixRange.from);
-    if (matrixRange.to)   q = q.lte('usage_date', matrixRange.to);
-    return q;
-  });
-
-  // populate customer dropdown
-  const custSet = new Set();
-  allUsage.forEach(u => {
-    const c = (u.roll_for_customer || '').trim();
-    if (c) custSet.add(c);
-  });
-  const custList = [...custSet].sort();
-  const custSel = $('qCustomer');
-  const keepVal = custSel.value;
-  custSel.innerHTML = '<option value="">ทั้งหมด</option><option value="__GENERAL__">ทั่วไป (ไม่ระบุลูกค้า)</option>' +
-    custList.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
-  custSel.value = keepVal;
-
-  // filter customer
-  let usage = allUsage;
-  if (customer === GENERAL_CUSTOMER) {
-    usage = allUsage.filter(u => !u.roll_for_customer || !String(u.roll_for_customer).trim());
-  } else if (customer) {
-    usage = allUsage.filter(u => u.roll_for_customer === customer);
-  }
-
-  const mByCode = {}; masterCache.forEach(m => mByCode[m.item_code] = m);
-  if (grade || gram) {
-    usage = usage.filter(u => {
-      const m = mByCode[u.item_code]; if (!m) return false;
-      if (grade && m.grade !== grade) return false;
-      if (gram && String(m.gram) !== String(gram)) return false;
-      return true;
-    });
-  }
-
-  const daily = {};
-  usage.forEach(u => {
-    const key = u.item_code + '|' + u.usage_date;
-    daily[key] = (daily[key] || 0) + Number(u.used_kgs);
-  });
-
-  const perItem = {};
-  Object.entries(daily).forEach(([k, kg]) => {
-    const code = k.split('|')[0];
-    const m = mByCode[code]; if (!m) return;
-    const rolls = kg / Number(m.std_weight_kg);
-    if (!perItem[code]) perItem[code] = { total: 0, max: 0 };
-    perItem[code].total += rolls;
-    if (rolls > perItem[code].max) perItem[code].max = rolls;
-  });
-
-  const rowSet = new Map(), colSet = new Set(), cells = {}, rowTotals = {}, colTotals = {};
-  let grand = 0;
-  Object.entries(perItem).forEach(([code, v]) => {
-    const m = mByCode[code];
-    const rk = m.grade + '|' + m.gram;
-    rowSet.set(rk, m);
-    colSet.add(m.size);
-    const val = mode === 'sum' ? v.total : v.max;
-    const k = rk + '|' + m.size;
-    cells[k] = (cells[k] || 0) + val;
-    rowTotals[rk] = (rowTotals[rk] || 0) + val;
-    colTotals[m.size] = (colTotals[m.size] || 0) + val;
-    grand += val;
-  });
-
-  const rowKeys = [...rowSet.keys()].sort((a,b) => {
-    const [ga, ma] = a.split('|'), [gb, mb] = b.split('|');
-    return ga.localeCompare(gb) || Number(ma) - Number(mb);
-  });
-  const colKeys = [...colSet].sort((a,b) => a - b);
-
-  if (!rowKeys.length) {
-    $('matrixBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่มีข้อมูลในช่วงที่เลือก</p>';
-    return;
-  }
-
-  let html = '<div class="report-wrap"><table class="report-table"><thead><tr><th class="grade-col">grade</th>';
-  colKeys.forEach(s => html += `<th>${s}</th>`);
-  html += '<th class="total-col">Total</th></tr></thead><tbody>';
-
-  rowKeys.forEach(rk => {
-    const [g, gr] = rk.split('|');
-    html += '<tr>';
-    html += `<td class="grade-col">${g}${gr}</td>`;
-    colKeys.forEach(s => {
-      const v = cells[rk + '|' + s];
-      if (!v) html += '<td class="empty">-</td>';
-      else html += `<td class="clickable" onclick="openDrill('${g}','${gr}',${s})">${Number(v).toFixed(2)}</td>`;
-    });
-    html += `<td class="total-col">${Number(rowTotals[rk]).toFixed(2)}</td></tr>`;
-  });
-  html += '<tr class="total-row"><td class="grade-col">Total</td>';
-  colKeys.forEach(s => html += `<td>${Number(colTotals[s] || 0).toFixed(2)}</td>`);
-  html += `<td class="total-col">${Number(grand).toFixed(2)}</td></tr></tbody></table></div>`;
-  html += `<div class="report-foot">แสดงเป็นจำนวนม้วน · ${mode === 'max' ? 'ยอดสูงสุดต่อวัน' : 'ยอดรวมทั้งช่วง'}</div>`;
-  $('matrixBody').innerHTML = html;
-}
-
-// ═══════════════════════════════════════════════
-//  ✅ แก้แล้ว: Drill Modal ตรงกับคอลัมน์จริง
-//  (ตัด job_no + remark ออก — Excel ไม่มี)
-//  ✅ แก้แล้ว: Number(r.used_kgs) อยู่บรรทัดเดียว
-// ═══════════════════════════════════════════════
-async function openDrill(grade, gram, size) {
-  const m = masterCache.find(r => r.grade === grade && String(r.gram) === String(gram) && r.size === size);
-  if (!m) return alert('ไม่พบ Item Code');
-  $('drillTitle').innerHTML = `${m.item_code} <span style="font-weight:400;color:#64748b;font-size:14px">(Grade ${grade} · Gram ${gram} · Size ${size})</span>`;
-  openModal('modalDrill');
-
-  const usage = await fetchAllRows(() => {
-    let q = supabase.from('usage_records').select('*').eq('item_code', m.item_code);
-    if (matrixRange.from) q = q.gte('usage_date', matrixRange.from);
-    if (matrixRange.to)   q = q.lte('usage_date', matrixRange.to);
-    return q;
-  });
-
-  const customer = $('qCustomer').value;
-  let filtered = usage;
-  if (customer === GENERAL_CUSTOMER) filtered = usage.filter(u => !u.roll_for_customer || !String(u.roll_for_customer).trim());
-  else if (customer) filtered = usage.filter(u => u.roll_for_customer === customer);
-
-  const byDate = {};
-  filtered.forEach(u => {
-    if (!byDate[u.usage_date]) byDate[u.usage_date] = { kg: 0, records: [] };
-    byDate[u.usage_date].kg += Number(u.used_kgs);
-    byDate[u.usage_date].records.push(u);
-  });
-  const dates = Object.keys(byDate).sort();
-
-  let html = '<table><thead><tr><th>วันที่</th><th>kg รวม</th><th>Std Weight</th><th>จำนวนม้วน</th><th>รายการ</th><th></th></tr></thead><tbody>';
-  if (!dates.length) html += '<tr><td colspan="6" style="text-align:center;color:#94a3b8">ไม่มีข้อมูล</td></tr>';
-  dates.forEach(d => {
-    const info = byDate[d];
-    const rolls = info.kg / Number(m.std_weight_kg);
-    html += `<tr><td>${d}</td><td>${info.kg.toFixed(2)}</td><td>${m.std_weight_kg}</td>
-      <td><b>${rolls.toFixed(2)}</b></td><td>${info.records.length}</td>
-      <td><button onclick="toggleDate('${d}')">ดู</button></td></tr>
-      <tr id="rec-${d}" class="hidden"><td colspan="6">
-        <table style="background:#fff"><thead><tr><th>Doc No</th><th>ลูกค้า</th><th style="text-align:right">kg</th></tr></thead>
-        <tbody>${info.records.map(r => `<tr><td>${esc(r.doc_no)||'-'}</td>
-          <td>${esc(r.roll_for_customer)||'ทั่วไป'}</td>
-          <td style="text-align:right">${Number(r.used_kgs).toFixed(2)}</td></tr>`).join('')}
-        </tbody></table></td></tr>`;
-  });
-  html += '</tbody></table>';
-  $('drillBody').innerHTML = html;
-}
-function toggleDate(d) { $('rec-'+d).classList.toggle('hidden'); }
-
-// ================= MASTER =================
-function renderMaster() {
-  const q = ($('masterSearch').value || '').toLowerCase();
-  const rows = masterCache.filter(r => !q || (r.grade + r.gram + r.size + r.item_code).toLowerCase().includes(q));
-  let html = '<div style="max-height:550px;overflow:auto"><table><thead><tr><th>#</th><th>Grade</th><th>Gram</th><th>Size</th><th>Item Code</th><th>Std Weight</th><th></th></tr></thead><tbody>';
-  if (!rows.length) html += '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:20px">ไม่มีข้อมูล</td></tr>';
-  rows.forEach((r, i) => {
-    html += `<tr><td>${i+1}</td><td>${r.grade}</td><td>${r.gram}</td><td>${r.size}</td>
-      <td>${r.item_code}</td><td>${Number(r.std_weight_kg).toFixed(2)}</td>
-      <td class="admin-only">${isAdmin() ? `<button onclick="editMaster(${r.id})">แก้ไข</button> <button class="danger" onclick="delMaster(${r.id})">ลบ</button>` : '-'}</td></tr>`;
-  });
-  html += '</tbody></table></div>';
-  html += `<div style="margin-top:8px;font-size:13px;color:#64748b">แสดง ${rows.length} / ${masterCache.length} แถว</div>`;
-  $('masterBody').innerHTML = html;
-}
-let editingMasterId = null;
-function openMasterForm(row) {
-  editingMasterId = row ? row.id : null;
-  $('masterFormTitle').textContent = row ? 'แก้ไข Master Data' : 'เพิ่ม Master Data';
-  $('masterFormError').innerHTML = '';
-  ['Grade','Gram','Size','Item','Weight'].forEach(k => $('f'+k).value = '');
-  if (row) {
-    $('fGrade').value = row.grade; $('fGram').value = row.gram; $('fSize').value = row.size;
-    $('fItem').value = row.item_code;
-    $('fWeight').value = row.std_weight_kg;
-  }
-  openModal('modalMaster');
-}
-function editMaster(id) { openMasterForm(masterCache.find(r => r.id === id)); }
-
-async function saveMaster() {
-  const grade = $('fGrade').value.trim();
-  const gram = Number($('fGram').value);
-  const size = Number($('fSize').value);
-  const item_code = $('fItem').value.trim();
-  const std_weight_kg = Number($('fWeight').value);
-  if (!grade || !gram || !size || !item_code || !std_weight_kg) {
-    $('masterFormError').innerHTML = '<div class="msg err">กรอกให้ครบ (std_weight ต้อง > 0)</div>'; return;
-  }
-  const dup = masterCache.find(r => r.grade === grade && r.gram === gram && r.size === size && r.id !== editingMasterId);
-  if (dup) { $('masterFormError').innerHTML = `<div class="msg err">⚠ ซ้ำกับ ${dup.item_code}</div>`; return; }
-  const payload = { grade, gram, size, item_code, std_weight_kg };
-  let error;
-  if (editingMasterId) ({ error } = await supabase.from('paper_specs').update(payload).eq('id', editingMasterId));
-  else ({ error } = await supabase.from('paper_specs').insert(payload));
-  if (error) { $('masterFormError').innerHTML = `<div class="msg err">${error.message}</div>`; return; }
-  closeModal('modalMaster');
-  await loadMaster(); populateFilterDropdowns(); renderMaster();
-}
-async function delMaster(id) {
-  if (!confirm('ยืนยันลบ?')) return;
-  const { error } = await supabase.from('paper_specs').delete().eq('id', id);
-  if (error) return alert(error.message);
-  await loadMaster(); renderMaster();
-}
-async function clearMaster() {
-  if (!confirm('ลบ Master Data ทั้งหมด?')) return;
-  const { error } = await supabase.from('paper_specs').delete().neq('id', 0);
-  if (error) return alert(error.message);
-  await loadMaster(); populateFilterDropdowns(); renderMaster();
-}
-function exportMaster() {
-  if (!masterCache.length) return alert('ไม่มีข้อมูล');
-  const data = masterCache.map(r => ({
-    grade: r.grade, gram: r.gram, size: r.size,
-    item_code: r.item_code, std_weight_kg: r.std_weight_kg
-  }));
-  const ws = XLSX.utils.json_to_sheet(data);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Master');
-  XLSX.writeFile(wb, `master_${new Date().toISOString().slice(0,10)}.xlsx`);
-}
-
-// ================= IMPORT MASTER (RPC + Progress) =================
-function importMaster(ev) {
-  const f = ev.target.files[0]; if (!f) return;
-  const r = new FileReader();
-  r.onload = async e => {
-    try {
-      showProgress('masterProgress', 0, 1, 'กำลังอ่านไฟล์...');
-      const wb = XLSX.read(e.target.result, { type: 'array' });
-      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-      showProgress('masterProgress', 0, rows.length, `อ่านได้ ${rows.length} แถว กำลังตรวจสอบ...`);
-
-      const payload = [];
-      const errors = [];
-      const seenKeys = new Set();
-
-      rows.forEach((row, i) => {
-        const grade = String(findColumn(row, MASTER_COLS.grade) || '').trim();
-        const gram = Number(findColumn(row, MASTER_COLS.gram));
-        const size = Number(findColumn(row, MASTER_COLS.size));
-        const item_code = String(findColumn(row, MASTER_COLS.item_code) || '').trim();
-        const std_weight_kg = Number(findColumn(row, MASTER_COLS.std_weight_kg));
-
-        if (!grade || !gram || !size || !item_code || !std_weight_kg) {
-          errors.push(`แถว ${i+2}: ข้อมูลไม่ครบ`);
-          return;
-        }
-        const key = `${grade}|${gram}|${size}`;
-        if (seenKeys.has(key)) {
-          errors.push(`แถว ${i+2} (${item_code}): ซ้ำในไฟล์`);
-          return;
-        }
-        seenKeys.add(key);
-        payload.push({ grade, gram, size, item_code, std_weight_kg });
-      });
-
-      if (!payload.length) {
-        hideProgress('masterProgress');
-        showMsg('importMasterMsg', `⚠ ไม่มีแถวที่บันทึกได้ (ทั้งหมด ${rows.length})<br>${errors.slice(0,5).join('<br>')}`, 'err');
-        return;
-      }
-
-      showProgress('masterProgress', 0, 1, `กำลังบันทึก ${payload.length} แถว (transaction)...`);
-      const { data, error } = await supabase.rpc('import_master_batch', { rows: payload });
-      if (error) {
-        hideProgress('masterProgress');
-        showMsg('importMasterMsg', '❌ บันทึกไม่สำเร็จ: ' + error.message + '<br>(rollback แล้ว)', 'err');
-        return;
-      }
-
-      hideProgress('masterProgress');
-      let html = `✅ Master: เพิ่ม ${data.added} · อัปเดต ${data.updated}` + (errors.length ? ` · ⚠ ข้าม ${errors.length}` : '');
-      if (errors.length) html += '<br><br>ตัวอย่าง:<br>' + errors.slice(0, 8).join('<br>');
-      showMsg('importMasterMsg', html, errors.length ? 'err' : 'ok');
-
-      await loadMaster(); populateFilterDropdowns(); renderMaster();
-    } catch (ex) {
-      hideProgress('masterProgress');
-      showMsg('importMasterMsg', 'อ่านไฟล์ไม่สำเร็จ: ' + ex.message, 'err');
-    }
-  };
-  r.readAsArrayBuffer(f);
-  ev.target.value = '';
-}
-
-// ================= DATA TAB =================
-const RAW_COLUMNS = [
-  { key: 'id', label: 'id' },
-  { key: 'import_at', label: 'import_at' },
-  { key: 'import_batch_id', label: 'batch' },
-  { key: 'is_valid', label: 'สถานะ' },
-  { key: 'error_msg', label: 'error' },
-  { key: 'plant_code', label: 'plant_code' },
-  { key: 'plant_desc', label: 'plant_desc' },
-  { key: 'corrugator_no', label: 'corrugator_no' },
-  { key: 'doc_date', label: 'doc_date' },
-  { key: 'doc_shift', label: 'doc_shift' },
-  { key: 'doc_no', label: 'doc_no' },
-  { key: 'stand', label: 'stand' },
-  { key: 'isn', label: 'isn' },
-  { key: 'roll_ssn', label: 'roll_ssn' },
-  { key: 'grade', label: 'grade' },
-  { key: 'width', label: 'width' },
-  { key: 'quality', label: 'quality' },
-  { key: 'supplier', label: 'supplier' },
-  { key: 'dimeter', label: 'dimeter' },
-  { key: 'kgs', label: 'kgs' },
-  { key: 'return_dimeter', label: 'return_dimeter' },
-  { key: 'return_kgs', label: 'return_kgs' },
-  { key: 'used_kgs', label: 'used_kgs' },
-  { key: 'roll_for_customer', label: 'roll_for_customer' },
-  { key: 'loc', label: 'loc' },
-  { key: 'warehouse_no', label: 'warehouse_no' },
-  { key: 'usage_date', label: 'usage_date' },
-  { key: 'item_code', label: 'item_code' }
-];
-
-async function renderData() {
-  $('dataBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
-
-  if (!$('dtBatch').dataset.loaded) {
-    try {
-      const batches = await fetchAllRows(() =>
-        supabase.from('usage_records_raw').select('import_batch_id, import_at').order('import_at', { ascending: false })
-      );
-      const seen = new Map();
-      batches.forEach(b => {
-        if (b.import_batch_id && !seen.has(b.import_batch_id)) {
-          seen.set(b.import_batch_id, b.import_at);
-        }
-      });
-      const arr = [...seen.entries()];
-      $('dtBatch').innerHTML = '<option value="">ทั้งหมด</option>' +
-        arr.map(([id, at]) => `<option value="${id}">${new Date(at).toLocaleString('th-TH')}</option>`).join('');
-      $('dtBatch').dataset.loaded = '1';
-    } catch(e) { /* ignore */ }
-  }
-
-  const from = $('dtFrom').value;
-  const to   = $('dtTo').value;
-  const valid = $('dtValid').value;
-  const batch = $('dtBatch').value;
-
-  const rows = await fetchAllRows(() => {
-    let q = supabase.from('usage_records_raw').select('*').order('id', { ascending: false });
-    if (from)  q = q.gte('usage_date', from);
-    if (to)    q = q.lte('usage_date', to);
-    if (valid === 'valid')   q = q.eq('is_valid', true);
-    if (valid === 'invalid') q = q.eq('is_valid', false);
-    if (batch) q = q.eq('import_batch_id', batch);
-    return q;
-  });
-
-  dataCache = rows;
-
-  let html = '<div class="data-scroll"><table class="data-table"><thead><tr>';
-  RAW_COLUMNS.forEach(c => html += `<th>${c.label}</th>`);
-  html += '</tr></thead><tbody>';
-
-  if (!rows.length) {
-    html += `<tr><td colspan="${RAW_COLUMNS.length}" style="text-align:center;color:#94a3b8;padding:20px">ไม่มีข้อมูล</td></tr>`;
-  } else {
-    rows.slice(0, 2000).forEach(r => {
-      const cls = r.is_valid === false ? 'invalid' : '';
-      html += `<tr class="${cls}">`;
-      RAW_COLUMNS.forEach(c => {
-        let v = r[c.key];
-        if (c.key === 'is_valid') {
-          v = v ? '<span class="badge ok">✓</span>' : '<span class="badge bad">✗</span>';
-        } else if (c.key === 'import_at' && v) {
-          v = new Date(v).toLocaleString('th-TH');
-        } else {
-          v = esc(v);
-        }
-        html += `<td>${v ?? ''}</td>`;
-      });
-      html += '</tr>';
-    });
-  }
-  html += '</tbody></table></div>';
-  html += `<div style="margin-top:8px;font-size:13px;color:#64748b">แสดง ${Math.min(rows.length, 2000)} / ${rows.length} แถว ${rows.length > 2000 ? '(แสดง 2,000 แรก)' : ''}</div>`;
-  $('dataBody').innerHTML = html;
-}
-
-function exportData() {
-  if (!dataCache.length) return alert('ไม่มีข้อมูล');
-  const data = dataCache.map(r => {
-    const o = {};
-    RAW_COLUMNS.forEach(c => { o[c.label] = r[c.key]; });
-    return o;
-  });
-  const ws = XLSX.utils.json_to_sheet(data);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'RawData');
-  XLSX.writeFile(wb, `raw_usage_${new Date().toISOString().slice(0,10)}.xlsx`);
-}
-
-// ================= LATEST BATCH (Valid 10 + Invalid ทั้งหมด) =================
-async function renderLatestBatch() {
-  const el = $('latestBatch');
-  el.innerHTML = '<p style="color:#94a3b8;font-size:13px">กำลังโหลด...</p>';
-
-  const { data: latest } = await supabase
-    .from('usage_records_raw')
-    .select('import_batch_id, import_at')
-    .order('import_at', { ascending: false })
-    .limit(1);
-
-  if (!latest || !latest.length) {
-    el.innerHTML = '<p style="color:#94a3b8;font-size:13px">ยังไม่มีข้อมูลที่ import</p>';
-    return;
-  }
-
-  const batchId = latest[0].import_batch_id;
-  const batchAt = new Date(latest[0].import_at).toLocaleString('th-TH');
-
-  const validRows = await fetchAllRows(() =>
-    supabase.from('usage_records_raw').select('*').eq('import_batch_id', batchId).eq('is_valid', true).limit(10)
-  );
-  const invalidRows = await fetchAllRows(() =>
-    supabase.from('usage_records_raw').select('*').eq('import_batch_id', batchId).eq('is_valid', false)
-  );
-  const totalInBatch = await fetchAllRows(() =>
-    supabase.from('usage_records_raw').select('id', { count: 'exact', head: false }).eq('import_batch_id', batchId)
-  );
-
-  let html = `<div class="msg info">
-    <b>Batch ล่าสุด:</b> ${batchAt}<br>
-    <b>ทั้งหมด:</b> ${totalInBatch.length} แถว · 
-    <b style="color:#166534">ถูกต้อง:</b> ${totalInBatch.length - invalidRows.length} · 
-    <b style="color:#dc2626">ไม่ผ่าน:</b> ${invalidRows.length}
-  </div>`;
-
-  html += '<h3 style="margin-top:16px">✅ ตัวอย่าง 10 แถวที่ถูกต้อง</h3>';
-  html += '<div class="data-scroll" style="max-height:400px"><table class="data-table"><thead><tr>';
-  ['id','doc_date','doc_no','grade','width','used_kgs','item_code','usage_date','roll_for_customer'].forEach(k => html += `<th>${k}</th>`);
-  html += '</tr></thead><tbody>';
-  if (!validRows.length) {
-    html += '<tr><td colspan="9" style="text-align:center;color:#94a3b8">ไม่มีแถวที่ถูกต้อง</td></tr>';
-  } else {
-    validRows.forEach(r => {
-      html += '<tr>';
-      ['id','doc_date','doc_no','grade','width','used_kgs','item_code','usage_date','roll_for_customer'].forEach(k => {
-        html += `<td>${esc(r[k]) ?? ''}</td>`;
-      });
-      html += '</tr>';
-    });
-  }
-  html += '</tbody></table></div>';
-
-  html += `<h3 style="margin-top:16px">❌ แถวที่ไม่ผ่านทั้งหมด (${invalidRows.length} แถว)</h3>`;
-  html += '<div class="data-scroll" style="max-height:400px"><table class="data-table"><thead><tr>';
-  ['id','doc_date','doc_no','grade','width','used_kgs','error_msg'].forEach(k => html += `<th>${k}</th>`);
-  html += '</tr></thead><tbody>';
-  if (!invalidRows.length) {
-    html += '<tr><td colspan="7" style="text-align:center;color:#94a3b8">ไม่มีแถวที่ไม่ผ่าน 🎉</td></tr>';
-  } else {
-    invalidRows.forEach(r => {
-      html += '<tr class="invalid">';
-      ['id','doc_date','doc_no','grade','width','used_kgs'].forEach(k => {
-        html += `<td>${esc(r[k]) ?? ''}</td>`;
-      });
-      html += `<td><b>${esc(r.error_msg) || 'ไม่ทราบสาเหตุ'}</b></td>`;
-      html += '</tr>';
-    });
-  }
-  html += '</tbody></table></div>';
-
-  el.innerHTML = html;
-}
-
-// ================= IMPORT USAGE (RPC full + Progress) =================
-function importUsage(ev) {
-  const f = ev.target.files[0]; if (!f) return;
-  const r = new FileReader();
-  r.onload = async e => {
-    try {
-      showProgress('usageProgress', 0, 1, 'กำลังอ่านไฟล์...');
-      const wb = XLSX.read(e.target.result, { type: 'array' });
-      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-      showProgress('usageProgress', 0, rows.length, `อ่านได้ ${rows.length} แถว กำลังตรวจสอบ...`);
-
-      const payload = [];
-      rows.forEach((row) => {
-        const usage_date = toISODate(findColumn(row, USAGE_COLS.doc_date));
-        const gradegram  = String(findColumn(row, USAGE_COLS.grade) || '').trim();
-        const width      = Number(findColumn(row, USAGE_COLS.width));
-        const used_kgs   = Number(findColumn(row, USAGE_COLS.used_kgs));
-
-        const item_code = (usage_date && gradegram && width) ? findItemCode(gradegram, width) : null;
-
-        payload.push({
-          plant_code:        findColumn(row, USAGE_COLS.plant_code) || '',
-          plant_desc:        findColumn(row, USAGE_COLS.plant_desc) || '',
-          corrugator_no:     findColumn(row, USAGE_COLS.corrugator_no) || '',
-          doc_date:          findColumn(row, USAGE_COLS.doc_date) || '',
-          doc_shift:         findColumn(row, USAGE_COLS.doc_shift) || '',
-          doc_no:            findColumn(row, USAGE_COLS.doc_no) || '',
-          stand:             findColumn(row, USAGE_COLS.stand) || '',
-          isn:               findColumn(row, USAGE_COLS.isn) || '',
-          roll_ssn:          findColumn(row, USAGE_COLS.roll_ssn) || '',
-          grade:             gradegram,
-          width:             isNaN(width) ? '' : width,
-          quality:           findColumn(row, USAGE_COLS.quality) || '',
-          supplier:          findColumn(row, USAGE_COLS.supplier) || '',
-          dimeter:           findColumn(row, USAGE_COLS.dimeter) ?? '',
-          kgs:               findColumn(row, USAGE_COLS.kgs) ?? '',
-          return_dimeter:    findColumn(row, USAGE_COLS.return_dimeter) ?? '',
-          return_kgs:        findColumn(row, USAGE_COLS.return_kgs) ?? '',
-          used_kgs:          isNaN(used_kgs) ? '' : used_kgs,
-          roll_for_customer: findColumn(row, USAGE_COLS.roll_for_customer) || '',
-          loc:               findColumn(row, USAGE_COLS.loc) || '',
-          warehouse_no:      findColumn(row, USAGE_COLS.warehouse_no) || '',
-          usage_date:        usage_date,
-          item_code:         item_code || '',
-          created_by:        currentUser.id
-        });
-      });
-
-      const batchId = crypto.randomUUID();
-      showProgress('usageProgress', 0, 1, `กำลังบันทึก ${payload.length} แถว (transaction)...`);
-      const { data, error } = await supabase.rpc('import_usage_full', {
-        rows: payload,
-        batch_id: batchId
-      });
-      if (error) {
-        hideProgress('usageProgress');
-        showMsg('importUsageMsg', '❌ บันทึกไม่สำเร็จ: ' + error.message + '<br>(rollback แล้ว)', 'err');
-        return;
-      }
-
-      hideProgress('usageProgress');
-      let html = `✅ ทั้งหมด ${data.total} แถว · <b style="color:#166534">ผ่าน ${data.valid}</b> · <b style="color:#dc2626">ไม่ผ่าน ${data.invalid}</b>`;
-      showMsg('importUsageMsg', html, data.invalid ? 'info' : 'ok');
-
-      await renderLatestBatch();
-    } catch (ex) {
-      hideProgress('usageProgress');
-      showMsg('importUsageMsg', 'อ่านไฟล์ไม่สำเร็จ: ' + ex.message, 'err');
-    }
-  };
-  r.readAsArrayBuffer(f);
-  ev.target.value = '';
-}
-
-async function clearAllUsage() {
-  if (!confirm('ลบข้อมูลทั้งหมด (Raw + Usage)?\n\n⚠ การลบจะถาวร!')) return;
-  if (!confirm('ยืนยันอีกครั้ง — ลบทั้งหมดจริง ๆ?')) return;
-  const { error: e1 } = await supabase.from('usage_records').delete().neq('id', 0);
-  if (e1) return alert('ลบ usage_records ไม่สำเร็จ: ' + e1.message);
-  const { error: e2 } = await supabase.from('usage_records_raw').delete().neq('id', 0);
-  if (e2) return alert('ลบ usage_records_raw ไม่สำเร็จ: ' + e2.message);
-  showMsg('importUsageMsg', '✅ ลบข้อมูลทั้งหมดแล้ว', 'ok');
-  renderLatestBatch();
-}
-
-// ================= DELETE BY MONTH =================
-function openDeleteMonth() {
-  $('delMonth').value = currentMonthStr();
-  $('deleteMonthMsg').innerHTML = '';
-  openModal('modalDeleteMonth');
-}
-async function confirmDeleteMonth() {
-  const m = $('delMonth').value;
-  if (!m) return;
-  const [y, mo] = m.split('-').map(Number);
-  const fromShort = thaiMonthShort(m);
-  if (!confirm(`ยืนยันลบข้อมูลของเดือน ${fromShort}?`)) return;
-
-  $('deleteMonthMsg').innerHTML = '<div class="msg info">กำลังลบ...</div>';
-  const { data, error } = await supabase.rpc('delete_usage_by_month', { p_year: y, p_month: mo });
-  if (error) {
-    $('deleteMonthMsg').innerHTML = `<div class="msg err">ลบไม่สำเร็จ: ${error.message}</div>`;
-    return;
-  }
-  $('deleteMonthMsg').innerHTML = `<div class="msg ok">✅ ลบ ${data.deleted} แถวของเดือน ${fromShort} แล้ว</div>`;
-  setTimeout(() => { closeModal('modalDeleteMonth'); renderLatestBatch(); }, 1500);
-}
-
-// ================= USERS =================
-async function callAdmin(action, payload = {}) {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error('ไม่ได้ login');
-  const res = await fetch(EDGE_FUNCTION_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-    body: JSON.stringify({ action, ...payload })
-  });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.error || 'Edge function error');
-  return json;
-}
-
-async function loadUsers() {
-  if (!isAdmin() || !HAS_EDGE_FUNCTION) return;
-  $('usersBody').innerHTML = '<p>กำลังโหลด...</p>';
-  try {
-    const { users } = await callAdmin('list');
-    let html = '<table><thead><tr><th>#</th><th>ชื่อผู้ใช้</th><th>ชื่อ-นามสกุล</th><th>สิทธิ์</th><th>เข้าใช้ล่าสุด</th><th></th></tr></thead><tbody>';
-    users.forEach((u, i) => {
-      const last = u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString('th-TH') : '-';
-      html += `<tr><td>${i+1}</td><td><b>${esc(u.username)}</b></td><td>${esc(u.full_name) || '-'}</td>
-        <td><span class="badge ok">${u.role}</span></td>
-        <td>${last}</td>
-        <td><button onclick='openChangeRole(${JSON.stringify(u)})'>เปลี่ยน Role</button>
-          <button onclick='openResetPass(${JSON.stringify(u)})'>Reset รหัส</button>
-          ${u.id !== currentUser.id ? `<button class="danger" onclick="delUser('${u.id}','${esc(u.username)}')">ลบ</button>` : ''}
-        </td></tr>`;
-    });
-    html += '</tbody></table>';
-    $('usersBody').innerHTML = html;
-  } catch (e) {
-    showMsg('usersMsg', 'โหลดไม่สำเร็จ: ' + e.message, 'err');
-    $('usersBody').innerHTML = '';
-  }
-}
-function openUserForm() {
-  ['uName','uFullName','uPassword'].forEach(k => $(k).value = '');
-  $('uRole').value = 'user';
-  $('userFormError').innerHTML = '';
-  openModal('modalUser');
-}
-async function saveUser() {
-  const username = $('uName').value.trim();
-  const full_name = $('uFullName').value.trim();
-  const password = $('uPassword').value;
-  const role = $('uRole').value;
-  try {
-    await callAdmin('create', { username, full_name, password, role });
-    closeModal('modalUser');
-    showMsg('usersMsg', `✅ สร้างผู้ใช้ ${username} สำเร็จ`, 'ok');
-    loadUsers();
-  } catch (e) { $('userFormError').innerHTML = `<div class="msg err">${e.message}</div>`; }
-}
-function openChangeRole(u) {
-  const newRole = prompt(`เปลี่ยน role ของ "${u.username}" เป็น (admin/user):`, u.role);
-  if (!newRole || !['admin','user'].includes(newRole)) return;
-  const newName = prompt('ชื่อ-นามสกุล:', u.full_name || u.username) || u.full_name;
-  callAdmin('updateRole', { id: u.id, role: newRole, full_name: newName })
-    .then(() => { showMsg('usersMsg', `✅ เปลี่ยน role เป็น ${newRole}`, 'ok'); loadUsers(); })
-    .catch(e => showMsg('usersMsg', 'ผิดพลาด: ' + e.message, 'err'));
-}
-function openResetPass(u) {
-  const newPass = prompt(`รหัสผ่านใหม่สำหรับ "${u.username}" (อย่างน้อย 6 ตัว):`);
-  if (!newPass || newPass.length < 6) return;
-  callAdmin('resetPassword', { id: u.id, password: newPass })
-    .then(() => showMsg('usersMsg', `✅ เปลี่ยนรหัสของ ${u.username} แล้ว`, 'ok'))
-    .catch(e => showMsg('usersMsg', 'ผิดพลาด: ' + e.message, 'err'));
-}
-async function delUser(id, username) {
-  if (!confirm(`ลบผู้ใช้ "${username}" ถาวร?`)) return;
-  try {
-    await callAdmin('delete', { id });
-    showMsg('usersMsg', `✅ ลบ ${username} แล้ว`, 'ok');
-    loadUsers();
-  } catch (e) { showMsg('usersMsg', 'ผิดพลาด: ' + e.message, 'err'); }
-}
-
-// ================= INIT =================
-(function init() {
-  if ($('qReportMonth')) $('qReportMonth').value = currentMonthStr();
-  document.querySelectorAll('.modal-bg').forEach(el => {
-    el.onclick = e => { if (e.target === el) el.classList.remove('show'); };
-  });
-  initSession();
-})();
-</script>
+<script src="app.js"></script>
 </body>
 </html>
