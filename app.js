@@ -268,26 +268,152 @@ async function refreshAll() {
   renderMatrix();
 }
 
-// ================= V6 — GRADE FILTER =================
+// ================= V6 — GRADEGRAMS FILTER (search + multi-select) =================
+let selectedGrades = [];        // เกรดที่เลือก
+let allGradesList = [];         // เกรดทั้งหมด
+let activeDropdownIndex = -1;   // สำหรับ keyboard navigate
+
+// โหลดรายการเกรดทั้งหมด
 async function loadGradeFilter() {
-  const sel = $('qGradeFilter');
-  if (!sel) return;
-
   // unique grade จาก masterCache
-  const grades = [...new Set(masterCache.map(m => m.grade))].sort();
+  allGradesList = [...new Set(masterCache.map(m => m.grade))].sort();
 
-  // เก็บค่าที่เคยเลือกไว้
-  const prevSelected = Array.from(sel.selectedOptions).map(o => o.value);
+  // render chips + input
+  renderGradeChips();
 
-  sel.innerHTML = grades.map(g =>
-    `<option value="${g}"${prevSelected.includes(g) ? ' selected' : ''}>${g}</option>`
-  ).join('');
+  const input = $('gradeSearch');
+  const dropdown = $('gradeDropdown');
+  const box = $('gradeFilterBox');
+
+  if (!input || !dropdown || !box) return;
+
+  // เปิด dropdown เมื่อ focus
+  input.addEventListener('focus', () => {
+    showGradeDropdown('');
+  });
+
+  // พิมพ์ค้นหา
+  input.addEventListener('input', (e) => {
+    showGradeDropdown(e.target.value);
+  });
+
+  // keyboard navigate
+  input.addEventListener('keydown', (e) => {
+    const items = dropdown.querySelectorAll('.item');
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      activeDropdownIndex = Math.min(activeDropdownIndex + 1, items.length - 1);
+      updateActiveItem(items);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      activeDropdownIndex = Math.max(activeDropdownIndex - 1, 0);
+      updateActiveItem(items);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (activeDropdownIndex >= 0 && items[activeDropdownIndex]) {
+        items[activeDropdownIndex].click();
+      }
+    } else if (e.key === 'Backspace' && input.value === '' && selectedGrades.length > 0) {
+      // ลบ chip ล่าสุด
+      selectedGrades.pop();
+      renderGradeChips();
+    } else if (e.key === 'Escape') {
+      hideGradeDropdown();
+    }
+  });
+
+  // ปิด dropdown เมื่อคลิกนอก
+  document.addEventListener('click', (e) => {
+    if (!box.contains(e.target)) hideGradeDropdown();
+  });
+
+  // คลิกที่ box → focus input
+  box.addEventListener('click', (e) => {
+    if (e.target === box) input.focus();
+  });
 }
 
+// แสดง dropdown
+function showGradeDropdown(query) {
+  const dropdown = $('gradeDropdown');
+  const q = String(query || '').trim().toUpperCase();
+
+  const available = allGradesList.filter(g => !selectedGrades.includes(g));
+  const filtered = q ? available.filter(g => g.toUpperCase().includes(q)) : available;
+
+  if (!filtered.length) {
+    dropdown.innerHTML = '<div class="empty">ไม่พบเกรดที่ตรงกัน</div>';
+  } else {
+    dropdown.innerHTML = filtered.map((g, i) =>
+      `<div class="item" data-grade="${esc(g)}" data-index="${i}">${esc(g)}</div>`
+    ).join('');
+  }
+
+  dropdown.classList.remove('hidden');
+  activeDropdownIndex = -1;
+
+  // คลิกที่ item
+  dropdown.querySelectorAll('.item').forEach(el => {
+    el.addEventListener('click', () => {
+      addGrade(el.dataset.grade);
+    });
+  });
+}
+
+// อัปเดต active item (keyboard)
+function updateActiveItem(items) {
+  items.forEach((el, i) => {
+    el.classList.toggle('active', i === activeDropdownIndex);
+    if (i === activeDropdownIndex) {
+      el.scrollIntoView({ block: 'nearest' });
+    }
+  });
+}
+
+// ซ่อน dropdown
+function hideGradeDropdown() {
+  const dropdown = $('gradeDropdown');
+  if (dropdown) dropdown.classList.add('hidden');
+  activeDropdownIndex = -1;
+}
+
+// เพิ่มเกรด
+function addGrade(grade) {
+  if (!grade || selectedGrades.includes(grade)) return;
+  selectedGrades.push(grade);
+  renderGradeChips();
+
+  // clear input
+  const input = $('gradeSearch');
+  if (input) { input.value = ''; input.focus(); }
+
+  // refresh dropdown
+  showGradeDropdown('');
+}
+
+// ลบเกรด
+function removeGrade(grade) {
+  selectedGrades = selectedGrades.filter(g => g !== grade);
+  renderGradeChips();
+}
+
+// render chips
+function renderGradeChips() {
+  const chips = $('gradeChips');
+  if (!chips) return;
+  chips.innerHTML = selectedGrades.map(g =>
+    `<span class="grade-chip" data-grade="${esc(g)}">${esc(g)} <span class="x">×</span></span>`
+  ).join('');
+
+  // คลิก chip → ลบ
+  chips.querySelectorAll('.grade-chip').forEach(el => {
+    el.addEventListener('click', () => removeGrade(el.dataset.grade));
+  });
+}
+
+// ดึงเกรดที่เลือก
 function getSelectedGrades() {
-  const sel = $('qGradeFilter');
-  if (!sel) return [];
-  return Array.from(sel.selectedOptions).map(o => o.value);
+  return selectedGrades;
 }
 
 // ================= MATRIX =================
