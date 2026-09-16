@@ -264,6 +264,7 @@ async function loadMaster(onProgress = null) {
 
 async function refreshAll() {
   await loadMaster();
+  await loadGradeFilter();   // ✅ เพิ่ม
   renderMatrix();
 }
 // ============================================================
