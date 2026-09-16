@@ -631,4 +631,450 @@ const RAW_COLUMNS = [
 ];
 
 async function renderData() {
-  $('dataBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20
+  $('dataBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
+
+  if (!$('dtBatch').dataset.loaded) {
+    try {
+      const batches = await fetchAllRows(() =>
+        supabase.from('usage_records_raw').select('import_batch_id, import_at').order('import_at', { ascending: false })
+      );
+      const seen = new Map();
+      batches.forEach(b => {
+        if (b.import_batch_id && !seen.has(b.import_batch_id)) {
+          seen.set(b.import_batch_id, b.import_at);
+        }
+      });
+      const arr = [...seen.entries()];
+      $('dtBatch').innerHTML = '<option value="">ทั้งหมด</option>' +
+        arr.map(([id, at]) => `<option value="${id}">${new Date(at).toLocaleString('th-TH')}</option>`).join('');
+      $('dtBatch').dataset.loaded = '1';
+    } catch(e) { /* ignore */ }
+  }
+
+  const from = $('dtFrom').value;
+  const to   = $('dtTo').value;
+  const valid = $('dtValid').value;
+  const batch = $('dtBatch').value;
+
+  const rows = await fetchAllRows(() => {
+    let q = supabase.from('usage_records_raw').select('*').order('id', { ascending: false });
+    if (from)  q = q.gte('usage_date', from);
+    if (to)    q = q.lte('usage_date', to);
+    if (valid === 'valid')   q = q.eq('is_valid', true);
+    if (valid === 'invalid') q = q.eq('is_valid', false);
+    if (batch) q = q.eq('import_batch_id', batch);
+    return q;
+  });
+
+  dataCache = rows;
+
+  let html = '<div class="data-scroll"><table class="data-table"><thead><tr>';
+  RAW_COLUMNS.forEach(c => html += `<th>${c.label}</th>`);
+  html += '</tr></thead><tbody>';
+
+  if (!rows.length) {
+    html += `<tr><td colspan="${RAW_COLUMNS.length}" style="text-align:center;color:#94a3b8;padding:20px">ไม่มีข้อมูล</td></tr>`;
+  } else {
+    rows.slice(0, 2000).forEach(r => {
+      const cls = r.is_valid === false ? 'invalid' : '';
+      html += `<tr class="${cls}">`;
+      RAW_COLUMNS.forEach(c => {
+        let v = r[c.key];
+        if (c.key === 'is_valid') {
+          v = v ? '<span class="badge ok">✓</span>' : '<span class="badge bad">✗</span>';
+        } else if (c.key === 'import_at' && v) {
+          v = new Date(v).toLocaleString('th-TH');
+        } else {
+          v = esc(v);
+        }
+        html += `<td>${v ?? ''}</td>`;
+      });
+      html += '</tr>';
+    });
+  }
+  html += '</tbody></table></div>';
+  html += `<div style="margin-top:8px;font-size:13px;color:#64748b">แสดง ${Math.min(rows.length, 2000)} / ${rows.length} แถว ${rows.length > 2000 ? '(แสดง 2,000 แรก)' : ''}</div>`;
+  $('dataBody').innerHTML = html;
+}
+
+function exportData() {
+  if (!dataCache.length) return alert('ไม่มีข้อมูล');
+  const data = dataCache.map(r => {
+    const o = {};
+    RAW_COLUMNS.forEach(c => { o[c.label] = r[c.key]; });
+    return o;
+  });
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'RawData');
+  XLSX.writeFile(wb, `raw_usage_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+// ================= LATEST BATCH =================
+async function renderLatestBatch() {
+  const el = $('latestBatch');
+  el.innerHTML = '<p style="color:#94a3b8;font-size:13px">กำลังโหลด...</p>';
+
+  const { data: latest } = await supabase
+    .from('usage_records_raw')
+    .select('import_batch_id, import_at')
+    .order('import_at', { ascending: false })
+    .limit(1);
+
+  if (!latest || !latest.length) {
+    el.innerHTML = '<p style="color:#94a3b8;font-size:13px">ยังไม่มีข้อมูลที่ import</p>';
+    return;
+  }
+
+  const batchId = latest[0].import_batch_id;
+  const batchAt = new Date(latest[0].import_at).toLocaleString('th-TH');
+
+  const validRows = await fetchAllRows(() =>
+    supabase.from('usage_records_raw').select('*').eq('import_batch_id', batchId).eq('is_valid', true).limit(10)
+  );
+  const invalidRows = await fetchAllRows(() =>
+    supabase.from('usage_records_raw').select('*').eq('import_batch_id', batchId).eq('is_valid', false)
+  );
+  const totalInBatch = await fetchAllRows(() =>
+    supabase.from('usage_records_raw').select('id', { count: 'exact', head: false }).eq('import_batch_id', batchId)
+  );
+
+  let html = `<div class="msg info">
+    <b>Batch ล่าสุด:</b> ${batchAt}<br>
+    <b>ทั้งหมด:</b> ${totalInBatch.length} แถว · 
+    <b style="color:#166534">ถูกต้อง:</b> ${totalInBatch.length - invalidRows.length} · 
+    <b style="color:#dc2626">ไม่ผ่าน:</b> ${invalidRows.length}
+  </div>`;
+
+  html += '<h3 style="margin-top:16px">✅ ตัวอย่าง 10 แถวที่ถูกต้อง</h3>';
+  html += '<div class="data-scroll" style="max-height:400px"><table class="data-table"><thead><tr>';
+  ['id','doc_date','doc_no','grade','width','used_kgs','item_code','usage_date','roll_for_customer'].forEach(k => html += `<th>${k}</th>`);
+  html += '</tr></thead><tbody>';
+  if (!validRows.length) {
+    html += '<tr><td colspan="9" style="text-align:center;color:#94a3b8">ไม่มีแถวที่ถูกต้อง</td></tr>';
+  } else {
+    validRows.forEach(r => {
+      html += '<tr>';
+      ['id','doc_date','doc_no','grade','width','used_kgs','item_code','usage_date','roll_for_customer'].forEach(k => {
+        html += `<td>${esc(r[k]) ?? ''}</td>`;
+      });
+      html += '</tr>';
+    });
+  }
+  html += '</tbody></table></div>';
+
+  html += `<h3 style="margin-top:16px">❌ แถวที่ไม่ผ่านทั้งหมด (${invalidRows.length} แถว)</h3>`;
+  html += '<div class="data-scroll" style="max-height:400px"><table class="data-table"><thead><tr>';
+  ['id','doc_date','doc_no','grade','width','used_kgs','error_msg'].forEach(k => html += `<th>${k}</th>`);
+  html += '</tr></thead><tbody>';
+  if (!invalidRows.length) {
+    html += '<tr><td colspan="7" style="text-align:center;color:#94a3b8">ไม่มีแถวที่ไม่ผ่าน 🎉</td></tr>';
+  } else {
+    invalidRows.forEach(r => {
+      html += '<tr class="invalid">';
+      ['id','doc_date','doc_no','grade','width','used_kgs'].forEach(k => {
+        html += `<td>${esc(r[k]) ?? ''}</td>`;
+      });
+      html += `<td><b>${esc(r.error_msg) || 'ไม่ทราบสาเหตุ'}</b></td>`;
+      html += '</tr>';
+    });
+  }
+  html += '</tbody></table></div>';
+
+  el.innerHTML = html;
+}
+
+// ================= IMPORT USAGE =================
+function importUsage(ev) {
+  const f = ev.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = async e => {
+    try {
+      showProgress('usageProgress', 0, 1, 'กำลังอ่านไฟล์...');
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+      showProgress('usageProgress', 0, rows.length, `อ่านได้ ${rows.length} แถว กำลังตรวจสอบ...`);
+
+      const payload = [];
+      rows.forEach((row) => {
+        const usage_date = toISODate(findColumn(row, USAGE_COLS.doc_date));
+        const gradegram  = String(findColumn(row, USAGE_COLS.grade) || '').trim();
+        const width      = Number(findColumn(row, USAGE_COLS.width));
+        const used_kgs   = Number(findColumn(row, USAGE_COLS.used_kgs));
+
+        const item_code = (usage_date && gradegram && width) ? findItemCode(gradegram, width) : null;
+
+        payload.push({
+          plant_code:        findColumn(row, USAGE_COLS.plant_code) || '',
+          plant_desc:        findColumn(row, USAGE_COLS.plant_desc) || '',
+          corrugator_no:     findColumn(row, USAGE_COLS.corrugator_no) || '',
+          doc_date:          findColumn(row, USAGE_COLS.doc_date) || '',
+          doc_shift:         findColumn(row, USAGE_COLS.doc_shift) || '',
+          doc_no:            findColumn(row, USAGE_COLS.doc_no) || '',
+          stand:             findColumn(row, USAGE_COLS.stand) || '',
+          isn:               findColumn(row, USAGE_COLS.isn) || '',
+          roll_ssn:          findColumn(row, USAGE_COLS.roll_ssn) || '',
+          grade:             gradegram,
+          width:             isNaN(width) ? '' : width,
+          quality:           findColumn(row, USAGE_COLS.quality) || '',
+          supplier:          findColumn(row, USAGE_COLS.supplier) || '',
+          dimeter:           findColumn(row, USAGE_COLS.dimeter) ?? '',
+          kgs:               findColumn(row, USAGE_COLS.kgs) ?? '',
+          return_dimeter:    findColumn(row, USAGE_COLS.return_dimeter) ?? '',
+          return_kgs:        findColumn(row, USAGE_COLS.return_kgs) ?? '',
+          used_kgs:          isNaN(used_kgs) ? '' : used_kgs,
+          roll_for_customer: findColumn(row, USAGE_COLS.roll_for_customer) || '',
+          loc:               findColumn(row, USAGE_COLS.loc) || '',
+          warehouse_no:      findColumn(row, USAGE_COLS.warehouse_no) || '',
+          usage_date:        usage_date,
+          item_code:         item_code || '',
+          created_by:        currentUser.id
+        });
+      });
+
+      const batchId = crypto.randomUUID();
+      showProgress('usageProgress', 0, 1, `กำลังบันทึก ${payload.length} แถว (transaction)...`);
+      const { data, error } = await supabase.rpc('import_usage_full', {
+        rows: payload,
+        batch_id: batchId
+      });
+      if (error) {
+        hideProgress('usageProgress');
+        showMsg('importUsageMsg', '❌ บันทึกไม่สำเร็จ: ' + error.message + '<br>(rollback แล้ว)', 'err');
+        return;
+      }
+
+      hideProgress('usageProgress');
+      let html = `✅ ทั้งหมด ${data.total} แถว · <b style="color:#166534">ผ่าน ${data.valid}</b> · <b style="color:#dc2626">ไม่ผ่าน ${data.invalid}</b>`;
+      showMsg('importUsageMsg', html, data.invalid ? 'info' : 'ok');
+
+      await renderLatestBatch();
+    } catch (ex) {
+      hideProgress('usageProgress');
+      showMsg('importUsageMsg', 'อ่านไฟล์ไม่สำเร็จ: ' + ex.message, 'err');
+    }
+  };
+  r.readAsArrayBuffer(f);
+  ev.target.value = '';
+}
+
+async function clearAllUsage() {
+  if (!confirm('ลบข้อมูลทั้งหมด (Raw + Usage)?\n\n⚠ การลบจะถาวร!')) return;
+  if (!confirm('ยืนยันอีกครั้ง — ลบทั้งหมดจริง ๆ?')) return;
+  const { error: e1 } = await supabase.from('usage_records').delete().neq('id', 0);
+  if (e1) return alert('ลบ usage_records ไม่สำเร็จ: ' + e1.message);
+  const { error: e2 } = await supabase.from('usage_records_raw').delete().neq('id', 0);
+  if (e2) return alert('ลบ usage_records_raw ไม่สำเร็จ: ' + e2.message);
+  showMsg('importUsageMsg', '✅ ลบข้อมูลทั้งหมดแล้ว', 'ok');
+  renderLatestBatch();
+}
+
+// ================= DELETE BY MONTH (V5 — ลบทั้ง 2 ตาราง) =================
+function openDeleteMonth() {
+  $('delMonth').value = currentMonthStr();
+  $('deleteMonthMsg').innerHTML = '';
+  openModal('modalDeleteMonth');
+}
+
+// Export Excel ของเดือนที่เลือก (ก่อนลบ)
+async function exportMonthBeforeDelete() {
+  const m = $('delMonth').value;
+  if (!m) return alert('เลือกเดือนก่อน');
+  const [y, mo] = m.split('-').map(Number);
+
+  $('deleteMonthMsg').innerHTML = '<div class="msg info">กำลังดึงข้อมูล...</div>';
+  const rows = await fetchAllRows(() =>
+    supabase.from('usage_records_raw').select('*')
+      .gte('usage_date', `${m}-01`)
+      .lte('usage_date', `${y}-${pad(mo)}-${pad(new Date(y, mo, 0).getDate())}`)
+  );
+
+  if (!rows.length) {
+    $('deleteMonthMsg').innerHTML = '<div class="msg err">ไม่พบข้อมูลในเดือนนี้</div>';
+    return;
+  }
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'RawData');
+  XLSX.writeFile(wb, `raw_${m}.xlsx`);
+  $('deleteMonthMsg').innerHTML = `<div class="msg ok">✅ Export ${rows.length} แถวแล้ว</div>`;
+}
+
+async function confirmDeleteMonth() {
+  const m = $('delMonth').value;
+  if (!m) return;
+  const [y, mo] = m.split('-').map(Number);
+  const fromShort = thaiMonthShort(m);
+  if (!confirm(`⚠️ ยืนยันลบข้อมูลของเดือน ${fromShort}?\n\nจะลบทั้ง usage_records และ usage_records_raw\nไม่สามารถกู้คืนได้`)) return;
+
+  $('deleteMonthMsg').innerHTML = '<div class="msg info">กำลังลบ...</div>';
+  const { data, error } = await supabase.rpc('delete_usage_by_month', { p_year: y, p_month: mo });
+  if (error) {
+    $('deleteMonthMsg').innerHTML = `<div class="msg err">ลบไม่สำเร็จ: ${error.message}</div>`;
+    return;
+  }
+  $('deleteMonthMsg').innerHTML = `<div class="msg ok">
+    ✅ ลบแล้วทั้งหมด ${data.deleted} แถว<br>
+    (usage_records: ${data.deleted_main} · raw: ${data.deleted_raw})<br>
+    เดือน ${fromShort}
+  </div>`;
+  setTimeout(() => { closeModal('modalDeleteMonth'); renderLatestBatch(); }, 2000);
+}
+
+// ================= ARCHIVE (V5 ใหม่) =================
+async function previewArchive() {
+  $('archiveMsg').innerHTML = '<div class="msg info">กำลังตรวจสอบ...</div>';
+  const { data, error } = await supabase.rpc('count_archivable_usage');
+  if (error) {
+    $('archiveMsg').innerHTML = `<div class="msg err">ตรวจสอบไม่สำเร็จ: ${error.message}</div>`;
+    return;
+  }
+  const cutoffThai = new Date(data.cutoff).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+  $('archiveMsg').innerHTML = `<div class="msg info">
+    📊 ข้อมูลที่เก่ากว่า <b>2 ปี</b> (ก่อน ${cutoffThai})<br>
+    มีทั้งหมด <b>${data.count.toLocaleString()}</b> แถว พร้อมย้าย
+  </div>`;
+}
+
+async function runArchive() {
+  if (!confirm('⚠️ ย้ายข้อมูลที่เก่ากว่า 2 ปี ไป Archive?\n\nข้อมูลจะไม่แสดงใน Matrix อีก')) return;
+  if (!confirm('ยืนยันอีกครั้ง — ดำเนินการเลย?')) return;
+
+  $('archiveMsg').innerHTML = '<div class="msg info">กำลังย้ายข้อมูล... (อาจใช้เวลาสักครู่)</div>';
+  const { data, error } = await supabase.rpc('archive_old_usage');
+  if (error) {
+    $('archiveMsg').innerHTML = `<div class="msg err">ย้ายไม่สำเร็จ: ${error.message}</div>`;
+    return;
+  }
+  const cutoffThai = new Date(data.cutoff).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+  $('archiveMsg').innerHTML = `<div class="msg ok">
+    ✅ ย้ายสำเร็จ ${data.archived.toLocaleString()} แถว<br>
+    (ข้อมูลก่อน ${cutoffThai})
+  </div>`;
+  await loadArchiveStats();
+}
+
+async function loadArchiveStats() {
+  $('archiveStats').innerHTML = '<p style="color:#94a3b8;font-size:13px">กำลังโหลด...</p>';
+  try {
+    const { count, error } = await supabase
+      .from('usage_records_archive')
+      .select('*', { count: 'exact', head: true });
+    if (error) throw error;
+
+    const { data: oldest } = await supabase
+      .from('usage_records_archive')
+      .select('usage_date')
+      .order('usage_date', { ascending: true })
+      .limit(1);
+    const { data: newest } = await supabase
+      .from('usage_records_archive')
+      .select('usage_date')
+      .order('usage_date', { ascending: false })
+      .limit(1);
+
+    let html = `<div class="msg info">
+      📦 <b>Archive ทั้งหมด:</b> ${(count || 0).toLocaleString()} แถว<br>`;
+    if (oldest?.[0]?.usage_date) {
+      html += `<b>ช่วงวันที่:</b> ${oldest[0].usage_date} ถึง ${newest[0].usage_date}`;
+    }
+    html += `</div>`;
+    $('archiveStats').innerHTML = html;
+  } catch (e) {
+    $('archiveStats').innerHTML = `<div class="msg err">โหลดสถิติไม่สำเร็จ: ${e.message}</div>`;
+  }
+}
+
+// ================= USERS =================
+async function callAdmin(action, payload = {}) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('ไม่ได้ login');
+  const res = await fetch(EDGE_FUNCTION_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+    body: JSON.stringify({ action, ...payload })
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Edge function error');
+  return json;
+}
+
+async function loadUsers() {
+  if (!isAdmin() || !HAS_EDGE_FUNCTION) return;
+  $('usersBody').innerHTML = '<p>กำลังโหลด...</p>';
+  try {
+    const { users } = await callAdmin('list');
+    let html = '<table><thead><tr><th>#</th><th>ชื่อผู้ใช้</th><th>ชื่อ-นามสกุล</th><th>สิทธิ์</th><th>เข้าใช้ล่าสุด</th><th></th></tr></thead><tbody>';
+    users.forEach((u, i) => {
+      const last = u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString('th-TH') : '-';
+      html += `<tr><td>${i+1}</td><td><b>${esc(u.username)}</b></td><td>${esc(u.full_name) || '-'}</td>
+        <td><span class="badge ok">${u.role}</span></td>
+        <td>${last}</td>
+        <td><button onclick='openChangeRole(${JSON.stringify(u)})'>เปลี่ยน Role</button>
+          <button onclick='openResetPass(${JSON.stringify(u)})'>Reset รหัส</button>
+          ${u.id !== currentUser.id ? `<button class="danger" onclick="delUser('${u.id}','${esc(u.username)}')">ลบ</button>` : ''}
+        </td></tr>`;
+    });
+    html += '</tbody></table>';
+    $('usersBody').innerHTML = html;
+  } catch (e) {
+    showMsg('usersMsg', 'โหลดไม่สำเร็จ: ' + e.message, 'err');
+    $('usersBody').innerHTML = '';
+  }
+}
+
+function openUserForm() {
+  ['uName','uFullName','uPassword'].forEach(k => $(k).value = '');
+  $('uRole').value = 'user';
+  $('userFormError').innerHTML = '';
+  openModal('modalUser');
+}
+
+async function saveUser() {
+  const username = $('uName').value.trim();
+  const full_name = $('uFullName').value.trim();
+  const password = $('uPassword').value;
+  const role = $('uRole').value;
+  try {
+    await callAdmin('create', { username, full_name, password, role });
+    closeModal('modalUser');
+    showMsg('usersMsg', `✅ สร้างผู้ใช้ ${username} สำเร็จ`, 'ok');
+    loadUsers();
+  } catch (e) { $('userFormError').innerHTML = `<div class="msg err">${e.message}</div>`; }
+}
+
+function openChangeRole(u) {
+  const newRole = prompt(`เปลี่ยน role ของ "${u.username}" เป็น (admin/user):`, u.role);
+  if (!newRole || !['admin','user'].includes(newRole)) return;
+  const newName = prompt('ชื่อ-นามสกุล:', u.full_name || u.username) || u.full_name;
+  callAdmin('updateRole', { id: u.id, role: newRole, full_name: newName })
+    .then(() => { showMsg('usersMsg', `✅ เปลี่ยน role เป็น ${newRole}`, 'ok'); loadUsers(); })
+    .catch(e => showMsg('usersMsg', 'ผิดพลาด: ' + e.message, 'err'));
+}
+
+function openResetPass(u) {
+  const newPass = prompt(`รหัสผ่านใหม่สำหรับ "${u.username}" (อย่างน้อย 6 ตัว):`);
+  if (!newPass || newPass.length < 6) return;
+  callAdmin('resetPassword', { id: u.id, password: newPass })
+    .then(() => showMsg('usersMsg', `✅ เปลี่ยนรหัสของ ${u.username} แล้ว`, 'ok'))
+    .catch(e => showMsg('usersMsg', 'ผิดพลาด: ' + e.message, 'err'));
+}
+
+async function delUser(id, username) {
+  if (!confirm(`ลบผู้ใช้ "${username}" ถาวร?`)) return;
+  try {
+    await callAdmin('delete', { id });
+    showMsg('usersMsg', `✅ ลบ ${username} แล้ว`, 'ok');
+    loadUsers();
+  } catch (e) { showMsg('usersMsg', 'ผิดพลาด: ' + e.message, 'err'); }
+}
+
+// ================= INIT =================
+(function init() {
+  if ($('qReportMonth')) $('qReportMonth').value = currentMonthStr();
+  document.querySelectorAll('.modal-bg').forEach(el => {
+    el.onclick = e => { if (e.target === el) el.classList.remove('show'); };
+  });
+  initSession();
+})();
