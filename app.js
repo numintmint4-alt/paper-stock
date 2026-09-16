@@ -387,10 +387,21 @@ async function renderMatrix() {
     grand += finalVal;
   });
 
-  const rowKeys = [...rowSet.keys()].sort((a,b) => {
-    const [ga, ma] = a.split('|'), [gb, mb] = b.split('|');
-    return ga.localeCompare(gb) || Number(ma) - Number(mb);
+  // ✅ V6: Filter เกรด
+const selectedGrades = getSelectedGrades();
+
+let rowKeys = [...rowSet.keys()].sort((a,b) => {
+  const [ga, ma] = a.split('|'), [gb, mb] = b.split('|');
+  return ga.localeCompare(gb) || Number(ma) - Number(mb);
+});
+
+// ถ้ามีการเลือกเกรด → filter
+if (selectedGrades.length > 0) {
+  rowKeys = rowKeys.filter(rk => {
+    const grade = rk.split('|')[0];
+    return selectedGrades.includes(grade);
   });
+}
   const colKeys = [...colSet].sort((a,b) => a - b);
 
   if (!rowKeys.length) {
