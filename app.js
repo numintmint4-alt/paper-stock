@@ -402,18 +402,6 @@ if (selectedGrades.length > 0) {
     return selectedGrades.includes(grade);
   });
 }
- // ✅ V6: Filter เกรด
-const selectedGrades = getSelectedGrades();
-
-let rowKeys = [...rowSet.keys()].sort((a,b) => {
-  const [ga, ma] = a.split('|'), [gb, mb] = b.split('|');
-  return ga.localeCompare(gb) || Number(ma) - Number(mb);
-});
-
-// ถ้ามีการเลือกเกรด → filter rowKeys
-if (selectedGrades.length > 0) {
-  rowKeys = rowKeys.filter(rk => selectedGrades.includes(rk.split('|')[0]));
-}
 
 // ✅ คำนวณ colKeys, rowTotals, colTotals ใหม่จาก rowKeys ที่ filter แล้ว
 const colSet2 = new Set();
