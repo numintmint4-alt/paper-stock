@@ -769,7 +769,7 @@ async function renderLatestBatch() {
   el.innerHTML = html;
 }
 
-// ================= IMPORT USAGE =================
+// ================= IMPORT USAGE (V5.1 — แบ่งชุด) =================
 function importUsage(ev) {
   const f = ev.target.files[0]; if (!f) return;
   const r = new FileReader();
@@ -778,8 +778,11 @@ function importUsage(ev) {
       showProgress('usageProgress', 0, 1, 'กำลังอ่านไฟล์...');
       const wb = XLSX.read(e.target.result, { type: 'array' });
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-      showProgress('usageProgress', 0, rows.length, `อ่านได้ ${rows.length} แถว กำลังตรวจสอบ...`);
+      showProgress('usageProgress', 0, rows.length, `อ่านได้ ${rows.length} แถว กำลังเตรียมข้อมูล...`);
 
+      // ─────────────────────────────────────────────
+      // STEP 1: แปลงข้อมูลทั้งหมดเป็น payload
+      // ─────────────────────────────────────────────
       const payload = [];
       rows.forEach((row) => {
         const usage_date = toISODate(findColumn(row, USAGE_COLS.doc_date));
@@ -817,21 +820,60 @@ function importUsage(ev) {
         });
       });
 
+      // ─────────────────────────────────────────────
+      // STEP 2: แบ่งเป็นชุดละ 500 แถว
+      // ─────────────────────────────────────────────
+      const CHUNK_SIZE = 500;
       const batchId = crypto.randomUUID();
-      showProgress('usageProgress', 0, 1, `กำลังบันทึก ${payload.length} แถว (transaction)...`);
-      const { data, error } = await supabase.rpc('import_usage_full', {
-        rows: payload,
-        batch_id: batchId
-      });
-      if (error) {
-        hideProgress('usageProgress');
-        showMsg('importUsageMsg', '❌ บันทึกไม่สำเร็จ: ' + error.message + '<br>(rollback แล้ว)', 'err');
-        return;
+      const totalChunks = Math.ceil(payload.length / CHUNK_SIZE);
+
+      let sumTotal = 0, sumValid = 0, sumInvalid = 0;
+      let failedChunks = [];
+
+      for (let i = 0; i < payload.length; i += CHUNK_SIZE) {
+        const chunk = payload.slice(i, i + CHUNK_SIZE);
+        const chunkNo = Math.floor(i / CHUNK_SIZE) + 1;
+
+        showProgress(
+          'usageProgress',
+          i + chunk.length,
+          payload.length,
+          `กำลังบันทึกชุดที่ ${chunkNo}/${totalChunks} (${i + chunk.length}/${payload.length} แถว)...`
+        );
+
+        const { data, error } = await supabase.rpc('import_usage_full', {
+          rows: chunk,
+          batch_id: batchId
+        });
+
+        if (error) {
+          failedChunks.push(`ชุด ${chunkNo}: ${error.message}`);
+          // ⚠️ หยุดทันทีถ้ามี error
+          hideProgress('usageProgress');
+          showMsg('importUsageMsg',
+            `❌ บันทึกชุดที่ ${chunkNo}/${totalChunks} ไม่สำเร็จ<br>
+             <b>Error:</b> ${error.message}<br>
+             <b>บันทึกสำเร็จแล้ว:</b> ${sumTotal} แถว (ชุดที่ 1-${chunkNo-1})<br>
+             ⚠️ ข้อมูลที่บันทึกแล้วจะไม่ rollback`,
+            'err');
+          await renderLatestBatch();
+          return;
+        }
+
+        sumTotal   += data.total   || 0;
+        sumValid   += data.valid   || 0;
+        sumInvalid += data.invalid || 0;
       }
 
+      // ─────────────────────────────────────────────
+      // STEP 3: แสดงผลสรุป
+      // ─────────────────────────────────────────────
       hideProgress('usageProgress');
-      let html = `✅ ทั้งหมด ${data.total} แถว · <b style="color:#166534">ผ่าน ${data.valid}</b> · <b style="color:#dc2626">ไม่ผ่าน ${data.invalid}</b>`;
-      showMsg('importUsageMsg', html, data.invalid ? 'info' : 'ok');
+      let html = `✅ ทั้งหมด ${sumTotal} แถว · 
+        <b style="color:#166534">ผ่าน ${sumValid}</b> · 
+        <b style="color:#dc2626">ไม่ผ่าน ${sumInvalid}</b><br>
+        <span style="font-size:12px;color:#64748b">แบ่งเป็น ${totalChunks} ชุด · batch: ${batchId.slice(0,8)}...</span>`;
+      showMsg('importUsageMsg', html, sumInvalid ? 'info' : 'ok');
 
       await renderLatestBatch();
     } catch (ex) {
@@ -841,17 +883,6 @@ function importUsage(ev) {
   };
   r.readAsArrayBuffer(f);
   ev.target.value = '';
-}
-
-async function clearAllUsage() {
-  if (!confirm('ลบข้อมูลทั้งหมด (Raw + Usage)?\n\n⚠ การลบจะถาวร!')) return;
-  if (!confirm('ยืนยันอีกครั้ง — ลบทั้งหมดจริง ๆ?')) return;
-  const { error: e1 } = await supabase.from('usage_records').delete().neq('id', 0);
-  if (e1) return alert('ลบ usage_records ไม่สำเร็จ: ' + e1.message);
-  const { error: e2 } = await supabase.from('usage_records_raw').delete().neq('id', 0);
-  if (e2) return alert('ลบ usage_records_raw ไม่สำเร็จ: ' + e2.message);
-  showMsg('importUsageMsg', '✅ ลบข้อมูลทั้งหมดแล้ว', 'ok');
-  renderLatestBatch();
 }
 
 // ================= DELETE BY MONTH (V5) =================
