@@ -442,27 +442,26 @@ if (!rowKeys.length) {
   return;
 }
 
-  let html = '<div class="report-wrap"><table class="report-table"><thead><tr><th class="grade-col">grade</th>';
-  colKeys.forEach(s => html += `<th>${s}</th>`);
-  html += '<th class="total-col">Total</th></tr></thead><tbody>';
+ let html = '<div class="report-wrap"><table class="report-table"><thead><tr><th class="grade-col">grade</th>';
+colKeys2.forEach(s => html += `<th>${s}</th>`);   // ✅ ใช้ colKeys2
+html += '<th class="total-col">Total</th></tr></thead><tbody>';
 
-  rowKeys.forEach(rk => {
-    const [g, gr] = rk.split('|');
-    html += '<tr>';
-    html += `<td class="grade-col">${g}${gr}</td>`;
-    colKeys.forEach(s => {
-      const v = cells[rk + '|' + s];
-      if (!v) html += '<td class="empty">-</td>';
-      else html += `<td class="clickable" onclick="openDrill('${g}','${gr}',${s})">${Number(v).toFixed(2)}</td>`;
-    });
-    html += `<td class="total-col">${Number(rowTotals[rk]).toFixed(2)}</td></tr>`;
+rowKeys.forEach(rk => {
+  const [g, gr] = rk.split('|');
+  html += '<tr>';
+  html += `<td class="grade-col">${g}${gr}</td>`;
+  colKeys2.forEach(s => {                         // ✅ ใช้ colKeys2
+    const v = cells[rk + '|' + s];
+    if (!v) html += '<td class="empty">-</td>';
+    else html += `<td class="clickable" onclick="openDrill('${g}','${gr}',${s})">${Number(v).toFixed(2)}</td>`;
   });
-  html += '<tr class="total-row"><td class="grade-col">Total</td>';
-  colKeys.forEach(s => html += `<td>${Number(colTotals[s] || 0).toFixed(2)}</td>`);
-  html += `<td class="total-col">${Number(grand).toFixed(2)}</td></tr></tbody></table></div>`;
-  html += `<div class="report-foot">แสดงเป็นจำนวนม้วน · โหมด: ${modeLabel} · ยอดสูงสุดต่อวัน</div>`;
-  $('matrixBody').innerHTML = html;
-}
+  html += `<td class="total-col">${Number(rowTotals2[rk] || 0).toFixed(2)}</td></tr>`;  // ✅ ใช้ rowTotals2
+});
+html += '<tr class="total-row"><td class="grade-col">Total</td>';
+colKeys2.forEach(s => html += `<td>${Number(colTotals2[s] || 0).toFixed(2)}</td>`);      // ✅ ใช้ colTotals2
+html += `<td class="total-col">${Number(grand2).toFixed(2)}</td></tr></tbody></table></div>`;  // ✅ ใช้ grand2
+html += `<div class="report-foot">แสดงเป็นจำนวนม้วน · โหมด: ${modeLabel} · ยอดสูงสุดต่อวัน</div>`;
+$('matrixBody').innerHTML = html;
 
 // ================= DRILL MODAL =================
 async function openDrill(grade, gram, size) {
