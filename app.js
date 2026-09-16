@@ -2,9 +2,9 @@
 //  STOCK ม้วนกระดาษ V5 — app.js
 //  ⚙️ แก้ 3 ค่าด้านล่างก่อนใช้งาน
 // ═══════════════════════════════════════════════════════════════
-const SUPABASE_URL      = 'xxxxxxxx';
-const SUPABASE_ANON_KEY = 'xxxxxxxxx';
-const EDGE_FUNCTION_URL = 'xxxxxxxxx';
+const SUPABASE_URL      = 'https://gwwgycbqzdjlijsuxahx.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_rMoUE6tUsQZHnJu2ULDxFg_4NAiw6wg';
+const EDGE_FUNCTION_URL = 'https://gwwgycbqzdjlijsuxahx.supabase.co/functions/v1/admin-users';
 // ═══════════════════════════════════════════════════════════════
 
 if (SUPABASE_URL.includes('xxxxx')) {
@@ -336,11 +336,9 @@ async function renderMatrix() {
 
     let rolls;
     if (mode === 'full') {
-      // ✅ โหมดม้วนเต็ม: ปัดขึ้นที่ระดับ "ยอดต่อวัน"
-      rolls = Math.ceil(kg / std);
+      rolls = Math.ceil(kg / std);   // ✅ โหมดม้วนเต็ม: ปัดขึ้นที่ระดับวัน
     } else {
-      // โหมดใช้จริง
-      rolls = kg / std;
+      rolls = kg / std;               // โหมดใช้จริง
     }
 
     if (!perItem[code]) perItem[code] = { total: 0, max: 0 };
@@ -351,23 +349,12 @@ async function renderMatrix() {
   const rowSet = new Map(), colSet = new Set(), cells = {}, rowTotals = {}, colTotals = {};
   let grand = 0;
 
-  // ⚠️ โหมดม้วนเต็ม: ใช้ "ยอดรวมต่อวัน" ไม่ใช่ sum ของ ceil
-  // แต่ตาม logic ที่เลือก: ปัดที่ระดับวัน → เก็บเป็น "ยอดต่อวัน" (max) หรือ "ยอดรวม" (sum)
-  // สำหรับ sum mode ในโหมด full: บวกของ ceil ต่อวัน (ตามที่ยืนยัน)
   Object.entries(perItem).forEach(([code, v]) => {
     const m = mByCode[code];
     const rk = m.grade + '|' + m.gram;
     rowSet.set(rk, m);
     colSet.add(m.size);
-    const val = mode === 'full'
-      ? (document.querySelector('input[name="mode"]:checked').value === 'full'
-          ? (new URLSearchParams()).get('x') // placeholder — ใช้ v.total หรือ v.max
-          : v.max)
-      : (document.querySelector('input[name="mode"]:checked').value === 'sum' ? v.total : v.max);
-
-    // ตัดสินใจ: ใช้ max เป็นค่าแสดง (โหมดเดิมมี max/sum แต่ V5 มีแค่ actual/full)
-    // V5: แสดง "ยอดสูงสุดต่อวัน" เสมอ (ตามที่ผู้ใช้ยืนยันโหมด full = ปัดขึ้นที่ระดับวัน)
-    const finalVal = v.max;
+    const finalVal = v.max;   // แสดง "ยอดสูงสุดต่อวัน"
 
     const k = rk + '|' + m.size;
     cells[k] = (cells[k] || 0) + finalVal;
@@ -409,9 +396,7 @@ async function renderMatrix() {
   $('matrixBody').innerHTML = html;
 }
 
-// ═══════════════════════════════════════════════
-//  DRILL MODAL
-// ═══════════════════════════════════════════════
+// ================= DRILL MODAL =================
 async function openDrill(grade, gram, size) {
   const m = masterCache.find(r => r.grade === grade && String(r.gram) === String(gram) && r.size === size);
   if (!m) return alert('ไม่พบ Item Code');
@@ -869,14 +854,13 @@ async function clearAllUsage() {
   renderLatestBatch();
 }
 
-// ================= DELETE BY MONTH (V5 — ลบทั้ง 2 ตาราง) =================
+// ================= DELETE BY MONTH (V5) =================
 function openDeleteMonth() {
   $('delMonth').value = currentMonthStr();
   $('deleteMonthMsg').innerHTML = '';
   openModal('modalDeleteMonth');
 }
 
-// Export Excel ของเดือนที่เลือก (ก่อนลบ)
 async function exportMonthBeforeDelete() {
   const m = $('delMonth').value;
   if (!m) return alert('เลือกเดือนก่อน');
@@ -922,7 +906,7 @@ async function confirmDeleteMonth() {
   setTimeout(() => { closeModal('modalDeleteMonth'); renderLatestBatch(); }, 2000);
 }
 
-// ================= ARCHIVE (V5 ใหม่) =================
+// ================= ARCHIVE (V5) =================
 async function previewArchive() {
   $('archiveMsg').innerHTML = '<div class="msg info">กำลังตรวจสอบ...</div>';
   const { data, error } = await supabase.rpc('count_archivable_usage');
