@@ -59,13 +59,23 @@
 
           <!-- ✅ V6: Gradegrams Filter (search + multi-select) -->
           <label class="grade-filter-wrap">
-            Gradegrams
-            <div class="grade-filter-box" id="gradeFilterBox">
-              <div class="grade-chips" id="gradeChips"></div>
-              <input type="text" id="gradeSearch" placeholder="พิมพ์เพื่อค้นหา เช่น KA" autocomplete="off">
-              <div class="grade-dropdown hidden" id="gradeDropdown"></div>
-            </div>
-          </label>
+  Gradegrams
+  <div class="grade-filter-box" id="gradeFilterBox">
+    <button type="button" class="grade-filter-btn" id="gradeFilterBtn">
+      <span id="gradeFilterLabel">ทั้งหมด</span>
+      <span class="arrow">▼</span>
+    </button>
+    <div class="grade-dropdown hidden" id="gradeDropdown">
+      <div class="grade-actions">
+        <button type="button" onclick="selectAllGrades()">✓ เลือกทั้งหมด</button>
+        <button type="button" onclick="clearAllGrades()">✗ ล้างทั้งหมด</button>
+      </div>
+      <div class="grade-list" id="gradeList">
+        <!-- checkbox จะถูก render ที่นี่ -->
+      </div>
+    </div>
+  </div>
+</label>
 
           <span style="font-size:13px;margin-left:8px">แสดง:</span>
           <label><input type="radio" name="mode" value="actual" checked> ใช้จริง</label>
