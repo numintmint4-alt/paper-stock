@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK ม้วนกระดาษ V6 — app.js
+//  STOCK ม้วนกระดาษ V6 — app.js (Core)
 //  ⚙️ แก้ 3 ค่าด้านล่างก่อนใช้งาน
 // ═══════════════════════════════════════════════════════════════
 const SUPABASE_URL      = 'https://gwwgycbqzdjlijsuxahx.supabase.co';
@@ -15,6 +15,7 @@ if (SUPABASE_URL.includes('xxxxx')) {
 const HAS_EDGE_FUNCTION = !EDGE_FUNCTION_URL.includes('xxxxx');
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// ================= GLOBAL STATE =================
 let currentUser = null;
 let currentProfile = null;
 let masterCache = [];
@@ -41,7 +42,7 @@ function reportMonthRange(reportMonthStr, monthsBack = 3) {
   if (!reportMonthStr) return { from: '', to: '' };
   const [y, m] = reportMonthStr.split('-').map(Number);
   const toDate = new Date(y, m - 1, 0);
-  let fromM = m - monthsBack, fromY = y;
+  let fromM = m - monthsBack + 1, fromY = y;
   while (fromM <= 0) { fromM += 12; fromY -= 1; }
   return {
     from: `${fromY}-${pad(fromM)}-01`,
@@ -58,6 +59,11 @@ function thaiMonthShort(monthStr) {
   const [y, m] = monthStr.split('-').map(Number);
   return `${THAI_MONTHS_SHORT[m-1]} ${String(y+543).slice(-2)}`;
 }
+function thaiDateFull(dateStr) {
+  if (!dateStr) return '-';
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+}
 function toISODate(v) {
   if (v == null || v === '') return '';
   if (typeof v === 'number') {
@@ -72,6 +78,18 @@ function toISODate(v) {
   m = s.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/);
   if (m) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
   return s.slice(0, 10);
+}
+// ✅ V6: แปลง Excel serial → วันที่ไทย (31/1/2569)
+function excelDateToThai(serial) {
+  if (!serial && serial !== 0) return '';
+  if (typeof serial !== 'number') return String(serial);
+  const utcDays = serial - 25569;
+  const msPerDay = 86400 * 1000;
+  const d = new Date(utcDays * msPerDay);
+  const day = d.getUTCDate();
+  const month = d.getUTCMonth() + 1;
+  const year = d.getUTCFullYear() + 543;
+  return `${day}/${month}/${year}`;
 }
 function findColumn(row, aliases) {
   const keys = Object.keys(row);
@@ -164,6 +182,7 @@ function findItemCode(grade, width) {
 // ================= PROGRESS =================
 function showProgress(elId, current, total, label = '') {
   const el = $(elId);
+  if (!el) return;
   el.classList.remove('hidden');
   const pct = total > 0 ? Math.round(current / total * 100) : 0;
   el.innerHTML = `
@@ -174,6 +193,7 @@ function showProgress(elId, current, total, label = '') {
 }
 function hideProgress(elId) {
   const el = $(elId);
+  if (!el) return;
   el.classList.add('hidden');
   el.innerHTML = '';
 }
@@ -242,14 +262,19 @@ $('logoutBtn').onclick = async () => {
 };
 
 // ================= TABS =================
+const TAB_LIST = ['matrix','stock','summary','receive','alert','data','settings'];
+
 document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
   btn.onclick = () => {
     document.querySelectorAll('.nav button[data-tab]').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    ['matrix','stock','data','settings'].forEach(t => $('tab-'+t).classList.toggle('hidden', t !== btn.dataset.tab));
+    TAB_LIST.forEach(t => $('tab-'+t).classList.toggle('hidden', t !== btn.dataset.tab));
     const t = btn.dataset.tab;
-    if (t === 'matrix') renderMatrix();
-    if (t === 'stock') initStockTab();
+    if (t === 'matrix' && typeof renderMatrix === 'function') renderMatrix();
+    if (t === 'stock' && typeof initStockTab === 'function') initStockTab();
+    if (t === 'summary' && typeof initSummaryTab === 'function') initSummaryTab();
+    if (t === 'receive' && typeof initReceiveTab === 'function') initReceiveTab();
+    if (t === 'alert' && typeof initAlertTab === 'function') initAlertTab();
     if (t === 'data') renderData();
   };
 });
@@ -265,17 +290,23 @@ async function loadMaster(onProgress = null) {
 
 async function refreshAll() {
   await loadMaster();
-  await loadGradeFilter();   // ✅ V6
+  if (typeof loadGradeFilter === 'function') await loadGradeFilter();
+  if (typeof loadStockGradeFilter === 'function') await loadStockGradeFilter();
+  if (typeof loadSummaryGradeFilter === 'function') await loadSummaryGradeFilter();
+  if (typeof loadReceiveGradeFilter === 'function') await loadReceiveGradeFilter();
+  if (typeof loadAlertGradeFilter === 'function') await loadAlertGradeFilter();
   renderMatrix();
 }
 
-// ================= V6 — GRADEGRAMS FILTER (checkbox) =================
-let selectedGrades = [];        // เกรดที่เลือก
-let allGradesList = [];         // เกรดทั้งหมด
+// ================= V6: MATRIX GRADE FILTER (grade+gram) =================
+let selectedGrades = [];
+let allGradesList = [];
 
-// โหลดรายการเกรดทั้งหมด
 async function loadGradeFilter() {
-  allGradesList = [...new Set(masterCache.map(m => m.grade))].sort();
+  // ✅ V6: grade + gram รวมกัน
+  allGradesList = [...new Set(
+    masterCache.map(m => m.grade + m.gram)
+  )].sort();
 
   renderGradeList();
   updateGradeFilterLabel();
@@ -286,7 +317,6 @@ async function loadGradeFilter() {
 
   if (!btn || !dropdown || !box) return;
 
-  // toggle dropdown
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
     const isHidden = dropdown.classList.contains('hidden');
@@ -299,7 +329,6 @@ async function loadGradeFilter() {
     }
   });
 
-  // ปิด dropdown เมื่อคลิกนอก
   document.addEventListener('click', (e) => {
     if (!box.contains(e.target)) {
       dropdown.classList.add('hidden');
@@ -308,16 +337,13 @@ async function loadGradeFilter() {
   });
 }
 
-// render checkbox list
 function renderGradeList() {
   const list = $('gradeList');
   if (!list) return;
-
   if (!allGradesList.length) {
-    list.innerHTML = '<div style="padding:10px;text-align:center;color:#94a3b8;font-size:13px">ไม่มีข้อมูลเกรด</div>';
+    list.innerHTML = '<div style="padding:10px;text-align:center;color:#94a3b8;font-size:13px">ไม่มีข้อมูล</div>';
     return;
   }
-
   list.innerHTML = allGradesList.map(g => {
     const checked = selectedGrades.includes(g);
     return `<label class="item ${checked ? 'checked' : ''}" data-grade="${esc(g)}">
@@ -325,8 +351,6 @@ function renderGradeList() {
       <span>${esc(g)}</span>
     </label>`;
   }).join('');
-
-  // ผูก event
   list.querySelectorAll('.item').forEach(el => {
     const cb = el.querySelector('input[type="checkbox"]');
     cb.addEventListener('change', () => {
@@ -342,11 +366,9 @@ function renderGradeList() {
   });
 }
 
-// อัปเดต label บนปุ่ม
 function updateGradeFilterLabel() {
   const label = $('gradeFilterLabel');
   if (!label) return;
-
   if (selectedGrades.length === 0) {
     label.textContent = 'ทั้งหมด';
     label.style.color = '#1e293b';
@@ -359,26 +381,23 @@ function updateGradeFilterLabel() {
   }
 }
 
-// เลือกทั้งหมด
 function selectAllGrades() {
   selectedGrades = [...allGradesList];
   renderGradeList();
   updateGradeFilterLabel();
 }
 
-// ล้างทั้งหมด
 function clearAllGrades() {
   selectedGrades = [];
   renderGradeList();
   updateGradeFilterLabel();
 }
 
-// ดึงเกรดที่เลือก
 function getSelectedGrades() {
   return selectedGrades;
 }
 
-// ================= MATRIX =================
+// ================= MATRIX (Stock Level) =================
 async function renderMatrix() {
   const reportMonth = $('qReportMonth').value;
   const monthsBack  = Number($('qMonthsBack').value) || 3;
@@ -393,10 +412,9 @@ async function renderMatrix() {
                     customer === GENERAL_CUSTOMER ? ' · ลูกค้า: ทั่วไป' : ` · ลูกค้า: ${customer}`;
   const modeLabel = mode === 'full' ? 'ม้วนเต็ม (ปัดขึ้น)' : 'ใช้จริง';
 
-  // ✅ V6: แสดงเกรดที่เลือกใน subtitle
-  const selectedGrades = getSelectedGrades();
-  const gradeLabel = selectedGrades.length > 0
-    ? ` · เกรด: ${selectedGrades.join(', ')}`
+  const selectedGradesInMatrix = getSelectedGrades();
+  const gradeLabel = selectedGradesInMatrix.length > 0
+    ? ` · เกรด: ${selectedGradesInMatrix.join(', ')}`
     : '';
 
   $('reportTitle').innerHTML = `
@@ -414,7 +432,6 @@ async function renderMatrix() {
     return q;
   });
 
-  // populate customer dropdown
   const custSet = new Set();
   allUsage.forEach(u => {
     const c = (u.roll_for_customer || '').trim();
@@ -427,7 +444,6 @@ async function renderMatrix() {
     custList.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
   custSel.value = keepVal;
 
-  // filter customer
   let usage = allUsage;
   if (customer === GENERAL_CUSTOMER) {
     usage = allUsage.filter(u => !u.roll_for_customer || !String(u.roll_for_customer).trim());
@@ -437,7 +453,6 @@ async function renderMatrix() {
 
   const mByCode = {}; masterCache.forEach(m => mByCode[m.item_code] = m);
 
-  // daily sum ต่อ item_code+date
   const daily = {};
   usage.forEach(u => {
     const key = u.item_code + '|' + u.usage_date;
@@ -452,11 +467,8 @@ async function renderMatrix() {
     if (!std) return;
 
     let rolls;
-    if (mode === 'full') {
-      rolls = Math.ceil(kg / std);
-    } else {
-      rolls = kg / std;
-    }
+    if (mode === 'full') rolls = Math.ceil(kg / std);
+    else rolls = kg / std;
 
     if (!perItem[code]) perItem[code] = { total: 0, max: 0 };
     perItem[code].total += rolls;
@@ -468,7 +480,7 @@ async function renderMatrix() {
 
   Object.entries(perItem).forEach(([code, v]) => {
     const m = mByCode[code];
-    const rk = m.grade + '|' + m.gram;
+    const rk = m.grade + m.gram;
     rowSet.set(rk, m);
     colSet.add(m.size);
     const finalVal = v.max;
@@ -480,18 +492,12 @@ async function renderMatrix() {
     grand += finalVal;
   });
 
-  // ✅ V6: Sort rowKeys + Filter เกรด
-  let rowKeys = [...rowSet.keys()].sort((a,b) => {
-    const [ga, ma] = a.split('|'), [gb, mb] = b.split('|');
-    return ga.localeCompare(gb) || Number(ma) - Number(mb);
-  });
+  let rowKeys = [...rowSet.keys()].sort((a,b) => a.localeCompare(b));
 
-  // ✅ V6: ถ้ามีการเลือกเกรด → filter rowKeys
-  if (selectedGrades.length > 0) {
-    rowKeys = rowKeys.filter(rk => selectedGrades.includes(rk.split('|')[0]));
+  if (selectedGradesInMatrix.length > 0) {
+    rowKeys = rowKeys.filter(rk => selectedGradesInMatrix.includes(rk));
   }
 
-  // ✅ V6: คำนวณ colKeys2, rowTotals2, colTotals2, grand2 ใหม่จาก rowKeys ที่ filter แล้ว
   const colSet2 = new Set();
   const rowTotals2 = {};
   const colTotals2 = {};
@@ -501,7 +507,6 @@ async function renderMatrix() {
     const m = rowSet.get(rk);
     if (!m) return;
     colSet2.add(m.size);
-
     colSet.forEach(s => {
       const v = cells[rk + '|' + s];
       if (v) {
@@ -519,19 +524,17 @@ async function renderMatrix() {
     return;
   }
 
-  // ✅ V6: Render HTML — ใช้ colKeys2, rowTotals2, colTotals2, grand2
-  let html = '<div class="report-wrap"><table class="report-table"><thead><tr><th class="grade-col">grade</th>';
+  let html = '<div class="report-wrap"><table class="report-table"><thead><tr><th class="grade-col">Gradegrams</th>';
   colKeys2.forEach(s => html += `<th>${s}</th>`);
   html += '<th class="total-col">Total</th></tr></thead><tbody>';
 
   rowKeys.forEach(rk => {
-    const [g, gr] = rk.split('|');
     html += '<tr>';
-    html += `<td class="grade-col">${g}${gr}</td>`;
+    html += `<td class="grade-col">${esc(rk)}</td>`;
     colKeys2.forEach(s => {
       const v = cells[rk + '|' + s];
       if (!v) html += '<td class="empty">-</td>';
-      else html += `<td class="clickable" onclick="openDrill('${g}','${gr}',${s})">${Number(v).toFixed(2)}</td>`;
+      else html += `<td class="clickable" onclick="openDrill('${esc(rk)}',${s})">${Number(v).toFixed(2)}</td>`;
     });
     html += `<td class="total-col">${Number(rowTotals2[rk] || 0).toFixed(2)}</td></tr>`;
   });
@@ -543,10 +546,10 @@ async function renderMatrix() {
 }
 
 // ================= DRILL MODAL =================
-async function openDrill(grade, gram, size) {
-  const m = masterCache.find(r => r.grade === grade && String(r.gram) === String(gram) && r.size === size);
+async function openDrill(gradegram, size) {
+  const m = masterCache.find(r => (r.grade + r.gram) === gradegram && r.size === size);
   if (!m) return alert('ไม่พบ Item Code');
-  $('drillTitle').innerHTML = `${m.item_code} <span style="font-weight:400;color:#64748b;font-size:14px">(Grade ${grade} · Gram ${gram} · Size ${size})</span>`;
+  $('drillTitle').innerHTML = `${m.item_code} <span style="font-weight:400;color:#64748b;font-size:14px">(Gradegrams ${gradegram} · Size ${size})</span>`;
   openModal('modalDrill');
 
   const usage = await fetchAllRows(() => {
@@ -596,7 +599,7 @@ function toggleDate(d) { $('rec-'+d).classList.toggle('hidden'); }
 function renderMaster() {
   const q = ($('masterSearch').value || '').toLowerCase();
   const rows = masterCache.filter(r => !q || (r.grade + r.gram + r.size + r.item_code).toLowerCase().includes(q));
-  let html = '<div style="max-height:550px;overflow:auto"><table><thead><tr><th>#</th><th>Grade</th><th>Gram</th><th>Size</th><th>Item Code</th><th>Std Weight</th><th></th></tr></thead><tbody>';
+  let html = '<div style="max-height:550px;overflow:auto"><table><thead><tr><th>#</th><th>Gradegrams</th><th>Gram</th><th>Size</th><th>Item Code</th><th>Std Weight</th><th></th></tr></thead><tbody>';
   if (!rows.length) html += '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:20px">ไม่มีข้อมูล</td></tr>';
   rows.forEach((r, i) => {
     html += `<tr><td>${i+1}</td><td>${r.grade}</td><td>${r.gram}</td><td>${r.size}</td>
@@ -639,7 +642,9 @@ async function saveMaster() {
   else ({ error } = await supabase.from('paper_specs').insert(payload));
   if (error) { $('masterFormError').innerHTML = `<div class="msg err">${error.message}</div>`; return; }
   closeModal('modalMaster');
-  await loadMaster(); renderMaster();
+  await loadMaster();
+  await loadGradeFilter();
+  renderMaster();
 }
 async function delMaster(id) {
   if (!confirm('ยืนยันลบ?')) return;
@@ -702,24 +707,25 @@ function importMaster(ev) {
 
       if (!payload.length) {
         hideProgress('masterProgress');
-        showMsg('importMasterMsg', `⚠ ไม่มีแถวที่บันทึกได้ (ทั้งหมด ${rows.length})<br>${errors.slice(0,5).join('<br>')}`, 'err');
+        showMsg('importMasterMsg', `⚠ ไม่มีแถวที่บันทึกได้`, 'err');
         return;
       }
 
-      showProgress('masterProgress', 0, 1, `กำลังบันทึก ${payload.length} แถว (transaction)...`);
+      showProgress('masterProgress', 0, 1, `กำลังบันทึก ${payload.length} แถว...`);
       const { data, error } = await supabase.rpc('import_master_batch', { rows: payload });
       if (error) {
         hideProgress('masterProgress');
-        showMsg('importMasterMsg', '❌ บันทึกไม่สำเร็จ: ' + error.message + '<br>(rollback แล้ว)', 'err');
+        showMsg('importMasterMsg', '❌ บันทึกไม่สำเร็จ: ' + error.message, 'err');
         return;
       }
 
       hideProgress('masterProgress');
       let html = `✅ Master: เพิ่ม ${data.added} · อัปเดต ${data.updated}` + (errors.length ? ` · ⚠ ข้าม ${errors.length}` : '');
-      if (errors.length) html += '<br><br>ตัวอย่าง:<br>' + errors.slice(0, 8).join('<br>');
       showMsg('importMasterMsg', html, errors.length ? 'err' : 'ok');
 
-      await loadMaster(); renderMaster();
+      await loadMaster();
+      await loadGradeFilter();
+      renderMaster();
     } catch (ex) {
       hideProgress('masterProgress');
       showMsg('importMasterMsg', 'อ่านไฟล์ไม่สำเร็จ: ' + ex.message, 'err');
@@ -730,16 +736,14 @@ function importMaster(ev) {
 }
 
 // ================= DATA TAB =================
+// ✅ V6: ย้าย import_at, batch, สถานะ ไปท้ายตาราง + doc_date แปลงเป็นไทย
 const RAW_COLUMNS = [
   { key: 'id', label: 'id' },
-  { key: 'import_at', label: 'import_at' },
-  { key: 'import_batch_id', label: 'batch' },
-  { key: 'is_valid', label: 'สถานะ' },
   { key: 'error_msg', label: 'error' },
   { key: 'plant_code', label: 'plant_code' },
   { key: 'plant_desc', label: 'plant_desc' },
   { key: 'corrugator_no', label: 'corrugator_no' },
-  { key: 'doc_date', label: 'doc_date' },
+  { key: 'doc_date', label: 'doc_date', isExcelDate: true },
   { key: 'doc_shift', label: 'doc_shift' },
   { key: 'doc_no', label: 'doc_no' },
   { key: 'stand', label: 'stand' },
@@ -758,7 +762,11 @@ const RAW_COLUMNS = [
   { key: 'loc', label: 'loc' },
   { key: 'warehouse_no', label: 'warehouse_no' },
   { key: 'usage_date', label: 'usage_date' },
-  { key: 'item_code', label: 'item_code' }
+  { key: 'item_code', label: 'item_code' },
+  // ✅ V6: ย้ายมาท้าย
+  { key: 'import_at', label: 'import_at' },
+  { key: 'import_batch_id', label: 'batch' },
+  { key: 'is_valid', label: 'สถานะ' }
 ];
 
 async function renderData() {
@@ -815,6 +823,9 @@ async function renderData() {
           v = v ? '<span class="badge ok">✓</span>' : '<span class="badge bad">✗</span>';
         } else if (c.key === 'import_at' && v) {
           v = new Date(v).toLocaleString('th-TH');
+        } else if (c.isExcelDate && v !== null && v !== undefined && v !== '') {
+          // ✅ V6: แปลง Excel serial → วันที่ไทย
+          v = excelDateToThai(Number(v));
         } else {
           v = esc(v);
         }
@@ -824,7 +835,7 @@ async function renderData() {
     });
   }
   html += '</tbody></table></div>';
-  html += `<div style="margin-top:8px;font-size:13px;color:#64748b">แสดง ${Math.min(rows.length, 2000)} / ${rows.length} แถว ${rows.length > 2000 ? '(แสดง 2,000 แรก)' : ''}</div>`;
+  html += `<div style="margin-top:8px;font-size:13px;color:#64748b">แสดง ${Math.min(rows.length, 2000)} / ${rows.length} แถว</div>`;
   $('dataBody').innerHTML = html;
 }
 
@@ -832,7 +843,13 @@ function exportData() {
   if (!dataCache.length) return alert('ไม่มีข้อมูล');
   const data = dataCache.map(r => {
     const o = {};
-    RAW_COLUMNS.forEach(c => { o[c.label] = r[c.key]; });
+    RAW_COLUMNS.forEach(c => {
+      let v = r[c.key];
+      if (c.isExcelDate && v !== null && v !== undefined && v !== '') {
+        v = excelDateToThai(Number(v));
+      }
+      o[c.label] = v;
+    });
     return o;
   });
   const ws = XLSX.utils.json_to_sheet(data);
@@ -887,7 +904,11 @@ async function renderLatestBatch() {
     validRows.forEach(r => {
       html += '<tr>';
       ['id','doc_date','doc_no','grade','width','used_kgs','item_code','usage_date','roll_for_customer'].forEach(k => {
-        html += `<td>${esc(r[k]) ?? ''}</td>`;
+        let v = r[k];
+        if (k === 'doc_date' && v !== null && v !== undefined && v !== '') {
+          v = excelDateToThai(Number(v));
+        }
+        html += `<td>${esc(v) ?? ''}</td>`;
       });
       html += '</tr>';
     });
@@ -904,7 +925,11 @@ async function renderLatestBatch() {
     invalidRows.forEach(r => {
       html += '<tr class="invalid">';
       ['id','doc_date','doc_no','grade','width','used_kgs'].forEach(k => {
-        html += `<td>${esc(r[k]) ?? ''}</td>`;
+        let v = r[k];
+        if (k === 'doc_date' && v !== null && v !== undefined && v !== '') {
+          v = excelDateToThai(Number(v));
+        }
+        html += `<td>${esc(v) ?? ''}</td>`;
       });
       html += `<td><b>${esc(r.error_msg) || 'ไม่ทราบสาเหตุ'}</b></td>`;
       html += '</tr>';
@@ -915,7 +940,7 @@ async function renderLatestBatch() {
   el.innerHTML = html;
 }
 
-// ================= IMPORT USAGE (V5.1 — แบ่งชุด) =================
+// ================= IMPORT USAGE =================
 function importUsage(ev) {
   const f = ev.target.files[0]; if (!f) return;
   const r = new FileReader();
@@ -973,12 +998,8 @@ function importUsage(ev) {
         const chunk = payload.slice(i, i + CHUNK_SIZE);
         const chunkNo = Math.floor(i / CHUNK_SIZE) + 1;
 
-        showProgress(
-          'usageProgress',
-          i + chunk.length,
-          payload.length,
-          `กำลังบันทึกชุดที่ ${chunkNo}/${totalChunks} (${i + chunk.length}/${payload.length} แถว)...`
-        );
+        showProgress('usageProgress', i + chunk.length, payload.length,
+          `กำลังบันทึกชุดที่ ${chunkNo}/${totalChunks} (${i + chunk.length}/${payload.length} แถว)...`);
 
         const { data, error } = await supabase.rpc('import_usage_full', {
           rows: chunk,
@@ -988,10 +1009,7 @@ function importUsage(ev) {
         if (error) {
           hideProgress('usageProgress');
           showMsg('importUsageMsg',
-            `❌ บันทึกชุดที่ ${chunkNo}/${totalChunks} ไม่สำเร็จ<br>
-             <b>Error:</b> ${error.message}<br>
-             <b>บันทึกสำเร็จแล้ว:</b> ${sumTotal} แถว (ชุดที่ 1-${chunkNo-1})<br>
-             ⚠️ ข้อมูลที่บันทึกแล้วจะไม่ rollback`,
+            `❌ บันทึกชุดที่ ${chunkNo}/${totalChunks} ไม่สำเร็จ<br><b>Error:</b> ${error.message}`,
             'err');
           await renderLatestBatch();
           return;
@@ -1005,8 +1023,7 @@ function importUsage(ev) {
       hideProgress('usageProgress');
       let html = `✅ ทั้งหมด ${sumTotal} แถว · 
         <b style="color:#166534">ผ่าน ${sumValid}</b> · 
-        <b style="color:#dc2626">ไม่ผ่าน ${sumInvalid}</b><br>
-        <span style="font-size:12px;color:#64748b">แบ่งเป็น ${totalChunks} ชุด · batch: ${batchId.slice(0,8)}...</span>`;
+        <b style="color:#dc2626">ไม่ผ่าน ${sumInvalid}</b>`;
       showMsg('importUsageMsg', html, sumInvalid ? 'info' : 'ok');
 
       await renderLatestBatch();
@@ -1055,7 +1072,7 @@ async function confirmDeleteMonth() {
   if (!m) return;
   const [y, mo] = m.split('-').map(Number);
   const fromShort = thaiMonthShort(m);
-  if (!confirm(`⚠️ ยืนยันลบข้อมูลของเดือน ${fromShort}?\n\nจะลบทั้ง usage_records และ usage_records_raw\nไม่สามารถกู้คืนได้`)) return;
+  if (!confirm(`⚠️ ยืนยันลบข้อมูลของเดือน ${fromShort}?`)) return;
 
   $('deleteMonthMsg').innerHTML = '<div class="msg info">กำลังลบ...</div>';
   const { data, error } = await supabase.rpc('delete_usage_by_month', { p_year: y, p_month: mo });
@@ -1065,8 +1082,7 @@ async function confirmDeleteMonth() {
   }
   $('deleteMonthMsg').innerHTML = `<div class="msg ok">
     ✅ ลบแล้วทั้งหมด ${data.deleted} แถว<br>
-    (usage_records: ${data.deleted_main} · raw: ${data.deleted_raw})<br>
-    เดือน ${fromShort}
+    (usage_records: ${data.deleted_main} · raw: ${data.deleted_raw})
   </div>`;
   setTimeout(() => { closeModal('modalDeleteMonth'); renderLatestBatch(); }, 2000);
 }
@@ -1087,10 +1103,10 @@ async function previewArchive() {
 }
 
 async function runArchive() {
-  if (!confirm('⚠️ ย้ายข้อมูลที่เก่ากว่า 2 ปี ไป Archive?\n\nข้อมูลจะไม่แสดงใน Matrix อีก')) return;
-  if (!confirm('ยืนยันอีกครั้ง — ดำเนินการเลย?')) return;
+  if (!confirm('⚠️ ย้ายข้อมูลที่เก่ากว่า 2 ปี ไป Archive?')) return;
+  if (!confirm('ยืนยันอีกครั้ง?')) return;
 
-  $('archiveMsg').innerHTML = '<div class="msg info">กำลังย้ายข้อมูล... (อาจใช้เวลาสักครู่)</div>';
+  $('archiveMsg').innerHTML = '<div class="msg info">กำลังย้ายข้อมูล...</div>';
   const { data, error } = await supabase.rpc('archive_old_usage');
   if (error) {
     $('archiveMsg').innerHTML = `<div class="msg err">ย้ายไม่สำเร็จ: ${error.message}</div>`;
@@ -1217,489 +1233,6 @@ async function delUser(id, username) {
     showMsg('usersMsg', `✅ ลบ ${username} แล้ว`, 'ok');
     loadUsers();
   } catch (e) { showMsg('usersMsg', 'ผิดพลาด: ' + e.message, 'err'); }
-}
-// ============================================================
-// V6 ส่วนที่ 4: STOCK คงเหลือ
-// ============================================================
-
-let stockSelectedGrades = [];   // เกรดแกรมที่เลือก
-let stockAllGrades = [];        // เกรดแกรมทั้งหมด
-let stockCache = [];            // cache ข้อมูล Stock
-
-// ===== INIT =====
-async function initStockTab() {
-  // ตั้งค่าวันที่เริ่มต้น = เมื่อวาน
-  const dateInput = $('stockDate');
-  if (dateInput && !dateInput.value) {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    dateInput.value = toISODate(yesterday);
-  }
-
-  // โหลด grade filter
-  await loadStockGradeFilter();
-
-  // โหลด customer dropdown
-  await loadStockCustomers();
-
-  // render Matrix
-  await renderStockMatrix();
-}
-
-// ===== โหลด Filter Gradegrams =====
-async function loadStockGradeFilter() {
-  // ✅ V6: ใช้ grade + gram รวมกัน
-  stockAllGrades = [...new Set(
-    masterCache.map(m => m.grade + m.gram)
-  )].sort();
-
-  renderStockGradeList();
-  updateStockGradeLabel();
-
-  const btn = $('stockGradeFilterBtn');
-  const dropdown = $('stockGradeDropdown');
-  const box = $('stockGradeFilterBox');
-
-  if (!btn || !dropdown || !box) return;
-
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const isHidden = dropdown.classList.contains('hidden');
-    if (isHidden) {
-      dropdown.classList.remove('hidden');
-      btn.classList.add('open');
-    } else {
-      dropdown.classList.add('hidden');
-      btn.classList.remove('open');
-    }
-  });
-
-  document.addEventListener('click', (e) => {
-    if (!box.contains(e.target)) {
-      dropdown.classList.add('hidden');
-      btn.classList.remove('open');
-    }
-  });
-}
-
-function renderStockGradeList() {
-  const list = $('stockGradeList');
-  if (!list) return;
-
-  if (!stockAllGrades.length) {
-    list.innerHTML = '<div style="padding:10px;text-align:center;color:#94a3b8;font-size:13px">ไม่มีข้อมูล</div>';
-    return;
-  }
-
-  list.innerHTML = stockAllGrades.map(g => {
-    const checked = stockSelectedGrades.includes(g);
-    return `<label class="item ${checked ? 'checked' : ''}" data-grade="${esc(g)}">
-      <input type="checkbox" ${checked ? 'checked' : ''}>
-      <span>${esc(g)}</span>
-    </label>`;
-  }).join('');
-
-  list.querySelectorAll('.item').forEach(el => {
-    const cb = el.querySelector('input[type="checkbox"]');
-    cb.addEventListener('change', () => {
-      const grade = el.dataset.grade;
-      if (cb.checked) {
-        if (!stockSelectedGrades.includes(grade)) stockSelectedGrades.push(grade);
-      } else {
-        stockSelectedGrades = stockSelectedGrades.filter(g => g !== grade);
-      }
-      el.classList.toggle('checked', cb.checked);
-      updateStockGradeLabel();
-    });
-  });
-}
-
-function updateStockGradeLabel() {
-  const label = $('stockGradeFilterLabel');
-  if (!label) return;
-  if (stockSelectedGrades.length === 0) {
-    label.textContent = 'ทั้งหมด';
-    label.style.color = '#1e293b';
-  } else if (stockSelectedGrades.length === 1) {
-    label.textContent = stockSelectedGrades[0];
-    label.style.color = '#1e40af';
-  } else {
-    label.textContent = `เลือก ${stockSelectedGrades.length} เกรด`;
-    label.style.color = '#1e40af';
-  }
-}
-
-function selectAllStockGrades() {
-  stockSelectedGrades = [...stockAllGrades];
-  renderStockGradeList();
-  updateStockGradeLabel();
-}
-
-function clearAllStockGrades() {
-  stockSelectedGrades = [];
-  renderStockGradeList();
-  updateStockGradeLabel();
-}
-
-// ===== โหลด Customer Dropdown =====
-async function loadStockCustomers() {
-  const sel = $('stockCustomer');
-  if (!sel) return;
-
-  try {
-    const { data, error } = await supabase
-      .from('stock_balance')
-      .select('customer')
-      .not('customer', 'is', null)
-      .neq('customer', '');
-
-    if (error) throw error;
-
-    const customers = [...new Set(data.map(d => d.customer))].filter(Boolean).sort();
-    const keepVal = sel.value;
-    sel.innerHTML = '<option value="">ทั้งหมด</option>' +
-      customers.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
-    sel.value = keepVal;
-  } catch (e) {
-    console.warn('loadStockCustomers:', e);
-  }
-}
-
-// ===== Render Stock Matrix =====
-async function renderStockMatrix() {
-  const stockDate = $('stockDate')?.value;
-  const customer = $('stockCustomer')?.value || '';
-  const loc = $('stockLoc')?.value || '';
-  const rollStatus = $('stockRollStatus')?.value || 'all';
-
-  if (!stockDate) {
-    alert('กรุณาเลือกวันที่ Stock');
-    return;
-  }
-
-  // อัปเดตหัวข้อ
-  const dateThai = new Date(stockDate).toLocaleDateString('th-TH', {
-    year: 'numeric', month: 'long', day: 'numeric'
-  });
-  const gradeLabel = stockSelectedGrades.length > 0
-    ? ` · เกรด: ${stockSelectedGrades.join(', ')}`
-    : '';
-  const custLabel = customer ? ` · ลูกค้า: ${customer}` : '';
-  const locLabel = loc ? ` · ${loc}` : '';
-  const statusLabel = rollStatus === 'all' ? '' :
-                      rollStatus === 'full' ? ' · ม้วนเต็ม' : ' · ม้วนเศษ';
-
-  $('stockReportTitle').innerHTML = `
-    รายงาน Stock คงเหลือ ม้วนกระดาษ<br>
-    ประจำวันที่ ${dateThai}
-    <div class="report-subtitle">(${gradeLabel || 'ทุกเกรด'}${custLabel}${locLabel}${statusLabel})</div>
-  `;
-
-  $('stockBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
-
-  try {
-    // เรียก RPC
-    const { data, error } = await supabase.rpc('get_stock_matrix', {
-      p_stock_date: stockDate,
-      p_grades: stockSelectedGrades.length > 0 ? stockSelectedGrades : null,
-      p_customers: customer ? [customer] : null,
-      p_locations: loc ? [loc] : null,
-      p_roll_status: rollStatus
-    });
-
-    if (error) throw error;
-
-    const rows = data || [];
-    stockCache = rows;
-
-    if (!rows.length) {
-      $('stockBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่มีข้อมูล Stock ในเงื่อนไขที่เลือก</p>';
-      return;
-    }
-
-    // สร้าง Matrix
-    const rowSet = new Map();   // gradegram → true
-    const colSet = new Set();   // size
-    const cells = {};           // "gradegram|size" → {full, scrap, kgs}
-    const rowTotals = {};
-    const colTotals = {};
-
-    rows.forEach(r => {
-      const rk = r.gradegram || r.grade;
-      const size = r.width;
-      rowSet.set(rk, r.grade);
-      colSet.add(size);
-
-      const k = rk + '|' + size;
-      if (!cells[k]) cells[k] = { full: 0, scrap: 0, kgs: 0 };
-      cells[k].full += Number(r.full_count) || 0;
-      cells[k].scrap += Number(r.scrap_count) || 0;
-      cells[k].kgs += Number(r.total_kgs) || 0;
-
-      if (!rowTotals[rk]) rowTotals[rk] = { full: 0, scrap: 0, kgs: 0 };
-      rowTotals[rk].full += Number(r.full_count) || 0;
-      rowTotals[rk].scrap += Number(r.scrap_count) || 0;
-      rowTotals[rk].kgs += Number(r.total_kgs) || 0;
-
-      if (!colTotals[size]) colTotals[size] = { full: 0, scrap: 0, kgs: 0 };
-      colTotals[size].full += Number(r.full_count) || 0;
-      colTotals[size].scrap += Number(r.scrap_count) || 0;
-      colTotals[size].kgs += Number(r.total_kgs) || 0;
-    });
-
-    const rowKeys = [...rowSet.keys()].sort();
-    const colKeys = [...colSet].sort((a,b) => a - b);
-
-    // Render HTML
-    let html = '<div class="report-wrap"><table class="report-table"><thead><tr>';
-    html += '<th class="grade-col">Gradegrams</th>';
-    colKeys.forEach(s => html += `<th>${s}</th>`);
-    html += '<th class="total-col">Total</th>';
-    html += '</tr></thead><tbody>';
-
-    rowKeys.forEach(rk => {
-      html += '<tr>';
-      html += `<td class="grade-col">${esc(rk)}</td>`;
-      colKeys.forEach(s => {
-        const v = cells[rk + '|' + s];
-        if (!v || (v.full === 0 && v.scrap === 0)) {
-          html += '<td class="empty">-</td>';
-        } else {
-          // ✅ แสดงรูปแบบ (2+1) = เต็ม 2 เศษ 1
-          let cellTxt = '';
-          if (v.full > 0 && v.scrap > 0) cellTxt = `${v.full}+${v.scrap}`;
-          else if (v.full > 0) cellTxt = `${v.full}`;
-          else if (v.scrap > 0) cellTxt = `+${v.scrap}`;
-
-          html += `<td class="clickable" onclick="openStockDetail('${esc(rk)}', ${s})">
-            <div class="cell-content">
-              <div class="cell-main">${cellTxt}</div>
-              <div class="cell-sub">${v.kgs.toFixed(0)} kg</div>
-            </div>
-          </td>`;
-        }
-      });
-      const rt = rowTotals[rk];
-      let rowTxt = '';
-      if (rt.full > 0 && rt.scrap > 0) rowTxt = `${rt.full}+${rt.scrap}`;
-      else if (rt.full > 0) rowTxt = `${rt.full}`;
-      else if (rt.scrap > 0) rowTxt = `+${rt.scrap}`;
-      html += `<td class="total-col">${rowTxt}</td>`;
-      html += '</tr>';
-    });
-
-    // Total row
-    html += '<tr class="total-row"><td class="grade-col">Total</td>';
-    colKeys.forEach(s => {
-      const ct = colTotals[s];
-      let txt = '';
-      if (ct.full > 0 && ct.scrap > 0) txt = `${ct.full}+${ct.scrap}`;
-      else if (ct.full > 0) txt = `${ct.full}`;
-      else if (ct.scrap > 0) txt = `+${ct.scrap}`;
-      html += `<td>${txt}</td>`;
-    });
-    // Grand total
-    const grand = { full: 0, scrap: 0 };
-    Object.values(colTotals).forEach(ct => {
-      grand.full += ct.full;
-      grand.scrap += ct.scrap;
-    });
-    let grandTxt = '';
-    if (grand.full > 0 && grand.scrap > 0) grandTxt = `${grand.full}+${grand.scrap}`;
-    else if (grand.full > 0) grandTxt = `${grand.full}`;
-    else if (grand.scrap > 0) grandTxt = `+${grand.scrap}`;
-    html += `<td class="total-col">${grandTxt}</td>`;
-    html += '</tr></tbody></table></div>';
-
-    html += `<div class="report-foot">
-      แสดง (ม้วนเต็ม + ม้วนเศษ) · 
-      คลิก Cell เพื่อดู SN · 
-      วันที่: ${dateThai}
-    </div>`;
-
-    $('stockBody').innerHTML = html;
-
-  } catch (err) {
-    console.error('renderStockMatrix error:', err);
-    $('stockBody').innerHTML = `<div class="msg err">เกิดข้อผิดพลาด: ${esc(err.message)}</div>`;
-  }
-}
-
-// ===== Stock Detail Modal =====
-async function openStockDetail(gradegram, size) {
-  const stockDate = $('stockDate')?.value;
-  if (!stockDate) return;
-
-  // แยก grade + gram จาก gradegram
-  const match = gradegram.match(/^([A-Z]+)(\d+)$/);
-  const grade = match ? match[1] : gradegram;
-
-  $('stockDetailTitle').innerHTML = `${esc(gradegram)} · Size ${size} <span style="font-weight:400;color:#64748b;font-size:14px">(วันที่ ${stockDate})</span>`;
-  openModal('modalStockDetail');
-  $('stockDetailBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
-
-  try {
-    const { data, error } = await supabase.rpc('get_stock_detail', {
-      p_stock_date: stockDate,
-      p_grade: grade,
-      p_width: size
-    });
-
-    if (error) throw error;
-
-    const rows = data || [];
-    if (!rows.length) {
-      $('stockDetailBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">ไม่พบรายละเอียด</p>';
-      return;
-    }
-
-    // Summary
-    const fullCount = rows.filter(r => r.roll_status === 'full').length;
-    const scrapCount = rows.filter(r => r.roll_status === 'scrap').length;
-    const totalKgs = rows.reduce((s, r) => s + (Number(r.kgs) || 0), 0);
-
-    let html = `<div class="msg info" style="margin-bottom:10px">
-      📦 ทั้งหมด ${rows.length} ม้วน · 
-      <b style="color:#166534">เต็ม ${fullCount}</b> · 
-      <b style="color:#d97706">เศษ ${scrapCount}</b> · 
-      <b>${totalKgs.toFixed(2)} kg</b>
-    </div>`;
-
-    html += '<div style="max-height:500px;overflow:auto"><table><thead><tr>';
-    html += '<th>#</th><th>SN</th><th>Diameter</th><th>Kgs</th><th>Meter</th>';
-    html += '<th>Supplier</th><th>QLT</th><th>Customer</th><th>Loc</th><th>สถานะ</th>';
-    html += '</tr></thead><tbody>';
-
-    rows.forEach((r, i) => {
-      const cls = r.roll_status === 'full' ? 'full-row' : 'scrap-row';
-      const statusTxt = r.roll_status === 'full' ? '✅ เต็ม' : '♻️ เศษ';
-      const custTxt = r.is_customer_roll ? `👤 ${esc(r.customer)}` : esc(r.customer) || '-';
-      html += `<tr class="${cls}">
-        <td>${i+1}</td>
-        <td><b>${esc(r.sn)}</b></td>
-        <td>${Number(r.dimeter).toFixed(2)}</td>
-        <td>${Number(r.kgs).toFixed(2)}</td>
-        <td>${Number(r.meter || 0).toFixed(0)}</td>
-        <td>${esc(r.supplier) || '-'}</td>
-        <td>${esc(r.qlt) || '-'}</td>
-        <td>${custTxt}</td>
-        <td>${esc(r.loc) || '-'}</td>
-        <td>${statusTxt}</td>
-      </tr>`;
-    });
-
-    html += '</tbody></table></div>';
-    $('stockDetailBody').innerHTML = html;
-
-  } catch (err) {
-    $('stockDetailBody').innerHTML = `<div class="msg err">${esc(err.message)}</div>`;
-  }
-}
-
-// ===== Import Stock =====
-function importStock(ev) {
-  const f = ev.target.files[0];
-  if (!f) return;
-
-  // เปิด Modal กรอกวันที่
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  $('stockImportDate').value = toISODate(yesterday);
-  $('stockImportError').innerHTML = '';
-
-  // เก็บไฟล์ไว้รอ
-  window.__pendingStockFile = f;
-
-  openModal('modalStockImport');
-  ev.target.value = '';
-}
-
-async function confirmStockImport() {
-  const f = window.__pendingStockFile;
-  const stockDate = $('stockImportDate')?.value;
-
-  if (!f) {
-    $('stockImportError').innerHTML = '<div class="msg err">ไม่พบไฟล์</div>';
-    return;
-  }
-  if (!stockDate) {
-    $('stockImportError').innerHTML = '<div class="msg err">กรุณาเลือกวันที่</div>';
-    return;
-  }
-
-  closeModal('modalStockImport');
-  $('stockProgress').classList.remove('hidden');
-
-  const reader = new FileReader();
-  reader.onload = async (e) => {
-    try {
-      showProgress('stockProgress', 0, 1, 'กำลังอ่านไฟล์...');
-      const wb = XLSX.read(e.target.result, { type: 'array' });
-      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-      showProgress('stockProgress', 0, rows.length, `อ่านได้ ${rows.length} แถว กำลังเตรียมข้อมูล...`);
-
-      // แปลงข้อมูล
-      const payload = rows.map(row => ({
-        grade:          String(row['grade'] || '').trim(),
-        width:          Number(row['width']) || '',
-        supplier:       String(row['supplier'] || '').trim(),
-        supplier_grade: String(row['supplier_grade'] || '').trim(),
-        sn:             String(row['sn'] || '').trim(),
-        supplier_sn:    String(row['supplier_sn'] || '').trim(),
-        dimeter:        Number(row['dimeter']) || '',
-        kgs:            Number(row['kgs']) || '',
-        meter:          Number(row['meter']) || '',
-        supplier_doc_no: String(row['supplier_doc_no'] || '').trim(),
-        buy_date:       String(row['buy_date'] || '').trim(),
-        ageing:         Number(row['ageing']) || '',
-        qlt:            String(row['qlt'] || '').trim(),
-        customer:       String(row['customer'] || '').trim(),
-        comp_no:        String(row['comp_no'] || '').trim(),
-        loc:            String(row['loc'] || '').trim(),
-        label_grade:    String(row['label_grade'] || '').trim(),
-        created_by:     currentUser.id
-      })).filter(r => r.sn && r.grade);
-
-      if (!payload.length) {
-        hideProgress('stockProgress');
-        showMsg('stockImportMsg', '⚠ ไม่มีแถวที่บันทึกได้', 'err');
-        window.__pendingStockFile = null;
-        return;
-      }
-
-      showProgress('stockProgress', 0, 1, `กำลังบันทึก ${payload.length} แถว...`);
-
-      const { data, error } = await supabase.rpc('import_stock_balance', {
-        rows: payload,
-        p_stock_date: stockDate
-      });
-
-      if (error) {
-        hideProgress('stockProgress');
-        showMsg('stockImportMsg', '❌ บันทึกไม่สำเร็จ: ' + error.message, 'err');
-        window.__pendingStockFile = null;
-        return;
-      }
-
-      hideProgress('stockProgress');
-      showMsg('stockImportMsg',
-        `✅ Import สำเร็จ ${data.inserted} แถว<br>วันที่ Stock: ${stockDate}`,
-        'ok');
-
-      window.__pendingStockFile = null;
-
-      // โหลดใหม่
-      $('stockDate').value = stockDate;
-      await loadStockCustomers();
-      await renderStockMatrix();
-
-    } catch (ex) {
-      hideProgress('stockProgress');
-      showMsg('stockImportMsg', 'อ่านไฟล์ไม่สำเร็จ: ' + ex.message, 'err');
-      window.__pendingStockFile = null;
-    }
-  };
-  reader.readAsArrayBuffer(f);
 }
 
 // ================= INIT =================
