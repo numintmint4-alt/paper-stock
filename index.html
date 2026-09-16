@@ -88,7 +88,86 @@
         <div id="matrixBody"></div>
       </div>
     </div>
+<!-- ========== STOCK คงเหลือ ========== -->
+<div id="tab-stock" class="hidden">
+  <div class="card">
+    <div class="report-head">
+      <div></div>
+      <div class="report-title" id="stockReportTitle">
+        รายงาน Stock คงเหลือ ม้วนกระดาษ<br>
+        ประจำวันที่
+      </div>
+      <div class="report-doc">FQ-ษ6-06-05 rev.01</div>
+    </div>
 
+    <div class="filters no-print">
+      <label>📅 วันที่ Stock
+        <input type="date" id="stockDate">
+      </label>
+
+      <label class="grade-filter-wrap">
+        Gradegrams
+        <div class="grade-filter-box" id="stockGradeFilterBox">
+          <button type="button" class="grade-filter-btn" id="stockGradeFilterBtn">
+            <span id="stockGradeFilterLabel">ทั้งหมด</span>
+            <span class="arrow">▼</span>
+          </button>
+          <div class="grade-dropdown hidden" id="stockGradeDropdown">
+            <div class="grade-actions">
+              <button type="button" onclick="selectAllStockGrades()">✓ เลือกทั้งหมด</button>
+              <button type="button" onclick="clearAllStockGrades()">✗ ล้างทั้งหมด</button>
+            </div>
+            <div class="grade-list" id="stockGradeList"></div>
+          </div>
+        </div>
+      </label>
+
+      <label>ลูกค้า
+        <select id="stockCustomer">
+          <option value="">ทั้งหมด</option>
+        </select>
+      </label>
+
+      <label>Location
+        <select id="stockLoc">
+          <option value="">ทั้งหมด</option>
+          <option value="LOC1">LOC1</option>
+          <option value="LOCF">LOCF</option>
+        </select>
+      </label>
+
+      <label>สถานะม้วน
+        <select id="stockRollStatus">
+          <option value="all">ทั้งหมด</option>
+          <option value="full">ม้วนเต็ม</option>
+          <option value="scrap">ม้วนเศษ</option>
+        </select>
+      </label>
+
+      <button class="primary" onclick="renderStockMatrix()">🔍 ค้นหา</button>
+      <button class="admin-only" onclick="document.getElementById('fileStock').click()">📥 Import Excel</button>
+      <input type="file" id="fileStock" accept=".xlsx,.xls" class="hidden" onchange="importStock(event)">
+      <button onclick="window.print()">🖨 พิมพ์ (A4 แนวนอน)</button>
+    </div>
+
+    <div id="stockImportMsg"></div>
+    <div id="stockProgress" class="hidden"></div>
+
+    <div id="stockBody"></div>
+  </div>
+</div>
+
+<!-- ========== STOCK DETAIL MODAL ========== -->
+<div class="modal-bg" id="modalStockDetail">
+  <div class="modal" style="max-width:900px">
+    <div class="modal-head">
+      <h3 id="stockDetailTitle">รายละเอียด SN</h3>
+      <button onclick="closeModal('modalStockDetail')">ปิด</button>
+    </div>
+    <div id="stockDetailBody"></div>
+  </div>
+</div>
+    
     <!-- ========== DATA ========== -->
     <div id="tab-data" class="hidden">
       <div class="card">
