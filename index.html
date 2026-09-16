@@ -351,7 +351,24 @@
     </div>
   </div>
 </div>
-
+<!-- Stock Import Modal -->
+<div class="modal-bg" id="modalStockImport">
+  <div class="modal" style="max-width:480px">
+    <h3>📥 Import Stock คงเหลือ</h3>
+    <div id="stockImportError"></div>
+    <div class="form-grid" style="grid-template-columns:1fr">
+      <label>วันที่ Stock คงเหลือ
+        <input type="date" id="stockImportDate">
+      </label>
+    </div>
+    <div class="hint">ค่าเริ่มต้น = เมื่อวาน (Stock คงเหลือจากการใช้งานเมื่อวาน)</div>
+    <div class="form-actions">
+      <button onclick="closeModal('modalStockImport')">ยกเลิก</button>
+      <button class="primary" onclick="confirmStockImport()">เลือกไฟล์ Excel</button>
+    </div>
+  </div>
+</div>
+  
 <script src="app.js"></script>
 </body>
 </html>
