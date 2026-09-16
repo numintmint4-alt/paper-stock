@@ -1,0 +1,135 @@
+*{box-sizing:border-box}
+body{margin:0;font-family:'Sarabun',sans-serif;background:#f5f6fa;color:#222}
+.hidden{display:none!important}
+
+/* ========== LOGIN ========== */
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1e293b,#334155)}
+.login-card{background:#fff;padding:40px 36px;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);width:380px;max-width:92vw}
+.login-card h1{margin:0 0 6px;font-size:22px;color:#1e293b}
+.login-card p{margin:0 0 24px;font-size:13px;color:#64748b}
+.login-card label{display:block;margin-bottom:14px;font-size:13px;color:#475569;font-weight:600}
+.login-card input{display:block;width:100%;margin-top:5px;padding:10px 12px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:15px;font-family:inherit}
+.login-card input:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.15)}
+.login-card button{width:100%;padding:11px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit}
+.login-card button:hover{background:#1d4ed8}
+.login-card button:disabled{background:#94a3b8;cursor:not-allowed}
+.login-msg{margin-top:14px;padding:10px;border-radius:8px;font-size:13px;text-align:center}
+.login-msg.err{background:#fee2e2;color:#dc2626}
+.login-msg.ok{background:#dcfce7;color:#166534}
+
+/* ========== NAV ========== */
+.nav{background:#1e293b;color:#fff;display:flex;gap:4px;align-items:center;height:56px;padding:0 20px;flex-wrap:wrap;position:sticky;top:0;z-index:50}
+.nav strong{margin-right:16px;font-size:15px}
+.nav button{color:#cbd5e1;background:none;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:14px;font-family:inherit}
+.nav button:hover{color:#fff;background:#334155}
+.nav button.active{background:#334155;color:#fff}
+.nav .spacer{flex:1}
+.nav .user-badge{font-size:13px;padding:5px 12px;background:#334155;border-radius:20px}
+.nav .logout{padding:6px 12px;background:#dc2626;color:#fff;border-radius:6px;font-size:13px}
+
+/* ========== LAYOUT ========== */
+.container{max-width:1600px;margin:auto;padding:20px}
+.card{background:#fff;border-radius:10px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:16px}
+h2{margin-top:0;font-size:19px}
+h3{font-size:16px}
+
+/* ========== BUTTONS ========== */
+button.primary{background:#2563eb;color:#fff;border-color:#2563eb}
+button.danger{background:#dc2626;color:#fff;border-color:#dc2626}
+button,input,select{font-family:inherit;font-size:14px}
+button{padding:7px 14px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;cursor:pointer}
+button:hover{background:#f1f5f9}
+button.primary:hover{background:#1d4ed8}
+button.danger:hover{background:#b91c1c}
+button:disabled{opacity:.5;cursor:not-allowed}
+input,select{padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px}
+
+/* ========== FILTERS ========== */
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.filters label{font-size:13px;display:flex;gap:5px;align-items:center}
+
+/* ========== MESSAGES ========== */
+.msg{padding:10px 14px;border-radius:8px;margin:10px 0;font-size:14px;line-height:1.6}
+.msg.err{background:#fee2e2;color:#dc2626}
+.msg.ok{background:#dcfce7;color:#166534}
+.msg.info{background:#dbeafe;color:#1e40af}
+
+/* ========== TABLE (general) ========== */
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{border:1px solid #e2e8f0;padding:6px 8px;text-align:left}
+th{background:#f1f5f9;font-weight:600}
+
+/* ========== REPORT / MATRIX ========== */
+.report-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1e293b;padding-bottom:10px;margin-bottom:10px;gap:16px}
+.report-title{text-align:center;flex:1;font-weight:600;font-size:16px;line-height:1.5}
+.report-subtitle{text-align:center;font-size:13px;color:#64748b;font-weight:400;margin-top:4px}
+.report-doc{font-size:12px;color:#475569;white-space:nowrap}
+.report-wrap{overflow:auto;max-height:72vh}
+.report-table{font-size:12px;table-layout:auto}
+.report-table th,.report-table td{border:1px solid #94a3b8;padding:3px 6px;text-align:center;white-space:nowrap}
+.report-table thead th{background:#e2e8f0;position:sticky;top:0;z-index:2}
+.report-table .grade-col{background:#f1f5f9;font-weight:600;text-align:left;padding-left:10px;min-width:75px;position:sticky;left:0;z-index:1}
+.report-table thead .grade-col{z-index:3}
+.report-table td.empty{color:#cbd5e1}
+.report-table td.clickable{cursor:pointer;background:#fffbeb}
+.report-table td.clickable:hover{background:#fde68a}
+.report-table .total-col{background:#e0e7ff;font-weight:600}
+.report-table .total-row td{background:#cbd5e1;font-weight:700}
+.report-table .total-row .total-col{background:#a5b4fc}
+.report-foot{margin-top:10px;font-size:12px;color:#64748b;text-align:right}
+
+/* ========== MODAL ========== */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:100;padding:16px}
+.modal-bg.show{display:flex}
+.modal{background:#fff;border-radius:10px;padding:22px;max-width:1400px;width:100%;max-height:88vh;overflow:auto}
+.modal h3{margin:0 0 12px}
+.modal-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
+
+/* ========== FORM ========== */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-grid label{font-size:13px;display:block;color:#475569;font-weight:600}
+.form-grid input,.form-grid select{display:block;width:100%;margin-top:4px}
+.form-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+.hint{font-size:12px;color:#64748b;margin:4px 0 8px 0}
+
+/* ========== ACCORDION ========== */
+.acc-item{border:1px solid #e2e8f0;border-radius:10px;margin-bottom:10px;overflow:hidden}
+.acc-head{background:#f1f5f9;padding:14px 18px;cursor:pointer;font-weight:600;display:flex;justify-content:space-between;align-items:center;user-select:none}
+.acc-head:hover{background:#e2e8f0}
+.acc-head .arrow{transition:transform .2s}
+.acc-head.open .arrow{transform:rotate(90deg)}
+.acc-body{padding:16px 18px}
+
+/* ========== PROGRESS ========== */
+.progress-wrap{background:#e2e8f0;border-radius:8px;height:24px;overflow:hidden;margin:10px 0;position:relative}
+.progress-bar{background:linear-gradient(90deg,#2563eb,#3b82f6);height:100%;width:0;transition:width .3s ease}
+.progress-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#1e293b}
+
+/* ========== DATA TABLE ========== */
+.data-scroll{overflow:auto;max-height:70vh;border:1px solid #e2e8f0;border-radius:8px}
+.data-table{font-size:12px;table-layout:auto;width:max-content;min-width:100%}
+.data-table th{background:#1e293b;color:#fff;position:sticky;top:0;z-index:2;padding:8px 10px;white-space:nowrap}
+.data-table td{padding:6px 10px;white-space:nowrap;border:1px solid #e2e8f0}
+.data-table tr.invalid{background:#fee2e2}
+.data-table tr.invalid td{color:#991b1b}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.badge.ok{background:#dcfce7;color:#166534}
+.badge.bad{background:#fee2e2;color:#991b1b}
+
+/* ========== PRINT ========== */
+@media print {
+  @page { size: A4 landscape; margin: 8mm; }
+  .nav,.filters,button,.no-print{display:none!important}
+  .card{box-shadow:none;padding:0}
+  body{background:#fff}
+  .container{padding:0;max-width:100%}
+  .report-wrap{max-height:none;overflow:visible}
+  .report-table{font-size:9px}
+  .report-table th,.report-table td{padding:2px 3px}
+}
+
+/* ========== MOBILE ========== */
+@media (max-width:640px){
+  .form-grid{grid-template-columns:1fr}
+  .nav{height:auto;padding:10px}
+}
