@@ -48,6 +48,22 @@ input,select{padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px}
 .filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
 .filters label{font-size:13px;display:flex;gap:5px;align-items:center}
 
+/* ========== V6: GRADEGRAMS FILTER (search + multi-select chips) ========== */
+.grade-filter-wrap{position:relative;display:flex;gap:6px;align-items:center}
+.grade-filter-box{position:relative;min-width:240px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;padding:4px 6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;cursor:text}
+.grade-filter-box:focus-within{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.15)}
+.grade-chips{display:flex;flex-wrap:wrap;gap:4px}
+.grade-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;background:#dbeafe;color:#1e40af;border-radius:12px;font-size:12px;font-weight:600;cursor:pointer}
+.grade-chip:hover{background:#bfdbfe}
+.grade-chip .x{font-weight:700;color:#1e40af;font-size:14px;line-height:1}
+.grade-chip .x:hover{color:#dc2626}
+#gradeSearch{border:none;outline:none;flex:1;min-width:100px;padding:4px;font-size:13px;background:transparent}
+.grade-dropdown{position:absolute;top:100%;left:0;right:0;margin-top:4px;max-height:280px;overflow-y:auto;background:#fff;border:1px solid #cbd5e1;border-radius:6px;box-shadow:0 8px 20px rgba(0,0,0,.15);z-index:100}
+.grade-dropdown .item{padding:8px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid #f1f5f9}
+.grade-dropdown .item:hover,.grade-dropdown .item.active{background:#dbeafe;color:#1e40af;font-weight:600}
+.grade-dropdown .item:last-child{border-bottom:none}
+.grade-dropdown .empty{padding:10px;text-align:center;color:#94a3b8;font-size:13px}
+
 /* ========== MESSAGES ========== */
 .msg{padding:10px 14px;border-radius:8px;margin:10px 0;font-size:14px;line-height:1.6}
 .msg.err{background:#fee2e2;color:#dc2626}
@@ -64,12 +80,14 @@ th{background:#f1f5f9;font-weight:600}
 .report-title{text-align:center;flex:1;font-weight:600;font-size:16px;line-height:1.5}
 .report-subtitle{text-align:center;font-size:13px;color:#64748b;font-weight:400;margin-top:4px}
 .report-doc{font-size:12px;color:#475569;white-space:nowrap}
-.report-wrap{overflow:auto;max-height:72vh}
-.report-table{font-size:12px;table-layout:auto}
+
+/* V6: Matrix เต็มหน้า ไม่มี scroll ในกรอบ */
+.report-wrap{overflow-x:auto;overflow-y:visible;width:100%}
+.report-table{font-size:12px;table-layout:auto;width:100%}
 .report-table th,.report-table td{border:1px solid #94a3b8;padding:3px 6px;text-align:center;white-space:nowrap}
-.report-table thead th{background:#e2e8f0;position:sticky;top:0;z-index:2}
-.report-table .grade-col{background:#f1f5f9;font-weight:600;text-align:left;padding-left:10px;min-width:75px;position:sticky;left:0;z-index:1}
-.report-table thead .grade-col{z-index:3}
+.report-table thead th{background:#e2e8f0;position:sticky;top:0;z-index:5}
+.report-table .grade-col{background:#f1f5f9;font-weight:600;text-align:left;padding-left:10px;min-width:75px;position:sticky;left:0;z-index:4}
+.report-table thead .grade-col{z-index:6}
 .report-table td.empty{color:#cbd5e1}
 .report-table td.clickable{cursor:pointer;background:#fffbeb}
 .report-table td.clickable:hover{background:#fde68a}
@@ -126,84 +144,13 @@ th{background:#f1f5f9;font-weight:600}
   .report-wrap{max-height:none;overflow:visible}
   .report-table{font-size:9px}
   .report-table th,.report-table td{padding:2px 3px}
+  .report-table thead th,
+  .report-table .grade-col{position:static}
 }
 
 /* ========== MOBILE ========== */
 @media (max-width:640px){
   .form-grid{grid-template-columns:1fr}
   .nav{height:auto;padding:10px}
-}
-/* ============================================================
-   V6 — MATRIX FULL PAGE + GRADE FILTER
-   ============================================================ */
-
-/* Matrix — เต็มหน้าจอ */
-#tab-matrix .card {
-    padding: 12px 16px;
-}
-
-/* Filter bar — sticky */
-#tab-matrix .filters {
-    position: sticky;
-    top: 56px;              /* ใต้ nav */
-    background: #fff;
-    z-index: 30;
-    padding: 10px 0;
-    border-bottom: 1px solid #e2e8f0;
-    margin-bottom: 8px;
-}
-
-/* Report wrap — ขยายเต็ม ไม่ scroll ในกรอบ */
-#tab-matrix .report-wrap {
-    max-height: none;        /* ยกเลิก max-height เดิม */
-    overflow-x: auto;        /* scroll แนวนอน */
-    overflow-y: visible;     /* ไม่ scroll แนวตั้ง */
-    width: 100%;
-}
-
-/* ตาราง Matrix */
-#tab-matrix .report-table {
-    font-size: 12px;
-    width: 100%;
-}
-
-/* Header sticky */
-#tab-matrix .report-table thead th {
-    position: sticky;
-    top: 0;
-    z-index: 5;
-    background: #e2e8f0;
-}
-
-/* คอลัมน์แรก (grade) — sticky left */
-#tab-matrix .report-table .grade-col {
-    position: sticky;
-    left: 0;
-    z-index: 4;
-    background: #f1f5f9;
-}
-
-#tab-matrix .report-table thead .grade-col {
-    z-index: 6;
-}
-
-/* Grade Filter — multi-select */
-#qGradeFilter {
-    min-width: 200px;
-    max-width: 320px;
-    height: auto;
-    padding: 4px;
-}
-
-#qGradeFilter option {
-    padding: 4px 8px;
-    font-size: 13px;
-}
-
-/* Print — ไม่มี sticky */
-@media print {
-    #tab-matrix .filters { position: static; }
-    #tab-matrix .report-wrap { overflow: visible; max-height: none; }
-    #tab-matrix .report-table thead th,
-    #tab-matrix .report-table .grade-col { position: static; }
+  .grade-filter-box{min-width:160px}
 }
