@@ -246,7 +246,7 @@ document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
   btn.onclick = () => {
     document.querySelectorAll('.nav button[data-tab]').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    ['matrix','data','settings'].forEach(t => $('tab-'+t).classList.toggle('hidden', t !== btn.dataset.tab));
+    ['matrix','stock','data','settings'].forEach(t => $('tab-'+t).classList.toggle('hidden', t !== btn.dataset.tab));
     const t = btn.dataset.tab;
     if (t === 'matrix') renderMatrix();
     if (t === 'data') renderData();
