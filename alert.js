@@ -1,9 +1,8 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK ม้วนกระดาษ V6 — alert.js
-//  ส่วนที่ 8: หน้า Roll Alert (แจ้งเตือนสั่งซื้อ)
+// STOCK V6 — alert.js
+// ✅ แก้ 3 จุด: filter, ชื่อ, demand month
 // ═══════════════════════════════════════════════════════════════
 
-// ================= STATE =================
 let alertSelectedGrades = [];
 let alertAllGrades = [];
 let alertCache = [];
@@ -14,9 +13,17 @@ async function initAlertTab() {
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
 
-  if ($('alertDate') && !$('alertDate').value) $('alertDate').value = today;
-  if ($('alertStockDate') && !$('alertStockDate').value) $('alertStockDate').value = toISODate(yesterday);
+  // ✅ แก้ 2: เปลี่ยนชื่อ + ค่า default
+  // alertStockDate = today - 1 (default)
+  // alertReceiveDate = today (default)
+  if ($('alertDate')        && !$('alertDate').value)        $('alertDate').value = today;
+  if ($('alertStockDate')   && !$('alertStockDate').value)   $('alertStockDate').value = toISODate(yesterday);
   if ($('alertReceiveDate') && !$('alertReceiveDate').value) $('alertReceiveDate').value = today;
+
+  // ✅ แก้ 3: Demand → เลือกเดือนได้ (dropdown)
+  if ($('alertDemandMonth') && !$('alertDemandMonth').value) {
+    $('alertDemandMonth').value = today.slice(0, 7);
+  }
 
   await loadAlertGradeFilter();
   await renderAlert();
@@ -25,30 +32,25 @@ async function initAlertTab() {
 // ================= GRADE FILTER =================
 async function loadAlertGradeFilter() {
   alertAllGrades = [...new Set(
-    masterCache.map(m => m.grade + m.gram)
+    masterCache.map(m => normalizeGrade(m.grade) + m.gram)
   )].sort();
-
   renderAlertGradeList();
   updateAlertGradeLabel();
 
   const btn = $('alertGradeFilterBtn');
   const dropdown = $('alertGradeDropdown');
   const box = $('alertGradeFilterBox');
-
   if (!btn || !dropdown || !box) return;
+
+  // ✅ แก้ 1: ตรวจ event listener (attach ครั้งเดียว)
+  if (btn.dataset.listenerAttached === '1') return;
+  btn.dataset.listenerAttached = '1';
 
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
-    const isHidden = dropdown.classList.contains('hidden');
-    if (isHidden) {
-      dropdown.classList.remove('hidden');
-      btn.classList.add('open');
-    } else {
-      dropdown.classList.add('hidden');
-      btn.classList.remove('open');
-    }
+    dropdown.classList.toggle('hidden');
+    btn.classList.toggle('open');
   });
-
   document.addEventListener('click', (e) => {
     if (!box.contains(e.target)) {
       dropdown.classList.add('hidden');
@@ -90,37 +92,31 @@ function updateAlertGradeLabel() {
   const label = $('alertGradeFilterLabel');
   if (!label) return;
   if (alertSelectedGrades.length === 0) {
-    label.textContent = 'ทั้งหมด';
-    label.style.color = '#1e293b';
+    label.textContent = 'ทั้งหมด'; label.style.color = '#1e293b';
   } else if (alertSelectedGrades.length === 1) {
-    label.textContent = alertSelectedGrades[0];
-    label.style.color = '#1e40af';
+    label.textContent = alertSelectedGrades[0]; label.style.color = '#1e40af';
   } else {
-    label.textContent = `เลือก ${alertSelectedGrades.length} เกรด`;
-    label.style.color = '#1e40af';
+    label.textContent = `เลือก ${alertSelectedGrades.length} เกรด`; label.style.color = '#1e40af';
   }
 }
-
 function selectAllAlertGrades() {
   alertSelectedGrades = [...alertAllGrades];
-  renderAlertGradeList();
-  updateAlertGradeLabel();
+  renderAlertGradeList(); updateAlertGradeLabel();
 }
-
 function clearAllAlertGrades() {
   alertSelectedGrades = [];
-  renderAlertGradeList();
-  updateAlertGradeLabel();
+  renderAlertGradeList(); updateAlertGradeLabel();
 }
 
 // ================= RENDER ALERT =================
 async function renderAlert() {
-  const alertDate = $('alertDate')?.value;
-  const stockDate = $('alertStockDate')?.value;
-  const receiveDate = $('alertReceiveDate')?.value;
-  const monthsBack = Number($('alertMonths')?.value) || 3;
+  const alertDate     = $('alertDate')?.value;
+  const stockDate     = $('alertStockDate')?.value;
+  const receiveDate   = $('alertReceiveDate')?.value;
+  // ✅ แก้ 3: ใช้ demand month จาก dropdown แทน alertMonths
+  const demandMonth   = $('alertDemandMonth')?.value;
   const includeCustomer = $('alertIncludeCustomer')?.checked || false;
-  const onlyShortage = $('alertOnlyShortage')?.checked ?? true;
+  const onlyShortage    = $('alertOnlyShortage')?.checked ?? true;
 
   if (!alertDate || !stockDate || !receiveDate) {
     alert('กรุณาเลือกวันที่ให้ครบ');
@@ -129,69 +125,67 @@ async function renderAlert() {
 
   const dateThai = thaiDateFull(alertDate);
   const gradeLabel = alertSelectedGrades.length > 0
-    ? ` · เกรด: ${alertSelectedGrades.join(', ')}`
-    : '';
+    ? ` · เกรด: ${alertSelectedGrades.join(', ')}` : '';
   const custLabel = includeCustomer ? ' · รวมม้วนลูกค้า' : ' · ไม่รวมม้วนลูกค้า';
 
   $('alertReportTitle').innerHTML = `
     🚨 แจ้งเตือนสั่งซื้อ (Roll Alert)<br>
     ประจำวันที่ ${dateThai}
-    <div class="report-subtitle">(Stock ณ ${thaiDateFull(stockDate)} · Receive ${thaiDateFull(receiveDate)} · Demand ${monthsBack} เดือน${gradeLabel}${custLabel})</div>
+    <div class="report-subtitle">(Stock ณ ${thaiDateFull(stockDate)} · Receive ${thaiDateFull(receiveDate)} · Demand ${demandMonth || '3 เดือน'}${gradeLabel}${custLabel})</div>
   `;
-
   $('alertBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังวิเคราะห์...</p>';
 
   try {
-    // ===== 1. Demand จาก Stock Level (Matrix) — ยอดสูงสุดใน monthsBack เดือน =====
-    const [year, m] = alertDate.split('-').map(Number);
-    const toDate = new Date(year, m - 1, 0);
-    const toISO = toISODate(toDate);
+    // ✅ แก้ 3: คำนวณ 3 เดือนย้อนหลังจากเดือนที่เลือก
+    let fromISO, toISO;
+    if (demandMonth) {
+      const [yy, mm] = demandMonth.split('-').map(Number);
+      const monthsBack = 3;
+      let fromM = mm - monthsBack + 1, fromY = yy;
+      while (fromM <= 0) { fromM += 12; fromY -= 1; }
+      fromISO = `${fromY}-${pad(fromM)}-01`;
+      const toDate = new Date(yy, mm, 0);
+      toISO = toISODate(toDate);
+    } else {
+      const [year, m] = alertDate.split('-').map(Number);
+      const toDate = new Date(year, m - 1, 0);
+      toISO = toISODate(toDate);
+      let fromM = m - 2, fromY = year;
+      while (fromM <= 0) { fromM += 12; fromY -= 1; }
+      fromISO = `${fromY}-${pad(fromM)}-01`;
+    }
 
-    let fromM = m - monthsBack + 1, fromY = year;
-    while (fromM <= 0) { fromM += 12; fromY -= 1; }
-    const fromISO = `${fromY}-${pad(fromM)}-01`;
-
-    // โหลด usage_records ในช่วง monthsBack
-    const usage = await fetchAllRows(() => {
-      let q = supabase.from('usage_records').select('*')
+    const usage = await fetchAllRows(() =>
+      supabase.from('usage_records').select('*')
         .gte('usage_date', fromISO)
-        .lte('usage_date', toISO);
-      return q;
-    });
+        .lte('usage_date', toISO)
+    );
 
-    // โหลด master เพื่อ map item_code → gradegram + std_weight
     const mByCode = {};
     masterCache.forEach(m => mByCode[m.item_code] = m);
 
-    // daily sum
     const daily = {};
     usage.forEach(u => {
       const key = u.item_code + '|' + u.usage_date;
       daily[key] = (daily[key] || 0) + Number(u.used_kgs);
     });
 
-    // หาค่าสูงสุดต่อวันของแต่ละ item_code
-    const maxRolls = {};  // item_code → max rolls
+    const maxRolls = {};
     Object.entries(daily).forEach(([k, kg]) => {
       const code = k.split('|')[0];
       const m = mByCode[code]; if (!m) return;
       const std = Number(m.std_weight_kg); if (!std) return;
-
       const rolls = Math.ceil(kg / std);
-      if (!maxRolls[code] || rolls > maxRolls[code]) {
-        maxRolls[code] = rolls;
-      }
+      if (!maxRolls[code] || rolls > maxRolls[code]) maxRolls[code] = rolls;
     });
 
-    // map item_code → gradegram+size → demand
-    const demandMap = {};  // "gradegram|size" → demand
+    const demandMap = {};
     Object.entries(maxRolls).forEach(([code, rolls]) => {
       const m = mByCode[code]; if (!m) return;
-      const rk = m.grade + m.gram + '|' + m.size;
+      const rk = normalizeGrade(m.grade) + m.gram + '|' + m.size;
       demandMap[rk] = rolls;
     });
 
-    // ===== 2. Stock คงเหลือ (ม้วนเต็ม) =====
     const stockData = await fetchAllRows(() =>
       supabase.from('stock_balance')
         .select('grade, width, is_customer_roll')
@@ -199,19 +193,15 @@ async function renderAlert() {
         .eq('roll_status', 'full')
     );
 
-    // map stock → gradegram+size
-    const stockMap = {};  // "gradegram|size" → count
+    const stockMap = {};
     stockData.forEach(s => {
-      if (!includeCustomer && s.is_customer_roll) return;  // ไม่รวมม้วนลูกค้า
-
-      // หา gram จาก master
-      const m = masterCache.find(x => x.grade === s.grade && x.size === s.width);
+      if (!includeCustomer && s.is_customer_roll) return;
+      const m = masterCache.find(x => normalizeGrade(x.grade) === normalizeGrade(s.grade) && x.size === s.width);
       if (!m) return;
-      const rk = m.grade + m.gram + '|' + m.size;
+      const rk = normalizeGrade(m.grade) + m.gram + '|' + m.size;
       stockMap[rk] = (stockMap[rk] || 0) + 1;
     });
 
-    // ===== 3. Receive =====
     const receiveData = await fetchAllRows(() =>
       supabase.from('po_receive')
         .select('grade, size, quantity, is_customer_roll')
@@ -221,15 +211,12 @@ async function renderAlert() {
     const receiveMap = {};
     receiveData.forEach(r => {
       if (!includeCustomer && r.is_customer_roll) return;
-
-      const m = masterCache.find(x => x.grade === r.grade && x.size === r.size);
+      const m = masterCache.find(x => normalizeGrade(x.grade) === normalizeGrade(r.grade) && x.size === r.size);
       if (!m) return;
-      const rk = m.grade + m.gram + '|' + r.size;
+      const rk = normalizeGrade(m.grade) + m.gram + '|' + r.size;
       receiveMap[rk] = (receiveMap[rk] || 0) + Number(r.quantity);
     });
 
-    // ===== 4. รวมทุกอย่าง =====
-    // unique keys
     const allKeys = new Set([
       ...Object.keys(demandMap),
       ...Object.keys(stockMap),
@@ -240,34 +227,20 @@ async function renderAlert() {
     allKeys.forEach(k => {
       const [gradegram, sizeStr] = k.split('|');
       const size = Number(sizeStr);
-
-      // Filter เกรด
       if (alertSelectedGrades.length > 0 && !alertSelectedGrades.includes(gradegram)) return;
 
-      const demand = demandMap[k] || 0;
-      const stock = stockMap[k] || 0;
+      const demand  = demandMap[k]  || 0;
+      const stock   = stockMap[k]   || 0;
       const receive = receiveMap[k] || 0;
       const totalAvailable = stock + receive;
       const shortage = demand - totalAvailable;
 
-      result.push({
-        gradegram,
-        size,
-        demand,
-        stock,
-        receive,
-        total: totalAvailable,
-        shortage
-      });
+      result.push({ gradegram, size, demand, stock, receive, total: totalAvailable, shortage });
     });
 
-    // เรียงตาม shortage desc
     result.sort((a, b) => b.shortage - a.shortage);
-
-    // Filter เฉพาะที่มี shortage
     const display = onlyShortage ? result.filter(r => r.shortage > 0) : result;
 
-    // ===== 5. สรุป =====
     const totalShortage = result.filter(r => r.shortage > 0).length;
     const totalOK = result.filter(r => r.shortage <= 0).length;
 
@@ -283,8 +256,6 @@ async function renderAlert() {
       return;
     }
 
-    // ===== 6. Render ตาราง X-Y =====
-    // จัดกลุ่มตาม Gradegram → แสดง Size ใน row
     const groupedByGrade = {};
     display.forEach(r => {
       if (!groupedByGrade[r.gradegram]) groupedByGrade[r.gradegram] = [];
@@ -292,8 +263,6 @@ async function renderAlert() {
     });
 
     const rowKeys = Object.keys(groupedByGrade).sort();
-
-    // หา unique sizes ทั้งหมด
     const colSet = new Set();
     display.forEach(r => colSet.add(r.size));
     const colKeys = [...colSet].sort((a,b) => a - b);
@@ -310,21 +279,18 @@ async function renderAlert() {
 
       html += '<tr>';
       html += `<td class="grade-col">${esc(rk)}</td>`;
-
       colKeys.forEach(s => {
         const item = items.find(x => x.size === s);
         if (!item) {
           html += '<td class="empty">-</td>';
         } else if (item.shortage > 0) {
-          // 🔴 ต้องสั่ง
-          html += `<td class="clickable" onclick="openAlertDetail('${esc(rk)}', ${s}, '${stockDate}', '${receiveDate}', ${monthsBack}, ${includeCustomer})" style="cursor:pointer">
+          html += `<td class="clickable" onclick="openAlertDetail('${esc(rk)}', ${s}, '${stockDate}', '${receiveDate}', 3, ${includeCustomer})" style="cursor:pointer">
             <div style="font-weight:700;color:#dc2626;font-size:14px">${item.shortage}</div>
             <div style="font-size:10px;color:#64748b">D:${item.demand} S:${item.stock} R:${item.receive}</div>
           </td>`;
           rowTotalShortage += item.shortage;
         } else {
-          // 🟢 OK
-          html += `<td class="clickable" onclick="openAlertDetail('${esc(rk)}', ${s}, '${stockDate}', '${receiveDate}', ${monthsBack}, ${includeCustomer})" style="cursor:pointer;background:#f0fdf4">
+          html += `<td class="clickable" onclick="openAlertDetail('${esc(rk)}', ${s}, '${stockDate}', '${receiveDate}', 3, ${includeCustomer})" style="cursor:pointer;background:#f0fdf4">
             <div style="font-weight:700;color:#166534;font-size:12px">OK</div>
             <div style="font-size:10px;color:#64748b">D:${item.demand} S:${item.stock} R:${item.receive}</div>
           </td>`;
@@ -335,7 +301,6 @@ async function renderAlert() {
       html += '</tr>';
     });
 
-    // Grand total row
     const grandShortage = display.reduce((s, r) => s + Math.max(0, r.shortage), 0);
     html += '<tr class="total-row"><td class="grade-col">Total</td>';
     colKeys.forEach(s => {
@@ -348,14 +313,11 @@ async function renderAlert() {
     html += '</tr></tbody></table></div>';
 
     html += `<div class="report-foot">
-      D = Demand · S = Stock · R = Receive · คลิก Cell เพื่อดูรายละเอียด · 
-      Demand = ยอดใช้งานสูงสุด ${monthsBack} เดือน · 
-      รวมต้องสั่ง ${grandShortage} ม้วน
+      D = Demand · S = Stock · R = Receive · คลิก Cell เพื่อดูรายละเอียด ·
+      Demand = ยอดใช้งานสูงสุด 3 เดือน · รวมต้องสั่ง ${grandShortage} ม้วน
     </div>`;
-
     $('alertBody').innerHTML = html;
     alertCache = display;
-
   } catch (err) {
     console.error('renderAlert error:', err);
     $('alertBody').innerHTML = `<div class="msg err">เกิดข้อผิดพลาด: ${esc(err.message)}</div>`;
@@ -364,14 +326,11 @@ async function renderAlert() {
 
 // ================= ALERT DETAIL =================
 async function openAlertDetail(gradegram, size, stockDate, receiveDate, monthsBack, includeCustomer) {
-  // สร้าง modal content
-  const match = gradegram.match(/^([A-Z]+)(\d+)$/);
-  const grade = match ? match[1] : gradegram;
-  const gram = match ? match[2] : '';
+  // ✅ แก้: ใช้ parseGradegram() ดึง grade ที่ถูกต้อง
+  const { grade } = parseGradegram(gradegram);
 
   let html = `<h3 style="margin-bottom:12px">📊 ${esc(gradegram)} · Size ${size}</h3>`;
 
-  // === 1. Demand Detail (จาก usage) ===
   const [year, m] = stockDate.split('-').map(Number);
   const toDate = new Date(year, m - 1, 0);
   const toISO = toISODate(toDate);
@@ -379,8 +338,7 @@ async function openAlertDetail(gradegram, size, stockDate, receiveDate, monthsBa
   while (fromM <= 0) { fromM += 12; fromY -= 1; }
   const fromISO = `${fromY}-${pad(fromM)}-01`;
 
-  // หา item_code
-  const master = masterCache.find(x => x.grade === grade && x.gram == gram && x.size === size);
+  const master = masterCache.find(x => normalizeGrade(x.grade) === grade && x.size === size);
   if (!master) {
     $('alertBody').innerHTML += '<div class="msg err">ไม่พบ Master Data</div>';
     return;
@@ -395,7 +353,6 @@ async function openAlertDetail(gradegram, size, stockDate, receiveDate, monthsBa
       .order('usage_date', { ascending: false })
   );
 
-  // daily sum
   const byDate = {};
   usage.forEach(u => {
     const d = u.usage_date;
@@ -417,7 +374,6 @@ async function openAlertDetail(gradegram, size, stockDate, receiveDate, monthsBa
   });
   html += '</tbody></table>';
 
-  // === 2. Stock Detail ===
   const stockRows = await fetchAllRows(() =>
     supabase.from('stock_balance')
       .select('sn, dimeter, kgs, supplier, customer, is_customer_roll, roll_status')
@@ -447,7 +403,6 @@ async function openAlertDetail(gradegram, size, stockDate, receiveDate, monthsBa
     html += '<p style="color:#94a3b8">ไม่มีม้วนเต็มในสต็อก</p>';
   }
 
-  // === 3. Receive Detail ===
   const receiveRows = await fetchAllRows(() =>
     supabase.from('po_receive')
       .select('po_no, supplier, quantity, kg_total, remark, is_customer_roll')
@@ -478,10 +433,8 @@ async function openAlertDetail(gradegram, size, stockDate, receiveDate, monthsBa
   $('alertReportTitle').innerHTML = html;
 }
 
-// ================= EXPORT ALERT =================
 function exportAlert() {
   if (!alertCache.length) return alert('ไม่มีข้อมูล');
-
   const data = alertCache.map(r => ({
     Gradegrams: r.gradegram,
     Size: r.size,
@@ -492,7 +445,6 @@ function exportAlert() {
     Shortage: r.shortage > 0 ? r.shortage : 0,
     สถานะ: r.shortage > 0 ? 'ต้องสั่ง' : 'OK'
   }));
-
   const ws = XLSX.utils.json_to_sheet(data);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Alert');
