@@ -103,7 +103,6 @@ th{background:#f1f5f9;font-weight:600}
 /* Cell ที่มี (เต็ม+เศษ) */
 .report-table td .cell-content{display:flex;flex-direction:column;align-items:center;gap:2px}
 .report-table td .cell-main{font-weight:700;color:#1e293b;font-size:13px}
-.report-table td .cell-sub{font-size:10px;color:#64748b}
 
 /* ========== STOCK BALANCE HIGHLIGHT ========== */
 .stock-full{color:#166534;font-weight:700}
