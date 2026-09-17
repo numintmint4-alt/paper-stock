@@ -1,6 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// STOCK V6 — alert.js
-// ✅ แก้ 3 จุด: filter, ชื่อ, demand month
+// STOCK V6 — alert.js (แก้ 3 จุด: filter, ชื่อ, demand month)
 // ═══════════════════════════════════════════════════════════════
 
 let alertSelectedGrades = [];
@@ -13,9 +12,6 @@ async function initAlertTab() {
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
 
-  // ✅ แก้ 2: เปลี่ยนชื่อ + ค่า default
-  // alertStockDate = today - 1 (default)
-  // alertReceiveDate = today (default)
   if ($('alertDate')        && !$('alertDate').value)        $('alertDate').value = today;
   if ($('alertStockDate')   && !$('alertStockDate').value)   $('alertStockDate').value = toISODate(yesterday);
   if ($('alertReceiveDate') && !$('alertReceiveDate').value) $('alertReceiveDate').value = today;
@@ -326,7 +322,6 @@ async function renderAlert() {
 
 // ================= ALERT DETAIL =================
 async function openAlertDetail(gradegram, size, stockDate, receiveDate, monthsBack, includeCustomer) {
-  // ✅ แก้: ใช้ parseGradegram() ดึง grade ที่ถูกต้อง
   const { grade } = parseGradegram(gradegram);
 
   let html = `<h3 style="margin-bottom:12px">📊 ${esc(gradegram)} · Size ${size}</h3>`;
