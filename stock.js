@@ -1,11 +1,33 @@
 // ═══════════════════════════════════════════════════════════════
 //  STOCK ม้วนกระดาษ V6 — stock.js
 //  ส่วนที่ 4: หน้า Stock คงเหลือ (แก้ 4 จุด)
+//  ✅ แก้เพิ่ม: ย้าย showSuccessModal() ขึ้นบน + แก้ ${custLabel} ซ้ำ
 // ═══════════════════════════════════════════════════════════════
 
 let stockSelectedGrades = [];
 let stockAllGrades = [];
 let stockCache = [];
+
+// ═══════════════════════════════════════════════════════════════
+// ✅ แก้ 1: ย้าย showSuccessModal() ขึ้นบนสุด (หลัง let stockCache)
+// ═══════════════════════════════════════════════════════════════
+function showSuccessModal(message) {
+  let modal = document.getElementById('successModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'successModal';
+    modal.className = 'modal-bg';
+    modal.innerHTML = `
+      <div class="modal" style="max-width:400px;text-align:center">
+        <div style="font-size:48px;margin-bottom:10px">✅</div>
+        <div id="successModalMsg" style="font-size:15px;color:#166534;margin-bottom:16px"></div>
+        <button class="primary" onclick="document.getElementById('successModal').classList.remove('show')" style="width:100%">ตกลง</button>
+      </div>`;
+    document.body.appendChild(modal);
+  }
+  document.getElementById('successModalMsg').textContent = message;
+  modal.classList.add('show');
+}
 
 // ================= INIT =================
 async function initStockTab() {
@@ -129,6 +151,7 @@ async function loadStockCustomers() {
 // ================= RENDER STOCK MATRIX =================
 // ✅ แก้ 2: เอา KG ออก (cell-sub)
 // ✅ แก้ 3: ลบ subtitle เกรด
+// ✅ แก้ 5: ลบ ${custLabel} ซ้ำ
 async function renderStockMatrix() {
   const stockDate = $('stockDate')?.value;
   const customer = $('stockCustomer')?.value || '';
@@ -138,16 +161,16 @@ async function renderStockMatrix() {
   if (!stockDate) { alert('กรุณาเลือกวันที่ Stock'); return; }
 
   const dateThai = thaiDateFull(stockDate);
-  // ✅ แก้ 3: ลบ gradeLabel ออก
   const custLabel = customer ? ` · ลูกค้า: ${customer}` : '';
   const locLabel = loc ? ` · ${loc}` : '';
   const statusLabel = rollStatus === 'all' ? '' :
                       rollStatus === 'full' ? ' · ม้วนเต็ม' : ' · ม้วนเศษ';
 
+  // ✅ แก้ 5: ลบ ${custLabel} ซ้ำ (เดิมมี 2 ครั้ง)
   $('stockReportTitle').innerHTML = `
     รายงาน Stock คงเหลือ ม้วนกระดาษ<br>
     ประจำวันที่ ${dateThai}
-    <div class="report-subtitle">(${custLabel.replace(' · ','') || 'ทุกเกรด'}${custLabel}${locLabel}${statusLabel})</div>
+    <div class="report-subtitle">(${custLabel ? custLabel.replace(' · ','') : 'ทุกเกรด'}${locLabel}${statusLabel})</div>
   `;
 
   $('stockBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
@@ -416,23 +439,4 @@ function importStock(ev) {
   };
   reader.readAsArrayBuffer(f);
   ev.target.value = '';
-}
-
-// ✅ แก้ 6: Helper Modal สำเร็จ
-function showSuccessModal(message) {
-  let modal = document.getElementById('successModal');
-  if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'successModal';
-    modal.className = 'modal-bg';
-    modal.innerHTML = `
-      <div class="modal" style="max-width:400px;text-align:center">
-        <div style="font-size:48px;margin-bottom:10px">✅</div>
-        <div id="successModalMsg" style="font-size:15px;color:#166534;margin-bottom:16px"></div>
-        <button class="primary" onclick="document.getElementById('successModal').classList.remove('show')" style="width:100%">ตกลง</button>
-      </div>`;
-    document.body.appendChild(modal);
-  }
-  document.getElementById('successModalMsg').textContent = message;
-  modal.classList.add('show');
 }
