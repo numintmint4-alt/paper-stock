@@ -1,20 +1,14 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK ม้วนกระดาษ V6 — receive.js
-//  ส่วนที่ 5: หน้า Roll Receive (รับม้วนกระดาษเข้าคลัง)
+// STOCK V6 — receive.js
 // ═══════════════════════════════════════════════════════════════
 
-// ================= STATE =================
 let receiveSelectedGrades = [];
 let receiveAllGrades = [];
 let receiveCache = [];
 
-// ================= INIT =================
 async function initReceiveTab() {
   const dateInput = $('receiveDate');
-  if (dateInput && !dateInput.value) {
-    dateInput.value = toISODate(new Date());
-  }
-
+  if (dateInput && !dateInput.value) dateInput.value = toISODate(new Date());
   await loadReceiveGradeFilter();
   await renderReceive();
 }
@@ -22,30 +16,21 @@ async function initReceiveTab() {
 // ================= GRADE FILTER =================
 async function loadReceiveGradeFilter() {
   receiveAllGrades = [...new Set(
-    masterCache.map(m => m.grade + m.gram)
+    masterCache.map(m => normalizeGrade(m.grade) + m.gram)
   )].sort();
-
   renderReceiveGradeList();
   updateReceiveGradeLabel();
 
   const btn = $('receiveGradeFilterBtn');
   const dropdown = $('receiveGradeDropdown');
   const box = $('receiveGradeFilterBox');
-
   if (!btn || !dropdown || !box) return;
 
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
-    const isHidden = dropdown.classList.contains('hidden');
-    if (isHidden) {
-      dropdown.classList.remove('hidden');
-      btn.classList.add('open');
-    } else {
-      dropdown.classList.add('hidden');
-      btn.classList.remove('open');
-    }
+    dropdown.classList.toggle('hidden');
+    btn.classList.toggle('open');
   });
-
   document.addEventListener('click', (e) => {
     if (!box.contains(e.target)) {
       dropdown.classList.add('hidden');
@@ -87,27 +72,20 @@ function updateReceiveGradeLabel() {
   const label = $('receiveGradeFilterLabel');
   if (!label) return;
   if (receiveSelectedGrades.length === 0) {
-    label.textContent = 'ทั้งหมด';
-    label.style.color = '#1e293b';
+    label.textContent = 'ทั้งหมด'; label.style.color = '#1e293b';
   } else if (receiveSelectedGrades.length === 1) {
-    label.textContent = receiveSelectedGrades[0];
-    label.style.color = '#1e40af';
+    label.textContent = receiveSelectedGrades[0]; label.style.color = '#1e40af';
   } else {
-    label.textContent = `เลือก ${receiveSelectedGrades.length} เกรด`;
-    label.style.color = '#1e40af';
+    label.textContent = `เลือก ${receiveSelectedGrades.length} เกรด`; label.style.color = '#1e40af';
   }
 }
-
 function selectAllReceiveGrades() {
   receiveSelectedGrades = [...receiveAllGrades];
-  renderReceiveGradeList();
-  updateReceiveGradeLabel();
+  renderReceiveGradeList(); updateReceiveGradeLabel();
 }
-
 function clearAllReceiveGrades() {
   receiveSelectedGrades = [];
-  renderReceiveGradeList();
-  updateReceiveGradeLabel();
+  renderReceiveGradeList(); updateReceiveGradeLabel();
 }
 
 // ================= RENDER RECEIVE =================
@@ -117,19 +95,13 @@ async function renderReceive() {
   const fsc = $('receiveFsc')?.value || 'all';
   const remark = $('receiveRemark')?.value || '';
   const mode = $('receiveMode')?.value || 'matrix';
-
-  if (!receiveDate) {
-    alert('กรุณาเลือกวันที่รับเข้า');
-    return;
-  }
+  if (!receiveDate) { alert('กรุณาเลือกวันที่รับเข้า'); return; }
 
   const dateThai = thaiDateFull(receiveDate);
   const gradeLabel = receiveSelectedGrades.length > 0
-    ? ` · เกรด: ${receiveSelectedGrades.join(', ')}`
-    : '';
+    ? ` · เกรด: ${receiveSelectedGrades.join(', ')}` : '';
   const supLabel = supplier ? ` · Supplier: ${supplier}` : '';
-  const fscLabel = fsc === 'all' ? '' :
-                   fsc === 'fsc' ? ' · FSC' : ' · Non-FSC';
+  const fscLabel = fsc === 'all' ? '' : fsc === 'fsc' ? ' · FSC' : ' · Non-FSC';
   const remarkLabel = remark ? ` · ${remark}` : '';
 
   $('receiveReportTitle').innerHTML = `
@@ -137,48 +109,40 @@ async function renderReceive() {
     ประจำวันที่ ${dateThai}
     <div class="report-subtitle">(${gradeLabel || 'ทุกเกรด'}${supLabel}${fscLabel}${remarkLabel})</div>
   `;
-
   $('receiveBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
 
   try {
+    // ✅ แก้: normalize grade ที่ส่งไป RPC
+    const normalizedGrades = receiveSelectedGrades.map(g => normalizeGrade(g));
+
     const { data, error } = await supabase.rpc('get_receive_list', {
       p_date_from: receiveDate,
       p_date_to: receiveDate,
-      p_grades: receiveSelectedGrades.length > 0 ? receiveSelectedGrades : null,
+      p_grades: normalizedGrades.length > 0 ? normalizedGrades : null,
       p_suppliers: supplier ? [supplier] : null,
       p_fsc: fsc,
       p_remarks: remark ? [remark] : null
     });
-
     if (error) throw error;
 
     const rows = data || [];
     receiveCache = rows;
-
     if (!rows.length) {
       $('receiveBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่มีข้อมูลในเงื่อนไขที่เลือก</p>';
       return;
     }
 
-    if (mode === 'matrix') {
-      renderReceiveMatrix(rows, dateThai);
-    } else {
-      renderReceiveList(rows, dateThai);
-    }
-
+    if (mode === 'matrix') renderReceiveMatrix(rows, dateThai);
+    else renderReceiveList(rows, dateThai);
   } catch (err) {
     console.error('renderReceive error:', err);
     $('receiveBody').innerHTML = `<div class="msg err">เกิดข้อผิดพลาด: ${esc(err.message)}</div>`;
   }
 }
 
-// ================= MATRIX MODE =================
 function renderReceiveMatrix(rows, dateThai) {
-  const rowSet = new Map();
-  const colSet = new Set();
-  const cells = {};
-  const rowTotals = {};
-  const colTotals = {};
+  const rowSet = new Map(); const colSet = new Set();
+  const cells = {}; const rowTotals = {}; const colTotals = {};
   let grandQty = 0, grandKg = 0;
 
   rows.forEach(r => {
@@ -190,18 +154,18 @@ function renderReceiveMatrix(rows, dateThai) {
     const k = rk + '|' + size;
     if (!cells[k]) cells[k] = { qty: 0, kg: 0 };
     cells[k].qty += Number(r.quantity) || 0;
-    cells[k].kg += Number(r.kg_total) || 0;
+    cells[k].kg  += Number(r.kg_total) || 0;
 
     if (!rowTotals[rk]) rowTotals[rk] = { qty: 0, kg: 0 };
     rowTotals[rk].qty += Number(r.quantity) || 0;
-    rowTotals[rk].kg += Number(r.kg_total) || 0;
+    rowTotals[rk].kg  += Number(r.kg_total) || 0;
 
     if (!colTotals[size]) colTotals[size] = { qty: 0, kg: 0 };
     colTotals[size].qty += Number(r.quantity) || 0;
-    colTotals[size].kg += Number(r.kg_total) || 0;
+    colTotals[size].kg  += Number(r.kg_total) || 0;
 
     grandQty += Number(r.quantity) || 0;
-    grandKg += Number(r.kg_total) || 0;
+    grandKg  += Number(r.kg_total) || 0;
   });
 
   const rowKeys = [...rowSet.keys()].sort();
@@ -234,20 +198,16 @@ function renderReceiveMatrix(rows, dateThai) {
   });
 
   html += '<tr class="total-row"><td class="grade-col">Total</td>';
-  colKeys.forEach(s => {
-    html += `<td>${colTotals[s].qty}</td>`;
-  });
+  colKeys.forEach(s => html += `<td>${colTotals[s].qty}</td>`);
   html += `<td class="total-col">${grandQty}</td>`;
   html += '</tr></tbody></table></div>';
 
   html += `<div class="report-foot">
     แสดง จำนวน (KG) · คลิก Cell เพื่อดู PO · วันที่: ${dateThai} · รวม ${grandQty} ม้วน · ${grandKg.toFixed(0)} kg
   </div>`;
-
   $('receiveBody').innerHTML = html;
 }
 
-// ================= LIST MODE =================
 function renderReceiveList(rows, dateThai) {
   let html = '<div class="data-scroll"><table class="data-table"><thead><tr>';
   html += '<th>#</th><th>PO No.</th><th>Supplier</th><th>Gradegrams</th>';
@@ -275,7 +235,7 @@ function renderReceiveList(rows, dateThai) {
   });
 
   const totalQty = rows.reduce((s, r) => s + (Number(r.quantity)||0), 0);
-  const totalKg = rows.reduce((s, r) => s + (Number(r.kg_total)||0), 0);
+  const totalKg  = rows.reduce((s, r) => s + (Number(r.kg_total)||0), 0);
 
   html += `<tr class="total-row" style="background:#cbd5e1;font-weight:700">
     <td colspan="5" style="text-align:right">Total</td>
@@ -283,19 +243,21 @@ function renderReceiveList(rows, dateThai) {
     <td style="text-align:right">${totalKg.toFixed(0)}</td>
     <td colspan="4"></td>
   </tr>`;
-
   html += '</tbody></table></div>';
   html += `<div style="margin-top:8px;font-size:13px;color:#64748b">
     แสดง ${rows.length} รายการ · วันที่: ${dateThai} · รวม ${totalQty} ม้วน · ${totalKg.toFixed(0)} kg
   </div>`;
-
   $('receiveBody').innerHTML = html;
 }
 
 // ================= RECEIVE DETAIL =================
+// ✅ แก้: ใช้ parseGradegram() ดึง grade ที่ถูกต้อง
 async function openReceiveDetail(gradegram, size, dateThai) {
   const receiveDate = $('receiveDate')?.value;
   if (!receiveDate) return;
+
+  // ✅ ดึง grade = "CAF" / "CA125" (จาก gradegram "CAF125")
+  const { grade } = parseGradegram(gradegram);
 
   $('receiveDetailTitle').innerHTML = `${esc(gradegram)} · Size ${size} <span style="font-weight:400;color:#64748b;font-size:14px">(วันที่ ${dateThai})</span>`;
   openModal('modalReceiveDetail');
@@ -304,7 +266,7 @@ async function openReceiveDetail(gradegram, size, dateThai) {
   try {
     const { data, error } = await supabase.rpc('get_receive_detail', {
       p_po_date: receiveDate,
-      p_grade: gradegram.replace(/\d+$/, ''),
+      p_grade: grade,
       p_size: size
     });
     if (error) throw error;
@@ -316,7 +278,7 @@ async function openReceiveDetail(gradegram, size, dateThai) {
     }
 
     const totalQty = rows.reduce((s, r) => s + (Number(r.quantity)||0), 0);
-    const totalKg = rows.reduce((s, r) => s + (Number(r.kg_total)||0), 0);
+    const totalKg  = rows.reduce((s, r) => s + (Number(r.kg_total)||0), 0);
 
     let html = `<div class="msg info" style="margin-bottom:10px">
       📦 รวม ${totalQty} ม้วน · ${totalKg.toFixed(0)} kg · ${rows.length} รายการ
@@ -344,7 +306,6 @@ async function openReceiveDetail(gradegram, size, dateThai) {
 
     html += '</tbody></table>';
     $('receiveDetailBody').innerHTML = html;
-
   } catch (err) {
     $('receiveDetailBody').innerHTML = `<div class="msg err">${esc(err.message)}</div>`;
   }
@@ -360,15 +321,10 @@ function openReceiveImportModal() {
 function importReceive(ev) {
   const f = ev.target.files[0];
   if (!f) return;
-
   closeModal('modalReceiveImport');
 
   const receiveDate = $('receiveImportDate')?.value;
-  if (!receiveDate) {
-    alert('กรุณาเลือกวันที่');
-    ev.target.value = '';
-    return;
-  }
+  if (!receiveDate) { alert('กรุณาเลือกวันที่'); ev.target.value = ''; return; }
 
   const reader = new FileReader();
   reader.onload = async (e) => {
@@ -378,9 +334,7 @@ function importReceive(ev) {
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
       showProgress('receiveProgress', 0, rows.length, `อ่านได้ ${rows.length} แถว กำลังเตรียมข้อมูล...`);
 
-      // ⚠️ PO.xlsx คอลัมน์มีช่องว่าง (Gradegram-Size) → ต้องดึงจาก column "Gradegram" และ "Size"
       const payload = rows.map(row => {
-        // หา column แบบ flexible
         const keys = Object.keys(row);
         const findKey = (patterns) => {
           for (const p of patterns) {
@@ -390,28 +344,31 @@ function importReceive(ev) {
           return '';
         };
 
-        const poNo = String(findKey(['เลขที่ PO', 'po_no', 'po']) || '').trim();
-        const pcCode = String(findKey(['PC.', 'pc_code', 'pc']) || '').trim();
-        const supplier = String(findKey(['SUP.', 'supplier', 'sup']) || '').trim();
-        const gradegram = String(findKey(['Gradegram', 'grade']) || '').trim();
-        const sizeRaw = findKey(['Size', 'size']);
-        const size = Number(sizeRaw) || '';
-        const qtyRaw = findKey(['Quantity', 'quantity', 'qty']);
-        const quantity = Number(qtyRaw) || 0;
-        const kgRaw = findKey(['KG. รวม', 'kg_total', 'kg']);
-        const kgTotal = Number(kgRaw) || 0;
-        const buRaw = findKey(['BU', 'bu']);
-        const bu = Number(buRaw) || 1;
-        const dept = String(findKey(['Department', 'department', 'dept']) || '13110').trim();
-        const priceRaw = findKey(['Price', 'price', 'ราคา']);
-        const price = priceRaw !== '' && priceRaw != null ? Number(priceRaw) : null;
-        const remark = String(findKey(['หมายเหตุ', 'remark', 'note']) || '').trim();
+        const poNo       = String(findKey(['เลขที่ PO','po_no','po']) || '').trim();
+        const pcCode     = String(findKey(['PC.','pc_code','pc']) || '').trim();
+        const supplier   = String(findKey(['SUP.','supplier','sup']) || '').trim();
+        const gradegram  = String(findKey(['Gradegram','grade']) || '').trim();
+        const sizeRaw    = findKey(['Size','size']);
+        const size       = Number(sizeRaw) || '';
+        const qtyRaw     = findKey(['Quantity','quantity','qty']);
+        const quantity   = Number(qtyRaw) || 0;
+        const kgRaw      = findKey(['KG. รวม','kg_total','kg']);
+        const kgTotal    = Number(kgRaw) || 0;
+        const buRaw      = findKey(['BU','bu']);
+        const bu         = Number(buRaw) || 1;
+        const dept       = String(findKey(['Department','department','dept']) || '13110').trim();
+        const priceRaw   = findKey(['Price','price','ราคา']);
+        const price      = priceRaw !== '' && priceRaw != null ? Number(priceRaw) : null;
+        const remark     = String(findKey(['หมายเหตุ','remark','note']) || '').trim();
+
+        // ✅ แก้: normalize grade ที่ import (pad 3 หลัก + จัดการ F)
+        const gradeNorm = normalizeGrade(gradegram);
 
         return {
           po_no: poNo,
           pc_code: pcCode,
           supplier: supplier,
-          grade: gradegram,
+          grade: gradeNorm,
           size: size,
           quantity: quantity,
           kg_total: kgTotal,
@@ -430,7 +387,6 @@ function importReceive(ev) {
       }
 
       showProgress('receiveProgress', 0, 1, `กำลังบันทึก ${payload.length} แถว...`);
-
       const { data, error } = await supabase.rpc('import_po_receive', {
         rows: payload,
         p_po_date: receiveDate
@@ -443,13 +399,11 @@ function importReceive(ev) {
       }
 
       hideProgress('receiveProgress');
-      showMsg('receiveImportMsg',
-        `✅ Import สำเร็จ ${data.inserted} แถว<br>วันที่รับเข้า: ${receiveDate}`,
-        'ok');
+      // ✅ แก้: Modal สำเร็จ + X
+      showSuccessModal(`Import Receive สำเร็จ ${data.inserted} แถว · วันที่ ${receiveDate}`);
 
       $('receiveDate').value = receiveDate;
       await renderReceive();
-
     } catch (ex) {
       hideProgress('receiveProgress');
       showMsg('receiveImportMsg', 'อ่านไฟล์ไม่สำเร็จ: ' + ex.message, 'err');
