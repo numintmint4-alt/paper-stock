@@ -149,39 +149,6 @@
       </div>
     </div>
 
-    <!-- ========== TAB 5: ALERT ========== -->
-<div id="tab-alert" class="hidden">
-  <div class="card">
-    <div class="report-head">
-      ...
-    </div>
-    <div class="filters no-print">
-      <label>📅 วันที่วิเคราะห์ <input type="date" id="alertDate"></label>
-
-      <label>📅 สั่งซื้อเข้าภายในวันที่ <input type="date" id="alertStockDate"></label>
-
-      <label>📅 Receive วันที่ <input type="date" id="alertReceiveDate"></label>
-
-      <!-- ✅ แก้ 3: เปลี่ยนจาก alertMonths → alertDemandMonth -->
-      <label>Demand จากเดือน
-        <input type="month" id="alertDemandMonth">
-      </label>
-
-      <label class="grade-filter-wrap">
-        ...
-      </label>
-
-      <label><input type="checkbox" id="alertIncludeCustomer"> รวมม้วนลูกค้า</label>
-      <label><input type="checkbox" id="alertOnlyShortage" checked> แสดงเฉพาะที่ต้องสั่ง</label>
-
-      <button class="primary" onclick="renderAlert()">🔍 วิเคราะห์</button>
-      <button onclick="exportAlert()">📤 Export Excel</button>
-      <button onclick="window.print()">🖨 พิมพ์</button>
-    </div>
-    <div id="alertBody"></div>
-  </div>
-</div>
-
         <div class="filters no-print">
           <label>📅 วันที่รับเข้า <input type="date" id="summaryDate"></label>
 
