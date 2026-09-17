@@ -21,7 +21,49 @@ let currentProfile = null;
 let masterCache = [];
 let dataCache = [];
 let matrixRange = { from: '', to: '' };
+// ================= V6: Normalize Grade =================
+// "CA85"   → "CA085"
+// "CAF125" → "CAF125"
+// "CAF"    → "CAF"
+// "CA125F" → "CAF125"
+function normalizeGrade(g) {
+  if (!g) return '';
+  g = String(g).trim().toUpperCase();
 
+  // CAF125
+  let m = g.match(/^([A-Z]+)F(\d+)$/);
+  if (m) return m[1] + 'F' + m[2].padStart(3, '0');
+
+  // CA125F
+  m = g.match(/^([A-Z]+)(\d+)F$/);
+  if (m) return m[1] + 'F' + m[2].padStart(3, '0');
+
+  // CAF
+  if (/^[A-Z]+F$/.test(g)) return g;
+
+  // CA85 → CA085
+  m = g.match(/^([A-Z]+)(\d+)$/);
+  if (m) return m[1] + m[2].padStart(3, '0');
+
+  return g;
+}
+
+// ================= V6: Parse Gradegram =================
+// "CAF125" → { grade: "CAF", gram: "125" }
+// "CA085"  → { grade: "CA085", gram: null }
+function parseGradegram(gradegram) {
+  if (!gradegram) return { grade: '', gram: null };
+  const s = String(gradegram).trim().toUpperCase();
+
+  let m = s.match(/^([A-Z]+)F(\d+)$/);
+  if (m) return { grade: m[1] + 'F' + m[2].padStart(3, '0'), gram: m[2] };
+
+  m = s.match(/^([A-Z]+)(\d+)$/);
+  if (m) return { grade: m[1] + m[2].padStart(3, '0'), gram: null };
+
+  if (/^[A-Z]+F$/.test(s)) return { grade: s, gram: null };
+  return { grade: s, gram: null };
+}
 // ================= HELPERS =================
 const $ = id => document.getElementById(id);
 const pad = n => String(n).padStart(2, '0');
