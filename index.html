@@ -149,6 +149,16 @@
       </div>
     </div>
 
+    <!-- ========== TAB 3: SUMMARY ========== -->
+    <div id="tab-summary" class="hidden">
+      <div class="card">
+        <div class="report-head">
+          <div></div>
+          <div class="report-title" id="summaryReportTitle">
+            ตารางสรุปรายการสั่งเข้า<br>ประจำวันที่
+          </div>
+        </div>
+
         <div class="filters no-print">
           <label>📅 วันที่รับเข้า <input type="date" id="summaryDate"></label>
 
@@ -211,26 +221,11 @@
           <div class="report-title" id="receiveReportTitle">
             รายการรับม้วนกระดาษเข้าคลัง<br>ประจำวันที่
           </div>
+          <div class="report-doc">FQ-ษ6-06-07 rev.01</div>
+        </div>
 
-        <!-- ========== TAB 3: SUMMARY ========== -->
-<div id="tab-summary" class="hidden">
-  <div class="card">
-    <div class="report-head">
-      <div></div>
-      <div class="report-title" id="summaryReportTitle">
-        ตารางสรุปรายการสั่งเข้า<br>ประจำวันที่
-      </div>
-      <!-- ❌ ลบ report-doc ออก ตาม checklist -->
-    </div>
-
-    <div class="filters no-print">
-      <label>📅 วันที่รับเข้า <input type="date" id="summaryDate"></label>
-      ... (ของเดิม)
-    </div>
-
-    <div id="summaryBody"></div>
-  </div>
-</div>
+        <div class="filters no-print">
+          <label>📅 วันที่รับเข้า <input type="date" id="receiveDate"></label>
 
           <label class="grade-filter-wrap">
             Gradegrams
@@ -304,17 +299,19 @@
           <div class="report-title" id="alertReportTitle">
             🚨 แจ้งเตือนสั่งซื้อ (Roll Alert)<br>ประจำวันที่
           </div>
+          <div class="report-doc">FQ-ษ6-06-08 rev.01</div>
+        </div>
 
         <div class="filters no-print">
           <label>📅 วันที่วิเคราะห์ <input type="date" id="alertDate"></label>
 
-          <label>📅 Stock ณ วันที่ <input type="date" id="alertStockDate"></label>
+          <label>📅 สั่งซื้อเข้าภายในวันที่ <input type="date" id="alertStockDate"></label>
 
           <label>📅 Receive วันที่ <input type="date" id="alertReceiveDate"></label>
 
           <label>Demand จากเดือน
-  <input type="month" id="alertDemandMonth">
-</label>
+            <input type="month" id="alertDemandMonth">
+          </label>
 
           <label class="grade-filter-wrap">
             Gradegrams
@@ -552,6 +549,17 @@
       <button onclick="closeModal('modalSummaryDetail')">ปิด</button>
     </div>
     <div id="summaryDetailBody"></div>
+  </div>
+</div>
+
+<!-- Alert Detail (เพิ่มใหม่ สำหรับ alert.js) -->
+<div class="modal-bg" id="modalAlertDetail">
+  <div class="modal" style="max-width:1000px">
+    <div class="modal-head">
+      <h3 id="alertDetailTitle">รายละเอียด Alert</h3>
+      <button onclick="closeModal('modalAlertDetail')">ปิด</button>
+    </div>
+    <div id="alertDetailBody"></div>
   </div>
 </div>
 
