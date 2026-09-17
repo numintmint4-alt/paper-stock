@@ -1,11 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
 //  STOCK ม้วนกระดาษ V6 — stock.js
-//  ส่วนที่ 4: หน้า Stock คงเหลือ
-// ═══════════════════════════════════════════════════════════════
-
-// ================= STATE =================
-// ═══════════════════════════════════════════════════════════════
-// STOCK V6 — stock.js (แก้ 4+1 จุด)
+//  ส่วนที่ 4: หน้า Stock คงเหลือ (แก้ 4 จุด)
 // ═══════════════════════════════════════════════════════════════
 
 let stockSelectedGrades = [];
@@ -26,7 +21,6 @@ async function initStockTab() {
 }
 
 // ================= GRADE FILTER =================
-// ✅ แก้ 1: ใช้ normalizeGrade() ตอน map
 async function loadStockGradeFilter() {
   stockAllGrades = [...new Set(
     masterCache.map(m => normalizeGrade(m.grade) + m.gram)
@@ -38,6 +32,9 @@ async function loadStockGradeFilter() {
   const dropdown = $('stockGradeDropdown');
   const box = $('stockGradeFilterBox');
   if (!btn || !dropdown || !box) return;
+
+  if (btn.dataset.listenerAttached === '1') return;
+  btn.dataset.listenerAttached = '1';
 
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -157,10 +154,7 @@ async function renderStockMatrix() {
 
   try {
     // ✅ แก้ 4: normalize grade ที่ส่งไป RPC
-    const normalizedGrades = stockSelectedGrades.map(g => {
-      const m = g.match(/^([A-Z]+F?)(\d+)$/);
-      return m ? normalizeGrade(g) : g;
-    });
+    const normalizedGrades = stockSelectedGrades.map(g => normalizeGrade(g));
 
     const { data, error } = await supabase.rpc('get_stock_matrix', {
       p_stock_date: stockDate,
@@ -279,12 +273,10 @@ async function renderStockMatrix() {
 }
 
 // ================= STOCK DETAIL =================
-// ✅ แก้ 5: ส่ง grade ที่ normalize แล้ว (3 หลัก + F)
 async function openStockDetail(gradegram, size) {
   const stockDate = $('stockDate')?.value;
   if (!stockDate) return;
 
-  // ✅ ใช้ parseGradegram() เพื่อดึง grade ที่ถูกต้อง
   const { grade } = parseGradegram(gradegram);
 
   $('stockDetailTitle').innerHTML = `${esc(gradegram)} · Size ${size} <span style="font-weight:400;color:#64748b;font-size:14px">(วันที่ ${stockDate})</span>`;
@@ -426,7 +418,7 @@ function importStock(ev) {
   ev.target.value = '';
 }
 
-// ✅ แก้ 6: Helper Modal สำเร็จ (วางใน app.js ก็ได้)
+// ✅ แก้ 6: Helper Modal สำเร็จ
 function showSuccessModal(message) {
   let modal = document.getElementById('successModal');
   if (!modal) {
