@@ -214,8 +214,25 @@
           <div class="report-doc">FQ-ษ6-06-07 rev.01</div>
         </div>
 
-        <div class="filters no-print">
-          <label>📅 วันที่รับเข้า <input type="date" id="receiveDate"></label>
+        <!-- ========== TAB 3: SUMMARY ========== -->
+<div id="tab-summary" class="hidden">
+  <div class="card">
+    <div class="report-head">
+      <div></div>
+      <div class="report-title" id="summaryReportTitle">
+        ตารางสรุปรายการสั่งเข้า<br>ประจำวันที่
+      </div>
+      <!-- ❌ ลบ report-doc ออก ตาม checklist -->
+    </div>
+
+    <div class="filters no-print">
+      <label>📅 วันที่รับเข้า <input type="date" id="summaryDate"></label>
+      ... (ของเดิม)
+    </div>
+
+    <div id="summaryBody"></div>
+  </div>
+</div>
 
           <label class="grade-filter-wrap">
             Gradegrams
