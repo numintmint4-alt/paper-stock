@@ -4,6 +4,10 @@
 // ═══════════════════════════════════════════════════════════════
 
 // ================= STATE =================
+// ═══════════════════════════════════════════════════════════════
+// STOCK V6 — stock.js (แก้ 4+1 จุด)
+// ═══════════════════════════════════════════════════════════════
+
 let stockSelectedGrades = [];
 let stockAllGrades = [];
 let stockCache = [];
@@ -16,39 +20,30 @@ async function initStockTab() {
     yesterday.setDate(yesterday.getDate() - 1);
     dateInput.value = toISODate(yesterday);
   }
-
   await loadStockGradeFilter();
   await loadStockCustomers();
   await renderStockMatrix();
 }
 
-// ================= GRADE FILTER (grade+gram) =================
+// ================= GRADE FILTER =================
+// ✅ แก้ 1: ใช้ normalizeGrade() ตอน map
 async function loadStockGradeFilter() {
   stockAllGrades = [...new Set(
-    masterCache.map(m => m.grade + m.gram)
+    masterCache.map(m => normalizeGrade(m.grade) + m.gram)
   )].sort();
-
   renderStockGradeList();
   updateStockGradeLabel();
 
   const btn = $('stockGradeFilterBtn');
   const dropdown = $('stockGradeDropdown');
   const box = $('stockGradeFilterBox');
-
   if (!btn || !dropdown || !box) return;
 
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
-    const isHidden = dropdown.classList.contains('hidden');
-    if (isHidden) {
-      dropdown.classList.remove('hidden');
-      btn.classList.add('open');
-    } else {
-      dropdown.classList.add('hidden');
-      btn.classList.remove('open');
-    }
+    dropdown.classList.toggle('hidden');
+    btn.classList.toggle('open');
   });
-
   document.addEventListener('click', (e) => {
     if (!box.contains(e.target)) {
       dropdown.classList.add('hidden');
@@ -107,7 +102,6 @@ function selectAllStockGrades() {
   renderStockGradeList();
   updateStockGradeLabel();
 }
-
 function clearAllStockGrades() {
   stockSelectedGrades = [];
   renderStockGradeList();
@@ -136,21 +130,18 @@ async function loadStockCustomers() {
 }
 
 // ================= RENDER STOCK MATRIX =================
+// ✅ แก้ 2: เอา KG ออก (cell-sub)
+// ✅ แก้ 3: ลบ subtitle เกรด
 async function renderStockMatrix() {
   const stockDate = $('stockDate')?.value;
   const customer = $('stockCustomer')?.value || '';
   const loc = $('stockLoc')?.value || '';
   const rollStatus = $('stockRollStatus')?.value || 'all';
 
-  if (!stockDate) {
-    alert('กรุณาเลือกวันที่ Stock');
-    return;
-  }
+  if (!stockDate) { alert('กรุณาเลือกวันที่ Stock'); return; }
 
   const dateThai = thaiDateFull(stockDate);
-  const gradeLabel = stockSelectedGrades.length > 0
-    ? ` · เกรด: ${stockSelectedGrades.join(', ')}`
-    : '';
+  // ✅ แก้ 3: ลบ gradeLabel ออก
   const custLabel = customer ? ` · ลูกค้า: ${customer}` : '';
   const locLabel = loc ? ` · ${loc}` : '';
   const statusLabel = rollStatus === 'all' ? '' :
@@ -159,25 +150,29 @@ async function renderStockMatrix() {
   $('stockReportTitle').innerHTML = `
     รายงาน Stock คงเหลือ ม้วนกระดาษ<br>
     ประจำวันที่ ${dateThai}
-    <div class="report-subtitle">(${gradeLabel || 'ทุกเกรด'}${custLabel}${locLabel}${statusLabel})</div>
+    <div class="report-subtitle">(${custLabel.replace(' · ','') || 'ทุกเกรด'}${custLabel}${locLabel}${statusLabel})</div>
   `;
 
   $('stockBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
 
   try {
+    // ✅ แก้ 4: normalize grade ที่ส่งไป RPC
+    const normalizedGrades = stockSelectedGrades.map(g => {
+      const m = g.match(/^([A-Z]+F?)(\d+)$/);
+      return m ? normalizeGrade(g) : g;
+    });
+
     const { data, error } = await supabase.rpc('get_stock_matrix', {
       p_stock_date: stockDate,
-      p_grades: stockSelectedGrades.length > 0 ? stockSelectedGrades : null,
+      p_grades: normalizedGrades.length > 0 ? normalizedGrades : null,
       p_customers: customer ? [customer] : null,
       p_locations: loc ? [loc] : null,
       p_roll_status: rollStatus
     });
-
     if (error) throw error;
 
     const rows = data || [];
     stockCache = rows;
-
     if (!rows.length) {
       $('stockBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่มีข้อมูล Stock ในเงื่อนไขที่เลือก</p>';
       return;
@@ -197,19 +192,19 @@ async function renderStockMatrix() {
 
       const k = rk + '|' + size;
       if (!cells[k]) cells[k] = { full: 0, scrap: 0, kgs: 0 };
-      cells[k].full += Number(r.full_count) || 0;
+      cells[k].full  += Number(r.full_count)  || 0;
       cells[k].scrap += Number(r.scrap_count) || 0;
-      cells[k].kgs += Number(r.total_kgs) || 0;
+      cells[k].kgs   += Number(r.total_kgs)   || 0;
 
       if (!rowTotals[rk]) rowTotals[rk] = { full: 0, scrap: 0, kgs: 0 };
-      rowTotals[rk].full += Number(r.full_count) || 0;
+      rowTotals[rk].full  += Number(r.full_count)  || 0;
       rowTotals[rk].scrap += Number(r.scrap_count) || 0;
-      rowTotals[rk].kgs += Number(r.total_kgs) || 0;
+      rowTotals[rk].kgs   += Number(r.total_kgs)   || 0;
 
       if (!colTotals[size]) colTotals[size] = { full: 0, scrap: 0, kgs: 0 };
-      colTotals[size].full += Number(r.full_count) || 0;
+      colTotals[size].full  += Number(r.full_count)  || 0;
       colTotals[size].scrap += Number(r.scrap_count) || 0;
-      colTotals[size].kgs += Number(r.total_kgs) || 0;
+      colTotals[size].kgs   += Number(r.total_kgs)   || 0;
     });
 
     const rowKeys = [...rowSet.keys()].sort();
@@ -234,10 +229,10 @@ async function renderStockMatrix() {
           else if (v.full > 0) cellTxt = `${v.full}`;
           else if (v.scrap > 0) cellTxt = `+${v.scrap}`;
 
+          // ✅ แก้ 2: เอา cell-sub (KG) ออก
           html += `<td class="clickable" onclick="openStockDetail('${esc(rk)}', ${s})">
             <div class="cell-content">
               <div class="cell-main">${cellTxt}</div>
-              <div class="cell-sub">${v.kgs.toFixed(0)} kg</div>
             </div>
           </td>`;
         }
@@ -262,7 +257,7 @@ async function renderStockMatrix() {
     });
     const grand = { full: 0, scrap: 0 };
     Object.values(colTotals).forEach(ct => {
-      grand.full += ct.full;
+      grand.full  += ct.full;
       grand.scrap += ct.scrap;
     });
     let grandTxt = '';
@@ -277,7 +272,6 @@ async function renderStockMatrix() {
     </div>`;
 
     $('stockBody').innerHTML = html;
-
   } catch (err) {
     console.error('renderStockMatrix error:', err);
     $('stockBody').innerHTML = `<div class="msg err">เกิดข้อผิดพลาด: ${esc(err.message)}</div>`;
@@ -285,12 +279,13 @@ async function renderStockMatrix() {
 }
 
 // ================= STOCK DETAIL =================
+// ✅ แก้ 5: ส่ง grade ที่ normalize แล้ว (3 หลัก + F)
 async function openStockDetail(gradegram, size) {
   const stockDate = $('stockDate')?.value;
   if (!stockDate) return;
 
-  const match = gradegram.match(/^([A-Z]+)(\d+)$/);
-  const grade = match ? match[1] : gradegram;
+  // ✅ ใช้ parseGradegram() เพื่อดึง grade ที่ถูกต้อง
+  const { grade } = parseGradegram(gradegram);
 
   $('stockDetailTitle').innerHTML = `${esc(gradegram)} · Size ${size} <span style="font-weight:400;color:#64748b;font-size:14px">(วันที่ ${stockDate})</span>`;
   openModal('modalStockDetail');
@@ -310,14 +305,14 @@ async function openStockDetail(gradegram, size) {
       return;
     }
 
-    const fullCount = rows.filter(r => r.roll_status === 'full').length;
+    const fullCount  = rows.filter(r => r.roll_status === 'full').length;
     const scrapCount = rows.filter(r => r.roll_status === 'scrap').length;
-    const totalKgs = rows.reduce((s, r) => s + (Number(r.kgs) || 0), 0);
+    const totalKgs   = rows.reduce((s, r) => s + (Number(r.kgs) || 0), 0);
 
     let html = `<div class="msg info" style="margin-bottom:10px">
-      📦 ทั้งหมด ${rows.length} ม้วน · 
-      <b style="color:#166534">เต็ม ${fullCount}</b> · 
-      <b style="color:#d97706">เศษ ${scrapCount}</b> · 
+      📦 ทั้งหมด ${rows.length} ม้วน ·
+      <b style="color:#166534">เต็ม ${fullCount}</b> ·
+      <b style="color:#d97706">เศษ ${scrapCount}</b> ·
       <b>${totalKgs.toFixed(2)} kg</b>
     </div>`;
 
@@ -346,7 +341,6 @@ async function openStockDetail(gradegram, size) {
 
     html += '</tbody></table></div>';
     $('stockDetailBody').innerHTML = html;
-
   } catch (err) {
     $('stockDetailBody').innerHTML = `<div class="msg err">${esc(err.message)}</div>`;
   }
@@ -364,16 +358,10 @@ function openStockImportModal() {
 function importStock(ev) {
   const f = ev.target.files[0];
   if (!f) return;
-
-  // ปิด modal แล้วเริ่ม import
   closeModal('modalStockImport');
 
   const stockDate = $('stockImportDate')?.value;
-  if (!stockDate) {
-    alert('กรุณาเลือกวันที่');
-    ev.target.value = '';
-    return;
-  }
+  if (!stockDate) { alert('กรุณาเลือกวันที่'); ev.target.value = ''; return; }
 
   const reader = new FileReader();
   reader.onload = async (e) => {
@@ -384,7 +372,7 @@ function importStock(ev) {
       showProgress('stockProgress', 0, rows.length, `อ่านได้ ${rows.length} แถว กำลังเตรียมข้อมูล...`);
 
       const payload = rows.map(row => ({
-        grade:           String(row['grade'] || '').trim(),
+        grade:           normalizeGrade(row['grade'] || ''),
         width:           Number(row['width']) || '',
         supplier:        String(row['supplier'] || '').trim(),
         supplier_grade:  String(row['supplier_grade'] || '').trim(),
@@ -411,7 +399,6 @@ function importStock(ev) {
       }
 
       showProgress('stockProgress', 0, 1, `กำลังบันทึก ${payload.length} แถว...`);
-
       const { data, error } = await supabase.rpc('import_stock_balance', {
         rows: payload,
         p_stock_date: stockDate
@@ -424,14 +411,12 @@ function importStock(ev) {
       }
 
       hideProgress('stockProgress');
-      showMsg('stockImportMsg',
-        `✅ Import สำเร็จ ${data.inserted} แถว<br>วันที่ Stock: ${stockDate}`,
-        'ok');
+      // ✅ แก้ 6: Modal สำเร็จ + X
+      showSuccessModal(`Import Stock สำเร็จ ${data.inserted} แถว · วันที่ ${stockDate}`);
 
       $('stockDate').value = stockDate;
       await loadStockCustomers();
       await renderStockMatrix();
-
     } catch (ex) {
       hideProgress('stockProgress');
       showMsg('stockImportMsg', 'อ่านไฟล์ไม่สำเร็จ: ' + ex.message, 'err');
@@ -439,4 +424,23 @@ function importStock(ev) {
   };
   reader.readAsArrayBuffer(f);
   ev.target.value = '';
+}
+
+// ✅ แก้ 6: Helper Modal สำเร็จ (วางใน app.js ก็ได้)
+function showSuccessModal(message) {
+  let modal = document.getElementById('successModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'successModal';
+    modal.className = 'modal-bg';
+    modal.innerHTML = `
+      <div class="modal" style="max-width:400px;text-align:center">
+        <div style="font-size:48px;margin-bottom:10px">✅</div>
+        <div id="successModalMsg" style="font-size:15px;color:#166534;margin-bottom:16px"></div>
+        <button class="primary" onclick="document.getElementById('successModal').classList.remove('show')" style="width:100%">ตกลง</button>
+      </div>`;
+    document.body.appendChild(modal);
+  }
+  document.getElementById('successModalMsg').textContent = message;
+  modal.classList.add('show');
 }
