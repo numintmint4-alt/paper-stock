@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// STOCK V6 — alert.js (แก้ 3 จุด: filter, ชื่อ, demand month)
+// STOCK V6 — alert.js (แก้แล้ว: ใช้ modalAlertDetail)
 // ═══════════════════════════════════════════════════════════════
 
 let alertSelectedGrades = [];
@@ -16,7 +16,7 @@ async function initAlertTab() {
   if ($('alertStockDate')   && !$('alertStockDate').value)   $('alertStockDate').value = toISODate(yesterday);
   if ($('alertReceiveDate') && !$('alertReceiveDate').value) $('alertReceiveDate').value = today;
 
-  // ✅ แก้ 3: Demand → เลือกเดือนได้ (dropdown)
+  // ✅ Demand → เลือกเดือนได้ (dropdown)
   if ($('alertDemandMonth') && !$('alertDemandMonth').value) {
     $('alertDemandMonth').value = today.slice(0, 7);
   }
@@ -38,7 +38,7 @@ async function loadAlertGradeFilter() {
   const box = $('alertGradeFilterBox');
   if (!btn || !dropdown || !box) return;
 
-  // ✅ แก้ 1: ตรวจ event listener (attach ครั้งเดียว)
+  // ✅ ตรวจ event listener (attach ครั้งเดียว)
   if (btn.dataset.listenerAttached === '1') return;
   btn.dataset.listenerAttached = '1';
 
@@ -109,7 +109,6 @@ async function renderAlert() {
   const alertDate     = $('alertDate')?.value;
   const stockDate     = $('alertStockDate')?.value;
   const receiveDate   = $('alertReceiveDate')?.value;
-  // ✅ แก้ 3: ใช้ demand month จาก dropdown แทน alertMonths
   const demandMonth   = $('alertDemandMonth')?.value;
   const includeCustomer = $('alertIncludeCustomer')?.checked || false;
   const onlyShortage    = $('alertOnlyShortage')?.checked ?? true;
@@ -132,7 +131,7 @@ async function renderAlert() {
   $('alertBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังวิเคราะห์...</p>';
 
   try {
-    // ✅ แก้ 3: คำนวณ 3 เดือนย้อนหลังจากเดือนที่เลือก
+    // คำนวณ 3 เดือนย้อนหลังจากเดือนที่เลือก
     let fromISO, toISO;
     if (demandMonth) {
       const [yy, mm] = demandMonth.split('-').map(Number);
@@ -320,11 +319,16 @@ async function renderAlert() {
   }
 }
 
-// ================= ALERT DETAIL =================
+// ================= ALERT DETAIL (✅ แก้: ใช้ modalAlertDetail) =================
 async function openAlertDetail(gradegram, size, stockDate, receiveDate, monthsBack, includeCustomer) {
   const { grade } = parseGradegram(gradegram);
 
-  let html = `<h3 style="margin-bottom:12px">📊 ${esc(gradegram)} · Size ${size}</h3>`;
+  // ✅ เปิด Modal แทนการทับ title
+  $('alertDetailTitle').innerHTML = `📊 ${esc(gradegram)} · Size ${size}`;
+  openModal('modalAlertDetail');
+  $('alertDetailBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
+
+  let html = '';
 
   const [year, m] = stockDate.split('-').map(Number);
   const toDate = new Date(year, m - 1, 0);
@@ -335,7 +339,7 @@ async function openAlertDetail(gradegram, size, stockDate, receiveDate, monthsBa
 
   const master = masterCache.find(x => normalizeGrade(x.grade) === grade && x.size === size);
   if (!master) {
-    $('alertBody').innerHTML += '<div class="msg err">ไม่พบ Master Data</div>';
+    $('alertDetailBody').innerHTML = '<div class="msg err">ไม่พบ Master Data</div>';
     return;
   }
 
@@ -425,7 +429,8 @@ async function openAlertDetail(gradegram, size, stockDate, receiveDate, monthsBa
     html += '<p style="color:#94a3b8">ไม่มีรายการรับเข้า</p>';
   }
 
-  $('alertReportTitle').innerHTML = html;
+  // ✅ ใส่ใน modalAlertDetail แทนการทับ title
+  $('alertDetailBody').innerHTML = html;
 }
 
 function exportAlert() {
