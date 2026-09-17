@@ -284,3 +284,132 @@ async function openReceiveDetail(gradegram, size, dateThai) {
     let html = `<div class="msg info" style="margin-bottom:10px">
       📦 รวม ${totalQty} ม้วน · ${totalKg.toFixed(0)} kg · ${rows.length} รายการ
     </div>`;
+
+    html += '<table><thead><tr>';
+    html += '<th>#</th><th>PO No.</th><th>Supplier</th><th>Quantity</th>';
+    html += '<th>KG รวม</th><th>ราคา</th><th>หมายเหตุ</th><th>FSC</th>';
+    html += '</tr></thead><tbody>';
+
+    rows.forEach((r, i) => {
+      const fscBadge = r.is_fsc ? '<span class="badge ok">FSC</span>' : '-';
+      const priceTxt = r.price != null ? Number(r.price).toFixed(2) : '-';
+      html += `<tr>
+        <td>${i+1}</td>
+        <td><b>${esc(r.po_no)}</b></td>
+        <td>${esc(r.supplier)}</td>
+        <td style="text-align:right">${r.quantity}</td>
+        <td style="text-align:right">${Number(r.kg_total).toFixed(0)}</td>
+        <td style="text-align:right">${priceTxt}</td>
+        <td>${esc(r.remark) || '-'}</td>
+        <td>${fscBadge}</td>
+      </tr>`;
+    });
+
+    html += '</tbody></table>';
+    $('receiveDetailBody').innerHTML = html;
+  } catch (err) {
+    $('receiveDetailBody').innerHTML = `<div class="msg err">${esc(err.message)}</div>`;
+  }
+}
+
+// ================= IMPORT RECEIVE =================
+function openReceiveImportModal() {
+  $('receiveImportDate').value = toISODate(new Date());
+  $('receiveImportError').innerHTML = '';
+  openModal('modalReceiveImport');
+}
+
+function importReceive(ev) {
+  const f = ev.target.files[0];
+  if (!f) return;
+  closeModal('modalReceiveImport');
+
+  const receiveDate = $('receiveImportDate')?.value;
+  if (!receiveDate) { alert('กรุณาเลือกวันที่'); ev.target.value = ''; return; }
+
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      showProgress('receiveProgress', 0, 1, 'กำลังอ่านไฟล์...');
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+      showProgress('receiveProgress', 0, rows.length, `อ่านได้ ${rows.length} แถว กำลังเตรียมข้อมูล...`);
+
+      const payload = rows.map(row => {
+        const keys = Object.keys(row);
+        const findKey = (patterns) => {
+          for (const p of patterns) {
+            const found = keys.find(k => k.toLowerCase().trim() === p.toLowerCase().trim());
+            if (found) return row[found];
+          }
+          return '';
+        };
+
+        const poNo       = String(findKey(['เลขที่ PO','po_no','po']) || '').trim();
+        const pcCode     = String(findKey(['PC.','pc_code','pc']) || '').trim();
+        const supplier   = String(findKey(['SUP.','supplier','sup']) || '').trim();
+        const gradegram  = String(findKey(['Gradegram','grade']) || '').trim();
+        const sizeRaw    = findKey(['Size','size']);
+        const size       = Number(sizeRaw) || '';
+        const qtyRaw     = findKey(['Quantity','quantity','qty']);
+        const quantity   = Number(qtyRaw) || 0;
+        const kgRaw      = findKey(['KG. รวม','kg_total','kg']);
+        const kgTotal    = Number(kgRaw) || 0;
+        const buRaw      = findKey(['BU','bu']);
+        const bu         = Number(buRaw) || 1;
+        const dept       = String(findKey(['Department','department','dept']) || '13110').trim();
+        const priceRaw   = findKey(['Price','price','ราคา']);
+        const price      = priceRaw !== '' && priceRaw != null ? Number(priceRaw) : null;
+        const remark     = String(findKey(['หมายเหตุ','remark','note']) || '').trim();
+
+        // ✅ แก้: normalize grade ที่ import
+        const gradeNorm = normalizeGrade(gradegram);
+
+        return {
+          po_no: poNo,
+          pc_code: pcCode,
+          supplier: supplier,
+          grade: gradeNorm,
+          size: size,
+          quantity: quantity,
+          kg_total: kgTotal,
+          bu: bu,
+          department: dept,
+          price: price,
+          remark: remark,
+          created_by: currentUser.id
+        };
+      }).filter(r => r.po_no && r.grade && r.size);
+
+      if (!payload.length) {
+        hideProgress('receiveProgress');
+        showMsg('receiveImportMsg', '⚠ ไม่มีแถวที่บันทึกได้ (ตรวจสอบคอลัมน์)', 'err');
+        return;
+      }
+
+      showProgress('receiveProgress', 0, 1, `กำลังบันทึก ${payload.length} แถว...`);
+      const { data, error } = await supabase.rpc('import_po_receive', {
+        rows: payload,
+        p_po_date: receiveDate
+      });
+
+      if (error) {
+        hideProgress('receiveProgress');
+        showMsg('receiveImportMsg', '❌ บันทึกไม่สำเร็จ: ' + error.message, 'err');
+        return;
+      }
+
+      hideProgress('receiveProgress');
+      // ✅ แก้: Modal สำเร็จ + X
+      showSuccessModal(`Import Receive สำเร็จ ${data.inserted} แถว · วันที่ ${receiveDate}`);
+
+      $('receiveDate').value = receiveDate;
+      await renderReceive();
+    } catch (ex) {
+      hideProgress('receiveProgress');
+      showMsg('receiveImportMsg', 'อ่านไฟล์ไม่สำเร็จ: ' + ex.message, 'err');
+    }
+  };
+  reader.readAsArrayBuffer(f);
+  ev.target.value = '';
+}
