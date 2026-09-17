@@ -42,50 +42,90 @@
   <div class="container">
 
     <!-- ========== TAB 1: STOCK LEVEL (Matrix เดิม) ========== -->
-    <div id="tab-matrix">
-      <div class="card">
-        <div class="report-head">
-          <div></div>
-          <div class="report-title" id="reportTitle">ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ<br>ประจำเดือน</div>
-        </div>
+<div id="tab-matrix">
+  <div class="card">
+    <div class="report-head">
+      <div></div>
+      <div class="report-title" id="reportTitle">ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ<br>ประจำเดือน</div>
+    </div>
 
-        <div class="filters no-print">
-          <label>เดือนรายงาน <input type="month" id="qReportMonth"></label>
-          <label>ย้อนหลัง
-            <select id="qMonthsBack">
-              <option value="3" selected>3 เดือน</option>
-              <option value="4">4 เดือน</option>
-              <option value="6">6 เดือน</option>
-            </select>
-          </label>
-          <label>ลูกค้า <select id="qCustomer"><option value="">ทั้งหมด</option></select></label>
-
-          <label class="grade-filter-wrap">
-            Gradegrams
-            <div class="grade-filter-box" id="gradeFilterBox">
-              <button type="button" class="grade-filter-btn" id="gradeFilterBtn">
-                <span id="gradeFilterLabel">ทั้งหมด</span>
-                <span class="arrow">▼</span>
-              </button>
-              <div class="grade-dropdown hidden" id="gradeDropdown">
-                <div class="grade-actions">
-                  <button type="button" onclick="selectAllGrades()">✓ เลือกทั้งหมด</button>
-                  <button type="button" onclick="clearAllGrades()">✗ ล้างทั้งหมด</button>
-                </div>
-                <div class="grade-list" id="gradeList"></div>
-              </div>
+    <div class="filters no-print">
+      <label class="month-filter-wrap">
+        เดือน
+        <div class="month-filter-box" id="monthFilterBox">
+          <button type="button" class="grade-filter-btn" id="monthFilterBtn">
+            <span id="monthFilterLabel">ทั้งหมด</span>
+            <span class="arrow">▼</span>
+          </button>
+          <div class="grade-dropdown hidden" id="monthDropdown">
+            <div class="grade-actions">
+              <button type="button" onclick="selectAllMonths()">✓ เลือกทั้งหมด</button>
+              <button type="button" onclick="clearAllMonths()">✗ ล้างทั้งหมด</button>
             </div>
-          </label>
-
-          <span style="font-size:13px;margin-left:8px">แสดง:</span>
-          <label><input type="radio" name="mode" value="actual" checked> ใช้จริง</label>
-          <label><input type="radio" name="mode" value="full"> ม้วนเต็ม</label>
-          <button class="primary" onclick="renderMatrix()">ค้นหา</button>
-          <button onclick="window.print()">🖨 พิมพ์ (A4 แนวนอน)</button>
+            <div class="grade-list" id="monthList"></div>
+          </div>
         </div>
-        <div id="matrixBody"></div>
+      </label>
+
+      <label>ลูกค้า <select id="qCustomer"><option value="">ทั้งหมด</option></select></label>
+
+      <label class="grade-filter-wrap">
+        Gradegrams
+        <div class="grade-filter-box" id="gradeFilterBox">
+          <button type="button" class="grade-filter-btn" id="gradeFilterBtn">
+            <span id="gradeFilterLabel">ทั้งหมด</span>
+            <span class="arrow">▼</span>
+          </button>
+          <div class="grade-dropdown hidden" id="gradeDropdown">
+            <div class="grade-actions">
+              <button type="button" onclick="selectAllGrades()">✓ เลือกทั้งหมด</button>
+              <button type="button" onclick="clearAllGrades()">✗ ล้างทั้งหมด</button>
+            </div>
+            <div class="grade-list" id="gradeList"></div>
+          </div>
+        </div>
+      </label>
+
+      <span style="font-size:13px;margin-left:8px">แสดง:</span>
+      <label><input type="radio" name="mode" value="actual" checked> ใช้จริง</label>
+      <label><input type="radio" name="mode" value="full"> ม้วนเต็ม</label>
+      <button class="primary" onclick="renderMatrix()">ค้นหา</button>
+      <button onclick="window.print()">🖨 พิมพ์ (A4 แนวนอน)</button>
+    </div>
+
+    <div id="matrixBody"></div>
+
+    <!-- ✅ ส่วน Save + Snapshot -->
+    <div class="snapshot-save-bar no-print">
+      <label style="flex:1">
+        ชื่อที่บันทึก
+        <input id="snapshotTitle" placeholder="เช่น ตารางควบคุมระดับ Stock ประจำเดือน กันยายน 2569" style="width:100%;margin-top:4px">
+      </label>
+      <button class="primary" onclick="saveStockLevelSnapshot()" style="align-self:flex-end">💾 บันทึกผลสรุป</button>
+    </div>
+
+    <div id="snapshotMsg"></div>
+
+    <div class="snapshot-list-wrap no-print">
+      <h3 style="margin:16px 0 10px;font-size:15px">📋 รายการที่บันทึกไว้</h3>
+      <div id="snapshotList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== MODAL: ดู Snapshot ==================== -->
+<div class="modal-bg" id="modalSnapshot">
+  <div class="modal snapshot-modal" style="max-width:1100px">
+    <div class="modal-head">
+      <h3 id="snapshotViewTitle">รายละเอียด Snapshot</h3>
+      <div style="display:flex;gap:8px">
+        <button onclick="printSnapshot()">🖨 พิมพ์</button>
+        <button onclick="closeModal('modalSnapshot')">ปิด</button>
       </div>
     </div>
+    <div id="snapshotViewBody"></div>
+  </div>
+</div>
 
     <!-- ========== TAB 2: STOCK คงเหลือ ========== -->
     <div id="tab-stock" class="hidden">
