@@ -1314,7 +1314,11 @@ function printSnapshot() {
 }
 // ================= INIT =================
 (function init() {
-  if ($('qReportMonth')) $('qReportMonth').value = currentMonthStr();
+  const now = new Date();
+  if ($('titleMonth')) $('titleMonth').value = now.getMonth() + 1;
+  if ($('titleYear'))  $('titleYear').value = now.getFullYear() + 543;
+  if ($('filterYear')) $('filterYear').value = now.getFullYear() + 543;
+  
   document.querySelectorAll('.modal-bg').forEach(el => {
     el.onclick = e => { if (e.target === el) el.classList.remove('show'); };
   });
