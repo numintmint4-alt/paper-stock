@@ -332,6 +332,7 @@ async function loadMaster(onProgress = null) {
 async function refreshAll() {
   await loadMaster();
   if (typeof loadGradeFilter === 'function') await loadGradeFilter();
+  if (typeof loadSizeFilter === 'function') loadSizeFilter();   // ✅ เพิ่มบรรทัดนี้
   if (typeof loadMonthFilter === 'function') loadMonthFilter();
   if (typeof loadStockGradeFilter === 'function') await loadStockGradeFilter();
   if (typeof loadSummaryGradeFilter === 'function') await loadSummaryGradeFilter();
