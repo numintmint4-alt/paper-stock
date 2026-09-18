@@ -137,7 +137,7 @@
 
           <label>ลูกค้า <select id="qCustomer"><option value="">ทั้งหมด</option></select></label>
 
-          <label class="grade-filter-wrap">
+                   <label class="grade-filter-wrap">
             Gradegrams
             <div class="grade-filter-box" id="gradeFilterBox">
               <button type="button" class="grade-filter-btn" id="gradeFilterBtn">
@@ -150,6 +150,24 @@
                   <button type="button" onclick="clearAllGrades()">✗ ล้างทั้งหมด</button>
                 </div>
                 <div class="grade-list" id="gradeList"></div>
+              </div>
+            </div>
+          </label>
+
+          <!-- ✅ Size Filter -->
+          <label class="grade-filter-wrap">
+            Size
+            <div class="grade-filter-box" id="sizeFilterBox">
+              <button type="button" class="grade-filter-btn" id="sizeFilterBtn">
+                <span id="sizeFilterLabel">ทั้งหมด</span>
+                <span class="arrow">▼</span>
+              </button>
+              <div class="grade-dropdown hidden" id="sizeDropdown">
+                <div class="grade-actions">
+                  <button type="button" onclick="selectAllSizes()">✓ เลือกทั้งหมด</button>
+                  <button type="button" onclick="clearAllSizes()">✗ ล้างทั้งหมด</button>
+                </div>
+                <div class="grade-list" id="sizeList"></div>
               </div>
             </div>
           </label>
