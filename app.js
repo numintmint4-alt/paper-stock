@@ -330,16 +330,6 @@ async function loadMaster(onProgress = null) {
   return masterCache;
 }
 
-async function refreshAll() {
-  await loadMaster();
-  if (typeof loadGradeFilter === 'function') await loadGradeFilter();
-  if (typeof loadStockGradeFilter === 'function') await loadStockGradeFilter();
-  if (typeof loadSummaryGradeFilter === 'function') await loadSummaryGradeFilter();
-  if (typeof loadReceiveGradeFilter === 'function') await loadReceiveGradeFilter();
-  if (typeof loadAlertGradeFilter === 'function') await loadAlertGradeFilter();
-  renderMatrix();
-}
-
 // ================= V6: MATRIX GRADE FILTER (grade+gram) =================
 let selectedGrades = [];
 let allGradesList = [];
