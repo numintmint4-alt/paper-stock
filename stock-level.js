@@ -125,11 +125,18 @@ function onYearChange() { selectedMonths = []; loadMonthFilter(); }
 
 // ================= SIZE FILTER =================
 function loadSizeFilter() {
-  // ดึง Size ทั้งหมดจาก masterCache (เฉพาะตัวเลข)
+  // ✅ ถ้า masterCache ยังว่าง → รอ 300ms แล้วลองใหม่
+  if (!masterCache || masterCache.length === 0) {
+    console.log('[SizeFilter] masterCache ว่าง — รอ 300ms แล้วลองใหม่');
+    setTimeout(loadSizeFilter, 300);
+    return;
+  }
+
   allSizesList = [...new Set(
     masterCache.map(m => Number(m.size)).filter(Boolean)
   )].sort((a, b) => a - b);
 
+  console.log('[SizeFilter] ✅ โหลด ' + allSizesList.length + ' Size:', allSizesList);
   renderSizeList();
   updateSizeFilterLabel();
   attachSizeFilterListeners();
@@ -547,7 +554,7 @@ async function deleteSnapshot(id, title) {
 function printSnapshot() { window.print(); }
 
 // ═══════════════════════════════════════════════════════════════
-// INIT
+// INIT — โหลด Month Filter (Size Filter จะถูกเรียกใน refreshAll)
 // ═══════════════════════════════════════════════════════════════
 (function initStockLevel() {
   const run = () => {
@@ -555,10 +562,6 @@ function printSnapshot() { window.print(); }
       if (typeof loadMonthFilter === 'function') {
         loadMonthFilter();
         console.log('[StockLevel] ✅ loadMonthFilter() called');
-      }
-      if (typeof loadSizeFilter === 'function') {
-        loadSizeFilter();
-        console.log('[StockLevel] ✅ loadSizeFilter() called');
       }
       if (typeof loadStockLevelSnapshots === 'function') {
         loadStockLevelSnapshots();
