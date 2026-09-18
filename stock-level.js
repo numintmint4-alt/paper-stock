@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
-// STOCK V6.1 — stock-level.js
-// Month Filter + Matrix ใหม่ + Snapshot
+// STOCK V6.1 — stock-level.js (FULL)
+// Month Filter + Matrix + Snapshot + Init
 // ═══════════════════════════════════════════════════════════════
 
 // ================= STATE =================
@@ -12,12 +12,12 @@ let currentSnapshotData = null;
 function loadMonthFilter() {
   const yearEl = $('filterYear');
   const yearCE = yearEl ? Number(yearEl.value) - 543 : new Date().getFullYear();
-  
+
   allMonthsList = [];
   for (let m = 1; m <= 12; m++) {
     allMonthsList.push(`${yearCE}-${pad(m)}`);
   }
-  
+
   // default: 3 เดือนก่อนเดือนปัจจุบัน (ถ้ายังไม่เคยเลือก)
   if (selectedMonths.length === 0) {
     const now = new Date();
@@ -33,37 +33,52 @@ function loadMonthFilter() {
       selectedMonths.sort();
     }
   }
-  
+
   renderMonthList();
   updateMonthLabel();
-  
-  // ✅ attach listener แค่ครั้งเดียว (ทั้ง btn + document)
+
+  // ✅ attach listener แค่ครั้งเดียว
   attachMonthFilterListeners();
 }
 
-// ✅ ฟังก์ชันใหม่ — attach listener ครั้งเดียว
+// ✅ attach listener ครั้งเดียว (ปลอดภัย 100%)
 function attachMonthFilterListeners() {
   const btn = $('monthFilterBtn');
   const dropdown = $('monthDropdown');
   const box = $('monthFilterBox');
-  if (!btn || !dropdown || !box) return;
+
+  if (!btn || !dropdown || !box) {
+    console.warn('[MonthFilter] ไม่พบ element — เช็ค id ใน index.html');
+    return;
+  }
+
   if (btn.dataset.listenerAttached === '1') return;
   btn.dataset.listenerAttached = '1';
-  
-  btn.addEventListener('click', (e) => {
+
+  // ✅ ใช้ onclick → ทับซ้ำได้ ไม่ซ้อน
+  btn.onclick = (e) => {
+    e.preventDefault();
     e.stopPropagation();
     dropdown.classList.toggle('hidden');
     btn.classList.toggle('open');
-  });
-  
-  // ✅ ใช้ named function → removeEventListener ได้
-  window._monthDocClickHandler = (e) => {
-    if (!box.contains(e.target)) {
-      dropdown.classList.add('hidden');
-      btn.classList.remove('open');
-    }
   };
-  document.addEventListener('click', window._monthDocClickHandler);
+
+  // ✅ document handler ครั้งเดียว
+  if (!window._monthDocClickHandler) {
+    window._monthDocClickHandler = (e) => {
+      const b = $('monthFilterBtn');
+      const d = $('monthDropdown');
+      const bx = $('monthFilterBox');
+      if (!b || !d || !bx) return;
+      if (!bx.contains(e.target)) {
+        d.classList.add('hidden');
+        b.classList.remove('open');
+      }
+    };
+    document.addEventListener('click', window._monthDocClickHandler);
+  }
+
+  console.log('[MonthFilter] ✅ attach listener เรียบร้อย');
 }
 
 function renderMonthList() {
@@ -73,7 +88,7 @@ function renderMonthList() {
     list.innerHTML = '<div style="padding:10px;text-align:center;color:#94a3b8;font-size:13px">ไม่มีข้อมูล</div>';
     return;
   }
-  
+
   list.innerHTML = allMonthsList.map(ym => {
     const [y, m] = ym.split('-').map(Number);
     const label = `${THAI_MONTHS[m-1]} ${y + 543}`;
@@ -83,17 +98,17 @@ function renderMonthList() {
       <span>${label}</span>
     </label>`;
   }).join('');
-  
-  // ✅ ผูก event กับ label แทน checkbox (คลิกได้ทั้งแถว)
+
+  // ✅ ผูก event กับ label (คลิกได้ทั้งแถว)
   list.querySelectorAll('.item').forEach(el => {
+    const cb = el.querySelector('input[type="checkbox"]');
+
+    // คลิกที่ label (ไม่ใช่ checkbox)
     el.addEventListener('click', (e) => {
-      // ถ้าคลิกที่ checkbox → ปล่อยให้ browser จัดการเอง
       if (e.target.tagName === 'INPUT') return;
-      
       e.preventDefault();
-      const cb = el.querySelector('input[type="checkbox"]');
       cb.checked = !cb.checked;
-      
+
       const ym = el.dataset.month;
       if (cb.checked) {
         if (!selectedMonths.includes(ym)) selectedMonths.push(ym);
@@ -104,9 +119,8 @@ function renderMonthList() {
       el.classList.toggle('checked', cb.checked);
       updateMonthLabel();
     });
-    
-    // ✅ checkbox change (คลิก checkbox โดยตรง)
-    const cb = el.querySelector('input[type="checkbox"]');
+
+    // คลิก checkbox โดยตรง
     cb.addEventListener('change', () => {
       const ym = el.dataset.month;
       if (cb.checked) {
@@ -140,10 +154,12 @@ function selectAllMonths() {
   selectedMonths = [...allMonthsList];
   renderMonthList(); updateMonthLabel();
 }
+
 function clearAllMonths() {
   selectedMonths = [];
   renderMonthList(); updateMonthLabel();
 }
+
 function onYearChange() {
   // ✅ reset selectedMonths → loadMonthFilter จะ default 3 เดือนใหม่
   selectedMonths = [];
@@ -170,41 +186,41 @@ function getCurrentTitle() {
   return `ตารางควบคุมระดับ Stock ประจำเดือน ${THAI_MONTHS[m-1]} ${y}`;
 }
 
-// ================= MATRIX (ใหม่) =================
+// ================= MATRIX =================
 async function renderMatrix() {
   if (selectedMonths.length === 0) {
     alert('กรุณาเลือกเดือนก่อน');
     return;
   }
-  
+
   const sortedMonths = [...selectedMonths].sort();
   const fromYM = sortedMonths[0];
   const toYM = sortedMonths[sortedMonths.length - 1];
-  
+
   const [fromY, fromM] = fromYM.split('-').map(Number);
   const [toY, toM] = toYM.split('-').map(Number);
-  
+
   const fromISO = `${fromY}-${pad(fromM)}-01`;
   const toDate = new Date(toY, toM, 0);
   const toISO = `${toY}-${pad(toM)}-${pad(toDate.getDate())}`;
-  
+
   matrixRange = { from: fromISO, to: toISO };
-  
+
   const mode = document.querySelector('input[name="mode"]:checked').value;
   const customer = $('qCustomer').value;
   const selectedGradesInMatrix = getSelectedGrades();
-  
+
   updateReportTitle();
-  
+
   $('matrixBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลดข้อมูล...</p>';
-  
+
   const allUsage = await fetchAllRows(() => {
     let q = supabase.from('usage_records').select('*');
     if (matrixRange.from) q = q.gte('usage_date', matrixRange.from);
     if (matrixRange.to)   q = q.lte('usage_date', matrixRange.to);
     return q;
   });
-  
+
   // customer dropdown
   const custSet = new Set();
   allUsage.forEach(u => {
@@ -217,23 +233,24 @@ async function renderMatrix() {
   custSel.innerHTML = '<option value="">ทั้งหมด</option><option value="__GENERAL__">ทั่วไป (ไม่ระบุลูกค้า)</option>' +
     custList.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
   custSel.value = keepVal;
-  
+
   let usage = allUsage;
   if (customer === GENERAL_CUSTOMER) {
     usage = allUsage.filter(u => !u.roll_for_customer || !String(u.roll_for_customer).trim());
   } else if (customer) {
     usage = allUsage.filter(u => u.roll_for_customer === customer);
   }
-  
-  const mByCode = {}; masterCache.forEach(m => mByCode[m.item_code] = m);
-  
+
+  const mByCode = {};
+  masterCache.forEach(m => mByCode[m.item_code] = m);
+
   // group by item_code + usage_date
   const daily = {};
   usage.forEach(u => {
     const key = u.item_code + '|' + u.usage_date;
     daily[key] = (daily[key] || 0) + Number(u.used_kgs);
   });
-  
+
   // max ต่อ item_code
   const perItem = {};
   Object.entries(daily).forEach(([k, kg]) => {
@@ -244,11 +261,11 @@ async function renderMatrix() {
     let rolls = mode === 'full' ? Math.ceil(kg / std) : kg / std;
     if (!perItem[code] || rolls > perItem[code]) perItem[code] = rolls;
   });
-  
+
   // matrix
   const rowSet = new Map(), colSet = new Set(), cells = {}, rowTotals = {}, colTotals = {};
   let grand = 0;
-  
+
   Object.entries(perItem).forEach(([code, maxVal]) => {
     const m = mByCode[code];
     const rk = normalizeGrade(m.grade) + m.gram;
@@ -260,15 +277,15 @@ async function renderMatrix() {
     colTotals[m.size] = (colTotals[m.size] || 0) + maxVal;
     grand += maxVal;
   });
-  
-  let rowKeys = [...rowSet.keys()].sort((a,b) => a.localeCompare(b));
+
+  let rowKeys = [...rowSet.keys()].sort((a, b) => a.localeCompare(b));
   if (selectedGradesInMatrix.length > 0) {
     rowKeys = rowKeys.filter(rk => selectedGradesInMatrix.includes(rk));
   }
-  
+
   const colSet2 = new Set(), rowTotals2 = {}, colTotals2 = {};
   let grand2 = 0;
-  
+
   rowKeys.forEach(rk => {
     const m = rowSet.get(rk);
     if (!m) return;
@@ -282,19 +299,19 @@ async function renderMatrix() {
       }
     });
   });
-  
-  const colKeys2 = [...colSet2].sort((a,b) => a - b);
-  
+
+  const colKeys2 = [...colSet2].sort((a, b) => a - b);
+
   if (!rowKeys.length) {
     $('matrixBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่มีข้อมูลในช่วงที่เลือก</p>';
     currentSnapshotData = null;
     return;
   }
-  
+
   let html = '<div class="report-wrap"><table class="report-table"><thead><tr><th class="grade-col">Gradegrams</th>';
   colKeys2.forEach(s => html += `<th>${s}</th>`);
   html += '<th class="total-col">Total</th></tr></thead><tbody>';
-  
+
   rowKeys.forEach(rk => {
     html += '<tr>';
     html += `<td class="grade-col">${esc(rk)}</td>`;
@@ -310,7 +327,7 @@ async function renderMatrix() {
   html += `<td class="total-col">${Number(grand2).toFixed(2)}</td></tr></tbody></table></div>`;
   html += `<div class="report-foot">แสดงเป็นจำนวนม้วน · โหมด: ${mode === 'full' ? 'ม้วนเต็ม' : 'ใช้จริง'} · ยอดสูงสุดต่อวัน</div>`;
   $('matrixBody').innerHTML = html;
-  
+
   // ✅ เก็บ snapshot data
   currentSnapshotData = [];
   rowKeys.forEach(rk => {
@@ -325,22 +342,22 @@ async function renderMatrix() {
 async function saveStockLevelSnapshot() {
   const title = getCurrentTitle();
   const msgEl = $('snapshotMsg');
-  
+
   if (!currentSnapshotData || !currentSnapshotData.length) {
     if (msgEl) msgEl.innerHTML = '<div class="msg err">⚠ ยังไม่มีข้อมูล — กด "ค้นหา" ก่อน</div>';
     return;
   }
-  
+
   const { data: existing, error: errChk } = await supabase
     .from('stock_level_snapshots')
     .select('title')
     .ilike('title', title);
-  
+
   if (errChk) {
     if (msgEl) msgEl.innerHTML = `<div class="msg err">ตรวจสอบชื่อไม่สำเร็จ: ${esc(errChk.message)}</div>`;
     return;
   }
-  
+
   let finalTitle = title;
   if (existing && existing.length > 0) {
     const count = existing.length;
@@ -357,7 +374,7 @@ async function saveStockLevelSnapshot() {
     }
     finalTitle = `${title}/${n}`;
   }
-  
+
   const payload = {
     title: finalTitle,
     months: selectedMonths,
@@ -367,17 +384,17 @@ async function saveStockLevelSnapshot() {
     matrix_data: currentSnapshotData,
     created_by: currentUser.id
   };
-  
+
   const { error } = await supabase.from('stock_level_snapshots').insert(payload);
-  
+
   if (error) {
     if (msgEl) msgEl.innerHTML = `<div class="msg err">บันทึกไม่สำเร็จ: ${esc(error.message)}</div>`;
     return;
   }
-  
+
   if (msgEl) msgEl.innerHTML = `<div class="msg ok">✅ บันทึก "${esc(finalTitle)}" สำเร็จ</div>`;
   setTimeout(() => { if (msgEl) msgEl.innerHTML = ''; }, 3000);
-  
+
   await loadStockLevelSnapshots();
 }
 
@@ -385,22 +402,22 @@ async function loadStockLevelSnapshots() {
   const listEl = $('snapshotList');
   if (!listEl) return;
   listEl.innerHTML = '<p style="color:#94a3b8;font-size:13px">กำลังโหลด...</p>';
-  
+
   const { data, error } = await supabase
     .from('stock_level_snapshots')
     .select('id, title, months, mode, customer, grades, created_at')
     .order('created_at', { ascending: false });
-  
+
   if (error) {
     listEl.innerHTML = `<div class="msg err">${esc(error.message)}</div>`;
     return;
   }
-  
+
   if (!data || !data.length) {
     listEl.innerHTML = '<p style="color:#94a3b8;font-size:13px">ยังไม่มีรายการที่บันทึกไว้</p>';
     return;
   }
-  
+
   listEl.innerHTML = data.map(s => {
     const dt = new Date(s.created_at).toLocaleString('th-TH', {
       year: 'numeric', month: 'short', day: 'numeric',
@@ -423,29 +440,29 @@ async function viewSnapshot(id) {
   $('snapshotViewTitle').textContent = 'กำลังโหลด...';
   $('snapshotViewBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
   openModal('modalSnapshot');
-  
+
   const { data, error } = await supabase
     .from('stock_level_snapshots')
     .select('*')
     .eq('id', id)
     .single();
-  
+
   if (error || !data) {
     $('snapshotViewBody').innerHTML = `<div class="msg err">โหลดไม่สำเร็จ: ${esc(error?.message || 'ไม่พบข้อมูล')}</div>`;
     return;
   }
-  
+
   $('snapshotViewTitle').textContent = data.title;
-  
+
   const md = data.matrix_data || [];
   if (!md.length) {
     $('snapshotViewBody').innerHTML = '<p style="color:#94a3b8">ไม่มีข้อมูล</p>';
     return;
   }
-  
+
   const rowSet = new Set(), colSet = new Set(), cells = {}, rowTotals = {}, colTotals = {};
   let grand = 0;
-  
+
   md.forEach(r => {
     rowSet.add(r.gradegram);
     colSet.add(r.size);
@@ -455,15 +472,15 @@ async function viewSnapshot(id) {
     colTotals[r.size] = (colTotals[r.size] || 0) + r.max_rolls;
     grand += r.max_rolls;
   });
-  
+
   const rowKeys = [...rowSet].sort();
-  const colKeys = [...colSet].sort((a,b) => a - b);
-  
+  const colKeys = [...colSet].sort((a, b) => a - b);
+
   let html = '<div class="report-wrap"><table class="report-table"><thead><tr>';
   html += '<th class="grade-col">Gradegrams</th>';
   colKeys.forEach(s => html += `<th>${s}</th>`);
   html += '<th class="total-col">Total</th></tr></thead><tbody>';
-  
+
   rowKeys.forEach(rk => {
     html += '<tr>';
     html += `<td class="grade-col">${esc(rk)}</td>`;
@@ -478,13 +495,13 @@ async function viewSnapshot(id) {
   colKeys.forEach(s => html += `<td>${Number(colTotals[s] || 0).toFixed(2)}</td>`);
   html += `<td class="total-col">${Number(grand).toFixed(2)}</td></tr>`;
   html += '</tbody></table></div>';
-  
+
   const dt = new Date(data.created_at).toLocaleString('th-TH');
   html += `<div class="report-foot">
     บันทึกเมื่อ: ${dt} · เดือน: ${(data.months || []).join(', ')} · 
     โหมด: ${data.mode === 'full' ? 'ม้วนเต็ม' : 'ใช้จริง'}
   </div>`;
-  
+
   $('snapshotViewBody').innerHTML = html;
 }
 
@@ -498,3 +515,27 @@ async function deleteSnapshot(id, title) {
 function printSnapshot() {
   window.print();
 }
+
+// ═══════════════════════════════════════════════════════════════
+// INIT — เรียก loadMonthFilter หลัง DOM + app.js พร้อม
+// ═══════════════════════════════════════════════════════════════
+(function initStockLevel() {
+  const run = () => {
+    // รอ app.js initSession + refreshAll เสร็จ
+    setTimeout(() => {
+      if (typeof loadMonthFilter === 'function') {
+        loadMonthFilter();
+        console.log('[StockLevel] ✅ loadMonthFilter() called');
+      }
+      if (typeof loadStockLevelSnapshots === 'function') {
+        loadStockLevelSnapshots();
+      }
+    }, 150);
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', run);
+  } else {
+    run();
+  }
+})();
