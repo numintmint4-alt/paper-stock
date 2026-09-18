@@ -1280,7 +1280,201 @@ async function delUser(id, username) {
     loadUsers();
   } catch (e) { showMsg('usersMsg', 'ผิดพลาด: ' + e.message, 'err'); }
 }
+// ================= SNAPSHOT (Stock Level) =================
+let currentSnapshotData = null;   // เก็บ matrix ปัจจุบัน
 
+async function saveStockLevelSnapshot() {
+  const title = getCurrentTitle();
+  const msgEl = $('snapshotMsg');
+  
+  // ดึง matrix ปัจจุบันจากตาราง
+  const matrixBody = $('matrixBody');
+  if (!matrixBody || !matrixBody.querySelector('table')) {
+    if (msgEl) msgEl.innerHTML = '<div class="msg err">⚠ ยังไม่มีข้อมูล — กด "ค้นหา" ก่อน</div>';
+    return;
+  }
+  
+  // ✅ ดึงข้อมูล matrix จากตัวแปร (เราต้องเก็บไว้ตอน renderMatrix)
+  if (!currentSnapshotData) {
+    if (msgEl) msgEl.innerHTML = '<div class="msg err">⚠ ยังไม่มีข้อมูลให้บันทึก</div>';
+    return;
+  }
+  
+  // เช็ค title ซ้ำ (case-insensitive)
+  const { data: existing, error: errChk } = await supabase
+    .from('stock_level_snapshots')
+    .select('title')
+    .ilike('title', title);
+  
+  if (errChk) {
+    if (msgEl) msgEl.innerHTML = `<div class="msg err">ตรวจสอบชื่อไม่สำเร็จ: ${esc(errChk.message)}</div>`;
+    return;
+  }
+  
+  let finalTitle = title;
+  if (existing && existing.length > 0) {
+    const count = existing.length;
+    const choice = prompt(
+      `ชื่อ "${title}" ซ้ำ ${count} ครั้ง\n` +
+      `พิมพ์หมายเลขที่จะบันทึก (1-${count + 1}) หรือกด Cancel เพื่อยกเลิก:`,
+      String(count + 1)
+    );
+    if (!choice) return;   // cancel
+    const n = Number(choice);
+    if (!n || n < 1 || n > count + 1) {
+      if (msgEl) msgEl.innerHTML = '<div class="msg err">หมายเลขไม่ถูกต้อง</div>';
+      return;
+    }
+    finalTitle = `${title}/${n}`;
+  }
+  
+  // save
+  const payload = {
+    title: finalTitle,
+    months: selectedMonths,
+    mode: document.querySelector('input[name="mode"]:checked').value,
+    customer: $('qCustomer').value,
+    grades: getSelectedGrades(),
+    matrix_data: currentSnapshotData,
+    created_by: currentUser.id
+  };
+  
+  const { error } = await supabase.from('stock_level_snapshots').insert(payload);
+  
+  if (error) {
+    if (msgEl) msgEl.innerHTML = `<div class="msg err">บันทึกไม่สำเร็จ: ${esc(error.message)}</div>`;
+    return;
+  }
+  
+  if (msgEl) msgEl.innerHTML = `<div class="msg ok">✅ บันทึก "${esc(finalTitle)}" สำเร็จ</div>`;
+  setTimeout(() => { if (msgEl) msgEl.innerHTML = ''; }, 3000);
+  
+  await loadStockLevelSnapshots();
+}
+
+async function loadStockLevelSnapshots() {
+  const listEl = $('snapshotList');
+  if (!listEl) return;
+  listEl.innerHTML = '<p style="color:#94a3b8;font-size:13px">กำลังโหลด...</p>';
+  
+  const { data, error } = await supabase
+    .from('stock_level_snapshots')
+    .select('id, title, months, mode, customer, grades, created_at')
+    .order('created_at', { ascending: false });
+  
+  if (error) {
+    listEl.innerHTML = `<div class="msg err">${esc(error.message)}</div>`;
+    return;
+  }
+  
+  if (!data || !data.length) {
+    listEl.innerHTML = '<p style="color:#94a3b8;font-size:13px">ยังไม่มีรายการที่บันทึกไว้</p>';
+    return;
+  }
+  
+  listEl.innerHTML = data.map(s => {
+    const dt = new Date(s.created_at).toLocaleString('th-TH', {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+    return `<div class="snapshot-card">
+      <div class="snapshot-card-info">
+        <div class="snapshot-card-title">${esc(s.title)}</div>
+        <div class="snapshot-card-meta">📅 ${dt}</div>
+      </div>
+      <div class="snapshot-card-actions">
+        <button onclick="viewSnapshot(${s.id})">👁 ดู</button>
+        <button class="danger" onclick="deleteSnapshot(${s.id}, '${esc(s.title)}')">🗑 ลบ</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function viewSnapshot(id) {
+  $('snapshotViewTitle').textContent = 'กำลังโหลด...';
+  $('snapshotViewBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
+  openModal('modalSnapshot');
+  
+  const { data, error } = await supabase
+    .from('stock_level_snapshots')
+    .select('*')
+    .eq('id', id)
+    .single();
+  
+  if (error || !data) {
+    $('snapshotViewBody').innerHTML = `<div class="msg err">โหลดไม่สำเร็จ: ${esc(error?.message || 'ไม่พบข้อมูล')}</div>`;
+    return;
+  }
+  
+  $('snapshotViewTitle').textContent = data.title;
+  
+  // render matrix จาก matrix_data
+  const md = data.matrix_data || [];
+  if (!md.length) {
+    $('snapshotViewBody').innerHTML = '<p style="color:#94a3b8">ไม่มีข้อมูล</p>';
+    return;
+  }
+  
+  // group
+  const rowSet = new Set(), colSet = new Set(), cells = {}, rowTotals = {}, colTotals = {};
+  let grand = 0;
+  
+  md.forEach(r => {
+    rowSet.add(r.gradegram);
+    colSet.add(r.size);
+    const k = r.gradegram + '|' + r.size;
+    cells[k] = r.max_rolls;
+    rowTotals[r.gradegram] = (rowTotals[r.gradegram] || 0) + r.max_rolls;
+    colTotals[r.size] = (colTotals[r.size] || 0) + r.max_rolls;
+    grand += r.max_rolls;
+  });
+  
+  const rowKeys = [...rowSet].sort();
+  const colKeys = [...colSet].sort((a,b) => a - b);
+  
+  let html = '<div class="report-wrap"><table class="report-table"><thead><tr>';
+  html += '<th class="grade-col">Gradegrams</th>';
+  colKeys.forEach(s => html += `<th>${s}</th>`);
+  html += '<th class="total-col">Total</th></tr></thead><tbody>';
+  
+  rowKeys.forEach(rk => {
+    html += '<tr>';
+    html += `<td class="grade-col">${esc(rk)}</td>`;
+    colKeys.forEach(s => {
+      const v = cells[rk + '|' + s];
+      if (v == null) html += '<td class="empty">-</td>';
+      else html += `<td>${Number(v).toFixed(2)}</td>`;
+    });
+    html += `<td class="total-col">${Number(rowTotals[rk] || 0).toFixed(2)}</td></tr>`;
+  });
+  html += '<tr class="total-row"><td class="grade-col">Total</td>';
+  colKeys.forEach(s => html += `<td>${Number(colTotals[s] || 0).toFixed(2)}</td>`);
+  html += `<td class="total-col">${Number(grand).toFixed(2)}</td></tr>`;
+  html += '</tbody></table></div>';
+  
+  // meta
+  const dt = new Date(data.created_at).toLocaleString('th-TH');
+  html += `<div class="report-foot">
+    บันทึกเมื่อ: ${dt} · เดือน: ${(data.months || []).join(', ')} · 
+    โหมด: ${data.mode === 'full' ? 'ม้วนเต็ม' : 'ใช้จริง'}
+  </div>`;
+  
+  $('snapshotViewBody').innerHTML = html;
+}
+
+async function deleteSnapshot(id, title) {
+  if (!confirm(`ลบ "${title}" ?`)) return;
+  const { error } = await supabase.from('stock_level_snapshots').delete().eq('id', id);
+  if (error) {
+    alert('ลบไม่สำเร็จ: ' + error.message);
+    return;
+  }
+  await loadStockLevelSnapshots();
+}
+
+function printSnapshot() {
+  window.print();
+}
 // ================= INIT =================
 (function init() {
   if ($('qReportMonth')) $('qReportMonth').value = currentMonthStr();
