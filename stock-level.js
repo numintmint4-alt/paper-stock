@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
-// STOCK V6.2 — stock-level.js (FULL)
-// Month Filter + Gradegrams Filter + Size Filter + Matrix + Snapshot
+// STOCK V6.3 — stock-level.js (FULL)
+// Month Filter + Customer Filter + Gradegrams Filter + Size Filter
+// + Matrix + Snapshot
 // ═══════════════════════════════════════════════════════════════
 
 // ================= STATE =================
@@ -11,6 +12,10 @@ let currentSnapshotData = null;
 // ✅ Size Filter
 let selectedSizes = [];
 let allSizesList = [];
+
+// ✅ Customer Filter (ใหม่)
+let selectedCustomers = [];
+let allCustomersList = [];
 
 // ================= MONTH FILTER =================
 function loadMonthFilter() {
@@ -125,7 +130,6 @@ function onYearChange() { selectedMonths = []; loadMonthFilter(); }
 
 // ================= SIZE FILTER =================
 function loadSizeFilter() {
-  // ✅ ถ้า masterCache ยังว่าง → รอ 300ms แล้วลองใหม่
   if (!masterCache || masterCache.length === 0) {
     console.log('[SizeFilter] masterCache ว่าง — รอ 300ms แล้วลองใหม่');
     setTimeout(loadSizeFilter, 300);
@@ -220,6 +224,132 @@ function selectAllSizes() { selectedSizes = [...allSizesList]; renderSizeList();
 function clearAllSizes() { selectedSizes = []; renderSizeList(); updateSizeFilterLabel(); }
 function getSelectedSizes() { return selectedSizes; }
 
+// ================= CUSTOMER FILTER (ใหม่) =================
+function loadCustomerFilter(custList) {
+  // อัปเดต allCustomersList — เก็บค่าที่เคยเลือกไว้ (selectedCustomers) ไม่ให้หาย
+  if (Array.isArray(custList) && custList.length > 0) {
+    // รวมรายชื่อใหม่ + ค่าที่เคยเลือกไว้ (ถ้าหลุดจาก list ใหม่ ให้คงไว้)
+    const merged = new Set([...custList, ...selectedCustomers]);
+    allCustomersList = [...merged].sort();
+  } else {
+    // ถ้าไม่มีข้อมูลเลย ก็ยังคงค่าที่เคยเลือกไว้
+    if (allCustomersList.length === 0) allCustomersList = [...selectedCustomers];
+  }
+
+  console.log('[CustomerFilter] ✅ โหลด ' + allCustomersList.length + ' ลูกค้า:', allCustomersList);
+  renderCustomerList();
+  updateCustomerFilterLabel();
+  attachCustomerFilterListeners();
+}
+
+function attachCustomerFilterListeners() {
+  const btn = $('customerFilterBtn');
+  const dropdown = $('customerDropdown');
+  const box = $('customerFilterBox');
+  if (!btn || !dropdown || !box) {
+    console.warn('[CustomerFilter] ไม่พบ element — เช็ค id ใน index.html');
+    return;
+  }
+  if (btn.dataset.listenerAttached === '1') return;
+  btn.dataset.listenerAttached = '1';
+
+  btn.onclick = (e) => {
+    e.preventDefault(); e.stopPropagation();
+    dropdown.classList.toggle('hidden');
+    btn.classList.toggle('open');
+  };
+
+  if (!window._customerDocClickHandler) {
+    window._customerDocClickHandler = (e) => {
+      const b = $('customerFilterBtn'), d = $('customerDropdown'), bx = $('customerFilterBox');
+      if (!b || !d || !bx) return;
+      if (!bx.contains(e.target)) { d.classList.add('hidden'); b.classList.remove('open'); }
+    };
+    document.addEventListener('click', window._customerDocClickHandler);
+  }
+}
+
+function renderCustomerList() {
+  const list = $('customerList');
+  if (!list) return;
+
+  // เพิ่ม __GENERAL__ เป็นตัวเลือกแรกเสมอ (ถ้ายังไม่มี)
+  const displayList = ['__GENERAL__', ...allCustomersList.filter(c => c !== '__GENERAL__')];
+
+  if (displayList.length === 0) {
+    list.innerHTML = '<div style="padding:10px;text-align:center;color:#94a3b8;font-size:13px">ไม่มีข้อมูล</div>';
+    return;
+  }
+
+  list.innerHTML = displayList.map(c => {
+    const isGeneral = c === '__GENERAL__';
+    const label = isGeneral ? '— ทั่วไป (ไม่ระบุลูกค้า) —' : c;
+    const checked = selectedCustomers.includes(c);
+    return `<label class="item ${checked ? 'checked' : ''}" data-customer="${esc(c)}">
+      <input type="checkbox" ${checked ? 'checked' : ''}>
+      <span>${esc(label)}</span>
+    </label>`;
+  }).join('');
+
+  list.querySelectorAll('.item').forEach(el => {
+    const cb = el.querySelector('input[type="checkbox"]');
+    const val = el.dataset.customer;
+
+    el.addEventListener('click', (e) => {
+      if (e.target.tagName === 'INPUT') return;
+      e.preventDefault();
+      cb.checked = !cb.checked;
+      toggleCustomer(val, cb.checked);
+      el.classList.toggle('checked', cb.checked);
+    });
+    cb.addEventListener('change', () => {
+      toggleCustomer(val, cb.checked);
+      el.classList.toggle('checked', cb.checked);
+    });
+  });
+}
+
+function toggleCustomer(val, isChecked) {
+  if (isChecked) {
+    if (!selectedCustomers.includes(val)) selectedCustomers.push(val);
+  } else {
+    selectedCustomers = selectedCustomers.filter(x => x !== val);
+  }
+  updateCustomerFilterLabel();
+}
+
+function updateCustomerFilterLabel() {
+  const label = $('customerFilterLabel');
+  if (!label) return;
+  if (selectedCustomers.length === 0) {
+    label.textContent = 'ทั้งหมด';
+    label.style.color = '#1e293b';
+  } else if (selectedCustomers.length === 1) {
+    const c = selectedCustomers[0];
+    label.textContent = c === '__GENERAL__' ? 'ทั่วไป' : c;
+    label.style.color = '#1e40af';
+  } else {
+    label.textContent = `เลือก ${selectedCustomers.length} ลูกค้า`;
+    label.style.color = '#1e40af';
+  }
+}
+
+function selectAllCustomers() {
+  selectedCustomers = ['__GENERAL__', ...allCustomersList.filter(c => c !== '__GENERAL__')];
+  renderCustomerList();
+  updateCustomerFilterLabel();
+}
+
+function clearAllCustomers() {
+  selectedCustomers = [];
+  renderCustomerList();
+  updateCustomerFilterLabel();
+}
+
+function getSelectedCustomers() {
+  return selectedCustomers;
+}
+
 // ================= TITLE BUILDER =================
 function updateReportTitle() {
   const mEl = $('titleMonth');
@@ -261,7 +391,7 @@ async function renderMatrix() {
   matrixRange = { from: fromISO, to: toISO };
 
   const mode = document.querySelector('input[name="mode"]:checked').value;
-  const customer = $('qCustomer').value;
+  const customers = getSelectedCustomers();  // ✅ เปลี่ยนจาก const customer = $('qCustomer').value;
   const selectedGradesInMatrix = getSelectedGrades();
 
   updateReportTitle();
@@ -275,24 +405,23 @@ async function renderMatrix() {
     return q;
   });
 
-  // customer dropdown
+  // ✅ สร้างรายชื่อลูกค้าจาก allUsage แล้วส่งให้ loadCustomerFilter
   const custSet = new Set();
   allUsage.forEach(u => {
     const c = (u.roll_for_customer || '').trim();
     if (c) custSet.add(c);
   });
   const custList = [...custSet].sort();
-  const custSel = $('qCustomer');
-  const keepVal = custSel.value;
-  custSel.innerHTML = '<option value="">ทั้งหมด</option><option value="__GENERAL__">ทั่วไป (ไม่ระบุลูกค้า)</option>' +
-    custList.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
-  custSel.value = keepVal;
+  loadCustomerFilter(custList);
 
+  // ✅ กรองลูกค้าตาม selectedCustomers
   let usage = allUsage;
-  if (customer === GENERAL_CUSTOMER) {
-    usage = allUsage.filter(u => !u.roll_for_customer || !String(u.roll_for_customer).trim());
-  } else if (customer) {
-    usage = usage.filter(u => u.roll_for_customer === customer);
+  if (customers.length > 0) {
+    usage = allUsage.filter(u => {
+      const c = (u.roll_for_customer || '').trim();
+      if (customers.includes('__GENERAL__') && !c) return true;
+      return customers.includes(c);
+    });
   }
 
   const mByCode = {};
@@ -333,14 +462,14 @@ async function renderMatrix() {
     rowKeys = rowKeys.filter(rk => selectedGradesInMatrix.includes(rk));
   }
 
-  // ✅ colKeys2 จาก colSet (ครบทุก Size ที่มีข้อมูล) + filter Size
+  // colKeys2 จาก colSet + filter Size
   let colKeys2 = [...colSet].sort((a, b) => a - b);
   const selectedSizesInMatrix = getSelectedSizes();
   if (selectedSizesInMatrix.length > 0) {
     colKeys2 = colKeys2.filter(s => selectedSizesInMatrix.includes(s));
   }
 
-  // ✅ คำนวณ totals จาก colKeys2 (เฉพาะคอลัมน์ที่แสดง)
+  // คำนวณ totals จาก colKeys2
   const rowTotals2 = {}, colTotals2 = {};
   let grand2 = 0;
 
@@ -433,7 +562,7 @@ async function saveStockLevelSnapshot() {
     title: finalTitle,
     months: selectedMonths,
     mode: document.querySelector('input[name="mode"]:checked').value,
-    customer: $('qCustomer').value,
+    customer: getSelectedCustomers().join(','),  // ✅ join เป็น string
     grades: getSelectedGrades(),
     sizes: getSelectedSizes(),
     matrix_data: currentSnapshotData,
@@ -536,10 +665,21 @@ async function viewSnapshot(id) {
   html += `<td class="total-col">${Number(grand).toFixed(2)}</td></tr>`;
   html += '</tbody></table></div>';
 
+  // ✅ เพิ่มแสดงลูกค้าที่เคยกรองไว้
   const dt = new Date(data.created_at).toLocaleString('th-TH');
+  let customerDisplay = 'ทั้งหมด';
+  if (data.customer) {
+    const custArr = String(data.customer).split(',').map(c => c.trim()).filter(Boolean);
+    if (custArr.length > 0) {
+      customerDisplay = custArr.map(c => c === '__GENERAL__' ? 'ทั่วไป (ไม่ระบุลูกค้า)' : c).join(', ');
+    }
+  }
+
   html += `<div class="report-foot">
-    บันทึกเมื่อ: ${dt} · เดือน: ${(data.months || []).join(', ')} · 
-    โหมด: ${data.mode === 'full' ? 'ม้วนเต็ม' : 'ใช้จริง'}
+    บันทึกเมื่อ: ${dt}<br>
+    เดือน: ${(data.months || []).join(', ')} · 
+    โหมด: ${data.mode === 'full' ? 'ม้วนเต็ม' : 'ใช้จริง'}<br>
+    ลูกค้า: ${esc(customerDisplay)}
   </div>`;
   $('snapshotViewBody').innerHTML = html;
 }
@@ -554,7 +694,7 @@ async function deleteSnapshot(id, title) {
 function printSnapshot() { window.print(); }
 
 // ═══════════════════════════════════════════════════════════════
-// INIT — โหลด Month Filter (Size Filter จะถูกเรียกใน refreshAll)
+// INIT — โหลด Month Filter
 // ═══════════════════════════════════════════════════════════════
 (function initStockLevel() {
   const run = () => {
