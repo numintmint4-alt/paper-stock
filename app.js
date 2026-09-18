@@ -438,42 +438,47 @@ function clearAllGrades() {
 function getSelectedGrades() {
   return selectedGrades;
 }
-
-// ================= MATRIX (Stock Level) =================
+// ================= MATRIX (Stock Level) — V6.1 =================
 async function renderMatrix() {
-  const reportMonth = $('qReportMonth').value;
-  const monthsBack  = Number($('qMonthsBack').value) || 3;
-  matrixRange = reportMonthRange(reportMonth, monthsBack);
-
+  // ✅ Q14=A: ต้องเลือกเดือนก่อน
+  if (selectedMonths.length === 0) {
+    alert('กรุณาเลือกเดือนก่อน');
+    return;
+  }
+  
+  // ✅ Q21=A: onYearChange เก็บเดือนเดิม → ไม่ต้องกังวล
+  
+  // คำนวณ from/to จากเดือนที่เลือก
+  const sortedMonths = [...selectedMonths].sort();
+  const fromYM = sortedMonths[0];
+  const toYM = sortedMonths[sortedMonths.length - 1];
+  
+  const [fromY, fromM] = fromYM.split('-').map(Number);
+  const [toY, toM] = toYM.split('-').map(Number);
+  
+  const fromISO = `${fromY}-${pad(fromM)}-01`;
+  const toDate = new Date(toY, toM, 0);  // วันสุดท้ายของเดือน toM
+  const toISO = `${toY}-${pad(toM)}-${pad(toDate.getDate())}`;
+  
+  matrixRange = { from: fromISO, to: toISO };
+  
   const mode = document.querySelector('input[name="mode"]:checked').value;
   const customer = $('qCustomer').value;
-
-  const fromShort = matrixRange.from ? thaiMonthShort(matrixRange.from.slice(0,7)) : '-';
-  const toShort   = matrixRange.to   ? thaiMonthShort(matrixRange.to.slice(0,7))   : '-';
-  const custLabel = customer === '' ? '' :
-                    customer === GENERAL_CUSTOMER ? ' · ลูกค้า: ทั่วไป' : ` · ลูกค้า: ${customer}`;
-  const modeLabel = mode === 'full' ? 'ม้วนเต็ม (ปัดขึ้น)' : 'ใช้จริง';
-
   const selectedGradesInMatrix = getSelectedGrades();
-  const gradeLabel = selectedGradesInMatrix.length > 0
-    ? ` · เกรด: ${selectedGradesInMatrix.join(', ')}`
-    : '';
-
-  $('reportTitle').innerHTML = `
-    ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ<br>
-    ประจำ ${thaiMonthTitle(reportMonth)}
-    <div class="report-subtitle">(${modeLabel} · ย้อนหลัง ${monthsBack} เดือน: ${fromShort} – ${toShort}${custLabel}${gradeLabel})</div>
-  `;
-
+  
+  // ✅ Q20=C: title มาจาก title builder (ไม่แสดง grade label แล้ว)
+  updateReportTitle();
+  
   $('matrixBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลดข้อมูล...</p>';
-
+  
   const allUsage = await fetchAllRows(() => {
     let q = supabase.from('usage_records').select('*');
     if (matrixRange.from) q = q.gte('usage_date', matrixRange.from);
     if (matrixRange.to)   q = q.lte('usage_date', matrixRange.to);
     return q;
   });
-
+  
+  // customer dropdown
   const custSet = new Set();
   allUsage.forEach(u => {
     const c = (u.roll_for_customer || '').trim();
@@ -485,66 +490,65 @@ async function renderMatrix() {
   custSel.innerHTML = '<option value="">ทั้งหมด</option><option value="__GENERAL__">ทั่วไป (ไม่ระบุลูกค้า)</option>' +
     custList.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
   custSel.value = keepVal;
-
+  
   let usage = allUsage;
   if (customer === GENERAL_CUSTOMER) {
     usage = allUsage.filter(u => !u.roll_for_customer || !String(u.roll_for_customer).trim());
   } else if (customer) {
     usage = allUsage.filter(u => u.roll_for_customer === customer);
   }
-
+  
   const mByCode = {}; masterCache.forEach(m => mByCode[m.item_code] = m);
-
+  
+  // ✅ A5: Group by item_code + usage_date → รวม kg ของวันนั้น
   const daily = {};
   usage.forEach(u => {
     const key = u.item_code + '|' + u.usage_date;
     daily[key] = (daily[key] || 0) + Number(u.used_kgs);
   });
-
+  
+  // ✅ A5: หา max ต่อ item_code (Math.ceil)
   const perItem = {};
   Object.entries(daily).forEach(([k, kg]) => {
     const code = k.split('|')[0];
     const m = mByCode[code]; if (!m) return;
     const std = Number(m.std_weight_kg);
     if (!std) return;
-
+    
     let rolls;
     if (mode === 'full') rolls = Math.ceil(kg / std);
     else rolls = kg / std;
-
-    if (!perItem[code]) perItem[code] = { total: 0, max: 0 };
-    perItem[code].total += rolls;
-    if (rolls > perItem[code].max) perItem[code].max = rolls;
+    
+    if (!perItem[code] || rolls > perItem[code]) perItem[code] = rolls;
   });
-
+  
+  // สร้าง matrix
   const rowSet = new Map(), colSet = new Set(), cells = {}, rowTotals = {}, colTotals = {};
   let grand = 0;
-
-  Object.entries(perItem).forEach(([code, v]) => {
+  
+  Object.entries(perItem).forEach(([code, maxVal]) => {
     const m = mByCode[code];
-    const rk = m.grade + m.gram;
+    const rk = normalizeGrade(m.grade) + m.gram;   // ✅ normalize
     rowSet.set(rk, m);
     colSet.add(m.size);
-    const finalVal = v.max;
-
+    
     const k = rk + '|' + m.size;
-    cells[k] = (cells[k] || 0) + finalVal;
-    rowTotals[rk] = (rowTotals[rk] || 0) + finalVal;
-    colTotals[m.size] = (colTotals[m.size] || 0) + finalVal;
-    grand += finalVal;
+    cells[k] = (cells[k] || 0) + maxVal;
+    rowTotals[rk] = (rowTotals[rk] || 0) + maxVal;
+    colTotals[m.size] = (colTotals[m.size] || 0) + maxVal;
+    grand += maxVal;
   });
-
+  
   let rowKeys = [...rowSet.keys()].sort((a,b) => a.localeCompare(b));
-
+  
   if (selectedGradesInMatrix.length > 0) {
     rowKeys = rowKeys.filter(rk => selectedGradesInMatrix.includes(rk));
   }
-
-  const colSet2 = new Set();
-  const rowTotals2 = {};
-  const colTotals2 = {};
+  
+  // คำนวณใหม่หลัง filter
+  const colSet2 = new Set(), rowTotals2 = {}, colTotals2 = {};
   let grand2 = 0;
-
+  
   rowKeys.forEach(rk => {
     const m = rowSet.get(rk);
     if (!m) return;
@@ -558,18 +562,18 @@ async function renderMatrix() {
       }
     });
   });
-
+  
   const colKeys2 = [...colSet2].sort((a,b) => a - b);
-
+  
   if (!rowKeys.length) {
     $('matrixBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่มีข้อมูลในช่วงที่เลือก</p>';
     return;
   }
-
+  
   let html = '<div class="report-wrap"><table class="report-table"><thead><tr><th class="grade-col">Gradegrams</th>';
   colKeys2.forEach(s => html += `<th>${s}</th>`);
   html += '<th class="total-col">Total</th></tr></thead><tbody>';
-
+  
   rowKeys.forEach(rk => {
     html += '<tr>';
     html += `<td class="grade-col">${esc(rk)}</td>`;
@@ -583,7 +587,7 @@ async function renderMatrix() {
   html += '<tr class="total-row"><td class="grade-col">Total</td>';
   colKeys2.forEach(s => html += `<td>${Number(colTotals2[s] || 0).toFixed(2)}</td>`);
   html += `<td class="total-col">${Number(grand2).toFixed(2)}</td></tr></tbody></table></div>`;
-  html += `<div class="report-foot">แสดงเป็นจำนวนม้วน · โหมด: ${modeLabel} · ยอดสูงสุดต่อวัน</div>`;
+  html += `<div class="report-foot">แสดงเป็นจำนวนม้วน · โหมด: ${mode === 'full' ? 'ม้วนเต็ม' : 'ใช้จริง'} · ยอดสูงสุดต่อวัน</div>`;
   $('matrixBody').innerHTML = html;
 }
 
