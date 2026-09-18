@@ -37,6 +37,12 @@ function loadMonthFilter() {
   renderMonthList();
   updateMonthLabel();
   
+  // ✅ attach listener แค่ครั้งเดียว (ทั้ง btn + document)
+  attachMonthFilterListeners();
+}
+
+// ✅ ฟังก์ชันใหม่ — attach listener ครั้งเดียว
+function attachMonthFilterListeners() {
   const btn = $('monthFilterBtn');
   const dropdown = $('monthDropdown');
   const box = $('monthFilterBox');
@@ -49,12 +55,15 @@ function loadMonthFilter() {
     dropdown.classList.toggle('hidden');
     btn.classList.toggle('open');
   });
-  document.addEventListener('click', (e) => {
+  
+  // ✅ ใช้ named function → removeEventListener ได้
+  window._monthDocClickHandler = (e) => {
     if (!box.contains(e.target)) {
       dropdown.classList.add('hidden');
       btn.classList.remove('open');
     }
-  });
+  };
+  document.addEventListener('click', window._monthDocClickHandler);
 }
 
 function renderMonthList() {
@@ -64,6 +73,7 @@ function renderMonthList() {
     list.innerHTML = '<div style="padding:10px;text-align:center;color:#94a3b8;font-size:13px">ไม่มีข้อมูล</div>';
     return;
   }
+  
   list.innerHTML = allMonthsList.map(ym => {
     const [y, m] = ym.split('-').map(Number);
     const label = `${THAI_MONTHS[m-1]} ${y + 543}`;
@@ -74,7 +84,28 @@ function renderMonthList() {
     </label>`;
   }).join('');
   
+  // ✅ ผูก event กับ label แทน checkbox (คลิกได้ทั้งแถว)
   list.querySelectorAll('.item').forEach(el => {
+    el.addEventListener('click', (e) => {
+      // ถ้าคลิกที่ checkbox → ปล่อยให้ browser จัดการเอง
+      if (e.target.tagName === 'INPUT') return;
+      
+      e.preventDefault();
+      const cb = el.querySelector('input[type="checkbox"]');
+      cb.checked = !cb.checked;
+      
+      const ym = el.dataset.month;
+      if (cb.checked) {
+        if (!selectedMonths.includes(ym)) selectedMonths.push(ym);
+      } else {
+        selectedMonths = selectedMonths.filter(x => x !== ym);
+      }
+      selectedMonths.sort();
+      el.classList.toggle('checked', cb.checked);
+      updateMonthLabel();
+    });
+    
+    // ✅ checkbox change (คลิก checkbox โดยตรง)
     const cb = el.querySelector('input[type="checkbox"]');
     cb.addEventListener('change', () => {
       const ym = el.dataset.month;
@@ -114,6 +145,8 @@ function clearAllMonths() {
   renderMonthList(); updateMonthLabel();
 }
 function onYearChange() {
+  // ✅ reset selectedMonths → loadMonthFilter จะ default 3 เดือนใหม่
+  selectedMonths = [];
   loadMonthFilter();
 }
 
