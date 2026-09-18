@@ -1,12 +1,16 @@
 // ═══════════════════════════════════════════════════════════════
-// STOCK V6.1 — stock-level.js (FULL)
-// Month Filter + Matrix + Snapshot + Init
+// STOCK V6.2 — stock-level.js (FULL)
+// Month Filter + Gradegrams Filter + Size Filter + Matrix + Snapshot
 // ═══════════════════════════════════════════════════════════════
 
 // ================= STATE =================
 let selectedMonths = [];
 let allMonthsList = [];
 let currentSnapshotData = null;
+
+// ✅ Size Filter
+let selectedSizes = [];
+let allSizesList = [];
 
 // ================= MONTH FILTER =================
 function loadMonthFilter() {
@@ -18,7 +22,7 @@ function loadMonthFilter() {
     allMonthsList.push(`${yearCE}-${pad(m)}`);
   }
 
-  // default: 3 เดือนก่อนเดือนปัจจุบัน (ถ้ายังไม่เคยเลือก)
+  // default: 3 เดือนก่อนเดือนปัจจุบัน
   if (selectedMonths.length === 0) {
     const now = new Date();
     const curY = now.getFullYear();
@@ -36,49 +40,31 @@ function loadMonthFilter() {
 
   renderMonthList();
   updateMonthLabel();
-
-  // ✅ attach listener แค่ครั้งเดียว
   attachMonthFilterListeners();
 }
 
-// ✅ attach listener ครั้งเดียว (ปลอดภัย 100%)
 function attachMonthFilterListeners() {
   const btn = $('monthFilterBtn');
   const dropdown = $('monthDropdown');
   const box = $('monthFilterBox');
-
-  if (!btn || !dropdown || !box) {
-    console.warn('[MonthFilter] ไม่พบ element — เช็ค id ใน index.html');
-    return;
-  }
-
+  if (!btn || !dropdown || !box) return;
   if (btn.dataset.listenerAttached === '1') return;
   btn.dataset.listenerAttached = '1';
 
-  // ✅ ใช้ onclick → ทับซ้ำได้ ไม่ซ้อน
   btn.onclick = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
+    e.preventDefault(); e.stopPropagation();
     dropdown.classList.toggle('hidden');
     btn.classList.toggle('open');
   };
 
-  // ✅ document handler ครั้งเดียว
   if (!window._monthDocClickHandler) {
     window._monthDocClickHandler = (e) => {
-      const b = $('monthFilterBtn');
-      const d = $('monthDropdown');
-      const bx = $('monthFilterBox');
+      const b = $('monthFilterBtn'), d = $('monthDropdown'), bx = $('monthFilterBox');
       if (!b || !d || !bx) return;
-      if (!bx.contains(e.target)) {
-        d.classList.add('hidden');
-        b.classList.remove('open');
-      }
+      if (!bx.contains(e.target)) { d.classList.add('hidden'); b.classList.remove('open'); }
     };
     document.addEventListener('click', window._monthDocClickHandler);
   }
-
-  console.log('[MonthFilter] ✅ attach listener เรียบร้อย');
 }
 
 function renderMonthList() {
@@ -88,7 +74,6 @@ function renderMonthList() {
     list.innerHTML = '<div style="padding:10px;text-align:center;color:#94a3b8;font-size:13px">ไม่มีข้อมูล</div>';
     return;
   }
-
   list.innerHTML = allMonthsList.map(ym => {
     const [y, m] = ym.split('-').map(Number);
     const label = `${THAI_MONTHS[m-1]} ${y + 543}`;
@@ -99,35 +84,23 @@ function renderMonthList() {
     </label>`;
   }).join('');
 
-  // ✅ ผูก event กับ label (คลิกได้ทั้งแถว)
   list.querySelectorAll('.item').forEach(el => {
     const cb = el.querySelector('input[type="checkbox"]');
-
-    // คลิกที่ label (ไม่ใช่ checkbox)
     el.addEventListener('click', (e) => {
       if (e.target.tagName === 'INPUT') return;
       e.preventDefault();
       cb.checked = !cb.checked;
-
       const ym = el.dataset.month;
-      if (cb.checked) {
-        if (!selectedMonths.includes(ym)) selectedMonths.push(ym);
-      } else {
-        selectedMonths = selectedMonths.filter(x => x !== ym);
-      }
+      if (cb.checked) { if (!selectedMonths.includes(ym)) selectedMonths.push(ym); }
+      else selectedMonths = selectedMonths.filter(x => x !== ym);
       selectedMonths.sort();
       el.classList.toggle('checked', cb.checked);
       updateMonthLabel();
     });
-
-    // คลิก checkbox โดยตรง
     cb.addEventListener('change', () => {
       const ym = el.dataset.month;
-      if (cb.checked) {
-        if (!selectedMonths.includes(ym)) selectedMonths.push(ym);
-      } else {
-        selectedMonths = selectedMonths.filter(x => x !== ym);
-      }
+      if (cb.checked) { if (!selectedMonths.includes(ym)) selectedMonths.push(ym); }
+      else selectedMonths = selectedMonths.filter(x => x !== ym);
       selectedMonths.sort();
       el.classList.toggle('checked', cb.checked);
       updateMonthLabel();
@@ -138,33 +111,107 @@ function renderMonthList() {
 function updateMonthLabel() {
   const label = $('monthFilterLabel');
   if (!label) return;
-  if (selectedMonths.length === 0) {
-    label.textContent = 'ทั้งหมด'; label.style.color = '#1e293b';
-  } else if (selectedMonths.length === 1) {
+  if (selectedMonths.length === 0) { label.textContent = 'ทั้งหมด'; label.style.color = '#1e293b'; }
+  else if (selectedMonths.length === 1) {
     const [y, m] = selectedMonths[0].split('-').map(Number);
     label.textContent = `${THAI_MONTHS[m-1]} ${y + 543}`;
     label.style.color = '#1e40af';
-  } else {
-    label.textContent = `เลือก ${selectedMonths.length} เดือน`;
-    label.style.color = '#1e40af';
+  } else { label.textContent = `เลือก ${selectedMonths.length} เดือน`; label.style.color = '#1e40af'; }
+}
+
+function selectAllMonths() { selectedMonths = [...allMonthsList]; renderMonthList(); updateMonthLabel(); }
+function clearAllMonths() { selectedMonths = []; renderMonthList(); updateMonthLabel(); }
+function onYearChange() { selectedMonths = []; loadMonthFilter(); }
+
+// ================= SIZE FILTER =================
+function loadSizeFilter() {
+  // ดึง Size ทั้งหมดจาก masterCache (เฉพาะตัวเลข)
+  allSizesList = [...new Set(
+    masterCache.map(m => Number(m.size)).filter(Boolean)
+  )].sort((a, b) => a - b);
+
+  renderSizeList();
+  updateSizeFilterLabel();
+  attachSizeFilterListeners();
+}
+
+function attachSizeFilterListeners() {
+  const btn = $('sizeFilterBtn');
+  const dropdown = $('sizeDropdown');
+  const box = $('sizeFilterBox');
+  if (!btn || !dropdown || !box) {
+    console.warn('[SizeFilter] ไม่พบ element — เช็ค id ใน index.html');
+    return;
+  }
+  if (btn.dataset.listenerAttached === '1') return;
+  btn.dataset.listenerAttached = '1';
+
+  btn.onclick = (e) => {
+    e.preventDefault(); e.stopPropagation();
+    dropdown.classList.toggle('hidden');
+    btn.classList.toggle('open');
+  };
+
+  if (!window._sizeDocClickHandler) {
+    window._sizeDocClickHandler = (e) => {
+      const b = $('sizeFilterBtn'), d = $('sizeDropdown'), bx = $('sizeFilterBox');
+      if (!b || !d || !bx) return;
+      if (!bx.contains(e.target)) { d.classList.add('hidden'); b.classList.remove('open'); }
+    };
+    document.addEventListener('click', window._sizeDocClickHandler);
   }
 }
 
-function selectAllMonths() {
-  selectedMonths = [...allMonthsList];
-  renderMonthList(); updateMonthLabel();
+function renderSizeList() {
+  const list = $('sizeList');
+  if (!list) return;
+  if (!allSizesList.length) {
+    list.innerHTML = '<div style="padding:10px;text-align:center;color:#94a3b8;font-size:13px">ไม่มีข้อมูล</div>';
+    return;
+  }
+  list.innerHTML = allSizesList.map(s => {
+    const checked = selectedSizes.includes(s);
+    return `<label class="item ${checked ? 'checked' : ''}" data-size="${s}">
+      <input type="checkbox" ${checked ? 'checked' : ''}>
+      <span>${s}</span>
+    </label>`;
+  }).join('');
+
+  list.querySelectorAll('.item').forEach(el => {
+    const cb = el.querySelector('input[type="checkbox"]');
+    el.addEventListener('click', (e) => {
+      if (e.target.tagName === 'INPUT') return;
+      e.preventDefault();
+      cb.checked = !cb.checked;
+      const size = Number(el.dataset.size);
+      if (cb.checked) { if (!selectedSizes.includes(size)) selectedSizes.push(size); }
+      else selectedSizes = selectedSizes.filter(x => x !== size);
+      selectedSizes.sort((a, b) => a - b);
+      el.classList.toggle('checked', cb.checked);
+      updateSizeFilterLabel();
+    });
+    cb.addEventListener('change', () => {
+      const size = Number(el.dataset.size);
+      if (cb.checked) { if (!selectedSizes.includes(size)) selectedSizes.push(size); }
+      else selectedSizes = selectedSizes.filter(x => x !== size);
+      selectedSizes.sort((a, b) => a - b);
+      el.classList.toggle('checked', cb.checked);
+      updateSizeFilterLabel();
+    });
+  });
 }
 
-function clearAllMonths() {
-  selectedMonths = [];
-  renderMonthList(); updateMonthLabel();
+function updateSizeFilterLabel() {
+  const label = $('sizeFilterLabel');
+  if (!label) return;
+  if (selectedSizes.length === 0) { label.textContent = 'ทั้งหมด'; label.style.color = '#1e293b'; }
+  else if (selectedSizes.length === 1) { label.textContent = String(selectedSizes[0]); label.style.color = '#1e40af'; }
+  else { label.textContent = `เลือก ${selectedSizes.length} Size`; label.style.color = '#1e40af'; }
 }
 
-function onYearChange() {
-  // ✅ reset selectedMonths → loadMonthFilter จะ default 3 เดือนใหม่
-  selectedMonths = [];
-  loadMonthFilter();
-}
+function selectAllSizes() { selectedSizes = [...allSizesList]; renderSizeList(); updateSizeFilterLabel(); }
+function clearAllSizes() { selectedSizes = []; renderSizeList(); updateSizeFilterLabel(); }
+function getSelectedSizes() { return selectedSizes; }
 
 // ================= TITLE BUILDER =================
 function updateReportTitle() {
@@ -238,7 +285,7 @@ async function renderMatrix() {
   if (customer === GENERAL_CUSTOMER) {
     usage = allUsage.filter(u => !u.roll_for_customer || !String(u.roll_for_customer).trim());
   } else if (customer) {
-    usage = allUsage.filter(u => u.roll_for_customer === customer);
+    usage = usage.filter(u => u.roll_for_customer === customer);
   }
 
   const mByCode = {};
@@ -263,34 +310,35 @@ async function renderMatrix() {
   });
 
   // matrix
-  const rowSet = new Map(), colSet = new Set(), cells = {}, rowTotals = {}, colTotals = {};
-  let grand = 0;
-
+  const rowSet = new Map(), colSet = new Set(), cells = {};
   Object.entries(perItem).forEach(([code, maxVal]) => {
     const m = mByCode[code];
     const rk = normalizeGrade(m.grade) + m.gram;
     rowSet.set(rk, m);
-    colSet.add(m.size);
+    colSet.add(Number(m.size));
     const k = rk + '|' + m.size;
     cells[k] = (cells[k] || 0) + maxVal;
-    rowTotals[rk] = (rowTotals[rk] || 0) + maxVal;
-    colTotals[m.size] = (colTotals[m.size] || 0) + maxVal;
-    grand += maxVal;
   });
 
+  // rowKeys + filter Gradegrams
   let rowKeys = [...rowSet.keys()].sort((a, b) => a.localeCompare(b));
   if (selectedGradesInMatrix.length > 0) {
     rowKeys = rowKeys.filter(rk => selectedGradesInMatrix.includes(rk));
   }
 
-  const colSet2 = new Set(), rowTotals2 = {}, colTotals2 = {};
+  // ✅ colKeys2 จาก colSet (ครบทุก Size ที่มีข้อมูล) + filter Size
+  let colKeys2 = [...colSet].sort((a, b) => a - b);
+  const selectedSizesInMatrix = getSelectedSizes();
+  if (selectedSizesInMatrix.length > 0) {
+    colKeys2 = colKeys2.filter(s => selectedSizesInMatrix.includes(s));
+  }
+
+  // ✅ คำนวณ totals จาก colKeys2 (เฉพาะคอลัมน์ที่แสดง)
+  const rowTotals2 = {}, colTotals2 = {};
   let grand2 = 0;
 
   rowKeys.forEach(rk => {
-    const m = rowSet.get(rk);
-    if (!m) return;
-    colSet2.add(m.size);
-    colSet.forEach(s => {
+    colKeys2.forEach(s => {
       const v = cells[rk + '|' + s];
       if (v) {
         rowTotals2[rk] = (rowTotals2[rk] || 0) + v;
@@ -300,14 +348,13 @@ async function renderMatrix() {
     });
   });
 
-  const colKeys2 = [...colSet2].sort((a, b) => a - b);
-
-  if (!rowKeys.length) {
+  if (!rowKeys.length || !colKeys2.length) {
     $('matrixBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่มีข้อมูลในช่วงที่เลือก</p>';
     currentSnapshotData = null;
     return;
   }
 
+  // render
   let html = '<div class="report-wrap"><table class="report-table"><thead><tr><th class="grade-col">Gradegrams</th>';
   colKeys2.forEach(s => html += `<th>${s}</th>`);
   html += '<th class="total-col">Total</th></tr></thead><tbody>';
@@ -328,7 +375,7 @@ async function renderMatrix() {
   html += `<div class="report-foot">แสดงเป็นจำนวนม้วน · โหมด: ${mode === 'full' ? 'ม้วนเต็ม' : 'ใช้จริง'} · ยอดสูงสุดต่อวัน</div>`;
   $('matrixBody').innerHTML = html;
 
-  // ✅ เก็บ snapshot data
+  // snapshot data
   currentSnapshotData = [];
   rowKeys.forEach(rk => {
     colKeys2.forEach(s => {
@@ -381,12 +428,12 @@ async function saveStockLevelSnapshot() {
     mode: document.querySelector('input[name="mode"]:checked').value,
     customer: $('qCustomer').value,
     grades: getSelectedGrades(),
+    sizes: getSelectedSizes(),
     matrix_data: currentSnapshotData,
     created_by: currentUser.id
   };
 
   const { error } = await supabase.from('stock_level_snapshots').insert(payload);
-
   if (error) {
     if (msgEl) msgEl.innerHTML = `<div class="msg err">บันทึกไม่สำเร็จ: ${esc(error.message)}</div>`;
     return;
@@ -408,11 +455,7 @@ async function loadStockLevelSnapshots() {
     .select('id, title, months, mode, customer, grades, created_at')
     .order('created_at', { ascending: false });
 
-  if (error) {
-    listEl.innerHTML = `<div class="msg err">${esc(error.message)}</div>`;
-    return;
-  }
-
+  if (error) { listEl.innerHTML = `<div class="msg err">${esc(error.message)}</div>`; return; }
   if (!data || !data.length) {
     listEl.innerHTML = '<p style="color:#94a3b8;font-size:13px">ยังไม่มีรายการที่บันทึกไว้</p>';
     return;
@@ -441,28 +484,18 @@ async function viewSnapshot(id) {
   $('snapshotViewBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
   openModal('modalSnapshot');
 
-  const { data, error } = await supabase
-    .from('stock_level_snapshots')
-    .select('*')
-    .eq('id', id)
-    .single();
-
+  const { data, error } = await supabase.from('stock_level_snapshots').select('*').eq('id', id).single();
   if (error || !data) {
     $('snapshotViewBody').innerHTML = `<div class="msg err">โหลดไม่สำเร็จ: ${esc(error?.message || 'ไม่พบข้อมูล')}</div>`;
     return;
   }
 
   $('snapshotViewTitle').textContent = data.title;
-
   const md = data.matrix_data || [];
-  if (!md.length) {
-    $('snapshotViewBody').innerHTML = '<p style="color:#94a3b8">ไม่มีข้อมูล</p>';
-    return;
-  }
+  if (!md.length) { $('snapshotViewBody').innerHTML = '<p style="color:#94a3b8">ไม่มีข้อมูล</p>'; return; }
 
   const rowSet = new Set(), colSet = new Set(), cells = {}, rowTotals = {}, colTotals = {};
   let grand = 0;
-
   md.forEach(r => {
     rowSet.add(r.gradegram);
     colSet.add(r.size);
@@ -501,7 +534,6 @@ async function viewSnapshot(id) {
     บันทึกเมื่อ: ${dt} · เดือน: ${(data.months || []).join(', ')} · 
     โหมด: ${data.mode === 'full' ? 'ม้วนเต็ม' : 'ใช้จริง'}
   </div>`;
-
   $('snapshotViewBody').innerHTML = html;
 }
 
@@ -512,30 +544,27 @@ async function deleteSnapshot(id, title) {
   await loadStockLevelSnapshots();
 }
 
-function printSnapshot() {
-  window.print();
-}
+function printSnapshot() { window.print(); }
 
 // ═══════════════════════════════════════════════════════════════
-// INIT — เรียก loadMonthFilter หลัง DOM + app.js พร้อม
+// INIT
 // ═══════════════════════════════════════════════════════════════
 (function initStockLevel() {
   const run = () => {
-    // รอ app.js initSession + refreshAll เสร็จ
     setTimeout(() => {
       if (typeof loadMonthFilter === 'function') {
         loadMonthFilter();
         console.log('[StockLevel] ✅ loadMonthFilter() called');
+      }
+      if (typeof loadSizeFilter === 'function') {
+        loadSizeFilter();
+        console.log('[StockLevel] ✅ loadSizeFilter() called');
       }
       if (typeof loadStockLevelSnapshots === 'function') {
         loadStockLevelSnapshots();
       }
     }, 150);
   };
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', run);
-  } else {
-    run();
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
+  else run();
 })();
