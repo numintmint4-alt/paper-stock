@@ -212,3 +212,110 @@ th{background:#f1f5f9;font-weight:600}
   .grade-filter-box{min-width:160px}
   .alert-table{font-size:11px}
 }
+/* ========== TITLE SELECT (Stock Level) ========== */
+.title-select{
+  display:inline-block;
+  width:auto;
+  padding:2px 6px;
+  font-size:14px;
+  font-weight:600;
+  border:1px solid #cbd5e1;
+  border-radius:4px;
+  background:#fff;
+  cursor:pointer;
+  margin:0 2px;
+}
+.title-select:focus{
+  outline:none;
+  border-color:#2563eb;
+  box-shadow:0 0 0 2px rgba(37,99,235,.15);
+}
+
+/* ========== MONTH FILTER (pattern เดียวกับ grade filter) ========== */
+.month-filter-wrap{position:relative;display:flex;gap:6px;align-items:center}
+.month-filter-box{position:relative}
+
+/* ========== SNAPSHOT SAVE BAR ========== */
+.snapshot-save-bar{
+  display:flex;
+  gap:12px;
+  align-items:flex-end;
+  margin-top:16px;
+  padding:14px;
+  background:#f8fafc;
+  border-radius:8px;
+  border:1px solid #e2e8f0;
+}
+.snapshot-save-bar label{
+  font-size:13px;
+  color:#475569;
+  font-weight:600;
+}
+
+/* ========== SNAPSHOT LIST ========== */
+.snapshot-list-wrap{
+  margin-top:10px;
+}
+#snapshotList{
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(300px, 1fr));
+  gap:10px;
+}
+
+/* ========== SNAPSHOT CARD ========== */
+.snapshot-card{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  padding:12px 14px;
+  background:#fff;
+  border:1px solid #e2e8f0;
+  border-radius:8px;
+  box-shadow:0 1px 3px rgba(0,0,0,.05);
+  transition:all .15s;
+}
+.snapshot-card:hover{
+  border-color:#93c5fd;
+  box-shadow:0 2px 8px rgba(37,99,235,.1);
+}
+.snapshot-card-info{flex:1;min-width:0}
+.snapshot-card-title{
+  font-size:14px;
+  font-weight:600;
+  color:#1e293b;
+  margin-bottom:4px;
+  word-break:break-word;
+}
+.snapshot-card-meta{
+  font-size:12px;
+  color:#64748b;
+}
+.snapshot-card-actions{
+  display:flex;
+  gap:6px;
+  flex-shrink:0;
+}
+.snapshot-card-actions button{
+  padding:5px 10px;
+  font-size:12px;
+  border-radius:6px;
+}
+
+/* ========== SNAPSHOT MODAL ========== */
+.snapshot-modal .modal-head{
+  border-bottom:2px solid #1e293b;
+  padding-bottom:10px;
+  margin-bottom:14px;
+}
+.snapshot-modal #snapshotViewTitle{
+  font-size:16px;
+  font-weight:700;
+  color:#1e293b;
+}
+
+/* ========== MOBILE ========== */
+@media (max-width:640px){
+  .snapshot-save-bar{flex-direction:column;align-items:stretch}
+  #snapshotList{grid-template-columns:1fr}
+}
