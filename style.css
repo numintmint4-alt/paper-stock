@@ -28,8 +28,8 @@ body{margin:0;font-family:'Sarabun',sans-serif;background:#f5f6fa;color:#222}
 .nav .logout{padding:6px 12px;background:#dc2626;color:#fff;border-radius:6px;font-size:13px}
 
 /* ========== LAYOUT ========== */
-.container{max-width:1600px;margin:auto;padding:20px}
-.card{background:#fff;border-radius:10px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:16px}
+.container{max-width:100%;margin:auto;padding:12px}
+.card{background:#fff;border-radius:10px;padding:12px 14px;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:16px}
 h2{margin-top:0;font-size:19px}
 h3{font-size:16px}
 
@@ -87,10 +87,10 @@ th{background:#f1f5f9;font-weight:600}
 
 /* Report wrap — Matrix เต็มหน้า */
 .report-wrap{overflow-x:auto;overflow-y:visible;width:100%}
-.report-table{font-size:12px;table-layout:auto;width:100%}
-.report-table th,.report-table td{border:1px solid #94a3b8;padding:3px 6px;text-align:center;white-space:nowrap}
+.report-table{font-size:11px;table-layout:auto;width:100%}
+.report-table th,.report-table td{border:1px solid #94a3b8;padding:2px 4px;text-align:center;white-space:nowrap}
 .report-table thead th{background:#e2e8f0;position:sticky;top:0;z-index:5}
-.report-table .grade-col{background:#f1f5f9;font-weight:600;text-align:left;padding-left:10px;min-width:90px;position:sticky;left:0;z-index:4}
+.report-table .grade-col{background:#f1f5f9;font-weight:600;text-align:left;padding-left:6px;min-width:70px;position:sticky;left:0;z-index:4;font-size:11px}
 .report-table thead .grade-col{z-index:6}
 .report-table td.empty{color:#cbd5e1}
 .report-table td.clickable{cursor:pointer;background:#fffbeb}
@@ -102,7 +102,7 @@ th{background:#f1f5f9;font-weight:600}
 
 /* Cell ที่มี (เต็ม+เศษ) */
 .report-table td .cell-content{display:flex;flex-direction:column;align-items:center;gap:2px}
-.report-table td .cell-main{font-weight:700;color:#1e293b;font-size:13px}
+.report-table td .cell-main{font-weight:700;color:#1e293b;font-size:12px}
 
 /* ========== STOCK BALANCE HIGHLIGHT ========== */
 .stock-full{color:#166534;font-weight:700}
@@ -212,6 +212,7 @@ th{background:#f1f5f9;font-weight:600}
   .grade-filter-box{min-width:160px}
   .alert-table{font-size:11px}
 }
+
 /* ========== TITLE SELECT (Stock Level) ========== */
 .title-select{
   display:inline-block;
@@ -314,7 +315,7 @@ th{background:#f1f5f9;font-weight:600}
   color:#1e293b;
 }
 
-/* ========== MOBILE ========== */
+/* ========== MOBILE (SNAPSHOT) ========== */
 @media (max-width:640px){
   .snapshot-save-bar{flex-direction:column;align-items:stretch}
   #snapshotList{grid-template-columns:1fr}
