@@ -489,7 +489,7 @@ async function renderStockMatrix() {
     html += '<tr class="total-row"><td class="grade-col">Total</td>';
     colKeys.forEach(s => {
       const ct = colTotals[s];
-      html += `<td>${buildCellText(ct)}</td>`;
+      html += `<td>${buildTotalText(ct)}</td>`;
     });
     const grand = { full: 0, scrap: 0, waiting: 0 };
     Object.values(colTotals).forEach(ct => {
