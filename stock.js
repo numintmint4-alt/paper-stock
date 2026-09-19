@@ -448,7 +448,7 @@ async function renderStockMatrix() {
       const parts = [];
       if (v.full > 0)    parts.push(`${v.full}`);
       if (v.scrap > 0)   parts.push(`+${v.scrap}`);
-      if (v.waiting > 0) parts.push(`/${v.waiting}`);
+      if (v.waiting > 0) parts.push(`·${v.waiting}`);
       if (!parts.length) return '';
       // ถ้ามี full ตัวแรก ไม่ต้องมี + นำหน้า
       return parts.join('').replace(/^\+/, '');
