@@ -89,13 +89,20 @@ th{background:#f1f5f9;font-weight:600}
 .report-wrap{overflow-x:auto;overflow-y:visible;width:100%}
 .report-table{font-size:11px;table-layout:auto;width:100%}
 .report-table th,.report-table td{border:1px solid #94a3b8;padding:2px 4px;text-align:center;white-space:nowrap}
+/* ✅ Size column — fix 56px (ยกเว้น grade-col และ total-col) */
+.report-table thead th:not(.grade-col):not(.total-col),
+.report-table tbody td:not(.grade-col):not(.total-col):not(.empty){
+  min-width:56px;
+  max-width:56px;
+  width:56px;
+}
 .report-table thead th{background:#e2e8f0;position:sticky;top:0;z-index:5}
-.report-table .grade-col{background:#f1f5f9;font-weight:600;text-align:left;padding-left:4px;min-width:52px;max-width:60px;width:56px;position:sticky;left:0;z-index:4;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.report-table .grade-col{background:#f1f5f9;font-weight:600;text-align:left;padding-left:4px;min-width:64px;max-width:64px;width:64px;position:sticky;left:0;z-index:4;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .report-table thead .grade-col{z-index:6}
 .report-table td.empty{color:#cbd5e1}
 .report-table td.clickable{cursor:pointer;background:#fffbeb}
 .report-table td.clickable:hover{background:#fde68a}
-.report-table .total-col{background:#e0e7ff;font-weight:600;min-width:40px;max-width:48px;width:44px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.report-table .total-col{background:#e0e7ff;font-weight:600;min-width:56px;max-width:56px;width:56px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .report-table .total-row td{background:#cbd5e1;font-weight:700}
 .report-table .total-row .total-col{background:#a5b4fc}
 .report-foot{margin-top:10px;font-size:12px;color:#64748b;text-align:right}
