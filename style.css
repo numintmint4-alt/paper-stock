@@ -485,7 +485,8 @@ th{background:#f1f5f9;font-weight:600}
 }
 
 /* ═══════════════════════════════════════════════════════════ */
-/* ========== RECEIVE — แสดงเต็มหน้าจอ ไม่ต้องเลื่อน ========== */
+/* ========== RECEIVE — ล็อก Gradegrams/Total = 100px ========== */
+/* ========== font-size +2 จากค่าล่าสุด ========== */
 /* ═══════════════════════════════════════════════════════════ */
 
 /* --- Supplier Summary (คงเดิม) --- */
@@ -505,33 +506,33 @@ th{background:#f1f5f9;font-weight:600}
 
 /* --- Report wrap: ไม่ให้ scroll แนวนอน --- */
 #receiveBody .report-wrap {
-  overflow-x: hidden;       /* ← เอา scroll ออก */
+  overflow-x: hidden;
   overflow-y: visible;
   width: 100%;
 }
 
 /* --- Matrix: บีบให้พอดีหน้าจอ --- */
 #receiveBody .report-table {
-  font-size: 13px;          /* ← ลดลงเพื่อให้พอดี */
+  font-size: 15px;            /* 13 → 15 (+2) */
   width: 100%;
-  table-layout: fixed;      /* ← บังคับให้คอลัมน์เท่ากัน */
+  table-layout: fixed;
   border-collapse: collapse;
 }
 
 #receiveBody .report-table th,
 #receiveBody .report-table td {
-  padding: 4px 2px;
+  padding: 5px 3px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* --- Gradegrams column: กว้าง 12% --- */
+/* --- Gradegrams column: ล็อก 100px --- */
 #receiveBody .report-table .grade-col {
-  width: 12%;
-  min-width: 0;
-  max-width: none;
-  font-size: 13px;
+  width: 100px;
+  min-width: 100px;
+  max-width: 100px;
+  font-size: 15px;
   font-weight: 700;
   padding-left: 6px;
   position: sticky;
@@ -542,25 +543,25 @@ th{background:#f1f5f9;font-weight:600}
   z-index: 6;
 }
 #receiveBody .report-table .total-row .grade-col {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
 }
 
-/* --- Size column: กว้างอัตโนมัติ (แบ่งเท่ากัน) --- */
+/* --- Size column: auto แบ่งพื้นที่ที่เหลือ --- */
 #receiveBody .report-table thead th:not(.grade-col):not(.total-col),
 #receiveBody .report-table tbody td:not(.grade-col):not(.total-col):not(.empty) {
   width: auto;
   min-width: 0;
   max-width: none;
-  font-size: 13px;
+  font-size: 15px;
 }
 
-/* --- Total column: กว้าง 10% --- */
+/* --- Total column: ล็อก 100px --- */
 #receiveBody .report-table .total-col {
-  width: 10%;
-  min-width: 0;
-  max-width: none;
-  font-size: 13px;
+  width: 100px;
+  min-width: 100px;
+  max-width: 100px;
+  font-size: 15px;
   position: sticky;
   right: 0;
   z-index: 4;
@@ -571,13 +572,13 @@ th{background:#f1f5f9;font-weight:600}
 
 /* --- cell-main (qty) --- */
 #receiveBody .report-table td .cell-main {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
 }
 
-/* --- List (ตารางรายการ) --- */
+/* --- List (ตารางรายการ): 12 → 14 (+2) --- */
 #receiveBody .data-table {
-  font-size: 12px;
+  font-size: 14px;
   width: 100%;
   table-layout: fixed;
 }
@@ -593,8 +594,8 @@ th{background:#f1f5f9;font-weight:600}
   max-height: 70vh;
 }
 
-/* --- report-foot --- */
+/* --- report-foot: 12 → 14 (+2) --- */
 #receiveBody .report-foot {
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.6;
 }
