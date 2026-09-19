@@ -90,12 +90,12 @@ th{background:#f1f5f9;font-weight:600}
 .report-table{font-size:11px;table-layout:auto;width:100%}
 .report-table th,.report-table td{border:1px solid #94a3b8;padding:2px 4px;text-align:center;white-space:nowrap}
 .report-table thead th{background:#e2e8f0;position:sticky;top:0;z-index:5}
-.report-table .grade-col{background:#f1f5f9;font-weight:600;text-align:left;padding-left:6px;min-width:70px;position:sticky;left:0;z-index:4;font-size:11px}
+.report-table .grade-col{background:#f1f5f9;font-weight:600;text-align:left;padding-left:4px;min-width:52px;max-width:60px;width:56px;position:sticky;left:0;z-index:4;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .report-table thead .grade-col{z-index:6}
 .report-table td.empty{color:#cbd5e1}
 .report-table td.clickable{cursor:pointer;background:#fffbeb}
 .report-table td.clickable:hover{background:#fde68a}
-.report-table .total-col{background:#e0e7ff;font-weight:600}
+.report-table .total-col{background:#e0e7ff;font-weight:600;min-width:40px;max-width:48px;width:44px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .report-table .total-row td{background:#cbd5e1;font-weight:700}
 .report-table .total-row .total-col{background:#a5b4fc}
 .report-foot{margin-top:10px;font-size:12px;color:#64748b;text-align:right}
@@ -142,6 +142,7 @@ th{background:#f1f5f9;font-weight:600}
 .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:100;padding:16px}
 .modal-bg.show{display:flex}
 .modal{background:#fff;border-radius:10px;padding:22px;max-width:1400px;width:100%;max-height:88vh;overflow:auto}
+.modal.modal-stock-detail{max-width:1200px}
 .modal h3{margin:0 0 12px}
 .modal-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
 
@@ -179,15 +180,42 @@ th{background:#f1f5f9;font-weight:600}
 /* ========== DETAIL MODAL ========== */
 #stockDetailBody table,
 #receiveDetailBody table,
-#summaryDetailBody table{font-size:12px;width:100%}
+#summaryDetailBody table{font-size:12.5px;width:100%}
 #stockDetailBody th,
 #receiveDetailBody th,
-#summaryDetailBody th{background:#1e293b;color:#fff;padding:8px 10px;position:sticky;top:0;z-index:2}
+#summaryDetailBody th{background:#1e293b;color:#fff;padding:9px 11px;position:sticky;top:0;z-index:2}
 #stockDetailBody td,
 #receiveDetailBody td,
-#summaryDetailBody td{padding:6px 10px;border:1px solid #e2e8f0}
+#summaryDetailBody td{padding:7px 11px;border:1px solid #e2e8f0}
+
+/* ✅ Stock Detail Modal — หัวข้อ Gradegrams · Size */
+#stockDetailTitle{
+  font-size:17px;
+  font-weight:700;
+  color:#1e293b;
+  line-height:1.4;
+}
+#stockDetailTitle .stock-detail-sub{
+  font-size:13px;
+  font-weight:400;
+  color:#64748b;
+  margin-left:6px;
+}
+
+/* ✅ Stock Detail Modal — info box */
+#stockDetailBody .msg.info{
+  font-size:13.5px;
+  padding:11px 15px;
+}
+
+/* ✅ Stock Detail Modal — ตารางใน modal */
+#stockDetailBody td:first-child{font-weight:600;color:#475569}
+#stockDetailBody td:nth-child(3){font-weight:600;color:#1e40af}
+#stockDetailBody td:nth-child(4){font-weight:600;color:#166534}
+
 #stockDetailBody tr.full-row{background:#dcfce7}
 #stockDetailBody tr.scrap-row{background:#fef3c7}
+#stockDetailBody tr.waiting-row{background:#e0f2fe}
 
 /* ========== TITLE SELECT (Stock Level) ========== */
 .title-select{
