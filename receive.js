@@ -91,6 +91,34 @@ function clearAllReceiveGrades() {
   renderReceiveGradeList(); updateReceiveGradeLabel();
 }
 
+// ================= SUPPLIER SUMMARY (ย้ายมาจาก Summary tab) =================
+function renderSupplierSummary(rows, dateThai) {
+  const supplierSummary = {};
+  rows.forEach(r => {
+    const sup = r.supplier || '(ไม่ระบุ)';
+    if (!supplierSummary[sup]) supplierSummary[sup] = { qty: 0, kg: 0 };
+    supplierSummary[sup].qty += Number(r.quantity) || 0;
+    supplierSummary[sup].kg  += Number(r.kg_total) || 0;
+  });
+
+  const supKeys = Object.keys(supplierSummary).sort();
+  let html = '<div class="supplier-summary"><h4>📊 สรุป Supplier (วันที่ ' + dateThai + ')</h4>';
+  html += '<table><thead><tr><th>Supplier</th><th>จำนวน (ม้วน)</th><th>KG รวม</th></tr></thead><tbody>';
+  let totalSupQty = 0, totalSupKg = 0;
+  supKeys.forEach(sup => {
+    const s = supplierSummary[sup];
+    totalSupQty += s.qty; totalSupKg += s.kg;
+    html += `<tr><td>${esc(sup)}</td>
+      <td style="text-align:right">${s.qty}</td>
+      <td style="text-align:right">${s.kg.toFixed(0)}</td></tr>`;
+  });
+  html += `<tr class="total-row"><td>รวม</td>
+    <td style="text-align:right">${totalSupQty}</td>
+    <td style="text-align:right">${totalSupKg.toFixed(0)}</td></tr>`;
+  html += '</tbody></table></div>';
+  return html;
+}
+
 // ================= RENDER RECEIVE =================
 async function renderReceive() {
   const receiveDate = $('receiveDate')?.value;
@@ -115,7 +143,6 @@ async function renderReceive() {
   $('receiveBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
 
   try {
-    // ✅ แก้: normalize grade ที่ส่งไป RPC
     const normalizedGrades = receiveSelectedGrades.map(g => normalizeGrade(g));
 
     const { data, error } = await supabase.rpc('get_receive_list', {
@@ -135,18 +162,21 @@ async function renderReceive() {
       return;
     }
 
-    if (mode === 'matrix') renderReceiveMatrix(rows, dateThai);
-    else renderReceiveList(rows, dateThai);
+    // ✅ สร้าง Supplier Summary แล้วส่งเข้า Matrix/List
+    const supHtml = renderSupplierSummary(rows, dateThai);
+    if (mode === 'matrix') renderReceiveMatrix(rows, dateThai, supHtml);
+    else renderReceiveList(rows, dateThai, supHtml);
   } catch (err) {
     console.error('renderReceive error:', err);
     $('receiveBody').innerHTML = `<div class="msg err">เกิดข้อผิดพลาด: ${esc(err.message)}</div>`;
   }
 }
 
-function renderReceiveMatrix(rows, dateThai) {
+// ================= MATRIX (ไม่แสดง KG) =================
+function renderReceiveMatrix(rows, dateThai, supHtml = '') {
   const rowSet = new Map(); const colSet = new Set();
   const cells = {}; const rowTotals = {}; const colTotals = {};
-  let grandQty = 0, grandKg = 0;
+  let grandQty = 0;
 
   rows.forEach(r => {
     const rk = r.gradegram || r.grade;
@@ -155,20 +185,16 @@ function renderReceiveMatrix(rows, dateThai) {
     colSet.add(size);
 
     const k = rk + '|' + size;
-    if (!cells[k]) cells[k] = { qty: 0, kg: 0 };
+    if (!cells[k]) cells[k] = { qty: 0 };
     cells[k].qty += Number(r.quantity) || 0;
-    cells[k].kg  += Number(r.kg_total) || 0;
 
-    if (!rowTotals[rk]) rowTotals[rk] = { qty: 0, kg: 0 };
+    if (!rowTotals[rk]) rowTotals[rk] = { qty: 0 };
     rowTotals[rk].qty += Number(r.quantity) || 0;
-    rowTotals[rk].kg  += Number(r.kg_total) || 0;
 
-    if (!colTotals[size]) colTotals[size] = { qty: 0, kg: 0 };
+    if (!colTotals[size]) colTotals[size] = { qty: 0 };
     colTotals[size].qty += Number(r.quantity) || 0;
-    colTotals[size].kg  += Number(r.kg_total) || 0;
 
     grandQty += Number(r.quantity) || 0;
-    grandKg  += Number(r.kg_total) || 0;
   });
 
   const rowKeys = [...rowSet.keys()].sort();
@@ -188,10 +214,10 @@ function renderReceiveMatrix(rows, dateThai) {
       if (!v || v.qty === 0) {
         html += '<td class="empty">-</td>';
       } else {
+        // ✅ เอา Kg. ออก แสดงแค่ qty
         html += `<td class="clickable" onclick="openReceiveDetail('${esc(rk)}', ${s}, '${dateThai}')">
           <div class="cell-content">
             <div class="cell-main">${v.qty}</div>
-            <div class="cell-sub">${v.kg.toFixed(0)} kg</div>
           </div>
         </td>`;
       }
@@ -205,16 +231,19 @@ function renderReceiveMatrix(rows, dateThai) {
   html += `<td class="total-col">${grandQty}</td>`;
   html += '</tr></tbody></table></div>';
 
+  // ✅ เอา kg ออก
   html += `<div class="report-foot">
-    แสดง จำนวน (KG) · คลิก Cell เพื่อดู PO · วันที่: ${dateThai} · รวม ${grandQty} ม้วน · ${grandKg.toFixed(0)} kg
+    แสดง จำนวน · คลิก Cell เพื่อดู PO · วันที่: ${dateThai} · รวม ${grandQty} ม้วน
   </div>`;
-  $('receiveBody').innerHTML = html;
+  $('receiveBody').innerHTML = supHtml + html;
 }
 
-function renderReceiveList(rows, dateThai) {
+// ================= LIST (ไม่แสดง KG) =================
+function renderReceiveList(rows, dateThai, supHtml = '') {
   let html = '<div class="data-scroll"><table class="data-table"><thead><tr>';
   html += '<th>#</th><th>PO No.</th><th>Supplier</th><th>Gradegrams</th>';
-  html += '<th>Size</th><th>Quantity</th><th>KG รวม</th><th>ราคา</th>';
+  // ✅ เอา KG รวม ออก
+  html += '<th>Size</th><th>Quantity</th><th>ราคา</th>';
   html += '<th>หมายเหตุ</th><th>FSC</th><th>ม้วนลูกค้า</th>';
   html += '</tr></thead><tbody>';
 
@@ -229,7 +258,6 @@ function renderReceiveList(rows, dateThai) {
       <td>${esc(r.gradegram || r.grade)}</td>
       <td>${r.size}</td>
       <td style="text-align:right">${r.quantity}</td>
-      <td style="text-align:right">${Number(r.kg_total).toFixed(0)}</td>
       <td style="text-align:right">${priceTxt}</td>
       <td>${esc(r.remark) || '-'}</td>
       <td>${fscBadge}</td>
@@ -238,19 +266,19 @@ function renderReceiveList(rows, dateThai) {
   });
 
   const totalQty = rows.reduce((s, r) => s + (Number(r.quantity)||0), 0);
-  const totalKg  = rows.reduce((s, r) => s + (Number(r.kg_total)||0), 0);
+  // ✅ เอา totalKg ออก
 
   html += `<tr class="total-row" style="background:#cbd5e1;font-weight:700">
     <td colspan="5" style="text-align:right">Total</td>
     <td style="text-align:right">${totalQty}</td>
-    <td style="text-align:right">${totalKg.toFixed(0)}</td>
     <td colspan="4"></td>
   </tr>`;
   html += '</tbody></table></div>';
+  // ✅ เอา kg ออก
   html += `<div style="margin-top:8px;font-size:13px;color:#64748b">
-    แสดง ${rows.length} รายการ · วันที่: ${dateThai} · รวม ${totalQty} ม้วน · ${totalKg.toFixed(0)} kg
+    แสดง ${rows.length} รายการ · วันที่: ${dateThai} · รวม ${totalQty} ม้วน
   </div>`;
-  $('receiveBody').innerHTML = html;
+  $('receiveBody').innerHTML = supHtml + html;
 }
 
 // ================= RECEIVE DETAIL =================
@@ -312,6 +340,65 @@ async function openReceiveDetail(gradegram, size, dateThai) {
   }
 }
 
+// ================= EXPORT RECEIVE TO EXCEL =================
+function exportReceive() {
+  if (!receiveCache || !receiveCache.length) {
+    alert('ไม่มีข้อมูลให้ Export');
+    return;
+  }
+  const receiveDate = $('receiveDate')?.value || '';
+  const dateThai = receiveDate ? thaiDateFull(receiveDate) : '';
+
+  // สรุป Supplier
+  const supMap = {};
+  receiveCache.forEach(r => {
+    const sup = r.supplier || '(ไม่ระบุ)';
+    if (!supMap[sup]) supMap[sup] = { qty: 0, kg: 0 };
+    supMap[sup].qty += Number(r.quantity) || 0;
+    supMap[sup].kg  += Number(r.kg_total) || 0;
+  });
+
+  const wb = XLSX.utils.book_new();
+
+  // Sheet 1: สรุป Supplier
+  const supRows = [['Supplier', 'จำนวน (ม้วน)', 'KG รวม']];
+  let totalQty = 0, totalKg = 0;
+  Object.keys(supMap).sort().forEach(sup => {
+    supRows.push([sup, supMap[sup].qty, Number(supMap[sup].kg.toFixed(0))]);
+    totalQty += supMap[sup].qty;
+    totalKg  += supMap[sup].kg;
+  });
+  supRows.push(['รวม', totalQty, Number(totalKg.toFixed(0))]);
+  const wsSup = XLSX.utils.aoa_to_sheet(supRows);
+  XLSX.utils.book_append_sheet(wb, wsSup, 'สรุป Supplier');
+
+  // Sheet 2: รายการทั้งหมด (เอา KG ออก)
+  const listRows = [[
+    '#', 'PO No.', 'Supplier', 'Gradegrams', 'Size',
+    'Quantity', 'ราคา', 'หมายเหตุ', 'FSC', 'ม้วนลูกค้า'
+  ]];
+  receiveCache.forEach((r, i) => {
+    listRows.push([
+      i + 1,
+      r.po_no || '',
+      r.supplier || '',
+      r.gradegram || r.grade || '',
+      r.size || '',
+      Number(r.quantity) || 0,
+      r.price != null ? Number(r.price) : '',
+      r.remark || '',
+      r.is_fsc ? 'FSC' : '-',
+      r.is_customer_roll ? 'ลูกค้า' : '-'
+    ]);
+  });
+  const wsList = XLSX.utils.aoa_to_sheet(listRows);
+  XLSX.utils.book_append_sheet(wb, wsList, 'รายการรับเข้า');
+
+  // ชื่อไฟล์
+  const fileName = `Receive_${receiveDate || 'export'}.xlsx`;
+  XLSX.writeFile(wb, fileName);
+}
+
 // ================= IMPORT RECEIVE =================
 function openReceiveImportModal() {
   $('receiveImportDate').value = toISODate(new Date());
@@ -362,7 +449,6 @@ function importReceive(ev) {
         const price      = priceRaw !== '' && priceRaw != null ? Number(priceRaw) : null;
         const remark     = String(findKey(['หมายเหตุ','remark','note']) || '').trim();
 
-        // ✅ แก้: normalize grade ที่ import
         const gradeNorm = normalizeGrade(gradegram);
 
         return {
@@ -400,7 +486,6 @@ function importReceive(ev) {
       }
 
       hideProgress('receiveProgress');
-      // ✅ แก้: Modal สำเร็จ + X
       showSuccessModal(`Import Receive สำเร็จ ${data.inserted} แถว · วันที่ ${receiveDate}`);
 
       $('receiveDate').value = receiveDate;
