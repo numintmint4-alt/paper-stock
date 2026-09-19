@@ -91,7 +91,7 @@ function clearAllReceiveGrades() {
   renderReceiveGradeList(); updateReceiveGradeLabel();
 }
 
-// ================= SUPPLIER SUMMARY (ย้ายมาจาก Summary tab) =================
+// ================= SUPPLIER SUMMARY =================
 function renderSupplierSummary(rows, dateThai) {
   const supplierSummary = {};
   rows.forEach(r => {
@@ -130,21 +130,10 @@ async function renderReceive() {
 
   const dateThai = thaiDateFull(receiveDate);
 
-  // ✅ แก้: ตัด 'ทุกเกรด' ออก + สร้าง subtitle แบบมีเงื่อนไข
-  const gradeLabel = receiveSelectedGrades.length > 0
-    ? `เกรด: ${receiveSelectedGrades.join(', ')}` : '';
-  const supLabel = supplier ? `Supplier: ${supplier}` : '';
-  const fscLabel = fsc === 'all' ? '' : fsc === 'fsc' ? 'FSC' : 'Non-FSC';
-  const remarkLabel = remark ? remark : '';
-
-  // รวม label ที่มีค่าเท่านั้น
-  const subParts = [gradeLabel, supLabel, fscLabel, remarkLabel].filter(Boolean);
-  const subText = subParts.length ? `(${subParts.join(' · ')})` : '';
-
+  // ✅ แก้: ลบ subtitle ออกทั้งหมด — แสดงแค่หัวข้อ + วันที่
   $('receiveReportTitle').innerHTML = `
     รายการรับม้วนกระดาษเข้าคลัง<br>
     ประจำวันที่ ${dateThai}
-    ${subText ? `<div class="report-subtitle">${subText}</div>` : ''}
   `;
   $('receiveBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
 
