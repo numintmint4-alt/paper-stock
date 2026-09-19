@@ -129,16 +129,22 @@ async function renderReceive() {
   if (!receiveDate) { alert('กรุณาเลือกวันที่รับเข้า'); return; }
 
   const dateThai = thaiDateFull(receiveDate);
+
+  // ✅ แก้: ตัด 'ทุกเกรด' ออก + สร้าง subtitle แบบมีเงื่อนไข
   const gradeLabel = receiveSelectedGrades.length > 0
-    ? ` · เกรด: ${receiveSelectedGrades.join(', ')}` : '';
-  const supLabel = supplier ? ` · Supplier: ${supplier}` : '';
-  const fscLabel = fsc === 'all' ? '' : fsc === 'fsc' ? ' · FSC' : ' · Non-FSC';
-  const remarkLabel = remark ? ` · ${remark}` : '';
+    ? `เกรด: ${receiveSelectedGrades.join(', ')}` : '';
+  const supLabel = supplier ? `Supplier: ${supplier}` : '';
+  const fscLabel = fsc === 'all' ? '' : fsc === 'fsc' ? 'FSC' : 'Non-FSC';
+  const remarkLabel = remark ? remark : '';
+
+  // รวม label ที่มีค่าเท่านั้น
+  const subParts = [gradeLabel, supLabel, fscLabel, remarkLabel].filter(Boolean);
+  const subText = subParts.length ? `(${subParts.join(' · ')})` : '';
 
   $('receiveReportTitle').innerHTML = `
     รายการรับม้วนกระดาษเข้าคลัง<br>
     ประจำวันที่ ${dateThai}
-    <div class="report-subtitle">(${gradeLabel || 'ทุกเกรด'}${supLabel}${fscLabel}${remarkLabel})</div>
+    ${subText ? `<div class="report-subtitle">${subText}</div>` : ''}
   `;
   $('receiveBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
 
@@ -162,7 +168,6 @@ async function renderReceive() {
       return;
     }
 
-    // ✅ สร้าง Supplier Summary แล้วส่งเข้า Matrix/List
     const supHtml = renderSupplierSummary(rows, dateThai);
     if (mode === 'matrix') renderReceiveMatrix(rows, dateThai, supHtml);
     else renderReceiveList(rows, dateThai, supHtml);
@@ -214,7 +219,6 @@ function renderReceiveMatrix(rows, dateThai, supHtml = '') {
       if (!v || v.qty === 0) {
         html += '<td class="empty">-</td>';
       } else {
-        // ✅ เอา Kg. ออก แสดงแค่ qty
         html += `<td class="clickable" onclick="openReceiveDetail('${esc(rk)}', ${s}, '${dateThai}')">
           <div class="cell-content">
             <div class="cell-main">${v.qty}</div>
@@ -231,7 +235,6 @@ function renderReceiveMatrix(rows, dateThai, supHtml = '') {
   html += `<td class="total-col">${grandQty}</td>`;
   html += '</tr></tbody></table></div>';
 
-  // ✅ เอา kg ออก
   html += `<div class="report-foot">
     แสดง จำนวน · คลิก Cell เพื่อดู PO · วันที่: ${dateThai} · รวม ${grandQty} ม้วน
   </div>`;
@@ -242,7 +245,6 @@ function renderReceiveMatrix(rows, dateThai, supHtml = '') {
 function renderReceiveList(rows, dateThai, supHtml = '') {
   let html = '<div class="data-scroll"><table class="data-table"><thead><tr>';
   html += '<th>#</th><th>PO No.</th><th>Supplier</th><th>Gradegrams</th>';
-  // ✅ เอา KG รวม ออก
   html += '<th>Size</th><th>Quantity</th><th>ราคา</th>';
   html += '<th>หมายเหตุ</th><th>FSC</th><th>ม้วนลูกค้า</th>';
   html += '</tr></thead><tbody>';
@@ -266,7 +268,6 @@ function renderReceiveList(rows, dateThai, supHtml = '') {
   });
 
   const totalQty = rows.reduce((s, r) => s + (Number(r.quantity)||0), 0);
-  // ✅ เอา totalKg ออก
 
   html += `<tr class="total-row" style="background:#cbd5e1;font-weight:700">
     <td colspan="5" style="text-align:right">Total</td>
@@ -274,7 +275,6 @@ function renderReceiveList(rows, dateThai, supHtml = '') {
     <td colspan="4"></td>
   </tr>`;
   html += '</tbody></table></div>';
-  // ✅ เอา kg ออก
   html += `<div style="margin-top:8px;font-size:13px;color:#64748b">
     แสดง ${rows.length} รายการ · วันที่: ${dateThai} · รวม ${totalQty} ม้วน
   </div>`;
