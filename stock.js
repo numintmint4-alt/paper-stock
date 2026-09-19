@@ -1,15 +1,24 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK ม้วนกระดาษ V6 — stock.js
-//  ส่วนที่ 4: หน้า Stock คงเหลือ (แก้ 4 จุด)
-//  ✅ แก้เพิ่ม: ย้าย showSuccessModal() ขึ้นบน + แก้ ${custLabel} ซ้ำ
+//  STOCK ม้วนกระดาษ V7 — stock.js
+//  เพิ่ม: multi-select Customer/Location/Status + waiting status
 // ═══════════════════════════════════════════════════════════════
 
 let stockSelectedGrades = [];
 let stockAllGrades = [];
+
+let stockSelectedCustomers = [];
+let stockAllCustomers = [];
+
+let stockSelectedLocs = [];
+let stockAllLocs = [];
+
+let stockSelectedStatuses = [];
+const STOCK_ALL_STATUSES = ['full', 'scrap', 'waiting'];
+
 let stockCache = [];
 
 // ═══════════════════════════════════════════════════════════════
-// ✅ แก้ 1: ย้าย showSuccessModal() ขึ้นบนสุด (หลัง let stockCache)
+// SUCCESS MODAL
 // ═══════════════════════════════════════════════════════════════
 function showSuccessModal(message) {
   let modal = document.getElementById('successModal');
@@ -29,7 +38,9 @@ function showSuccessModal(message) {
   modal.classList.add('show');
 }
 
-// ================= INIT =================
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
 async function initStockTab() {
   const dateInput = $('stockDate');
   if (dateInput && !dateInput.value) {
@@ -39,20 +50,18 @@ async function initStockTab() {
   }
   await loadStockGradeFilter();
   await loadStockCustomers();
+  await loadStockLocs();
+  loadStockStatusFilter();
   await renderStockMatrix();
 }
 
-// ================= GRADE FILTER =================
-async function loadStockGradeFilter() {
-  stockAllGrades = [...new Set(
-    masterCache.map(m => normalizeGrade(m.grade) + m.gram)
-  )].sort();
-  renderStockGradeList();
-  updateStockGradeLabel();
-
-  const btn = $('stockGradeFilterBtn');
-  const dropdown = $('stockGradeDropdown');
-  const box = $('stockGradeFilterBox');
+// ═══════════════════════════════════════════════════════════════
+// GENERIC MULTI-SELECT HELPERS
+// ═══════════════════════════════════════════════════════════════
+function _attachDropdown(btnId, dropdownId, boxId, docKey) {
+  const btn = $(btnId);
+  const dropdown = $(dropdownId);
+  const box = $(boxId);
   if (!btn || !dropdown || !box) return;
 
   if (btn.dataset.listenerAttached === '1') return;
@@ -63,12 +72,27 @@ async function loadStockGradeFilter() {
     dropdown.classList.toggle('hidden');
     btn.classList.toggle('open');
   });
-  document.addEventListener('click', (e) => {
-    if (!box.contains(e.target)) {
-      dropdown.classList.add('hidden');
-      btn.classList.remove('open');
-    }
-  });
+
+  if (!window['_' + docKey + 'DocClick']) {
+    window['_' + docKey + 'DocClick'] = (e) => {
+      const b = $(btnId), d = $(dropdownId), bx = $(boxId);
+      if (!b || !d || !bx) return;
+      if (!bx.contains(e.target)) { d.classList.add('hidden'); b.classList.remove('open'); }
+    };
+    document.addEventListener('click', window['_' + docKey + 'DocClick']);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// GRADE FILTER
+// ═══════════════════════════════════════════════════════════════
+async function loadStockGradeFilter() {
+  stockAllGrades = [...new Set(
+    masterCache.map(m => normalizeGrade(m.grade) + m.gram)
+  )].sort();
+  renderStockGradeList();
+  updateStockGradeLabel();
+  _attachDropdown('stockGradeFilterBtn', 'stockGradeDropdown', 'stockGradeFilterBox', 'stockGrade');
 }
 
 function renderStockGradeList() {
@@ -105,32 +129,27 @@ function updateStockGradeLabel() {
   const label = $('stockGradeFilterLabel');
   if (!label) return;
   if (stockSelectedGrades.length === 0) {
-    label.textContent = 'ทั้งหมด';
-    label.style.color = '#1e293b';
+    label.textContent = 'ทั้งหมด'; label.style.color = '#1e293b';
   } else if (stockSelectedGrades.length === 1) {
-    label.textContent = stockSelectedGrades[0];
-    label.style.color = '#1e40af';
+    label.textContent = stockSelectedGrades[0]; label.style.color = '#1e40af';
   } else {
-    label.textContent = `เลือก ${stockSelectedGrades.length} เกรด`;
-    label.style.color = '#1e40af';
+    label.textContent = `เลือก ${stockSelectedGrades.length} เกรด`; label.style.color = '#1e40af';
   }
 }
 
 function selectAllStockGrades() {
   stockSelectedGrades = [...stockAllGrades];
-  renderStockGradeList();
-  updateStockGradeLabel();
+  renderStockGradeList(); updateStockGradeLabel();
 }
 function clearAllStockGrades() {
   stockSelectedGrades = [];
-  renderStockGradeList();
-  updateStockGradeLabel();
+  renderStockGradeList(); updateStockGradeLabel();
 }
 
-// ================= CUSTOMER DROPDOWN =================
+// ═══════════════════════════════════════════════════════════════
+// CUSTOMER FILTER
+// ═══════════════════════════════════════════════════════════════
 async function loadStockCustomers() {
-  const sel = $('stockCustomer');
-  if (!sel) return;
   try {
     const { data, error } = await supabase
       .from('stock_balance')
@@ -138,53 +157,246 @@ async function loadStockCustomers() {
       .not('customer', 'is', null)
       .neq('customer', '');
     if (error) throw error;
-    const customers = [...new Set(data.map(d => d.customer))].filter(Boolean).sort();
-    const keepVal = sel.value;
-    sel.innerHTML = '<option value="">ทั้งหมด</option>' +
-      customers.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
-    sel.value = keepVal;
+    stockAllCustomers = [...new Set(data.map(d => d.customer))].filter(Boolean).sort();
   } catch (e) {
     console.warn('loadStockCustomers:', e);
+    stockAllCustomers = [];
+  }
+  renderStockCustomerList();
+  updateStockCustomerLabel();
+  _attachDropdown('stockCustomerFilterBtn', 'stockCustomerDropdown', 'stockCustomerFilterBox', 'stockCustomer');
+}
+
+function renderStockCustomerList() {
+  const list = $('stockCustomerList');
+  if (!list) return;
+  if (!stockAllCustomers.length) {
+    list.innerHTML = '<div style="padding:10px;text-align:center;color:#94a3b8;font-size:13px">ไม่มีข้อมูล</div>';
+    return;
+  }
+  list.innerHTML = stockAllCustomers.map(c => {
+    const checked = stockSelectedCustomers.includes(c);
+    return `<label class="item ${checked ? 'checked' : ''}" data-customer="${esc(c)}">
+      <input type="checkbox" ${checked ? 'checked' : ''}>
+      <span>${esc(c)}</span>
+    </label>`;
+  }).join('');
+
+  list.querySelectorAll('.item').forEach(el => {
+    const cb = el.querySelector('input[type="checkbox"]');
+    cb.addEventListener('change', () => {
+      const c = el.dataset.customer;
+      if (cb.checked) {
+        if (!stockSelectedCustomers.includes(c)) stockSelectedCustomers.push(c);
+      } else {
+        stockSelectedCustomers = stockSelectedCustomers.filter(x => x !== c);
+      }
+      el.classList.toggle('checked', cb.checked);
+      updateStockCustomerLabel();
+    });
+  });
+}
+
+function updateStockCustomerLabel() {
+  const label = $('stockCustomerFilterLabel');
+  if (!label) return;
+  if (stockSelectedCustomers.length === 0) {
+    label.textContent = 'ทั้งหมด'; label.style.color = '#1e293b';
+  } else if (stockSelectedCustomers.length === 1) {
+    label.textContent = stockSelectedCustomers[0]; label.style.color = '#1e40af';
+  } else {
+    label.textContent = `เลือก ${stockSelectedCustomers.length} ลูกค้า`; label.style.color = '#1e40af';
   }
 }
 
-// ================= RENDER STOCK MATRIX =================
-// ✅ แก้ 2: เอา KG ออก (cell-sub)
-// ✅ แก้ 3: ลบ subtitle เกรด
-// ✅ แก้ 5: ลบ ${custLabel} ซ้ำ
+function selectAllStockCustomers() {
+  stockSelectedCustomers = [...stockAllCustomers];
+  renderStockCustomerList(); updateStockCustomerLabel();
+}
+function clearAllStockCustomers() {
+  stockSelectedCustomers = [];
+  renderStockCustomerList(); updateStockCustomerLabel();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LOCATION FILTER
+// ═══════════════════════════════════════════════════════════════
+async function loadStockLocs() {
+  try {
+    const { data, error } = await supabase
+      .from('stock_balance')
+      .select('loc')
+      .not('loc', 'is', null)
+      .neq('loc', '');
+    if (error) throw error;
+    stockAllLocs = [...new Set(data.map(d => d.loc))].filter(Boolean).sort();
+  } catch (e) {
+    console.warn('loadStockLocs:', e);
+    stockAllLocs = ['LOC1', 'LOCF'];
+  }
+  renderStockLocList();
+  updateStockLocLabel();
+  _attachDropdown('stockLocFilterBtn', 'stockLocDropdown', 'stockLocFilterBox', 'stockLoc');
+}
+
+function renderStockLocList() {
+  const list = $('stockLocList');
+  if (!list) return;
+  if (!stockAllLocs.length) {
+    list.innerHTML = '<div style="padding:10px;text-align:center;color:#94a3b8;font-size:13px">ไม่มีข้อมูล</div>';
+    return;
+  }
+  list.innerHTML = stockAllLocs.map(c => {
+    const checked = stockSelectedLocs.includes(c);
+    return `<label class="item ${checked ? 'checked' : ''}" data-loc="${esc(c)}">
+      <input type="checkbox" ${checked ? 'checked' : ''}>
+      <span>${esc(c)}</span>
+    </label>`;
+  }).join('');
+
+  list.querySelectorAll('.item').forEach(el => {
+    const cb = el.querySelector('input[type="checkbox"]');
+    cb.addEventListener('change', () => {
+      const c = el.dataset.loc;
+      if (cb.checked) {
+        if (!stockSelectedLocs.includes(c)) stockSelectedLocs.push(c);
+      } else {
+        stockSelectedLocs = stockSelectedLocs.filter(x => x !== c);
+      }
+      el.classList.toggle('checked', cb.checked);
+      updateStockLocLabel();
+    });
+  });
+}
+
+function updateStockLocLabel() {
+  const label = $('stockLocFilterLabel');
+  if (!label) return;
+  if (stockSelectedLocs.length === 0) {
+    label.textContent = 'ทั้งหมด'; label.style.color = '#1e293b';
+  } else if (stockSelectedLocs.length === 1) {
+    label.textContent = stockSelectedLocs[0]; label.style.color = '#1e40af';
+  } else {
+    label.textContent = `เลือก ${stockSelectedLocs.length} Location`; label.style.color = '#1e40af';
+  }
+}
+
+function selectAllStockLocs() {
+  stockSelectedLocs = [...stockAllLocs];
+  renderStockLocList(); updateStockLocLabel();
+}
+function clearAllStockLocs() {
+  stockSelectedLocs = [];
+  renderStockLocList(); updateStockLocLabel();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STATUS FILTER (full / scrap / waiting)
+// ═══════════════════════════════════════════════════════════════
+function loadStockStatusFilter() {
+  renderStockStatusList();
+  updateStockStatusLabel();
+  _attachDropdown('stockStatusFilterBtn', 'stockStatusDropdown', 'stockStatusFilterBox', 'stockStatus');
+}
+
+const STOCK_STATUS_LABELS = {
+  full: '✅ ม้วนเต็ม',
+  scrap: '♻️ ม้วนเศษ',
+  waiting: '⏳ รอกรอ'
+};
+
+function renderStockStatusList() {
+  const list = $('stockStatusList');
+  if (!list) return;
+  list.innerHTML = STOCK_ALL_STATUSES.map(s => {
+    const checked = stockSelectedStatuses.includes(s);
+    return `<label class="item ${checked ? 'checked' : ''}" data-status="${s}">
+      <input type="checkbox" ${checked ? 'checked' : ''}>
+      <span>${STOCK_STATUS_LABELS[s]}</span>
+    </label>`;
+  }).join('');
+
+  list.querySelectorAll('.item').forEach(el => {
+    const cb = el.querySelector('input[type="checkbox"]');
+    cb.addEventListener('change', () => {
+      const s = el.dataset.status;
+      if (cb.checked) {
+        if (!stockSelectedStatuses.includes(s)) stockSelectedStatuses.push(s);
+      } else {
+        stockSelectedStatuses = stockSelectedStatuses.filter(x => x !== s);
+      }
+      el.classList.toggle('checked', cb.checked);
+      updateStockStatusLabel();
+    });
+  });
+}
+
+function updateStockStatusLabel() {
+  const label = $('stockStatusFilterLabel');
+  if (!label) return;
+  if (stockSelectedStatuses.length === 0) {
+    label.textContent = 'ทั้งหมด'; label.style.color = '#1e293b';
+  } else if (stockSelectedStatuses.length === 1) {
+    label.textContent = STOCK_STATUS_LABELS[stockSelectedStatuses[0]] || stockSelectedStatuses[0];
+    label.style.color = '#1e40af';
+  } else {
+    label.textContent = `เลือก ${stockSelectedStatuses.length} สถานะ`; label.style.color = '#1e40af';
+  }
+}
+
+function selectAllStockStatuses() {
+  stockSelectedStatuses = [...STOCK_ALL_STATUSES];
+  renderStockStatusList(); updateStockStatusLabel();
+}
+function clearAllStockStatuses() {
+  stockSelectedStatuses = [];
+  renderStockStatusList(); updateStockStatusLabel();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER STOCK MATRIX
+// ═══════════════════════════════════════════════════════════════
 async function renderStockMatrix() {
   const stockDate = $('stockDate')?.value;
-  const customer = $('stockCustomer')?.value || '';
-  const loc = $('stockLoc')?.value || '';
-  const rollStatus = $('stockRollStatus')?.value || 'all';
-
   if (!stockDate) { alert('กรุณาเลือกวันที่ Stock'); return; }
 
   const dateThai = thaiDateFull(stockDate);
-  const custLabel = customer ? ` · ลูกค้า: ${customer}` : '';
-  const locLabel = loc ? ` · ${loc}` : '';
-  const statusLabel = rollStatus === 'all' ? '' :
-                      rollStatus === 'full' ? ' · ม้วนเต็ม' : ' · ม้วนเศษ';
 
-  // ✅ แก้ 5: ลบ ${custLabel} ซ้ำ (เดิมมี 2 ครั้ง)
+  // สร้าง subtitle
+  const custLabel = stockSelectedCustomers.length
+    ? ` · ลูกค้า: ${stockSelectedCustomers.length === 1 ? stockSelectedCustomers[0] : stockSelectedCustomers.length + ' ราย'}`
+    : '';
+  const locLabel = stockSelectedLocs.length
+    ? ` · ${stockSelectedLocs.join(', ')}`
+    : '';
+  const statusLabel = stockSelectedStatuses.length
+    ? ` · ${stockSelectedStatuses.map(s => STOCK_STATUS_LABELS[s]).join(', ')}`
+    : '';
+
   $('stockReportTitle').innerHTML = `
     รายงาน Stock คงเหลือ ม้วนกระดาษ<br>
     ประจำวันที่ ${dateThai}
-    <div class="report-subtitle">(${custLabel ? custLabel.replace(' · ','') : 'ทุกเกรด'}${locLabel}${statusLabel})</div>
+    <div class="report-subtitle">(ทุกเกรด${custLabel}${locLabel}${statusLabel})</div>
   `;
 
   $('stockBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
 
   try {
-    // ✅ แก้ 4: normalize grade ที่ส่งไป RPC
     const normalizedGrades = stockSelectedGrades.map(g => normalizeGrade(g));
+
+    // ✅ ส่ง p_roll_status เป็น jsonb
+    // ถ้าไม่ได้เลือกอะไร → ส่ง null (ให้ RPC ใช้ default full+scrap+waiting)
+    // ถ้าเลือก → ส่ง array jsonb
+    const rollStatusParam = stockSelectedStatuses.length > 0
+      ? stockSelectedStatuses
+      : null;
 
     const { data, error } = await supabase.rpc('get_stock_matrix', {
       p_stock_date: stockDate,
       p_grades: normalizedGrades.length > 0 ? normalizedGrades : null,
-      p_customers: customer ? [customer] : null,
-      p_locations: loc ? [loc] : null,
-      p_roll_status: rollStatus
+      p_customers: stockSelectedCustomers.length > 0 ? stockSelectedCustomers : null,
+      p_locations: stockSelectedLocs.length > 0 ? stockSelectedLocs : null,
+      p_roll_status: rollStatusParam
     });
     if (error) throw error;
 
@@ -208,24 +420,39 @@ async function renderStockMatrix() {
       colSet.add(size);
 
       const k = rk + '|' + size;
-      if (!cells[k]) cells[k] = { full: 0, scrap: 0, kgs: 0 };
-      cells[k].full  += Number(r.full_count)  || 0;
-      cells[k].scrap += Number(r.scrap_count) || 0;
-      cells[k].kgs   += Number(r.total_kgs)   || 0;
+      if (!cells[k]) cells[k] = { full: 0, scrap: 0, waiting: 0, kgs: 0 };
+      cells[k].full    += Number(r.full_count)    || 0;
+      cells[k].scrap   += Number(r.scrap_count)   || 0;
+      cells[k].waiting += Number(r.waiting_count) || 0;
+      cells[k].kgs     += Number(r.total_kgs)     || 0;
 
-      if (!rowTotals[rk]) rowTotals[rk] = { full: 0, scrap: 0, kgs: 0 };
-      rowTotals[rk].full  += Number(r.full_count)  || 0;
-      rowTotals[rk].scrap += Number(r.scrap_count) || 0;
-      rowTotals[rk].kgs   += Number(r.total_kgs)   || 0;
+      if (!rowTotals[rk]) rowTotals[rk] = { full: 0, scrap: 0, waiting: 0, kgs: 0 };
+      rowTotals[rk].full    += Number(r.full_count)    || 0;
+      rowTotals[rk].scrap   += Number(r.scrap_count)   || 0;
+      rowTotals[rk].waiting += Number(r.waiting_count) || 0;
+      rowTotals[rk].kgs     += Number(r.total_kgs)     || 0;
 
-      if (!colTotals[size]) colTotals[size] = { full: 0, scrap: 0, kgs: 0 };
-      colTotals[size].full  += Number(r.full_count)  || 0;
-      colTotals[size].scrap += Number(r.scrap_count) || 0;
-      colTotals[size].kgs   += Number(r.total_kgs)   || 0;
+      if (!colTotals[size]) colTotals[size] = { full: 0, scrap: 0, waiting: 0, kgs: 0 };
+      colTotals[size].full    += Number(r.full_count)    || 0;
+      colTotals[size].scrap   += Number(r.scrap_count)   || 0;
+      colTotals[size].waiting += Number(r.waiting_count) || 0;
+      colTotals[size].kgs     += Number(r.total_kgs)     || 0;
     });
 
     const rowKeys = [...rowSet.keys()].sort();
     const colKeys = [...colSet].sort((a,b) => a - b);
+
+    // ═══ Helper: สร้าง text ของ cell ═══
+    // รูปแบบ: เต็ม+เศษ หรือ +รอกรอ
+    function buildCellText(v) {
+      const parts = [];
+      if (v.full > 0)    parts.push(`${v.full}`);
+      if (v.scrap > 0)   parts.push(`+${v.scrap}`);
+      if (v.waiting > 0) parts.push(`⏳${v.waiting}`);
+      if (!parts.length) return '';
+      // ถ้ามี full ตัวแรก ไม่ต้องมี + นำหน้า
+      return parts.join('').replace(/^\+/, '');
+    }
 
     let html = '<div class="report-wrap"><table class="report-table"><thead><tr>';
     html += '<th class="grade-col">Gradegrams</th>';
@@ -238,15 +465,10 @@ async function renderStockMatrix() {
       html += `<td class="grade-col">${esc(rk)}</td>`;
       colKeys.forEach(s => {
         const v = cells[rk + '|' + s];
-        if (!v || (v.full === 0 && v.scrap === 0)) {
+        if (!v || (v.full === 0 && v.scrap === 0 && v.waiting === 0)) {
           html += '<td class="empty">-</td>';
         } else {
-          let cellTxt = '';
-          if (v.full > 0 && v.scrap > 0) cellTxt = `${v.full}+${v.scrap}`;
-          else if (v.full > 0) cellTxt = `${v.full}`;
-          else if (v.scrap > 0) cellTxt = `+${v.scrap}`;
-
-          // ✅ แก้ 2: เอา cell-sub (KG) ออก
+          const cellTxt = buildCellText(v);
           html += `<td class="clickable" onclick="openStockDetail('${esc(rk)}', ${s})">
             <div class="cell-content">
               <div class="cell-main">${cellTxt}</div>
@@ -255,37 +477,26 @@ async function renderStockMatrix() {
         }
       });
       const rt = rowTotals[rk];
-      let rowTxt = '';
-      if (rt.full > 0 && rt.scrap > 0) rowTxt = `${rt.full}+${rt.scrap}`;
-      else if (rt.full > 0) rowTxt = `${rt.full}`;
-      else if (rt.scrap > 0) rowTxt = `+${rt.scrap}`;
-      html += `<td class="total-col">${rowTxt}</td>`;
+      html += `<td class="total-col">${buildCellText(rt)}</td>`;
       html += '</tr>';
     });
 
     html += '<tr class="total-row"><td class="grade-col">Total</td>';
     colKeys.forEach(s => {
       const ct = colTotals[s];
-      let txt = '';
-      if (ct.full > 0 && ct.scrap > 0) txt = `${ct.full}+${ct.scrap}`;
-      else if (ct.full > 0) txt = `${ct.full}`;
-      else if (ct.scrap > 0) txt = `+${ct.scrap}`;
-      html += `<td>${txt}</td>`;
+      html += `<td>${buildCellText(ct)}</td>`;
     });
-    const grand = { full: 0, scrap: 0 };
+    const grand = { full: 0, scrap: 0, waiting: 0 };
     Object.values(colTotals).forEach(ct => {
-      grand.full  += ct.full;
-      grand.scrap += ct.scrap;
+      grand.full    += ct.full;
+      grand.scrap   += ct.scrap;
+      grand.waiting += ct.waiting;
     });
-    let grandTxt = '';
-    if (grand.full > 0 && grand.scrap > 0) grandTxt = `${grand.full}+${grand.scrap}`;
-    else if (grand.full > 0) grandTxt = `${grand.full}`;
-    else if (grand.scrap > 0) grandTxt = `+${grand.scrap}`;
-    html += `<td class="total-col">${grandTxt}</td>`;
+    html += `<td class="total-col">${buildCellText(grand)}</td>`;
     html += '</tr></tbody></table></div>';
 
     html += `<div class="report-foot">
-      แสดง (ม้วนเต็ม + ม้วนเศษ) · คลิก Cell เพื่อดู SN · วันที่: ${dateThai}
+      แสดง (✅ เต็ม + ♻️ เศษ + ⏳ รอกรอ) · คลิก Cell เพื่อดู SN · วันที่: ${dateThai}
     </div>`;
 
     $('stockBody').innerHTML = html;
@@ -295,22 +506,34 @@ async function renderStockMatrix() {
   }
 }
 
-// ================= STOCK DETAIL =================
+// ═══════════════════════════════════════════════════════════════
+// STOCK DETAIL MODAL
+// ═══════════════════════════════════════════════════════════════
 async function openStockDetail(gradegram, size) {
   const stockDate = $('stockDate')?.value;
   if (!stockDate) return;
 
   const { grade } = parseGradegram(gradegram);
 
-  $('stockDetailTitle').innerHTML = `${esc(gradegram)} · Size ${size} <span style="font-weight:400;color:#64748b;font-size:14px">(วันที่ ${stockDate})</span>`;
+  // ✅ Title ฟอนต์ใหญ่ + subtitle
+  $('stockDetailTitle').innerHTML = `
+    ${esc(gradegram)} · Size ${size}
+    <span class="stock-detail-sub">(วันที่ ${stockDate})</span>
+  `;
   openModal('modalStockDetail');
   $('stockDetailBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
 
   try {
+    // ✅ ส่ง p_roll_status ตาม filter ที่เลือก (ถ้าไม่มี → null = full+scrap+waiting)
+    const rollStatusParam = stockSelectedStatuses.length > 0
+      ? stockSelectedStatuses
+      : null;
+
     const { data, error } = await supabase.rpc('get_stock_detail', {
       p_stock_date: stockDate,
       p_grade: grade,
-      p_width: size
+      p_width: size,
+      p_roll_status: rollStatusParam
     });
     if (error) throw error;
 
@@ -320,27 +543,34 @@ async function openStockDetail(gradegram, size) {
       return;
     }
 
-    const fullCount  = rows.filter(r => r.roll_status === 'full').length;
-    const scrapCount = rows.filter(r => r.roll_status === 'scrap').length;
-    const totalKgs   = rows.reduce((s, r) => s + (Number(r.kgs) || 0), 0);
+    const fullCount    = rows.filter(r => r.roll_status === 'full').length;
+    const scrapCount   = rows.filter(r => r.roll_status === 'scrap').length;
+    const waitingCount = rows.filter(r => r.roll_status === 'waiting').length;
+    const totalKgs     = rows.reduce((s, r) => s + (Number(r.kgs) || 0), 0);
 
-    let html = `<div class="msg info" style="margin-bottom:10px">
+    let html = `<div class="msg info" style="margin-bottom:12px">
       📦 ทั้งหมด ${rows.length} ม้วน ·
       <b style="color:#166534">เต็ม ${fullCount}</b> ·
       <b style="color:#d97706">เศษ ${scrapCount}</b> ·
+      <b style="color:#0369a1">รอกรอ ${waitingCount}</b> ·
       <b>${totalKgs.toFixed(2)} kg</b>
     </div>`;
 
-    html += '<div style="max-height:500px;overflow:auto"><table><thead><tr>';
+    html += '<div style="max-height:550px;overflow:auto"><table><thead><tr>';
     html += '<th>#</th><th>SN</th><th>Diameter</th><th>Kgs</th><th>Meter</th>';
     html += '<th>Supplier</th><th>QLT</th><th>Customer</th><th>Loc</th><th>สถานะ</th>';
     html += '</tr></thead><tbody>';
 
     rows.forEach((r, i) => {
-      const cls = r.roll_status === 'full' ? 'full-row' : 'scrap-row';
-      const statusTxt = r.roll_status === 'full' ? '✅ เต็ม' : '♻️ เศษ';
+      const statusMap = {
+        full:    { cls: 'full-row',    txt: '✅ เต็ม' },
+        scrap:   { cls: 'scrap-row',   txt: '♻️ เศษ' },
+        waiting: { cls: 'waiting-row', txt: '⏳ รอกรอ' }
+      };
+      const st = statusMap[r.roll_status] || { cls: '', txt: r.roll_status };
       const custTxt = r.is_customer_roll ? `👤 ${esc(r.customer)}` : esc(r.customer) || '-';
-      html += `<tr class="${cls}">
+
+      html += `<tr class="${st.cls}">
         <td>${i+1}</td>
         <td><b>${esc(r.sn)}</b></td>
         <td>${Number(r.dimeter).toFixed(2)}</td>
@@ -350,7 +580,7 @@ async function openStockDetail(gradegram, size) {
         <td>${esc(r.qlt) || '-'}</td>
         <td>${custTxt}</td>
         <td>${esc(r.loc) || '-'}</td>
-        <td>${statusTxt}</td>
+        <td>${st.txt}</td>
       </tr>`;
     });
 
@@ -361,7 +591,9 @@ async function openStockDetail(gradegram, size) {
   }
 }
 
-// ================= IMPORT STOCK =================
+// ═══════════════════════════════════════════════════════════════
+// IMPORT STOCK
+// ═══════════════════════════════════════════════════════════════
 function openStockImportModal() {
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
@@ -426,11 +658,11 @@ function importStock(ev) {
       }
 
       hideProgress('stockProgress');
-      // ✅ แก้ 6: Modal สำเร็จ + X
       showSuccessModal(`Import Stock สำเร็จ ${data.inserted} แถว · วันที่ ${stockDate}`);
 
       $('stockDate').value = stockDate;
       await loadStockCustomers();
+      await loadStockLocs();
       await renderStockMatrix();
     } catch (ex) {
       hideProgress('stockProgress');
