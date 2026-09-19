@@ -216,21 +216,24 @@ th{background:#f1f5f9;font-weight:600}
     width: 100%;
   }
   
-  /* ✅ หัวข้อตาราง — เพิ่มขนาดเป็น 14px */
+  /* ✅ หัวข้อตาราง — เพิ่มขนาดเป็น 16px */
   .report-title {
     text-align: center;
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 700;
     line-height: 1.4;
+    word-spacing: -2px; /* ✅ ลดช่องว่างระหว่างคำ */
   }
   
+  /* ✅ title-select — ขนาด 16px + margin 0 */
   .report-title .title-select {
     display: inline;
     border: none;
     background: transparent;
     font-weight: 700;
-    font-size: 14px;
-    padding: 0 2px;
+    font-size: 16px;
+    padding: 0;
+    margin: 0;
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
@@ -253,7 +256,7 @@ th{background:#f1f5f9;font-weight:600}
   }
   
   .report-table {
-    font-size: 9px; /* ✅ เพิ่มจาก 8px → 9px */
+    font-size: 9px; /* ✅ ตัวเลขในเซลล์ 9px */
     width: 100%;
     table-layout: fixed;
     border-collapse: collapse;
@@ -289,14 +292,14 @@ th{background:#f1f5f9;font-weight:600}
     font-weight: 700;
   }
   
-  /* ✅ Total row (แถวล่างสุด) — คงเดิม */
+  /* ✅ Total row — คงเดิม */
   .report-table .total-row td {
     background: #1e293b !important;
     color: #fff !important;
     font-weight: 700;
   }
   
-  /* ✅ หัวคอลัมน์ thead — เพิ่มขนาด Size header เป็น 9px + ตัวหนา */
+  /* ✅ หัวคอลัมน์ thead — 9px + ตัวหนา */
   .report-table thead th {
     position: static;
     background: #1e293b !important;
@@ -319,7 +322,6 @@ th{background:#f1f5f9;font-weight:600}
   .alert-table th,
   .alert-table td.grade-col { position: static; }
 }
-
 /* ========== MOBILE ========== */
 @media (max-width:640px){
   .form-grid{grid-template-columns:1fr}
