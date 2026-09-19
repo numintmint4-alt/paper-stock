@@ -483,42 +483,84 @@ th{background:#f1f5f9;font-weight:600}
   .snapshot-save-bar{flex-direction:column;align-items:stretch}
   #snapshotList{grid-template-columns:1fr}
 }
-/* ========== RECEIVE — ขยายฟอนต์รายละเอียด ========== */
+
+/* ═══════════════════════════════════════════════════════════ */
+/* ========== RECEIVE — ขยายฟอนต์รายละเอียด (เวอร์ชันใหญ่) ========== */
+/* ═══════════════════════════════════════════════════════════ */
+
+/* --- Supplier Summary --- */
 #receiveBody .supplier-summary h4 {
-  font-size: 17px;      /* เดิม 14px */
+  font-size: 22px;
+  margin-bottom: 14px;
+  line-height: 1.4;
 }
 #receiveBody .supplier-summary table {
-  font-size: 15px;      /* เดิม 13px */
+  font-size: 19px;
+  min-width: 520px;
 }
 #receiveBody .supplier-summary th,
 #receiveBody .supplier-summary td {
-  padding: 9px 14px;    /* เพิ่มพื้นที่ */
+  padding: 12px 18px;
 }
 
-/* Matrix */
+/* --- Matrix --- */
 #receiveBody .report-table {
-  font-size: 14px;      /* เดิม 11px */
+  font-size: 17px;
 }
 #receiveBody .report-table th,
 #receiveBody .report-table td {
-  padding: 6px 8px;     /* เดิม 2px 4px */
+  padding: 8px 10px;
 }
-
-/* cell หลักใน Matrix */
 #receiveBody .report-table td .cell-main {
-  font-size: 15px;      /* เดิม 12px */
+  font-size: 19px;
 }
 
-/* รายการ (List) */
+/* --- Gradegrams column (ขยาย) --- */
+#receiveBody .report-table .grade-col {
+  min-width: 130px;
+  max-width: 130px;
+  width: 130px;
+  font-size: 17px;
+  font-weight: 700;
+  padding-left: 10px;
+}
+#receiveBody .report-table .total-row .grade-col {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+/* --- List --- */
 #receiveBody .data-table {
-  font-size: 14px;      /* เดิม 12px */
+  font-size: 17px;
 }
 #receiveBody .data-table th,
 #receiveBody .data-table td {
-  padding: 9px 12px;    /* เดิม 6-8px */
+  padding: 11px 14px;
 }
 
-/* report-foot */
+/* --- report-foot --- */
 #receiveBody .report-foot {
-  font-size: 14px;      /* เดิม 12px */
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+/* ═══════════════════════════════════════════════════════════ */
+/* ========== RECEIVE — Print (A4 แนวนอน) ========== */
+/* ═══════════════════════════════════════════════════════════ */
+@media print {
+  #receiveBody .supplier-summary h4 { font-size: 12px; }
+  #receiveBody .supplier-summary table { font-size: 10px; }
+  #receiveBody .supplier-summary th,
+  #receiveBody .supplier-summary td { padding: 4px 8px; }
+
+  #receiveBody .report-table { font-size: 11px; }
+  #receiveBody .report-table .grade-col {
+    width: 80px;
+    min-width: 80px;
+    max-width: 80px;
+    font-size: 11px;
+    padding-left: 4px;
+  }
+  #receiveBody .report-table td .cell-main { font-size: 12px; }
+  #receiveBody .report-foot { font-size: 9px; }
 }
