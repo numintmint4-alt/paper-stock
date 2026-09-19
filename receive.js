@@ -6,6 +6,15 @@ let receiveSelectedGrades = [];
 let receiveAllGrades = [];
 let receiveCache = [];
 
+// ✅ Helper: ฟอร์แมตตัวเลข KG → 0,000,000.00
+function fmtKg(n) {
+  const num = Number(n) || 0;
+  return num.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
 async function initReceiveTab() {
   const dateInput = $('receiveDate');
   if (dateInput && !dateInput.value) dateInput.value = toISODate(new Date());
@@ -108,13 +117,14 @@ function renderSupplierSummary(rows, dateThai) {
   supKeys.forEach(sup => {
     const s = supplierSummary[sup];
     totalSupQty += s.qty; totalSupKg += s.kg;
+    // ✅ ใช้ fmtKg()
     html += `<tr><td>${esc(sup)}</td>
       <td style="text-align:right">${s.qty}</td>
-      <td style="text-align:right">${s.kg.toFixed(0)}</td></tr>`;
+      <td style="text-align:right">${fmtKg(s.kg)}</td></tr>`;
   });
   html += `<tr class="total-row"><td>รวม</td>
     <td style="text-align:right">${totalSupQty}</td>
-    <td style="text-align:right">${totalSupKg.toFixed(0)}</td></tr>`;
+    <td style="text-align:right">${fmtKg(totalSupKg)}</td></tr>`;
   html += '</tbody></table></div>';
   return html;
 }
@@ -130,7 +140,6 @@ async function renderReceive() {
 
   const dateThai = thaiDateFull(receiveDate);
 
-  // ✅ แก้: ลบ subtitle ออกทั้งหมด — แสดงแค่หัวข้อ + วันที่
   $('receiveReportTitle').innerHTML = `
     รายการรับม้วนกระดาษเข้าคลัง<br>
     ประจำวันที่ ${dateThai}
@@ -166,7 +175,7 @@ async function renderReceive() {
   }
 }
 
-// ================= MATRIX (ไม่แสดง KG) =================
+// ================= MATRIX =================
 function renderReceiveMatrix(rows, dateThai, supHtml = '') {
   const rowSet = new Map(); const colSet = new Set();
   const cells = {}; const rowTotals = {}; const colTotals = {};
@@ -224,13 +233,14 @@ function renderReceiveMatrix(rows, dateThai, supHtml = '') {
   html += `<td class="total-col">${grandQty}</td>`;
   html += '</tr></tbody></table></div>';
 
+  // ✅ report-foot (ไม่มี KG)
   html += `<div class="report-foot">
     แสดง จำนวน · คลิก Cell เพื่อดู PO · วันที่: ${dateThai} · รวม ${grandQty} ม้วน
   </div>`;
   $('receiveBody').innerHTML = supHtml + html;
 }
 
-// ================= LIST (ไม่แสดง KG) =================
+// ================= LIST =================
 function renderReceiveList(rows, dateThai, supHtml = '') {
   let html = '<div class="data-scroll"><table class="data-table"><thead><tr>';
   html += '<th>#</th><th>PO No.</th><th>Supplier</th><th>Gradegrams</th>';
@@ -264,7 +274,7 @@ function renderReceiveList(rows, dateThai, supHtml = '') {
     <td colspan="4"></td>
   </tr>`;
   html += '</tbody></table></div>';
-  html += `<div style="margin-top:8px;font-size:13px;color:#64748b">
+  html += `<div class="report-foot" style="margin-top:8px">
     แสดง ${rows.length} รายการ · วันที่: ${dateThai} · รวม ${totalQty} ม้วน
   </div>`;
   $('receiveBody').innerHTML = supHtml + html;
@@ -298,8 +308,9 @@ async function openReceiveDetail(gradegram, size, dateThai) {
     const totalQty = rows.reduce((s, r) => s + (Number(r.quantity)||0), 0);
     const totalKg  = rows.reduce((s, r) => s + (Number(r.kg_total)||0), 0);
 
+    // ✅ ใช้ fmtKg()
     let html = `<div class="msg info" style="margin-bottom:10px">
-      📦 รวม ${totalQty} ม้วน · ${totalKg.toFixed(0)} kg · ${rows.length} รายการ
+      📦 รวม ${totalQty} ม้วน · ${fmtKg(totalKg)} kg · ${rows.length} รายการ
     </div>`;
 
     html += '<table><thead><tr>';
@@ -315,7 +326,7 @@ async function openReceiveDetail(gradegram, size, dateThai) {
         <td><b>${esc(r.po_no)}</b></td>
         <td>${esc(r.supplier)}</td>
         <td style="text-align:right">${r.quantity}</td>
-        <td style="text-align:right">${Number(r.kg_total).toFixed(0)}</td>
+        <td style="text-align:right">${fmtKg(r.kg_total)}</td>
         <td style="text-align:right">${priceTxt}</td>
         <td>${esc(r.remark) || '-'}</td>
         <td>${fscBadge}</td>
@@ -353,12 +364,19 @@ function exportReceive() {
   const supRows = [['Supplier', 'จำนวน (ม้วน)', 'KG รวม']];
   let totalQty = 0, totalKg = 0;
   Object.keys(supMap).sort().forEach(sup => {
-    supRows.push([sup, supMap[sup].qty, Number(supMap[sup].kg.toFixed(0))]);
+    supRows.push([sup, supMap[sup].qty, Number(supMap[sup].kg.toFixed(2))]);
     totalQty += supMap[sup].qty;
     totalKg  += supMap[sup].kg;
   });
-  supRows.push(['รวม', totalQty, Number(totalKg.toFixed(0))]);
+  supRows.push(['รวม', totalQty, Number(totalKg.toFixed(2))]);
   const wsSup = XLSX.utils.aoa_to_sheet(supRows);
+
+  // ✅ กำหนด format cell.z = '#,##0.00' ให้คอลัมน์ KG (index 2)
+  const rangeSup = XLSX.utils.decode_range(wsSup['!ref']);
+  for (let R = 1; R <= rangeSup.e.r; R++) {
+    const cell = wsSup[XLSX.utils.encode_cell({ r: R, c: 2 })];
+    if (cell && cell.t === 'n') cell.z = '#,##0.00';
+  }
   XLSX.utils.book_append_sheet(wb, wsSup, 'สรุป Supplier');
 
   // Sheet 2: รายการทั้งหมด (เอา KG ออก)
