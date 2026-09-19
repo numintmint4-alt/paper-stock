@@ -485,34 +485,37 @@ th{background:#f1f5f9;font-weight:600}
 }
 
 /* ═══════════════════════════════════════════════════════════ */
-/* ========== RECEIVE — ขยายฟอนต์รายละเอียด (เวอร์ชันใหญ่) ========== */
+/* ========== RECEIVE — ขยายฟอนต์รายละเอียด (เวอร์ชันอัปเดต) ========== */
 /* ═══════════════════════════════════════════════════════════ */
 
 /* --- Supplier Summary --- */
 #receiveBody .supplier-summary h4 {
-  font-size: 22px;
-  margin-bottom: 14px;
+  font-size: 28px;         /* เดิม 14px */
+  margin-bottom: 16px;
   line-height: 1.4;
 }
 #receiveBody .supplier-summary table {
-  font-size: 19px;
-  min-width: 520px;
+  font-size: 26px;         /* เดิม 13px */
+  min-width: 680px;
 }
 #receiveBody .supplier-summary th,
 #receiveBody .supplier-summary td {
-  padding: 12px 18px;
+  padding: 14px 20px;
 }
 
-/* --- Matrix --- */
+/* --- Matrix (ตารางหลัก) --- */
 #receiveBody .report-table {
-  font-size: 17px;
+  font-size: 24px;         /* เดิม 11px */
 }
 #receiveBody .report-table th,
 #receiveBody .report-table td {
-  padding: 8px 10px;
+  padding: 10px 12px;
 }
+
+/* --- Cell หลัก (ตัวเลข qty) --- */
 #receiveBody .report-table td .cell-main {
-  font-size: 19px;
+  font-size: 24px;         /* เดิม 12px */
+  font-weight: 700;
 }
 
 /* --- Gradegrams column (ขยาย) --- */
@@ -520,18 +523,34 @@ th{background:#f1f5f9;font-weight:600}
   min-width: 130px;
   max-width: 130px;
   width: 130px;
-  font-size: 17px;
+  font-size: 26px;         /* เดิม 11px */
   font-weight: 700;
-  padding-left: 10px;
+  padding-left: 12px;
 }
 #receiveBody .report-table .total-row .grade-col {
-  font-size: 17px;
+  font-size: 26px;
   font-weight: 700;
 }
 
-/* --- List --- */
+/* --- Size column (ให้ใหญ่ขึ้นด้วย) --- */
+#receiveBody .report-table thead th:not(.grade-col):not(.total-col),
+#receiveBody .report-table tbody td:not(.grade-col):not(.total-col):not(.empty) {
+  min-width: 90px;
+  max-width: 90px;
+  width: 90px;
+}
+
+/* --- Total column --- */
+#receiveBody .report-table .total-col {
+  min-width: 90px;
+  max-width: 90px;
+  width: 90px;
+  font-size: 24px;
+}
+
+/* --- List (ตารางรายการ) --- */
 #receiveBody .data-table {
-  font-size: 17px;
+  font-size: 17px;         /* เดิม 12px */
 }
 #receiveBody .data-table th,
 #receiveBody .data-table td {
@@ -548,19 +567,49 @@ th{background:#f1f5f9;font-weight:600}
 /* ========== RECEIVE — Print (A4 แนวนอน) ========== */
 /* ═══════════════════════════════════════════════════════════ */
 @media print {
+  /* Supplier Summary */
   #receiveBody .supplier-summary h4 { font-size: 12px; }
-  #receiveBody .supplier-summary table { font-size: 10px; }
+  #receiveBody .supplier-summary table { font-size: 10px; min-width: auto; }
   #receiveBody .supplier-summary th,
   #receiveBody .supplier-summary td { padding: 4px 8px; }
 
+  /* Matrix */
   #receiveBody .report-table { font-size: 11px; }
-  #receiveBody .report-table .grade-col {
-    width: 80px;
-    min-width: 80px;
-    max-width: 80px;
-    font-size: 11px;
-    padding-left: 4px;
-  }
+  #receiveBody .report-table th,
+  #receiveBody .report-table td { padding: 3px 4px; }
+
+  /* Cell หลัก */
   #receiveBody .report-table td .cell-main { font-size: 12px; }
-  #receiveBody .report-foot { font-size: 9px; }
+
+  /* Gradegrams column — ตอนพิมพ์ */
+  #receiveBody .report-table .grade-col {
+    width: 120px;
+    min-width: 120px;
+    max-width: 120px;
+    font-size: 16px;
+    font-weight: 700;
+    padding-left: 6px;
+  }
+  #receiveBody .report-table .total-row .grade-col {
+    font-size: 16px;
+  }
+
+  /* Size column — ตอนพิมพ์ */
+  #receiveBody .report-table thead th:not(.grade-col):not(.total-col),
+  #receiveBody .report-table tbody td:not(.grade-col):not(.total-col):not(.empty) {
+    min-width: 40px;
+    max-width: 40px;
+    width: 40px;
+  }
+
+  /* Total column — ตอนพิมพ์ */
+  #receiveBody .report-table .total-col {
+    min-width: 45px;
+    max-width: 45px;
+    width: 45px;
+    font-size: 11px;
+  }
+
+  /* report-foot */
+  #receiveBody .report-foot { font-size: 10px; }
 }
