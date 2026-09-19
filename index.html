@@ -203,22 +203,58 @@
             </div>
           </label>
 
-          <label>ลูกค้า <select id="stockCustomer"><option value="">ทั้งหมด</option></select></label>
-
-          <label>Location
-            <select id="stockLoc">
-              <option value="">ทั้งหมด</option>
-              <option value="LOC1">LOC1</option>
-              <option value="LOCF">LOCF</option>
-            </select>
+          <!-- ✅ Customer Filter (multi-select) -->
+          <label class="grade-filter-wrap">
+            ลูกค้า
+            <div class="grade-filter-box" id="stockCustomerFilterBox">
+              <button type="button" class="grade-filter-btn" id="stockCustomerFilterBtn">
+                <span id="stockCustomerFilterLabel">ทั้งหมด</span>
+                <span class="arrow">▼</span>
+              </button>
+              <div class="grade-dropdown hidden" id="stockCustomerDropdown">
+                <div class="grade-actions">
+                  <button type="button" onclick="selectAllStockCustomers()">✓ เลือกทั้งหมด</button>
+                  <button type="button" onclick="clearAllStockCustomers()">✗ ล้างทั้งหมด</button>
+                </div>
+                <div class="grade-list" id="stockCustomerList"></div>
+              </div>
+            </div>
           </label>
 
-          <label>สถานะม้วน
-            <select id="stockRollStatus">
-              <option value="all">ทั้งหมด</option>
-              <option value="full">ม้วนเต็ม</option>
-              <option value="scrap">ม้วนเศษ</option>
-            </select>
+          <!-- ✅ Location Filter (multi-select) -->
+          <label class="grade-filter-wrap">
+            Location
+            <div class="grade-filter-box" id="stockLocFilterBox">
+              <button type="button" class="grade-filter-btn" id="stockLocFilterBtn">
+                <span id="stockLocFilterLabel">ทั้งหมด</span>
+                <span class="arrow">▼</span>
+              </button>
+              <div class="grade-dropdown hidden" id="stockLocDropdown">
+                <div class="grade-actions">
+                  <button type="button" onclick="selectAllStockLocs()">✓ เลือกทั้งหมด</button>
+                  <button type="button" onclick="clearAllStockLocs()">✗ ล้างทั้งหมด</button>
+                </div>
+                <div class="grade-list" id="stockLocList"></div>
+              </div>
+            </div>
+          </label>
+
+          <!-- ✅ สถานะม้วน Filter (multi-select) -->
+          <label class="grade-filter-wrap">
+            สถานะม้วน
+            <div class="grade-filter-box" id="stockStatusFilterBox">
+              <button type="button" class="grade-filter-btn" id="stockStatusFilterBtn">
+                <span id="stockStatusFilterLabel">ทั้งหมด</span>
+                <span class="arrow">▼</span>
+              </button>
+              <div class="grade-dropdown hidden" id="stockStatusDropdown">
+                <div class="grade-actions">
+                  <button type="button" onclick="selectAllStockStatuses()">✓ เลือกทั้งหมด</button>
+                  <button type="button" onclick="clearAllStockStatuses()">✗ ล้างทั้งหมด</button>
+                </div>
+                <div class="grade-list" id="stockStatusList"></div>
+              </div>
+            </div>
           </label>
 
           <button class="primary" onclick="renderStockMatrix()">🔍 ค้นหา</button>
@@ -574,7 +610,7 @@
 
 <!-- Stock Detail -->
 <div class="modal-bg" id="modalStockDetail">
-  <div class="modal" style="max-width:900px">
+  <div class="modal modal-stock-detail">
     <div class="modal-head">
       <h3 id="stockDetailTitle">รายละเอียด SN</h3>
       <button onclick="closeModal('modalStockDetail')">ปิด</button>
