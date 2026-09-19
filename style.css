@@ -189,172 +189,6 @@ th{background:#f1f5f9;font-weight:600}
 #stockDetailBody tr.full-row{background:#dcfce7}
 #stockDetailBody tr.scrap-row{background:#fef3c7}
 
-/* ========== PRINT ========== */
-@media print {
-  @page { size: A4 landscape; margin: 8mm; }
-  
-  html, body {
-    width: 100%;
-    height: auto;
-    margin: 0;
-    padding: 0;
-    background: #fff;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-  
-  .nav, .filters, button, .no-print { display: none !important; }
-  .card { box-shadow: none; padding: 0; margin: 0; border: none; }
-  .container { padding: 0; max-width: 100%; }
-  
-  /* ✅ report-head — จัด 3 คอลัมน์ ให้เลขเอกสารอยู่ขวาบน */
-  .report-head {
-    display: grid !important;
-    grid-template-columns: 1fr auto 1fr !important;
-    align-items: start;
-    margin-bottom: 6px;
-    width: 100%;
-  }
-  
-  /* ✅ หัวข้อตาราง — เพิ่มขนาดเป็น 16px */
-  .report-title {
-    text-align: center;
-    font-size: 16px;
-    font-weight: 700;
-    line-height: 1.4;
-    word-spacing: -2px; /* ✅ ลดช่องว่างระหว่างคำ */
-  }
-  
-  /* ✅ title-select — ขนาด 16px + margin 0 */
-  .report-title .title-select {
-    display: inline;
-    border: none;
-    background: transparent;
-    font-weight: 700;
-    font-size: 16px;
-    padding: 0;
-    margin: 0;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    appearance: none;
-    color: #000;
-  }
-  
-  .report-doc {
-    text-align: right;
-    font-size: 10px;
-    font-weight: 600;
-    color: #000;
-    white-space: nowrap;
-  }
-  
-  /* ✅ ตารางให้พอดี A4 */
-  .report-wrap {
-    max-height: none;
-    overflow: visible;
-    width: 100%;
-  }
-  
-  .report-table {
-    font-size: 9px; /* ✅ ตัวเลขในเซลล์ 9px */
-    width: 100%;
-    table-layout: fixed;
-    border-collapse: collapse;
-    page-break-inside: auto;
-  }
-  
-  .report-table th,
-  .report-table td {
-    padding: 1px 2px;
-    border: 0.5px solid #000;
-    text-align: center;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  
-  /* ✅ Grade column — คงเดิม */
-  .report-table .grade-col {
-    width: 50px;
-    min-width: 50px;
-    position: static;
-    background: #1e293b !important;
-    color: #fff !important;
-    text-align: left;
-    font-weight: 700;
-  }
-  
-  /* ✅ Total column — คงเดิม */
-  .report-table .total-col {
-    width: 45px;
-    min-width: 45px;
-    background: #1e293b !important;
-    color: #fff !important;
-    font-weight: 700;
-  }
-  
-  /* ✅ Total row — คงเดิม */
-  .report-table .total-row td {
-    background: #1e293b !important;
-    color: #fff !important;
-    font-weight: 700;
-  }
-  
-  /* ✅ หัวคอลัมน์ thead — 9px + ตัวหนา */
-  .report-table thead th {
-    position: static;
-    background: #1e293b !important;
-    color: #fff !important;
-    font-size: 9px;
-    font-weight: 700;
-    padding: 2px 1px;
-  }
-  
-  .report-table tr {
-    page-break-inside: avoid;
-  }
-  
-  .report-foot {
-    font-size: 8px;
-    margin-top: 4px;
-    text-align: left;
-  }
-    /* ✅ บีบ select ให้แคบที่สุด */
-  .report-title .title-select {
-    display: inline;
-    width: auto;
-    min-width: 0;
-    max-width: fit-content;
-    padding: 0;
-    margin: 0 4px;
-    border: none;
-    background: transparent;
-    font-weight: 700;
-    font-size: 16px;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    appearance: none;
-    color: #000;
-    text-align: center;
-    text-align-last: center;
-  }
-  .alert-table th,
-  .alert-table td.grade-col { position: static; }
-}
-  .report-title .title-select-print {
-    display: inline;
-    margin: 0 4px;
-    font-weight: 700;
-    font-size: 16px;
-    color: #000;
-  }
-/* ========== MOBILE ========== */
-@media (max-width:640px){
-  .form-grid{grid-template-columns:1fr}
-  .nav{height:auto;padding:10px}
-  .grade-filter-box{min-width:160px}
-  .alert-table{font-size:11px}
-}
-
 /* ========== TITLE SELECT (Stock Level) ========== */
 .title-select{
   display:inline-block;
@@ -457,8 +291,160 @@ th{background:#f1f5f9;font-weight:600}
   color:#1e293b;
 }
 
-/* ========== MOBILE (SNAPSHOT) ========== */
+/* ========== PRINT ========== */
+@media print {
+  @page { size: A4 landscape; margin: 8mm; }
+  
+  html, body {
+    width: 100%;
+    height: auto;
+    margin: 0;
+    padding: 0;
+    background: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  
+  .nav, .filters, button, .no-print { display: none !important; }
+  .card { box-shadow: none; padding: 0; margin: 0; border: none; }
+  .container { padding: 0; max-width: 100%; }
+  
+  /* ✅ report-head — จัด 3 คอลัมน์ ให้เลขเอกสารอยู่ขวาบน */
+  .report-head {
+    display: grid !important;
+    grid-template-columns: 1fr auto 1fr !important;
+    align-items: start;
+    margin-bottom: 6px;
+    width: 100%;
+  }
+  
+  /* ✅ หัวข้อตาราง — 16px */
+  .report-title {
+    text-align: center;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.4;
+  }
+  
+  /* ✅ title-select ปกติ (กรณีไม่ถูกแทนที่ด้วย span) */
+  .report-title .title-select {
+    display: inline;
+    border: none;
+    background: transparent;
+    font-weight: 700;
+    font-size: 16px;
+    padding: 0;
+    margin: 0 4px;
+    width: auto;
+    min-width: 0;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    color: #000;
+    text-align: center;
+    text-align-last: center;
+  }
+  
+  /* ✅ title-select-print — span ที่สร้างจาก JS ตอนพิมพ์ */
+  .report-title .title-select-print {
+    display: inline;
+    margin: 0 4px;
+    padding: 0;
+    font-weight: 700;
+    font-size: 16px;
+    color: #000;
+    text-align: center;
+  }
+  
+  .report-doc {
+    text-align: right;
+    font-size: 10px;
+    font-weight: 600;
+    color: #000;
+    white-space: nowrap;
+  }
+  
+  /* ✅ ตารางให้พอดี A4 */
+  .report-wrap {
+    max-height: none;
+    overflow: visible;
+    width: 100%;
+  }
+  
+  .report-table {
+    font-size: 9px;
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    page-break-inside: auto;
+  }
+  
+  .report-table th,
+  .report-table td {
+    padding: 1px 2px;
+    border: 0.5px solid #000;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  /* ✅ Grade column — คงเดิม */
+  .report-table .grade-col {
+    width: 50px;
+    min-width: 50px;
+    position: static;
+    background: #1e293b !important;
+    color: #fff !important;
+    text-align: left;
+    font-weight: 700;
+  }
+  
+  /* ✅ Total column — คงเดิม */
+  .report-table .total-col {
+    width: 45px;
+    min-width: 45px;
+    background: #1e293b !important;
+    color: #fff !important;
+    font-weight: 700;
+  }
+  
+  /* ✅ Total row — คงเดิม */
+  .report-table .total-row td {
+    background: #1e293b !important;
+    color: #fff !important;
+    font-weight: 700;
+  }
+  
+  /* ✅ thead — 9px + ตัวหนา */
+  .report-table thead th {
+    position: static;
+    background: #1e293b !important;
+    color: #fff !important;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 1px;
+  }
+  
+  .report-table tr {
+    page-break-inside: avoid;
+  }
+  
+  .report-foot {
+    font-size: 8px;
+    margin-top: 4px;
+    text-align: left;
+  }
+  
+  .alert-table th,
+  .alert-table td.grade-col { position: static; }
+}
+
+/* ========== MOBILE ========== */
 @media (max-width:640px){
+  .form-grid{grid-template-columns:1fr}
+  .nav{height:auto;padding:10px}
+  .grade-filter-box{min-width:160px}
+  .alert-table{font-size:11px}
   .snapshot-save-bar{flex-direction:column;align-items:stretch}
   #snapshotList{grid-template-columns:1fr}
 }
