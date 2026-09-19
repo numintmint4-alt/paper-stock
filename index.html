@@ -88,6 +88,7 @@
               <option value="2585">2585</option>
             </select>
           </div>
+          <div class="report-doc">FQ-จซ-06-04-04 rev.01</div>
         </div>
 
         <!-- Filter Bar -->
@@ -135,24 +136,25 @@
             </div>
           </label>
 
-         <label class="grade-filter-wrap">
-  ลูกค้า
-  <div class="grade-filter-box" id="customerFilterBox">
-    <button type="button" class="grade-filter-btn" id="customerFilterBtn">
-      <span id="customerFilterLabel">ทั้งหมด</span>
-      <span class="arrow">▼</span>
-    </button>
-    <div class="grade-dropdown hidden" id="customerDropdown">
-      <div class="grade-actions">
-        <button type="button" onclick="selectAllCustomers()">✓ เลือกทั้งหมด</button>
-        <button type="button" onclick="clearAllCustomers()">✗ ล้างทั้งหมด</button>
-      </div>
-      <div class="grade-list" id="customerList"></div>
-    </div>
-  </div>
-</label>
+          <!-- ✅ Customer Filter (เปลี่ยนจาก <select> เป็น dropdown checkbox) -->
+          <label class="grade-filter-wrap">
+            ลูกค้า
+            <div class="grade-filter-box" id="customerFilterBox">
+              <button type="button" class="grade-filter-btn" id="customerFilterBtn">
+                <span id="customerFilterLabel">ทั้งหมด</span>
+                <span class="arrow">▼</span>
+              </button>
+              <div class="grade-dropdown hidden" id="customerDropdown">
+                <div class="grade-actions">
+                  <button type="button" onclick="selectAllCustomers()">✓ เลือกทั้งหมด</button>
+                  <button type="button" onclick="clearAllCustomers()">✗ ล้างทั้งหมด</button>
+                </div>
+                <div class="grade-list" id="customerList"></div>
+              </div>
+            </div>
+          </label>
 
-                   <label class="grade-filter-wrap">
+          <label class="grade-filter-wrap">
             Gradegrams
             <div class="grade-filter-box" id="gradeFilterBox">
               <button type="button" class="grade-filter-btn" id="gradeFilterBtn">
@@ -740,7 +742,7 @@
 </div>
 
 <script src="app.js"></script>
-<script src="stock-level.js"></script>   <!-- ✅ เพิ่มบรรทัดนี้ -->
+<script src="stock-level.js"></script>
 <script src="stock.js"></script>
 <script src="receive.js"></script>
 <script src="summary.js"></script>
