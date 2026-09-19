@@ -711,3 +711,47 @@ function printSnapshot() { window.print(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
   else run();
 })();
+
+// ═══════════════════════════════════════════════════════════════
+// PRINT HANDLER — เปลี่ยน <select> เป็น <span> ตอนพิมพ์
+// เพื่อควบคุมช่องว่างระหว่าง "ประจำเดือน [เดือน] [ปี]"
+// ═══════════════════════════════════════════════════════════════
+window.addEventListener('beforeprint', () => {
+  const mSel = document.getElementById('titleMonth');
+  const ySel = document.getElementById('titleYear');
+  if (!mSel || !ySel) return;
+
+  // เก็บ reference ไว้ restore
+  window._printBackup = {
+    monthSel: mSel,
+    yearSel: ySel
+  };
+
+  // สร้าง span แทน <select>
+  const mSpan = document.createElement('span');
+  mSpan.textContent = mSel.options[mSel.selectedIndex].text;
+  mSpan.className = 'title-select-print';
+  mSpan.id = 'titleMonthPrint';
+
+  const ySpan = document.createElement('span');
+  ySpan.textContent = ySel.options[ySel.selectedIndex].text;
+  ySpan.className = 'title-select-print';
+  ySpan.id = 'titleYearPrint';
+
+  // แทนที่ใน DOM
+  mSel.parentNode.replaceChild(mSpan, mSel);
+  ySel.parentNode.replaceChild(ySpan, ySel);
+});
+
+window.addEventListener('afterprint', () => {
+  if (!window._printBackup) return;
+  const b = window._printBackup;
+
+  const mSpan = document.getElementById('titleMonthPrint');
+  const ySpan = document.getElementById('titleYearPrint');
+
+  if (mSpan && b.monthSel) mSpan.parentNode.replaceChild(b.monthSel, mSpan);
+  if (ySpan && b.yearSel) ySpan.parentNode.replaceChild(b.yearSel, ySpan);
+
+  window._printBackup = null;
+});
