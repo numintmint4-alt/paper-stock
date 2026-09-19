@@ -489,7 +489,7 @@ async function renderStockMatrix() {
     html += '<tr class="total-row"><td class="grade-col">Total</td>';
     colKeys.forEach(s => {
       const ct = colTotals[s];
-      html += `<td>${buildTotalText(ct)}</td>`;
+      html += `<td>${buildCellText(ct)}</td>`;
     });
     const grand = { full: 0, scrap: 0, waiting: 0 };
     Object.values(colTotals).forEach(ct => {
@@ -500,8 +500,20 @@ async function renderStockMatrix() {
     html += `<td class="total-col">${buildTotalText(grand)}</td>`;
     html += '</tr></tbody></table></div>';
 
+    // ═══ สรุปยอดรวมแต่ละสถานะ ═══
+    const totalFull    = grand.full;
+    const totalScrap   = grand.scrap;
+    const totalWaiting = grand.waiting;
+    const totalAll     = totalFull + totalScrap + totalWaiting;
+
     html += `<div class="report-foot">
-      แสดง (✅ เต็ม + ♻️ เศษ + ⏳ รอกรอ) · คลิก Cell เพื่อดู SN · วันที่: ${dateThai}
+      <b>📊 สรุป:</b>
+      ม้วนเต็ม <b style="color:#166534">${totalFull.toLocaleString()}</b> ·
+      ม้วนเศษ <b style="color:#d97706">${totalScrap.toLocaleString()}</b> ·
+      รอกรอ <b style="color:#0369a1">${totalWaiting.toLocaleString()}</b> ·
+      รวม <b style="color:#1e293b">${totalAll.toLocaleString()}</b> ม้วน
+      <br>
+      <span style="font-size:11px;color:#94a3b8">คลิก Cell เพื่อดู SN · วันที่: ${dateThai}</span>
     </div>`;
 
     $('stockBody').innerHTML = html;
