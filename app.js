@@ -454,10 +454,16 @@ async function openDrill(gradegram, size) {
     return q;
   });
 
-  const customer = $('qCustomer').value;
+  // ✅ V7: ใช้ multi-select customers จาก stock-level.js
+  const customers = (typeof getSelectedCustomers === 'function') ? getSelectedCustomers() : [];
   let filtered = usage;
-  if (customer === GENERAL_CUSTOMER) filtered = usage.filter(u => !u.roll_for_customer || !String(u.roll_for_customer).trim());
-  else if (customer) filtered = usage.filter(u => u.roll_for_customer === customer);
+  if (customers.length > 0) {
+    filtered = usage.filter(u => {
+      const c = (u.roll_for_customer || '').trim();
+      if (customers.includes(GENERAL_CUSTOMER) && !c) return true;
+      return customers.includes(c);
+    });
+  }
 
   const mode = document.querySelector('input[name="mode"]:checked').value;
   const std = Number(m.std_weight_kg);
