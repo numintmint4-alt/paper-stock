@@ -29,7 +29,7 @@
     <strong>📦 Stock ม้วนกระดาษ</strong>
     <button data-tab="matrix" class="active">Stock Level</button>
     <button data-tab="stock">Stock</button>
-    <button data-tab="summary">Summary</button>
+    <!-- ✅ ลบปุ่ม Summary ออกแล้ว -->
     <button data-tab="receive">Receive</button>
     <button data-tab="alert">Alert</button>
     <button data-tab="data">Data</button>
@@ -44,14 +44,12 @@
     <!-- ========== TAB 1: STOCK LEVEL (Matrix) ========== -->
     <div id="tab-matrix">
       <div class="card">
-        <!-- Title Builder — บนตาราง -->
         <div class="report-head">
           <div></div>
           <div class="report-title">ตารางควบคุมระดับ Stock<br>ประจำเดือน <select id="titleMonth" onchange="updateReportTitle()" class="title-select"><option value="1">มกราคม</option><option value="2">กุมภาพันธ์</option><option value="3">มีนาคม</option><option value="4">เมษายน</option><option value="5">พฤษภาคม</option><option value="6">มิถุนายน</option><option value="7">กรกฎาคม</option><option value="8">สิงหาคม</option><option value="9">กันยายน</option><option value="10">ตุลาคม</option><option value="11">พฤศจิกายน</option><option value="12">ธันวาคม</option></select> <select id="titleYear" onchange="updateReportTitle()" class="title-select"><option value="2565">2565</option><option value="2566">2566</option><option value="2567">2567</option><option value="2568">2568</option><option value="2569">2569</option><option value="2570">2570</option><option value="2571">2571</option><option value="2572">2572</option><option value="2573">2573</option><option value="2574">2574</option><option value="2575">2575</option><option value="2576">2576</option><option value="2577">2577</option><option value="2578">2578</option><option value="2579">2579</option><option value="2580">2580</option><option value="2581">2581</option><option value="2582">2582</option><option value="2583">2583</option><option value="2584">2584</option><option value="2585">2585</option></select></div>
           <div class="report-doc">FQ-จซ-06-04-04 rev.01</div>
         </div>
 
-        <!-- Filter Bar -->
         <div class="filters no-print">
           <label>ปี
             <select id="filterYear" onchange="onYearChange()" style="width:100px">
@@ -96,7 +94,6 @@
             </div>
           </label>
 
-          <!-- ✅ Customer Filter (dropdown checkbox) -->
           <label class="grade-filter-wrap">
             ลูกค้า
             <div class="grade-filter-box" id="customerFilterBox">
@@ -131,7 +128,6 @@
             </div>
           </label>
 
-          <!-- ✅ Size Filter -->
           <label class="grade-filter-wrap">
             Size
             <div class="grade-filter-box" id="sizeFilterBox">
@@ -158,7 +154,6 @@
 
         <div id="matrixBody"></div>
 
-        <!-- Save Bar (ใต้ตาราง) -->
         <div class="snapshot-save-bar no-print">
           <button class="primary" onclick="saveStockLevelSnapshot()">💾 บันทึกผลสรุป</button>
         </div>
@@ -203,7 +198,6 @@
             </div>
           </label>
 
-          <!-- ✅ Customer Filter (multi-select) -->
           <label class="grade-filter-wrap">
             ลูกค้า
             <div class="grade-filter-box" id="stockCustomerFilterBox">
@@ -221,7 +215,6 @@
             </div>
           </label>
 
-          <!-- ✅ Location Filter (multi-select) -->
           <label class="grade-filter-wrap">
             Location
             <div class="grade-filter-box" id="stockLocFilterBox">
@@ -239,7 +232,6 @@
             </div>
           </label>
 
-          <!-- ✅ สถานะม้วน Filter (multi-select) -->
           <label class="grade-filter-wrap">
             สถานะม้วน
             <div class="grade-filter-box" id="stockStatusFilterBox">
@@ -270,69 +262,7 @@
       </div>
     </div>
 
-    <!-- ========== TAB 3: SUMMARY ========== -->
-    <div id="tab-summary" class="hidden">
-      <div class="card">
-        <div class="report-head">
-          <div></div>
-          <div class="report-title" id="summaryReportTitle">
-            ตารางสรุปรายการสั่งเข้า<br>ประจำวันที่
-          </div>
-        </div>
-
-        <div class="filters no-print">
-          <label>📅 วันที่รับเข้า <input type="date" id="summaryDate"></label>
-
-          <label class="grade-filter-wrap">
-            Gradegrams
-            <div class="grade-filter-box" id="summaryGradeFilterBox">
-              <button type="button" class="grade-filter-btn" id="summaryGradeFilterBtn">
-                <span id="summaryGradeFilterLabel">ทั้งหมด</span>
-                <span class="arrow">▼</span>
-              </button>
-              <div class="grade-dropdown hidden" id="summaryGradeDropdown">
-                <div class="grade-actions">
-                  <button type="button" onclick="selectAllSummaryGrades()">✓ เลือกทั้งหมด</button>
-                  <button type="button" onclick="clearAllSummaryGrades()">✗ ล้างทั้งหมด</button>
-                </div>
-                <div class="grade-list" id="summaryGradeList"></div>
-              </div>
-            </div>
-          </label>
-
-          <label>FSC
-            <select id="summaryFsc">
-              <option value="all">ทั้งหมด</option>
-              <option value="fsc">FSC (มี F)</option>
-              <option value="non_fsc">Non-FSC</option>
-            </select>
-          </label>
-
-          <label>หมายเหตุ
-            <select id="summaryRemark">
-              <option value="">ทั้งหมด</option>
-              <option value="ปั้ม F">ปั้ม F</option>
-              <option value="ปั้ม BT">ปั้ม BT</option>
-              <option value="ปั้ม KTP">ปั้ม KTP</option>
-              <option value="NC">NC</option>
-            </select>
-          </label>
-
-          <label>โหมด
-            <select id="summaryMode">
-              <option value="qty">จำนวน (Quantity)</option>
-              <option value="kg">KG รวม</option>
-              <option value="both">ทั้ง 2</option>
-            </select>
-          </label>
-
-          <button class="primary" onclick="renderSummary()">🔍 ค้นหา</button>
-          <button onclick="window.print()">🖨 พิมพ์ (A4 แนวนอน)</button>
-        </div>
-
-        <div id="summaryBody"></div>
-      </div>
-    </div>
+    <!-- ========== TAB 3: SUMMARY — ✅ ลบออกแล้ว ========== -->
 
     <!-- ========== TAB 4: RECEIVE (Roll Receive) ========== -->
     <div id="tab-receive" class="hidden">
@@ -402,6 +332,8 @@
           <button class="primary" onclick="renderReceive()">🔍 ค้นหา</button>
           <button class="admin-only" onclick="openReceiveImportModal()">📥 Import Excel</button>
           <input type="file" id="fileReceive" accept=".xlsx,.xls" class="hidden" onchange="importReceive(event)">
+          <!-- ✅ เพิ่มปุ่ม Export Excel -->
+          <button onclick="exportReceive()">📤 Export Excel</button>
           <button onclick="window.print()">🖨 พิมพ์ (A4 แนวนอน)</button>
         </div>
 
@@ -494,7 +426,6 @@
         <h2>⚙ ตั้งค่า</h2>
         <p class="hint">กดหัวข้อเพื่อเปิด/ปิด</p>
 
-        <!-- Master -->
         <div class="acc-item">
           <div class="acc-head" onclick="toggleAcc(this, 'accMaster')">
             <span>📋 Master Data — Gradegrams / Gram / Size</span>
@@ -516,7 +447,6 @@
           </div>
         </div>
 
-        <!-- Roll Paper Use -->
         <div class="acc-item">
           <div class="acc-head" onclick="toggleAcc(this, 'accRolluse')">
             <span>📥 Roll Paper Use — Import & ตรวจสอบข้อมูล</span>
@@ -536,7 +466,6 @@
           </div>
         </div>
 
-        <!-- Archive -->
         <div class="acc-item">
           <div class="acc-head" onclick="toggleAcc(this, 'accArchive')">
             <span>📦 Archive ข้อมูลเก่า (เก่ากว่า 2 ปี)</span>
@@ -554,7 +483,6 @@
           </div>
         </div>
 
-        <!-- Users -->
         <div class="acc-item" id="accUsersWrap">
           <div class="acc-head" onclick="toggleAcc(this, 'accUsers')">
             <span>👥 ผู้ใช้</span>
@@ -578,7 +506,6 @@
 
 <!-- ==================== MODALS ==================== -->
 
-<!-- Master Form -->
 <div class="modal-bg" id="modalMaster">
   <div class="modal" style="max-width:600px">
     <h3 id="masterFormTitle">เพิ่ม Master Data</h3>
@@ -597,7 +524,6 @@
   </div>
 </div>
 
-<!-- Drill -->
 <div class="modal-bg" id="modalDrill">
   <div class="modal">
     <div class="modal-head">
@@ -608,7 +534,6 @@
   </div>
 </div>
 
-<!-- Stock Detail -->
 <div class="modal-bg" id="modalStockDetail">
   <div class="modal modal-stock-detail">
     <div class="modal-head">
@@ -619,7 +544,6 @@
   </div>
 </div>
 
-<!-- Stock Import -->
 <div class="modal-bg" id="modalStockImport">
   <div class="modal" style="max-width:480px">
     <h3>📥 Import Stock คงเหลือ</h3>
@@ -635,7 +559,6 @@
   </div>
 </div>
 
-<!-- Receive Import -->
 <div class="modal-bg" id="modalReceiveImport">
   <div class="modal" style="max-width:480px">
     <h3>📥 Import Roll Receive</h3>
@@ -651,7 +574,6 @@
   </div>
 </div>
 
-<!-- Receive Detail -->
 <div class="modal-bg" id="modalReceiveDetail">
   <div class="modal" style="max-width:1000px">
     <div class="modal-head">
@@ -662,18 +584,8 @@
   </div>
 </div>
 
-<!-- Summary Detail -->
-<div class="modal-bg" id="modalSummaryDetail">
-  <div class="modal" style="max-width:1000px">
-    <div class="modal-head">
-      <h3 id="summaryDetailTitle">รายละเอียด PO</h3>
-      <button onclick="closeModal('modalSummaryDetail')">ปิด</button>
-    </div>
-    <div id="summaryDetailBody"></div>
-  </div>
-</div>
+<!-- ✅ ลบ modalSummaryDetail ออกแล้ว เพราะไม่มี Tab Summary -->
 
-<!-- Alert Detail -->
 <div class="modal-bg" id="modalAlertDetail">
   <div class="modal" style="max-width:1000px">
     <div class="modal-head">
@@ -684,7 +596,6 @@
   </div>
 </div>
 
-<!-- Snapshot View -->
 <div class="modal-bg" id="modalSnapshot">
   <div class="modal snapshot-modal" style="max-width:1100px">
     <div class="modal-head">
@@ -698,7 +609,6 @@
   </div>
 </div>
 
-<!-- User Form -->
 <div class="modal-bg" id="modalUser">
   <div class="modal" style="max-width:520px">
     <h3 id="userFormTitle">เพิ่มผู้ใช้ใหม่</h3>
@@ -716,7 +626,6 @@
   </div>
 </div>
 
-<!-- Delete Month -->
 <div class="modal-bg" id="modalDeleteMonth">
   <div class="modal" style="max-width:560px">
     <h3>🗑 ลบ Usage ตามเดือน</h3>
