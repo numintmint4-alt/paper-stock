@@ -485,54 +485,57 @@ th{background:#f1f5f9;font-weight:600}
 }
 
 /* ═══════════════════════════════════════════════════════════ */
-/* ========== RECEIVE — ขยายฟอนต์รายละเอียด (เวอร์ชันอัปเดต) ========== */
+/* ========== RECEIVE — ขยายฟอนต์รายละเอียด (หน้าจอ) ========== */
+/* ขั้นที่ 1: ลด -2px ทุกส่วน ยกเว้น 📊 สรุป Supplier ========== */
 /* ═══════════════════════════════════════════════════════════ */
 
 /* --- Supplier Summary --- */
+/* ⭐ หัวข้อ 📊 สรุป Supplier — คงเดิม 28px */
 #receiveBody .supplier-summary h4 {
-  font-size: 28px;         /* เดิม 14px */
+  font-size: 28px;         /* คงเดิม ไม่ลด */
   margin-bottom: 16px;
   line-height: 1.4;
 }
+/* ตาราง Supplier — 26 → 24 (-2) */
 #receiveBody .supplier-summary table {
-  font-size: 26px;         /* เดิม 13px */
-  min-width: 680px;
+  font-size: 24px;
+  min-width: 640px;
 }
 #receiveBody .supplier-summary th,
 #receiveBody .supplier-summary td {
-  padding: 14px 20px;
+  padding: 13px 18px;
 }
 
-/* --- Matrix (ตารางหลัก) --- */
+/* --- Matrix (ตารางหลัก) — 24 → 22 (-2) --- */
 #receiveBody .report-table {
-  font-size: 24px;         /* เดิม 11px */
+  font-size: 22px;
 }
 #receiveBody .report-table th,
 #receiveBody .report-table td {
-  padding: 10px 12px;
+  padding: 9px 11px;
 }
 
-/* --- Cell หลัก (ตัวเลข qty) --- */
+/* --- Cell หลัก (ตัวเลข qty) — 24 → 22 (-2) --- */
 #receiveBody .report-table td .cell-main {
-  font-size: 24px;         /* เดิม 12px */
+  font-size: 22px;
   font-weight: 700;
 }
 
-/* --- Gradegrams column (ขยาย) --- */
+/* --- Gradegrams column — 26 → 24 (-2), ความกว้างคงเดิม --- */
 #receiveBody .report-table .grade-col {
   min-width: 130px;
   max-width: 130px;
   width: 130px;
-  font-size: 26px;         /* เดิม 11px */
+  font-size: 24px;
   font-weight: 700;
   padding-left: 12px;
 }
 #receiveBody .report-table .total-row .grade-col {
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 700;
 }
 
-/* --- Size column (ให้ใหญ่ขึ้นด้วย) --- */
+/* --- Size column (ขนาดช่องคงเดิม 90px) --- */
 #receiveBody .report-table thead th:not(.grade-col):not(.total-col),
 #receiveBody .report-table tbody td:not(.grade-col):not(.total-col):not(.empty) {
   min-width: 90px;
@@ -540,76 +543,111 @@ th{background:#f1f5f9;font-weight:600}
   width: 90px;
 }
 
-/* --- Total column --- */
+/* --- Total column (ขนาดช่องคงเดิม 90px) --- */
 #receiveBody .report-table .total-col {
   min-width: 90px;
   max-width: 90px;
   width: 90px;
-  font-size: 24px;
+  font-size: 22px;
 }
 
-/* --- List (ตารางรายการ) --- */
+/* --- List (ตารางรายการ) — 17 → 15 (-2) --- */
 #receiveBody .data-table {
-  font-size: 17px;         /* เดิม 12px */
+  font-size: 15px;
 }
 #receiveBody .data-table th,
 #receiveBody .data-table td {
   padding: 11px 14px;
 }
 
-/* --- report-foot --- */
+/* --- report-foot — 17 → 15 (-2) --- */
 #receiveBody .report-foot {
-  font-size: 17px;
+  font-size: 15px;
   line-height: 1.6;
 }
 
 /* ═══════════════════════════════════════════════════════════ */
 /* ========== RECEIVE — Print (A4 แนวนอน) ========== */
+/* ขั้นที่ 2: จัดให้พอดี 1 A4 + สีครบเหมือนหน้าจอ ========== */
 /* ═══════════════════════════════════════════════════════════ */
 @media print {
-  /* Supplier Summary */
-  #receiveBody .supplier-summary h4 { font-size: 12px; }
-  #receiveBody .supplier-summary table { font-size: 10px; min-width: auto; }
+  /* บังคับสีให้พิมพ์ออกครบ */
+  #receiveBody,
+  #receiveBody * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* ========== Supplier Summary ========== */
+  /* ⭐ หัวข้อ 📊 สรุป Supplier — คงเดิม 12px */
+  #receiveBody .supplier-summary h4 {
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    color: #1e293b !important;
+    margin: 0 0 5px 0 !important;
+  }
+  #receiveBody .supplier-summary table {
+    font-size: 9px !important;
+    min-width: auto !important;
+  }
   #receiveBody .supplier-summary th,
-  #receiveBody .supplier-summary td { padding: 4px 8px; }
+  #receiveBody .supplier-summary td {
+    padding: 3px 6px !important;
+  }
 
-  /* Matrix */
-  #receiveBody .report-table { font-size: 11px; }
+  /* ========== Matrix ========== */
+  #receiveBody .report-table {
+    font-size: 10px !important;
+  }
   #receiveBody .report-table th,
-  #receiveBody .report-table td { padding: 3px 4px; }
+  #receiveBody .report-table td {
+    padding: 2px 3px !important;
+  }
+  #receiveBody .report-table td .cell-main {
+    font-size: 11px !important;
+  }
 
-  /* Cell หลัก */
-  #receiveBody .report-table td .cell-main { font-size: 12px; }
-
-  /* Gradegrams column — ตอนพิมพ์ */
+  /* Gradegrams column */
   #receiveBody .report-table .grade-col {
-    width: 120px;
-    min-width: 120px;
-    max-width: 120px;
-    font-size: 16px;
-    font-weight: 700;
-    padding-left: 6px;
+    width: 100px !important;
+    min-width: 100px !important;
+    max-width: 100px !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    padding-left: 5px !important;
   }
   #receiveBody .report-table .total-row .grade-col {
-    font-size: 16px;
+    font-size: 12px !important;
   }
 
-  /* Size column — ตอนพิมพ์ */
+  /* Size column */
   #receiveBody .report-table thead th:not(.grade-col):not(.total-col),
   #receiveBody .report-table tbody td:not(.grade-col):not(.total-col):not(.empty) {
-    min-width: 40px;
-    max-width: 40px;
-    width: 40px;
+    min-width: 38px !important;
+    max-width: 38px !important;
+    width: 38px !important;
   }
 
-  /* Total column — ตอนพิมพ์ */
+  /* Total column */
   #receiveBody .report-table .total-col {
-    min-width: 45px;
-    max-width: 45px;
-    width: 45px;
-    font-size: 11px;
+    min-width: 42px !important;
+    max-width: 42px !important;
+    width: 42px !important;
+    font-size: 10px !important;
   }
 
-  /* report-foot */
-  #receiveBody .report-foot { font-size: 10px; }
+  /* ========== List ========== */
+  #receiveBody .data-table {
+    font-size: 9px !important;
+  }
+  #receiveBody .data-table th,
+  #receiveBody .data-table td {
+    padding: 3px 5px !important;
+  }
+
+  /* ========== report-foot ========== */
+  #receiveBody .report-foot {
+    font-size: 9px !important;
+  }
 }
