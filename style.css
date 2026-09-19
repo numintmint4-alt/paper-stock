@@ -491,17 +491,17 @@ th{background:#f1f5f9;font-weight:600}
 
 /* --- Supplier Summary (-1.5) --- */
 #receiveBody .supplier-summary h4 {
-  font-size: 24.5px;        /* 26 - 1.5 */
-  margin-bottom: 14.5px;    /* 16 - 1.5 */
-  line-height: 1.4;
+  font-size: 24px;        /* 26 - 1.5 */
+  margin-bottom: 14px;    /* 16 - 1.5 */
+  line-height: 1.2;
 }
 #receiveBody .supplier-summary table {
-  font-size: 20.5px;        /* 22 - 1.5 */
-  min-width: 638.5px;       /* 640 - 1.5 */
+  font-size: 20px;        /* 22 - 1.5 */
+  min-width: 638px;       /* 640 - 1.5 */
 }
 #receiveBody .supplier-summary th,
 #receiveBody .supplier-summary td {
-  padding: 11.5px 16.5px;   /* 13-1.5 , 18-1.5 */
+  padding: 11px 16px;   /* 13-1.5 , 18-1.5 */
 }
 
 /* --- Report wrap: ไม่ให้ scroll แนวนอน --- */
