@@ -485,18 +485,17 @@ th{background:#f1f5f9;font-weight:600}
 }
 
 /* ═══════════════════════════════════════════════════════════ */
-/* ========== RECEIVE — ตารางด้านล่าง -3 ========== */
-/* 📊 สรุป Supplier คงเดิม / ตารางด้านล่างลด -3 */
+/* ========== RECEIVE — แสดงเต็มหน้าจอ ไม่ต้องเลื่อน ========== */
 /* ═══════════════════════════════════════════════════════════ */
 
 /* --- Supplier Summary (คงเดิม) --- */
 #receiveBody .supplier-summary h4 {
-  font-size: 28px;
+  font-size: 26px;
   margin-bottom: 16px;
   line-height: 1.4;
 }
 #receiveBody .supplier-summary table {
-  font-size: 24px;
+  font-size: 22px;
   min-width: 640px;
 }
 #receiveBody .supplier-summary th,
@@ -504,61 +503,97 @@ th{background:#f1f5f9;font-weight:600}
   padding: 13px 18px;
 }
 
-/* --- Matrix (ตารางหลัก): 22 → 19 (-3) --- */
-#receiveBody .report-table {
-  font-size: 19px;
+/* --- Report wrap: ไม่ให้ scroll แนวนอน --- */
+#receiveBody .report-wrap {
+  overflow-x: hidden;       /* ← เอา scroll ออก */
+  overflow-y: visible;
+  width: 100%;
 }
+
+/* --- Matrix: บีบให้พอดีหน้าจอ --- */
+#receiveBody .report-table {
+  font-size: 13px;          /* ← ลดลงเพื่อให้พอดี */
+  width: 100%;
+  table-layout: fixed;      /* ← บังคับให้คอลัมน์เท่ากัน */
+  border-collapse: collapse;
+}
+
 #receiveBody .report-table th,
 #receiveBody .report-table td {
-  padding: 9px 11px;
+  padding: 4px 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* --- Cell หลัก (qty): 22 → 19 (-3) --- */
-#receiveBody .report-table td .cell-main {
-  font-size: 19px;
-  font-weight: 700;
-}
-
-/* --- Gradegrams column: 24 → 21 (-3) --- */
+/* --- Gradegrams column: กว้าง 12% --- */
 #receiveBody .report-table .grade-col {
-  min-width: 130px;
-  max-width: 130px;
-  width: 130px;
-  font-size: 21px;
+  width: 12%;
+  min-width: 0;
+  max-width: none;
+  font-size: 13px;
   font-weight: 700;
-  padding-left: 12px;
+  padding-left: 6px;
+  position: sticky;
+  left: 0;
+  z-index: 4;
+}
+#receiveBody .report-table thead .grade-col {
+  z-index: 6;
 }
 #receiveBody .report-table .total-row .grade-col {
-  font-size: 21px;
+  font-size: 13px;
   font-weight: 700;
 }
 
-/* --- Size column (ขนาดช่องคงเดิม 90px) --- */
+/* --- Size column: กว้างอัตโนมัติ (แบ่งเท่ากัน) --- */
 #receiveBody .report-table thead th:not(.grade-col):not(.total-col),
 #receiveBody .report-table tbody td:not(.grade-col):not(.total-col):not(.empty) {
-  min-width: 90px;
-  max-width: 90px;
-  width: 90px;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  font-size: 13px;
 }
 
-/* --- Total column: 22 → 19 (-3) --- */
+/* --- Total column: กว้าง 10% --- */
 #receiveBody .report-table .total-col {
-  min-width: 90px;
-  max-width: 90px;
-  width: 90px;
-  font-size: 19px;
+  width: 10%;
+  min-width: 0;
+  max-width: none;
+  font-size: 13px;
+  position: sticky;
+  right: 0;
+  z-index: 4;
+}
+#receiveBody .report-table thead .total-col {
+  z-index: 6;
 }
 
-/* --- List (ตารางรายการ): 15 → 12 (-3) --- */
+/* --- cell-main (qty) --- */
+#receiveBody .report-table td .cell-main {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* --- List (ตารางรายการ) --- */
 #receiveBody .data-table {
   font-size: 12px;
+  width: 100%;
+  table-layout: fixed;
 }
 #receiveBody .data-table th,
 #receiveBody .data-table td {
-  padding: 11px 14px;
+  padding: 8px 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#receiveBody .data-scroll {
+  overflow-x: hidden;
+  max-height: 70vh;
 }
 
-/* --- report-foot: 15 → 12 (-3) --- */
+/* --- report-foot --- */
 #receiveBody .report-foot {
   font-size: 12px;
   line-height: 1.6;
