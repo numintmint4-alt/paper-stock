@@ -442,8 +442,7 @@ async function renderStockMatrix() {
     const rowKeys = [...rowSet.keys()].sort();
     const colKeys = [...colSet].sort((a,b) => a - b);
 
-    // ═══ Helper: สร้าง text ของ cell ═══
-    // รูปแบบ: เต็ม+เศษ หรือ +รอกรอ
+    // ═══ Helper: สร้าง text ของ cell ปกติ (เต็ม+เศษ·รอกรอ) ═══
     function buildCellText(v) {
       const parts = [];
       if (v.full > 0)    parts.push(`${v.full}`);
@@ -452,6 +451,12 @@ async function renderStockMatrix() {
       if (!parts.length) return '';
       // ถ้ามี full ตัวแรก ไม่ต้องมี + นำหน้า
       return parts.join('').replace(/^\+/, '');
+    }
+
+    // ═══ Helper: สร้าง text ของ Total (ผลรวมล้วน) ═══
+    function buildTotalText(v) {
+      const total = (v.full || 0) + (v.scrap || 0) + (v.waiting || 0);
+      return total > 0 ? `${total}` : '';
     }
 
     let html = '<div class="report-wrap"><table class="report-table"><thead><tr>';
@@ -477,7 +482,7 @@ async function renderStockMatrix() {
         }
       });
       const rt = rowTotals[rk];
-      html += `<td class="total-col">${buildCellText(rt)}</td>`;
+      html += `<td class="total-col">${buildTotalText(rt)}</td>`;
       html += '</tr>';
     });
 
@@ -492,7 +497,7 @@ async function renderStockMatrix() {
       grand.scrap   += ct.scrap;
       grand.waiting += ct.waiting;
     });
-    html += `<td class="total-col">${buildCellText(grand)}</td>`;
+    html += `<td class="total-col">${buildTotalText(grand)}</td>`;
     html += '</tr></tbody></table></div>';
 
     html += `<div class="report-foot">
