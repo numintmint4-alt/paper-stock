@@ -21,27 +21,20 @@ let currentProfile = null;
 let masterCache = [];
 let dataCache = [];
 let matrixRange = { from: '', to: '' };
+
 // ================= V6: Normalize Grade =================
-// "CA85"   → "CA085"
-// "CAF125" → "CAF125"
-// "CAF"    → "CAF"
-// "CA125F" → "CAF125"
 function normalizeGrade(g) {
   if (!g) return '';
   g = String(g).trim().toUpperCase();
 
-  // CAF125
   let m = g.match(/^([A-Z]+)F(\d+)$/);
   if (m) return m[1] + 'F' + m[2].padStart(3, '0');
 
-  // CA125F
   m = g.match(/^([A-Z]+)(\d+)F$/);
   if (m) return m[1] + 'F' + m[2].padStart(3, '0');
 
-  // CAF
   if (/^[A-Z]+F$/.test(g)) return g;
 
-  // CA85 → CA085
   m = g.match(/^([A-Z]+)(\d+)$/);
   if (m) return m[1] + m[2].padStart(3, '0');
 
@@ -49,8 +42,6 @@ function normalizeGrade(g) {
 }
 
 // ================= V6: Parse Gradegram =================
-// "CAF125" → { grade: "CAF", gram: "125" }
-// "CA085"  → { grade: "CA085", gram: null }
 function parseGradegram(gradegram) {
   if (!gradegram) return { grade: '', gram: null };
   const s = String(gradegram).trim().toUpperCase();
@@ -64,6 +55,7 @@ function parseGradegram(gradegram) {
   if (/^[A-Z]+F$/.test(s)) return { grade: s, gram: null };
   return { grade: s, gram: null };
 }
+
 // ================= HELPERS =================
 const $ = id => document.getElementById(id);
 const pad = n => String(n).padStart(2, '0');
@@ -121,7 +113,6 @@ function toISODate(v) {
   if (m) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
   return s.slice(0, 10);
 }
-// ✅ V6: แปลง Excel serial → วันที่ไทย (31/1/2569)
 function excelDateToThai(serial) {
   if (!serial && serial !== 0) return '';
   if (typeof serial !== 'number') return String(serial);
@@ -304,7 +295,8 @@ $('logoutBtn').onclick = async () => {
 };
 
 // ================= TABS =================
-const TAB_LIST = ['matrix','stock','summary','receive','alert','data','settings'];
+// ✅ แก้ 1: ลบ 'summary' ออกจาก TAB_LIST
+const TAB_LIST = ['matrix','stock','receive','alert','data','settings'];
 
 document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
   btn.onclick = () => {
@@ -314,7 +306,7 @@ document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
     const t = btn.dataset.tab;
     if (t === 'matrix' && typeof renderMatrix === 'function') renderMatrix();
     if (t === 'stock' && typeof initStockTab === 'function') initStockTab();
-    if (t === 'summary' && typeof initSummaryTab === 'function') initSummaryTab();
+    // ✅ แก้ 2: ลบบรรทัด initSummaryTab() ออก
     if (t === 'receive' && typeof initReceiveTab === 'function') initReceiveTab();
     if (t === 'alert' && typeof initAlertTab === 'function') initAlertTab();
     if (t === 'data') renderData();
@@ -332,22 +324,22 @@ async function loadMaster(onProgress = null) {
 async function refreshAll() {
   await loadMaster();
   if (typeof loadGradeFilter === 'function') await loadGradeFilter();
-  if (typeof loadSizeFilter === 'function') loadSizeFilter();   // ✅ เพิ่มบรรทัดนี้
+  if (typeof loadSizeFilter === 'function') loadSizeFilter();
   if (typeof loadMonthFilter === 'function') loadMonthFilter();
   if (typeof loadStockGradeFilter === 'function') await loadStockGradeFilter();
-  if (typeof loadSummaryGradeFilter === 'function') await loadSummaryGradeFilter();
+  // ✅ แก้ 3: ลบบรรทัด loadSummaryGradeFilter() ออก
   if (typeof loadReceiveGradeFilter === 'function') await loadReceiveGradeFilter();
   if (typeof loadAlertGradeFilter === 'function') await loadAlertGradeFilter();
   if (typeof loadStockLevelSnapshots === 'function') await loadStockLevelSnapshots();
   if (typeof updateReportTitle === 'function') updateReportTitle();
   renderMatrix();
 }
+
 // ================= V6: MATRIX GRADE FILTER (grade+gram) =================
 let selectedGrades = [];
 let allGradesList = [];
 
 async function loadGradeFilter() {
-  // ✅ V6: grade + gram รวมกัน
   allGradesList = [...new Set(
     masterCache.map(m => m.grade + m.gram)
   )].sort();
@@ -440,6 +432,7 @@ function clearAllGrades() {
 function getSelectedGrades() {
   return selectedGrades;
 }
+
 // ================= DRILL MODAL =================
 async function openDrill(gradegram, size) {
   const m = masterCache.find(r => (r.grade + r.gram) === gradegram && r.size === size);
@@ -454,7 +447,6 @@ async function openDrill(gradegram, size) {
     return q;
   });
 
-  // ✅ V7: ใช้ multi-select customers จาก stock-level.js
   const customers = (typeof getSelectedCustomers === 'function') ? getSelectedCustomers() : [];
   let filtered = usage;
   if (customers.length > 0) {
@@ -637,7 +629,6 @@ function importMaster(ev) {
 }
 
 // ================= DATA TAB =================
-// ✅ V6: ย้าย import_at, batch, สถานะ ไปท้ายตาราง + doc_date แปลงเป็นไทย
 const RAW_COLUMNS = [
   { key: 'id', label: 'id' },
   { key: 'error_msg', label: 'error' },
@@ -664,7 +655,6 @@ const RAW_COLUMNS = [
   { key: 'warehouse_no', label: 'warehouse_no' },
   { key: 'usage_date', label: 'usage_date' },
   { key: 'item_code', label: 'item_code' },
-  // ✅ V6: ย้ายมาท้าย
   { key: 'import_at', label: 'import_at' },
   { key: 'import_batch_id', label: 'batch' },
   { key: 'is_valid', label: 'สถานะ' }
@@ -725,7 +715,6 @@ async function renderData() {
         } else if (c.key === 'import_at' && v) {
           v = new Date(v).toLocaleString('th-TH');
         } else if (c.isExcelDate && v !== null && v !== undefined && v !== '') {
-          // ✅ V6: แปลง Excel serial → วันที่ไทย
           v = excelDateToThai(Number(v));
         } else {
           v = esc(v);
