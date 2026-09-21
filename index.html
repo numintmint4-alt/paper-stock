@@ -384,8 +384,14 @@
           </label>
 
           <label><input type="checkbox" id="alertIncludeCustomer"> รวมม้วนลูกค้า</label>
-          <label><input type="checkbox" id="alertOnlyShortage" checked> แสดงเฉพาะที่ต้องสั่ง</label>
-
+          <label>Alert
+  <select id="alertFilter" multiple style="min-width:120px;height:32px">
+    <option value="all" selected>ทั้งหมด</option>
+    <option value="lt0">ติดลบ (&lt; 0)</option>
+    <option value="eq0">พอดี (= 0)</option>
+    <option value="gt0">เกิน (&gt; 0)</option>
+  </select>
+</label>
           <button class="primary" onclick="renderAlert()">🔍 วิเคราะห์</button>
           <button onclick="exportAlert()">📤 Export Excel</button>
           <button onclick="window.print()">🖨 พิมพ์</button>
