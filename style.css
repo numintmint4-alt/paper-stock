@@ -599,3 +599,136 @@ th{background:#f1f5f9;font-weight:600}
   font-size: 14px;
   line-height: 1.6;
 }
+/* ═══════════════════════════════════════════════════════════ */
+/* ========== ALERT MATRIX V7 — Matrix + Input ========== */
+/* ═══════════════════════════════════════════════════════════ */
+
+.alert-matrix-table {
+  font-size: 11px;
+  table-layout: auto;
+  width: 100%;
+  border-collapse: collapse;
+}
+.alert-matrix-table th,
+.alert-matrix-table td {
+  border: 1px solid #94a3b8;
+  padding: 3px 4px;
+  text-align: center;
+  vertical-align: top;
+  white-space: nowrap;
+}
+.alert-matrix-table thead th {
+  background: #1e293b;
+  color: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  font-size: 12px;
+  padding: 6px 4px;
+}
+.alert-matrix-table .grade-col {
+  background: #f1f5f9;
+  font-weight: 700;
+  text-align: left;
+  padding-left: 6px;
+  min-width: 70px;
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  font-size: 12px;
+}
+.alert-matrix-table thead .grade-col {
+  z-index: 6;
+  background: #1e293b;
+  color: #fff;
+}
+.alert-matrix-table .total-col {
+  background: #e0e7ff;
+  font-weight: 700;
+  min-width: 50px;
+}
+.alert-matrix-table .total-row td {
+  background: #cbd5e1;
+  font-weight: 700;
+  font-size: 13px;
+}
+.alert-matrix-table .total-row .total-col {
+  background: #a5b4fc;
+}
+.alert-matrix-table td.empty {
+  color: #cbd5e1;
+  background: #f8fafc;
+}
+
+/* ========== Cell ที่มีข้อมูล ========== */
+.alert-matrix-table td.alert-red    { background: #fee2e2; }
+.alert-matrix-table td.alert-yellow { background: #fef3c7; }
+.alert-matrix-table td.alert-green  { background: #f0fdf4; }
+
+.alert-matrix-table td.clickable { cursor: pointer; }
+.alert-matrix-table td.clickable:hover { filter: brightness(0.95); }
+
+.alert-cell-wrap {
+  padding: 4px 2px;
+  border-bottom: 1px dashed #cbd5e1;
+  margin-bottom: 4px;
+}
+.alert-cell-alert {
+  font-weight: 700;
+  font-size: 15px;
+  color: #1e293b;
+  line-height: 1.2;
+}
+.alert-cell-detail {
+  font-size: 9px;
+  color: #64748b;
+  margin: 2px 0;
+}
+.alert-cell-status {
+  font-size: 10px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+/* ========== Input ภายใน Cell ========== */
+.alert-cell-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 4px;
+}
+.alert-input-qty,
+.alert-input-sup,
+.alert-input-note {
+  font-size: 10px;
+  padding: 2px 4px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  width: 100%;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.alert-input-qty {
+  text-align: center;
+  font-weight: 700;
+  color: #dc2626;
+}
+.alert-input-note {
+  font-size: 9px;
+}
+.alert-input-qty:focus,
+.alert-input-sup:focus,
+.alert-input-note:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37,99,235,.15);
+}
+
+/* ========== Mobile ========== */
+@media (max-width: 640px) {
+  .alert-matrix-table { font-size: 10px; }
+  .alert-cell-alert { font-size: 13px; }
+  .alert-input-qty,
+  .alert-input-sup,
+  .alert-input-note { font-size: 9px; }
+}
