@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// STOCK V7 — alert.js (Flat Table + Filter แบบ Gradegrams)
+// STOCK V8 — alert.js (Flat Table + Filter + PO + Lock Date)
 // ═══════════════════════════════════════════════════════════════
 
 let alertSelectedGrades = [];
@@ -7,7 +7,7 @@ let alertAllGrades = [];
 let alertCache = [];
 let alertSupplierCache = [];
 
-// ✅ Alert Filter (แบบ Gradegrams)
+// ✅ Alert Filter
 let alertSelectedFilters = ['all'];
 const ALERT_ALL_FILTERS = [
   { value: 'all', label: 'ทั้งหมด' },
@@ -16,16 +16,39 @@ const ALERT_ALL_FILTERS = [
   { value: 'gt0', label: '🟢 เกิน (> 0)' }
 ];
 
-const ALERT_LS_KEY = 'stockv7_alert_inputs';
+// ✅ Customer Roll (ม้วนลูกค้า)
+const ALERT_CUSTOMER_ROLLS = [
+  { value: 'normal',   label: 'ปกติ' },
+  { value: 'pump_f',   label: 'ปั้ม F' },
+  { value: 'pump_bt',  label: 'ปั้ม BT' },
+  { value: 'pump_ktp', label: 'ปั้ม KTP' }
+];
+
+// ✅ Quality B (คุณภาพ B)
+const ALERT_QUALITY_B = [
+  { value: 'normal', label: 'ปกติ' },
+  { value: 'nc',     label: 'NC' }
+];
+
+const ALERT_LS_KEY = 'stockv8_alert_inputs';
+const ALERT_PO_FLAG_KEY = 'stockv8_alert_po_created';
 
 // ================= INIT =================
 async function initAlertTab() {
   const today = toISODate(new Date());
+
+  // ✅ Lock วันที่วิเคราะห์ = today (disable)
+  const alertDateEl = $('alertDate');
+  if (alertDateEl) {
+    alertDateEl.value = today;
+    alertDateEl.disabled = true;
+    alertDateEl.style.background = '#f1f5f9';
+    alertDateEl.style.cursor = 'not-allowed';
+  }
+
+  // default stock = เมื่อวาน
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-
-  // ✅ วันที่วิเคราะห์ = today
-  if ($('alertDate') && !$('alertDate').value) $('alertDate').value = today;
   if ($('alertStockDate') && !$('alertStockDate').value) $('alertStockDate').value = toISODate(yesterday);
   if ($('alertReceiveDate') && !$('alertReceiveDate').value) $('alertReceiveDate').value = today;
 
@@ -134,7 +157,7 @@ function clearAllAlertGrades() {
   renderAlertGradeList(); updateAlertGradeLabel();
 }
 
-// ================= ALERT FILTER (แบบ Gradegrams) =================
+// ================= ALERT FILTER =================
 function loadAlertFilter() {
   renderAlertFilterList();
   updateAlertFilterLabel();
@@ -230,10 +253,45 @@ function saveAlertInput(key, field, value) {
   if (!data[key]) data[key] = {};
   data[key][field] = value;
   localStorage.setItem(ALERT_LS_KEY, JSON.stringify(data));
+
+  // ✅ Mark ว่ามีการแก้ไข (ถ้าเคยสร้าง PO แล้ว)
+  markAlertPOEdited();
 }
 function getAlertInput(key) {
   const data = loadAlertInputs();
   return data[key] || {};
+}
+
+// ✅ PO Flag (เก็บว่าสร้าง PO แล้วหรือยัง)
+function loadPOFlag() {
+  try {
+    const raw = localStorage.getItem(ALERT_PO_FLAG_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+function savePOFlag(data) {
+  localStorage.setItem(ALERT_PO_FLAG_KEY, JSON.stringify(data));
+}
+function markAlertPOCreated(refKey) {
+  const flags = loadPOFlag();
+  flags[refKey] = { created_at: new Date().toISOString(), edited: false };
+  savePOFlag(flags);
+}
+function markAlertPOEdited() {
+  const flags = loadPOFlag();
+  let changed = false;
+  Object.keys(flags).forEach(k => {
+    if (flags[k] && flags[k].created_at && !flags[k].edited) {
+      flags[k].edited = true;
+      flags[k].edited_at = new Date().toISOString();
+      changed = true;
+    }
+  });
+  if (changed) savePOFlag(flags);
+}
+function hasPOEdited() {
+  const flags = loadPOFlag();
+  return Object.values(flags).some(f => f.edited === true);
 }
 
 // ================= RENDER ALERT (Flat Table) =================
@@ -284,7 +342,7 @@ async function renderAlert() {
       result = result.filter(r => alertSelectedGrades.includes(r.gradegram));
     }
 
-    // ✅ Filter Alert
+    // Filter Alert
     let display = result;
     if (!alertSelectedFilters.includes('all') && alertSelectedFilters.length > 0) {
       display = result.filter(r => {
@@ -323,7 +381,8 @@ async function renderAlert() {
     // ============ FLAT TABLE ============
     html += '<div class="report-wrap alert-scroll"><table class="alert-flat-table"><thead><tr>';
     html += '<th>Gradegrams</th><th>Size</th><th>Snapshot</th><th>Stock</th><th>Receive</th>';
-    html += '<th>Alert</th><th>สถานะ</th><th>สั่งซื้อ</th><th>Sup.</th><th>หมายเหตุ</th>';
+    html += '<th>Alert</th><th>สถานะ</th><th>สั่งซื้อ</th><th>Sup.</th>';
+    html += '<th>ม้วนลูกค้า</th><th>คุณภาพ B</th><th>หมายเหตุ</th>';
     html += '</tr></thead><tbody>';
 
     let grandShortage = 0;
@@ -342,6 +401,14 @@ async function renderAlert() {
         `<option value="${esc(code)}" ${lsVal.sup === code ? 'selected' : ''}>${esc(code)}</option>`
       ).join('');
 
+      const custOptions = ALERT_CUSTOMER_ROLLS.map(c =>
+        `<option value="${c.value}" ${lsVal.customer_roll === c.value ? 'selected' : ''}>${c.label}</option>`
+      ).join('');
+
+      const qualOptions = ALERT_QUALITY_B.map(q =>
+        `<option value="${q.value}" ${lsVal.quality_b === q.value ? 'selected' : ''}>${q.label}</option>`
+      ).join('');
+
       html += `<tr class="${rowCls}">`;
       html += `<td class="grade-col clickable" onclick="openAlertDetail('${esc(r.gradegram)}', ${r.size})">${esc(r.gradegram)}</td>`;
       html += `<td class="clickable" onclick="openAlertDetail('${esc(r.gradegram)}', ${r.size})">${r.size}</td>`;
@@ -353,6 +420,8 @@ async function renderAlert() {
       html += `<td><input type="number" class="alert-input-qty" placeholder="-" value="${lsVal.qty || ''}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'qty', this.value)"></td>`;
       html += `<td><select class="alert-input-sup" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'sup', this.value)">
         <option value="">-- Sup --</option>${supOptions}</select></td>`;
+      html += `<td><select class="alert-input-customer" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'customer_roll', this.value)">${custOptions}</select></td>`;
+      html += `<td><select class="alert-input-quality" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'quality_b', this.value)">${qualOptions}</select></td>`;
       html += `<td><input type="text" class="alert-input-note" placeholder="-" value="${esc(lsVal.note || '')}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'note', this.value)"></td>`;
       html += '</tr>';
     });
@@ -360,27 +429,124 @@ async function renderAlert() {
     html += `<tr class="total-row">
       <td colspan="7" style="text-align:right;font-weight:700">จำนวนรวม (ม้วน)</td>
       <td style="font-weight:700;color:#dc2626;font-size:15px">${grandShortage > 0 ? grandShortage : '-'}</td>
-      <td colspan="2"></td>
+      <td colspan="4"></td>
     </tr>`;
 
     html += '</tbody></table></div>';
 
-    html += `<div class="report-foot">
-      Stock Level − (Stock + Receive) = Alert · คลิก Gradegrams/Size เพื่อดูรายละเอียด · รวมต้องสั่ง ${grandShortage} ม้วน
+    // ปุ่มด้านล่าง
+    html += `<div class="report-foot" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div>Stock Level − (Stock + Receive) = Alert · รวมต้องสั่ง ${grandShortage} ม้วน</div>
+      <div style="display:flex;gap:6px">
+        <button class="primary" onclick="createPOFromAlert()">📄 สร้าง PO</button>
+        <button onclick="exportAlert()">📤 Export Excel</button>
+        <button onclick="window.print()">🖨 พิมพ์</button>
+      </div>
     </div>`;
 
     $('alertBody').innerHTML = html;
     alertCache = display;
+
+    // ✅ ตรวจสอบว่ามีการแก้ไขหลังสร้าง PO ไหม
+    if (hasPOEdited()) {
+      showPOEditedWarning();
+    }
   } catch (err) {
     console.error('renderAlert error:', err);
     $('alertBody').innerHTML = `<div class="msg err">เกิดข้อผิดพลาด: ${esc(err.message)}</div>`;
   }
 }
 
+// ================= PO Edited Warning =================
+function showPOEditedWarning() {
+  // ✅ ใช้ modal popup (B)
+  let modal = document.getElementById('modalPOEditedWarning');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'modalPOEditedWarning';
+    modal.className = 'modal-bg';
+    modal.innerHTML = `
+      <div class="modal" style="max-width:480px;text-align:center">
+        <div style="font-size:48px;margin-bottom:10px">⚠️</div>
+        <h3 style="margin:0 0 12px;color:#dc2626">มีการแก้ไข Alert</h3>
+        <p style="color:#475569;margin-bottom:20px;line-height:1.6">
+          คุณได้แก้ไขข้อมูล Alert หลังจากสร้าง PO ไปแล้ว<br>
+          ต้องการอัปเดต PO ให้ตรงกับ Alert ปัจจุบันหรือไม่?
+        </p>
+        <div style="display:flex;gap:8px;justify-content:center">
+          <button onclick="dismissPOWarning()">ไม่ต้อง</button>
+          <button class="primary" onclick="dismissPOWarning()">รับทราบ</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+  }
+  modal.classList.add('show');
+}
+
+function dismissPOWarning() {
+  const modal = document.getElementById('modalPOEditedWarning');
+  if (modal) modal.classList.remove('show');
+}
+
 // ================= INPUT =================
 function onAlertInput(gradegram, size, field, value) {
   const key = alertLS_Key(gradegram, size);
   saveAlertInput(key, field, value);
+}
+
+// ================= CREATE PO FROM ALERT =================
+async function createPOFromAlert() {
+  if (!alertCache || !alertCache.length) {
+    alert('ไม่มีข้อมูล Alert');
+    return;
+  }
+
+  const items = [];
+
+  for (const r of alertCache) {
+    const lsKey = alertLS_Key(r.gradegram, r.size);
+    const lsVal = getAlertInput(lsKey);
+
+    if (!lsVal.qty || Number(lsVal.qty) <= 0) continue;
+    if (!lsVal.sup) continue;
+
+    items.push({
+      seq: items.length + 1,
+      gradegram: r.gradegram,
+      size: r.size,
+      gradegram_size: `${r.gradegram}-${Number(r.size).toFixed(2)}`,
+      quantity: Number(lsVal.qty),
+      sup: lsVal.sup,
+      customer_roll: lsVal.customer_roll || 'normal',
+      quality_b: lsVal.quality_b || 'normal',
+      note: lsVal.note || ''
+    });
+  }
+
+  if (!items.length) {
+    alert('กรุณากรอกจำนวนสั่งซื้อ + Sup. อย่างน้อย 1 รายการ');
+    return;
+  }
+
+  // ✅ Lock วันที่วิเคราะห์ = today
+  const analyzedDate = toISODate(new Date());
+
+  // ส่งไปหน้า PO Form
+  sessionStorage.setItem('alert_to_po', JSON.stringify({
+    items,
+    analyzed_date: analyzedDate,
+    ref_snapshot: $('alertSnapshotMonth')?.value,
+    ref_stock: $('alertStockDate')?.value,
+    ref_receive: $('alertReceiveDate')?.value
+  }));
+
+  // ✅ Mark flag
+  markAlertPOCreated(`ref_${Date.now()}`);
+
+  // ไป Tab PO
+  const poBtn = document.querySelector('.nav button[data-tab="purchase-order"]');
+  if (poBtn) poBtn.click();
+  else alert('ยังไม่ได้เพิ่ม Tab Purchase Order');
 }
 
 // ================= DETAIL MODAL =================
@@ -486,15 +652,24 @@ async function openAlertDetail(gradegram, size) {
 // ================= EXPORT =================
 function exportAlert() {
   if (!alertCache || !alertCache.length) return alert('ไม่มีข้อมูล');
-  const data = alertCache.map(r => ({
-    Gradegrams: r.gradegram,
-    Size: r.size,
-    Snapshot: r.snapshot,
-    Stock: r.stock,
-    Receive: r.receive,
-    Alert: r.alert,
-    สถานะ: r.alert < 0 ? `ขาด ${Math.ceil(Math.abs(r.alert))}` : (r.alert === 0 ? 'พอดี' : `เกิน ${Math.floor(r.alert)}`)
-  }));
+
+  const data = alertCache.map(r => {
+    const lsVal = getAlertInput(alertLS_Key(r.gradegram, r.size));
+    return {
+      Gradegrams: r.gradegram,
+      Size: r.size,
+      Snapshot: r.snapshot,
+      Stock: r.stock,
+      Receive: r.receive,
+      Alert: r.alert,
+      สถานะ: r.alert < 0 ? `ขาด ${Math.ceil(Math.abs(r.alert))}` : (r.alert === 0 ? 'พอดี' : `เกิน ${Math.floor(r.alert)}`),
+      สั่งซื้อ: lsVal.qty || '',
+      Sup: lsVal.sup || '',
+      ม้วนลูกค้า: ALERT_CUSTOMER_ROLLS.find(c => c.value === lsVal.customer_roll)?.label || 'ปกติ',
+      'คุณภาพ B': ALERT_QUALITY_B.find(q => q.value === lsVal.quality_b)?.label || 'ปกติ',
+      หมายเหตุ: lsVal.note || ''
+    };
+  });
   const ws = XLSX.utils.json_to_sheet(data);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Alert');
