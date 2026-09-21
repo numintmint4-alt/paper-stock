@@ -358,11 +358,11 @@
         <div class="filters no-print">
           <label>📅 วันที่วิเคราะห์ <input type="date" id="alertDate"></label>
 
-          <label>📅 สั่งซื้อเข้าภายในวันที่ <input type="date" id="alertStockDate"></label>
+          <label>📅 Stock วันที่ <input type="date" id="alertStockDate"></label>
 
           <label>📅 Receive วันที่ <input type="date" id="alertReceiveDate"></label>
 
-          <label>Snapshot เดือน
+          <label>📅 Stock Level เดือน
             <input type="month" id="alertSnapshotMonth">
           </label>
 
@@ -383,15 +383,25 @@
             </div>
           </label>
 
+          <label class="grade-filter-wrap">
+            🔎 Alert
+            <div class="grade-filter-box" id="alertFilterBox">
+              <button type="button" class="grade-filter-btn" id="alertFilterBtn">
+                <span id="alertFilterLabel">ทั้งหมด</span>
+                <span class="arrow">▼</span>
+              </button>
+              <div class="grade-dropdown hidden" id="alertFilterDropdown">
+                <div class="grade-actions">
+                  <button type="button" onclick="selectAllAlertFilters()">✓ เลือกทั้งหมด</button>
+                  <button type="button" onclick="clearAllAlertFilters()">✗ ล้างทั้งหมด</button>
+                </div>
+                <div class="grade-list" id="alertFilterList"></div>
+              </div>
+            </div>
+          </label>
+
           <label><input type="checkbox" id="alertIncludeCustomer"> รวมม้วนลูกค้า</label>
-          <label>Alert
-  <select id="alertFilter" multiple style="min-width:120px;height:32px">
-    <option value="all" selected>ทั้งหมด</option>
-    <option value="lt0">ติดลบ (&lt; 0)</option>
-    <option value="eq0">พอดี (= 0)</option>
-    <option value="gt0">เกิน (&gt; 0)</option>
-  </select>
-</label>
+
           <button class="primary" onclick="renderAlert()">🔍 วิเคราะห์</button>
           <button onclick="exportAlert()">📤 Export Excel</button>
           <button onclick="window.print()">🖨 พิมพ์</button>
