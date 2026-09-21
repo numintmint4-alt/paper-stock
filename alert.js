@@ -1,10 +1,15 @@
 // ═══════════════════════════════════════════════════════════════
-// STOCK V6 — alert.js (แก้แล้ว: ใช้ modalAlertDetail)
+// STOCK V7 — alert.js (ใช้ get_alert_matrix RPC)
 // ═══════════════════════════════════════════════════════════════
 
 let alertSelectedGrades = [];
 let alertAllGrades = [];
 let alertCache = [];
+let alertSupplierCache = [];
+let alertSnapshotMonths = [];
+
+// localStorage key
+const ALERT_LS_KEY = 'stockv7_alert_inputs';
 
 // ================= INIT =================
 async function initAlertTab() {
@@ -12,17 +17,54 @@ async function initAlertTab() {
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
 
-  if ($('alertDate')        && !$('alertDate').value)        $('alertDate').value = today;
+  // default วันที่
   if ($('alertStockDate')   && !$('alertStockDate').value)   $('alertStockDate').value = toISODate(yesterday);
   if ($('alertReceiveDate') && !$('alertReceiveDate').value) $('alertReceiveDate').value = today;
 
-  // ✅ Demand → เลือกเดือนได้ (dropdown)
-  if ($('alertDemandMonth') && !$('alertDemandMonth').value) {
-    $('alertDemandMonth').value = today.slice(0, 7);
-  }
-
+  await loadAlertSuppliers();
+  await loadSnapshotMonths();     // โหลดเดือน + set alertSnapshotMonth
   await loadAlertGradeFilter();
   await renderAlert();
+}
+
+// ================= SUPPLIERS =================
+async function loadAlertSuppliers() {
+  try {
+    const { data, error } = await supabase
+      .from('paper_suppliers')
+      .select('code')
+      .eq('is_active', true)
+      .order('code');
+    if (error) throw error;
+    alertSupplierCache = (data || []).map(s => s.code);
+  } catch (e) {
+    console.warn('loadAlertSuppliers:', e);
+    alertSupplierCache = ['EKP', 'MKP', 'SCK'];   // fallback
+  }
+}
+
+// ================= SNAPSHOT MONTHS =================
+async function loadSnapshotMonths() {
+  try {
+    const { data, error } = await supabase
+      .from('stock_level_snapshots')
+      .select('months')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+
+    const set = new Set();
+    (data || []).forEach(row => {
+      (row.months || []).forEach(m => set.add(m));
+    });
+    alertSnapshotMonths = [...set].sort().reverse();  // ใหม่สุดก่อน
+
+    // set ค่า default ให้ alertSnapshotMonth
+    if ($('alertSnapshotMonth') && !$('alertSnapshotMonth').value) {
+      $('alertSnapshotMonth').value = alertSnapshotMonths[0] || '';
+    }
+  } catch (e) {
+    console.warn('loadSnapshotMonths:', e);
+  }
 }
 
 // ================= GRADE FILTER =================
@@ -38,7 +80,6 @@ async function loadAlertGradeFilter() {
   const box = $('alertGradeFilterBox');
   if (!btn || !dropdown || !box) return;
 
-  // ✅ ตรวจ event listener (attach ครั้งเดียว)
   if (btn.dataset.listenerAttached === '1') return;
   btn.dataset.listenerAttached = '1';
 
@@ -104,213 +145,196 @@ function clearAllAlertGrades() {
   renderAlertGradeList(); updateAlertGradeLabel();
 }
 
+// ================= LOCAL STORAGE (input ใน Matrix) =================
+function alertLS_Key(gradegram, size) {
+  return `${gradegram}|${size}`;
+}
+
+function loadAlertInputs() {
+  try {
+    const raw = localStorage.getItem(ALERT_LS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
+function saveAlertInput(key, field, value) {
+  const data = loadAlertInputs();
+  if (!data[key]) data[key] = {};
+  data[key][field] = value;
+  localStorage.setItem(ALERT_LS_KEY, JSON.stringify(data));
+}
+
+function getAlertInput(key) {
+  const data = loadAlertInputs();
+  return data[key] || {};
+}
+
 // ================= RENDER ALERT =================
 async function renderAlert() {
-  const alertDate     = $('alertDate')?.value;
+  const snapshotMonth = $('alertSnapshotMonth')?.value;
   const stockDate     = $('alertStockDate')?.value;
   const receiveDate   = $('alertReceiveDate')?.value;
-  const demandMonth   = $('alertDemandMonth')?.value;
-  const includeCustomer = $('alertIncludeCustomer')?.checked || false;
-  const onlyShortage    = $('alertOnlyShortage')?.checked ?? true;
+  const onlyShortage  = $('alertOnlyShortage')?.checked ?? true;
 
-  if (!alertDate || !stockDate || !receiveDate) {
-    alert('กรุณาเลือกวันที่ให้ครบ');
+  if (!snapshotMonth || !stockDate || !receiveDate) {
+    alert('กรุณาเลือก Snapshot / Stock / Receive ให้ครบ');
     return;
   }
 
-  const dateThai = thaiDateFull(alertDate);
   const gradeLabel = alertSelectedGrades.length > 0
     ? ` · เกรด: ${alertSelectedGrades.join(', ')}` : '';
-  const custLabel = includeCustomer ? ' · รวมม้วนลูกค้า' : ' · ไม่รวมม้วนลูกค้า';
 
   $('alertReportTitle').innerHTML = `
     🚨 แจ้งเตือนสั่งซื้อ (Roll Alert)<br>
-    ประจำวันที่ ${dateThai}
-    <div class="report-subtitle">(Stock ณ ${thaiDateFull(stockDate)} · Receive ${thaiDateFull(receiveDate)} · Demand ${demandMonth || '3 เดือน'}${gradeLabel}${custLabel})</div>
+    Snapshot: ${snapshotMonth}
+    <div class="report-subtitle">(Stock ${thaiDateFull(stockDate)} · Receive ${thaiDateFull(receiveDate)}${gradeLabel})</div>
   `;
   $('alertBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังวิเคราะห์...</p>';
 
   try {
-    // คำนวณ 3 เดือนย้อนหลังจากเดือนที่เลือก
-    let fromISO, toISO;
-    if (demandMonth) {
-      const [yy, mm] = demandMonth.split('-').map(Number);
-      const monthsBack = 3;
-      let fromM = mm - monthsBack + 1, fromY = yy;
-      while (fromM <= 0) { fromM += 12; fromY -= 1; }
-      fromISO = `${fromY}-${pad(fromM)}-01`;
-      const toDate = new Date(yy, mm, 0);
-      toISO = toISODate(toDate);
-    } else {
-      const [year, m] = alertDate.split('-').map(Number);
-      const toDate = new Date(year, m - 1, 0);
-      toISO = toISODate(toDate);
-      let fromM = m - 2, fromY = year;
-      while (fromM <= 0) { fromM += 12; fromY -= 1; }
-      fromISO = `${fromY}-${pad(fromM)}-01`;
+    // ✅ เรียก RPC
+    const { data, error } = await supabase.rpc('get_alert_matrix', {
+      p_snapshot_month: snapshotMonth,
+      p_stock_date:     stockDate,
+      p_receive_date:   receiveDate,
+    });
+    if (error) throw error;
+
+    let result = data || [];
+
+    // Filter grade
+    if (alertSelectedGrades.length > 0) {
+      result = result.filter(r => {
+        const m = masterCache.find(x =>
+          normalizeGrade(x.grade) === normalizeGrade(r.grade) &&
+          x.size === r.size
+        );
+        if (!m) return false;
+        const gg = normalizeGrade(m.grade) + m.gram;
+        return alertSelectedGrades.includes(gg);
+      });
     }
 
-    const usage = await fetchAllRows(() =>
-      supabase.from('usage_records').select('*')
-        .gte('usage_date', fromISO)
-        .lte('usage_date', toISO)
-    );
-
-    const mByCode = {};
-    masterCache.forEach(m => mByCode[m.item_code] = m);
-
-    const daily = {};
-    usage.forEach(u => {
-      const key = u.item_code + '|' + u.usage_date;
-      daily[key] = (daily[key] || 0) + Number(u.used_kgs);
+    // เพิ่ม gradegram ให้แต่ละ row
+    result = result.map(r => {
+      const m = masterCache.find(x =>
+        normalizeGrade(x.grade) === normalizeGrade(r.grade) &&
+        x.size === r.size
+      );
+      return {
+        ...r,
+        gradegram: m ? (normalizeGrade(m.grade) + m.gram) : r.grade
+      };
     });
 
-    const maxRolls = {};
-    Object.entries(daily).forEach(([k, kg]) => {
-      const code = k.split('|')[0];
-      const m = mByCode[code]; if (!m) return;
-      const std = Number(m.std_weight_kg); if (!std) return;
-      const rolls = Math.ceil(kg / std);
-      if (!maxRolls[code] || rolls > maxRolls[code]) maxRolls[code] = rolls;
-    });
+    // Filter เฉพาะที่ขาด
+    const display = onlyShortage ? result.filter(r => r.alert < 0) : result;
 
-    const demandMap = {};
-    Object.entries(maxRolls).forEach(([code, rolls]) => {
-      const m = mByCode[code]; if (!m) return;
-      const rk = normalizeGrade(m.grade) + m.gram + '|' + m.size;
-      demandMap[rk] = rolls;
-    });
-
-    const stockData = await fetchAllRows(() =>
-      supabase.from('stock_balance')
-        .select('grade, width, is_customer_roll')
-        .eq('stock_date', stockDate)
-        .eq('roll_status', 'full')
-    );
-
-    const stockMap = {};
-    stockData.forEach(s => {
-      if (!includeCustomer && s.is_customer_roll) return;
-      const m = masterCache.find(x => normalizeGrade(x.grade) === normalizeGrade(s.grade) && x.size === s.width);
-      if (!m) return;
-      const rk = normalizeGrade(m.grade) + m.gram + '|' + m.size;
-      stockMap[rk] = (stockMap[rk] || 0) + 1;
-    });
-
-    const receiveData = await fetchAllRows(() =>
-      supabase.from('po_receive')
-        .select('grade, size, quantity, is_customer_roll')
-        .eq('po_date', receiveDate)
-    );
-
-    const receiveMap = {};
-    receiveData.forEach(r => {
-      if (!includeCustomer && r.is_customer_roll) return;
-      const m = masterCache.find(x => normalizeGrade(x.grade) === normalizeGrade(r.grade) && x.size === r.size);
-      if (!m) return;
-      const rk = normalizeGrade(m.grade) + m.gram + '|' + r.size;
-      receiveMap[rk] = (receiveMap[rk] || 0) + Number(r.quantity);
-    });
-
-    const allKeys = new Set([
-      ...Object.keys(demandMap),
-      ...Object.keys(stockMap),
-      ...Object.keys(receiveMap)
-    ]);
-
-    const result = [];
-    allKeys.forEach(k => {
-      const [gradegram, sizeStr] = k.split('|');
-      const size = Number(sizeStr);
-      if (alertSelectedGrades.length > 0 && !alertSelectedGrades.includes(gradegram)) return;
-
-      const demand  = demandMap[k]  || 0;
-      const stock   = stockMap[k]   || 0;
-      const receive = receiveMap[k] || 0;
-      const totalAvailable = stock + receive;
-      const shortage = demand - totalAvailable;
-
-      result.push({ gradegram, size, demand, stock, receive, total: totalAvailable, shortage });
-    });
-
-    result.sort((a, b) => b.shortage - a.shortage);
-    const display = onlyShortage ? result.filter(r => r.shortage > 0) : result;
-
-    const totalShortage = result.filter(r => r.shortage > 0).length;
-    const totalOK = result.filter(r => r.shortage <= 0).length;
+    // Summary
+    const totalShortage = result.filter(r => r.alert < 0).length;
+    const totalOK       = result.filter(r => r.alert === 0).length;
+    const totalOver     = result.filter(r => r.alert > 0).length;
 
     let html = `<div class="alert-summary">
-      <div class="item red">🔴 ต้องสั่งด่วน: ${totalShortage} รายการ</div>
-      <div class="item green">🟢 OK: ${totalOK} รายการ</div>
+      <div class="item red">🔴 ขาด: ${totalShortage} รายการ</div>
+      <div class="item yellow">🟡 พอดี: ${totalOK} รายการ</div>
+      <div class="item green">🟢 เกิน: ${totalOver} รายการ</div>
     </div>`;
 
     if (!display.length) {
-      html += '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่มีรายการที่ต้องสั่งซื้อ 🎉</p>';
+      html += '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่มีรายการ 🎉</p>';
       $('alertBody').innerHTML = html;
       alertCache = [];
       return;
     }
 
-    const groupedByGrade = {};
+    // จัดกลุ่มตาม gradegram
+    const grouped = {};
     display.forEach(r => {
-      if (!groupedByGrade[r.gradegram]) groupedByGrade[r.gradegram] = [];
-      groupedByGrade[r.gradegram].push(r);
+      if (!grouped[r.gradegram]) grouped[r.gradegram] = [];
+      grouped[r.gradegram].push(r);
     });
 
-    const rowKeys = Object.keys(groupedByGrade).sort();
+    const rowKeys = Object.keys(grouped).sort();
     const colSet = new Set();
     display.forEach(r => colSet.add(r.size));
     const colKeys = [...colSet].sort((a,b) => a - b);
 
-    html += '<div class="report-wrap"><table class="alert-table"><thead><tr>';
+    html += '<div class="report-wrap"><table class="alert-matrix-table"><thead><tr>';
     html += '<th class="grade-col">Gradegrams</th>';
     colKeys.forEach(s => html += `<th>${s}</th>`);
-    html += '<th>Total<br>ต้องสั่ง</th>';
+    html += '<th class="total-col">Total</th>';
     html += '</tr></thead><tbody>';
 
+    let grandShortage = 0;
+    const colShortage = {};
+
     rowKeys.forEach(rk => {
-      const items = groupedByGrade[rk];
-      let rowTotalShortage = 0;
+      const items = grouped[rk];
+      let rowShortage = 0;
 
       html += '<tr>';
       html += `<td class="grade-col">${esc(rk)}</td>`;
+
       colKeys.forEach(s => {
         const item = items.find(x => x.size === s);
         if (!item) {
           html += '<td class="empty">-</td>';
-        } else if (item.shortage > 0) {
-          html += `<td class="clickable" onclick="openAlertDetail('${esc(rk)}', ${s}, '${stockDate}', '${receiveDate}', 3, ${includeCustomer})" style="cursor:pointer">
-            <div style="font-weight:700;color:#dc2626;font-size:14px">${item.shortage}</div>
-            <div style="font-size:10px;color:#64748b">D:${item.demand} S:${item.stock} R:${item.receive}</div>
-          </td>`;
-          rowTotalShortage += item.shortage;
-        } else {
-          html += `<td class="clickable" onclick="openAlertDetail('${esc(rk)}', ${s}, '${stockDate}', '${receiveDate}', 3, ${includeCustomer})" style="cursor:pointer;background:#f0fdf4">
-            <div style="font-weight:700;color:#166534;font-size:12px">OK</div>
-            <div style="font-size:10px;color:#64748b">D:${item.demand} S:${item.stock} R:${item.receive}</div>
-          </td>`;
+          return;
         }
+
+        const a = Number(item.alert) || 0;
+        let statusCls, statusTxt;
+        if (a < 0)      { statusCls = 'alert-red';    statusTxt = `🔴 ขาด ${Math.ceil(Math.abs(a))}`; rowShortage += Math.abs(a); colShortage[s] = (colShortage[s]||0) + Math.abs(a); }
+        else if (a === 0) { statusCls = 'alert-yellow'; statusTxt = '🟡 พอดี'; }
+        else             { statusCls = 'alert-green';  statusTxt = `🟢 เกิน ${Math.floor(a)}`; }
+
+        const lsKey = alertLS_Key(rk, s);
+        const lsVal = getAlertInput(lsKey);
+
+        const supOptions = alertSupplierCache.map(code =>
+          `<option value="${esc(code)}" ${lsVal.sup === code ? 'selected' : ''}>${esc(code)}</option>`
+        ).join('');
+
+        html += `<td class="clickable ${statusCls}">
+          <div class="alert-cell-wrap" onclick="openAlertDetail('${esc(rk)}', ${s})">
+            <div class="alert-cell-alert">${a > 0 ? '+' + a : a}</div>
+            <div class="alert-cell-detail">S:${item.snapshot} · K:${item.stock} · R:${item.receive}</div>
+            <div class="alert-cell-status">${statusTxt}</div>
+          </div>
+          <div class="alert-cell-inputs" onclick="event.stopPropagation()">
+            <input type="number" class="alert-input-qty" placeholder="สั่งซื้อ"
+              value="${lsVal.qty || ''}"
+              onchange="onAlertInput('${esc(rk)}', ${s}, 'qty', this.value)">
+            <select class="alert-input-sup" onchange="onAlertInput('${esc(rk)}', ${s}, 'sup', this.value)">
+              <option value="">-- Sup --</option>
+              ${supOptions}
+            </select>
+            <input type="text" class="alert-input-note" placeholder="หมายเหตุ"
+              value="${esc(lsVal.note || '')}"
+              onchange="onAlertInput('${esc(rk)}', ${s}, 'note', this.value)">
+          </div>
+        </td>`;
       });
 
-      html += `<td style="font-weight:700;color:#dc2626;font-size:15px">${rowTotalShortage}</td>`;
+      html += `<td class="total-col">${rowShortage > 0 ? rowShortage : '-'}</td>`;
       html += '</tr>';
+      grandShortage += rowShortage;
     });
 
-    const grandShortage = display.reduce((s, r) => s + Math.max(0, r.shortage), 0);
+    // Total row
     html += '<tr class="total-row"><td class="grade-col">Total</td>';
     colKeys.forEach(s => {
-      const sizeShortage = display
-        .filter(r => r.size === s)
-        .reduce((sum, r) => sum + Math.max(0, r.shortage), 0);
-      html += `<td style="background:#cbd5e1;font-weight:700;color:#dc2626">${sizeShortage || '-'}</td>`;
+      const v = colShortage[s] || 0;
+      html += `<td>${v > 0 ? v : '-'}</td>`;
     });
-    html += `<td style="background:#a5b4fc;font-weight:700;color:#dc2626;font-size:16px">${grandShortage}</td>`;
+    html += `<td class="total-col">${grandShortage > 0 ? grandShortage : '-'}</td>`;
     html += '</tr></tbody></table></div>';
 
     html += `<div class="report-foot">
-      D = Demand · S = Stock · R = Receive · คลิก Cell เพื่อดูรายละเอียด ·
-      Demand = ยอดใช้งานสูงสุด 3 เดือน · รวมต้องสั่ง ${grandShortage} ม้วน
+      S = Snapshot · K = Stock · R = Receive · คลิก cell เพื่อดูรายละเอียด · รวมต้องสั่ง ${grandShortage} ม้วน
     </div>`;
+
     $('alertBody').innerHTML = html;
     alertCache = display;
   } catch (err) {
@@ -319,134 +343,131 @@ async function renderAlert() {
   }
 }
 
-// ================= ALERT DETAIL (✅ แก้: ใช้ modalAlertDetail) =================
-async function openAlertDetail(gradegram, size, stockDate, receiveDate, monthsBack, includeCustomer) {
+// ================= INPUT HANDLER =================
+function onAlertInput(gradegram, size, field, value) {
+  const key = alertLS_Key(gradegram, size);
+  saveAlertInput(key, field, value);
+}
+
+// ================= ALERT DETAIL MODAL =================
+async function openAlertDetail(gradegram, size) {
+  const snapshotMonth = $('alertSnapshotMonth')?.value;
+  const stockDate     = $('alertStockDate')?.value;
+  const receiveDate   = $('alertReceiveDate')?.value;
+
   const { grade } = parseGradegram(gradegram);
 
-  // ✅ เปิด Modal แทนการทับ title
   $('alertDetailTitle').innerHTML = `📊 ${esc(gradegram)} · Size ${size}`;
   openModal('modalAlertDetail');
   $('alertDetailBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
 
-  let html = '';
+  try {
+    // ดึง RPC
+    const { data } = await supabase.rpc('get_alert_matrix', {
+      p_snapshot_month: snapshotMonth,
+      p_stock_date:     stockDate,
+      p_receive_date:   receiveDate,
+    });
 
-  const [year, m] = stockDate.split('-').map(Number);
-  const toDate = new Date(year, m - 1, 0);
-  const toISO = toISODate(toDate);
-  let fromM = m - monthsBack + 1, fromY = year;
-  while (fromM <= 0) { fromM += 12; fromY -= 1; }
-  const fromISO = `${fromY}-${pad(fromM)}-01`;
+    const row = (data || []).find(r =>
+      normalizeGrade(r.grade) === normalizeGrade(grade) && r.size === size
+    );
 
-  const master = masterCache.find(x => normalizeGrade(x.grade) === grade && x.size === size);
-  if (!master) {
-    $('alertDetailBody').innerHTML = '<div class="msg err">ไม่พบ Master Data</div>';
-    return;
-  }
+    if (!row) {
+      $('alertDetailBody').innerHTML = '<div class="msg err">ไม่พบข้อมูล</div>';
+      return;
+    }
 
-  const usage = await fetchAllRows(() =>
-    supabase.from('usage_records')
-      .select('usage_date, used_kgs, doc_no, roll_for_customer')
-      .eq('item_code', master.item_code)
-      .gte('usage_date', fromISO)
-      .lte('usage_date', toISO)
-      .order('usage_date', { ascending: false })
-  );
+    const a = Number(row.alert) || 0;
+    let statusHtml;
+    if (a < 0)      statusHtml = `<span style="color:#dc2626;font-weight:700">🔴 ขาด ${Math.ceil(Math.abs(a))} ม้วน (${a})</span>`;
+    else if (a === 0) statusHtml = `<span style="color:#b45309;font-weight:700">🟡 พอดี</span>`;
+    else             statusHtml = `<span style="color:#166534;font-weight:700">🟢 เกิน ${Math.floor(a)} ม้วน (+${a})</span>`;
 
-  const byDate = {};
-  usage.forEach(u => {
-    const d = u.usage_date;
-    if (!byDate[d]) byDate[d] = { kg: 0, records: [] };
-    byDate[d].kg += Number(u.used_kgs);
-    byDate[d].records.push(u);
-  });
+    let html = `
+      <div class="msg info" style="margin-bottom:14px">
+        <b>📊 สรุปการคำนวณ</b><br>
+        Snapshot (${snapshotMonth}) = <b>${row.snapshot}</b><br>
+        Stock (${stockDate}) = <b>${row.stock}</b><br>
+        Receive (${receiveDate}) = <b>${row.receive}</b><br>
+        <hr style="margin:8px 0;border:none;border-top:1px solid #cbd5e1">
+        Alert = ${row.snapshot} − (${row.stock} + ${row.receive}) = <b>${a}</b><br>
+        สถานะ: ${statusHtml}
+      </div>
+    `;
 
-  const std = Number(master.std_weight_kg);
-  const dates = Object.keys(byDate).sort((a,b) => b.localeCompare(a));
+    // Receives list
+    const { data: receives } = await supabase
+      .from('po_receive')
+      .select('po_no, supplier, quantity, kg_total, remark')
+      .eq('po_date', receiveDate)
+      .eq('grade', grade)
+      .eq('size', size);
 
-  html += `<div class="msg info"><b>Demand (${monthsBack} เดือน):</b> ${fromISO} ถึง ${toISO}</div>`;
-  html += '<h4>📈 ยอดใช้งานรายวัน (Top 10)</h4>';
-  html += '<table style="margin-bottom:16px"><thead><tr><th>วันที่</th><th>KG รวม</th><th>ม้วน</th></tr></thead><tbody>';
-  dates.slice(0, 10).forEach(d => {
-    const info = byDate[d];
-    const rolls = Math.ceil(info.kg / std);
-    html += `<tr><td>${d}</td><td style="text-align:right">${info.kg.toFixed(2)}</td><td style="text-align:right"><b>${rolls}</b></td></tr>`;
-  });
-  html += '</tbody></table>';
+    html += `<h4>📥 Receive (${receiveDate})</h4>`;
+    if (receives && receives.length) {
+      html += '<table><thead><tr><th>PO No.</th><th>Supplier</th><th>Qty</th><th>KG</th><th>หมายเหตุ</th></tr></thead><tbody>';
+      receives.forEach(r => {
+        html += `<tr>
+          <td>${esc(r.po_no)}</td>
+          <td>${esc(r.supplier) || '-'}</td>
+          <td style="text-align:right">${r.quantity}</td>
+          <td style="text-align:right">${Number(r.kg_total || 0).toFixed(2)}</td>
+          <td>${esc(r.remark) || '-'}</td>
+        </tr>`;
+      });
+      html += '</tbody></table>';
+    } else {
+      html += '<p style="color:#94a3b8">ไม่มีรายการรับเข้า</p>';
+    }
 
-  const stockRows = await fetchAllRows(() =>
-    supabase.from('stock_balance')
+    // Stock list
+    const { data: stocks } = await supabase
+      .from('stock_balance')
       .select('sn, dimeter, kgs, supplier, customer, is_customer_roll, roll_status')
       .eq('stock_date', stockDate)
       .eq('grade', grade)
-      .eq('width', size)
-      .eq('roll_status', 'full')
-  );
+      .eq('width', size);
 
-  const filteredStock = includeCustomer ? stockRows : stockRows.filter(s => !s.is_customer_roll);
+    html += `<h4 style="margin-top:16px">📦 Stock (${stockDate})</h4>`;
+    if (stocks && stocks.length) {
+      html += '<table><thead><tr><th>SN</th><th>Diameter</th><th>KG</th><th>Supplier</th><th>Customer</th><th>Status</th></tr></thead><tbody>';
+      stocks.forEach(s => {
+        const stTxt = { full: '✅ เต็ม', scrap: '♻️ เศษ', waiting: '⏳ รอกรอ' }[s.roll_status] || s.roll_status;
+        html += `<tr>
+          <td>${esc(s.sn)}</td>
+          <td>${Number(s.dimeter || 0).toFixed(2)}</td>
+          <td>${Number(s.kgs || 0).toFixed(2)}</td>
+          <td>${esc(s.supplier) || '-'}</td>
+          <td>${s.is_customer_roll ? '👤 ' + esc(s.customer) : '-'}</td>
+          <td>${stTxt}</td>
+        </tr>`;
+      });
+      html += '</tbody></table>';
+    } else {
+      html += '<p style="color:#94a3b8">ไม่มีม้วนในสต็อก</p>';
+    }
 
-  html += `<h4>📦 Stock คงเหลือ (${stockDate}) — ${filteredStock.length} ม้วน</h4>`;
-  if (filteredStock.length) {
-    html += '<table style="margin-bottom:16px"><thead><tr><th>SN</th><th>Diameter</th><th>KG</th><th>Supplier</th><th>Customer</th></tr></thead><tbody>';
-    filteredStock.forEach(s => {
-      const custTxt = s.is_customer_roll ? `👤 ${esc(s.customer)}` : '-';
-      html += `<tr>
-        <td>${esc(s.sn)}</td>
-        <td>${Number(s.dimeter).toFixed(2)}</td>
-        <td>${Number(s.kgs).toFixed(2)}</td>
-        <td>${esc(s.supplier)||'-'}</td>
-        <td>${custTxt}</td>
-      </tr>`;
-    });
-    html += '</tbody></table>';
-  } else {
-    html += '<p style="color:#94a3b8">ไม่มีม้วนเต็มในสต็อก</p>';
+    $('alertDetailBody').innerHTML = html;
+  } catch (err) {
+    $('alertDetailBody').innerHTML = `<div class="msg err">${esc(err.message)}</div>`;
   }
-
-  const receiveRows = await fetchAllRows(() =>
-    supabase.from('po_receive')
-      .select('po_no, supplier, quantity, kg_total, remark, is_customer_roll')
-      .eq('po_date', receiveDate)
-      .eq('grade', grade)
-      .eq('size', size)
-  );
-
-  const filteredReceive = includeCustomer ? receiveRows : receiveRows.filter(r => !r.is_customer_roll);
-
-  html += `<h4>📥 Receive (${receiveDate}) — ${filteredReceive.reduce((s,r)=>s+Number(r.quantity),0)} ม้วน</h4>`;
-  if (filteredReceive.length) {
-    html += '<table><thead><tr><th>PO</th><th>Supplier</th><th>Quantity</th><th>KG</th><th>หมายเหตุ</th></tr></thead><tbody>';
-    filteredReceive.forEach(r => {
-      html += `<tr>
-        <td>${esc(r.po_no)}</td>
-        <td>${esc(r.supplier)}</td>
-        <td style="text-align:right">${r.quantity}</td>
-        <td style="text-align:right">${Number(r.kg_total).toFixed(0)}</td>
-        <td>${esc(r.remark)||'-'}</td>
-      </tr>`;
-    });
-    html += '</tbody></table>';
-  } else {
-    html += '<p style="color:#94a3b8">ไม่มีรายการรับเข้า</p>';
-  }
-
-  // ✅ ใส่ใน modalAlertDetail แทนการทับ title
-  $('alertDetailBody').innerHTML = html;
 }
 
+// ================= EXPORT =================
 function exportAlert() {
-  if (!alertCache.length) return alert('ไม่มีข้อมูล');
+  if (!alertCache || !alertCache.length) return alert('ไม่มีข้อมูล');
   const data = alertCache.map(r => ({
     Gradegrams: r.gradegram,
     Size: r.size,
-    Demand: r.demand,
+    Snapshot: r.snapshot,
     Stock: r.stock,
     Receive: r.receive,
-    Total_Available: r.total,
-    Shortage: r.shortage > 0 ? r.shortage : 0,
-    สถานะ: r.shortage > 0 ? 'ต้องสั่ง' : 'OK'
+    Alert: r.alert,
+    สถานะ: r.alert < 0 ? `ขาด ${Math.ceil(Math.abs(r.alert))}` : (r.alert === 0 ? 'พอดี' : `เกิน ${Math.floor(r.alert)}`)
   }));
   const ws = XLSX.utils.json_to_sheet(data);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Alert');
-  XLSX.writeFile(wb, `roll_alert_${new Date().toISOString().slice(0,10)}.xlsx`);
+  XLSX.writeFile(wb, `alert_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
