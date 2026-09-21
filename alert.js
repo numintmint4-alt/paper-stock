@@ -1,14 +1,21 @@
 // ═══════════════════════════════════════════════════════════════
-// STOCK V7 — alert.js (ใช้ get_alert_matrix RPC)
+// STOCK V7 — alert.js (Flat Table + Filter แบบ Gradegrams)
 // ═══════════════════════════════════════════════════════════════
 
 let alertSelectedGrades = [];
 let alertAllGrades = [];
 let alertCache = [];
 let alertSupplierCache = [];
-let alertSnapshotMonths = [];
 
-// localStorage key
+// ✅ Alert Filter (แบบ Gradegrams)
+let alertSelectedFilters = ['all'];
+const ALERT_ALL_FILTERS = [
+  { value: 'all', label: 'ทั้งหมด' },
+  { value: 'lt0', label: '🔴 ขาด (< 0)' },
+  { value: 'eq0', label: '🟡 พอดี (= 0)' },
+  { value: 'gt0', label: '🟢 เกิน (> 0)' }
+];
+
 const ALERT_LS_KEY = 'stockv7_alert_inputs';
 
 // ================= INIT =================
@@ -17,13 +24,15 @@ async function initAlertTab() {
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
 
-  // default วันที่
-  if ($('alertStockDate')   && !$('alertStockDate').value)   $('alertStockDate').value = toISODate(yesterday);
+  // ✅ วันที่วิเคราะห์ = today
+  if ($('alertDate') && !$('alertDate').value) $('alertDate').value = today;
+  if ($('alertStockDate') && !$('alertStockDate').value) $('alertStockDate').value = toISODate(yesterday);
   if ($('alertReceiveDate') && !$('alertReceiveDate').value) $('alertReceiveDate').value = today;
 
   await loadAlertSuppliers();
-  await loadSnapshotMonths();     // โหลดเดือน + set alertSnapshotMonth
+  await loadSnapshotMonths();
   await loadAlertGradeFilter();
+  loadAlertFilter();
   await renderAlert();
 }
 
@@ -39,7 +48,7 @@ async function loadAlertSuppliers() {
     alertSupplierCache = (data || []).map(s => s.code);
   } catch (e) {
     console.warn('loadAlertSuppliers:', e);
-    alertSupplierCache = ['EKP', 'MKP', 'SCK'];   // fallback
+    alertSupplierCache = ['EKP', 'MKP', 'SCK'];
   }
 }
 
@@ -56,11 +65,10 @@ async function loadSnapshotMonths() {
     (data || []).forEach(row => {
       (row.months || []).forEach(m => set.add(m));
     });
-    alertSnapshotMonths = [...set].sort().reverse();  // ใหม่สุดก่อน
+    const months = [...set].sort().reverse();
 
-    // set ค่า default ให้ alertSnapshotMonth
     if ($('alertSnapshotMonth') && !$('alertSnapshotMonth').value) {
-      $('alertSnapshotMonth').value = alertSnapshotMonths[0] || '';
+      $('alertSnapshotMonth').value = months[0] || '';
     }
   } catch (e) {
     console.warn('loadSnapshotMonths:', e);
@@ -74,26 +82,7 @@ async function loadAlertGradeFilter() {
   )].sort();
   renderAlertGradeList();
   updateAlertGradeLabel();
-
-  const btn = $('alertGradeFilterBtn');
-  const dropdown = $('alertGradeDropdown');
-  const box = $('alertGradeFilterBox');
-  if (!btn || !dropdown || !box) return;
-
-  if (btn.dataset.listenerAttached === '1') return;
-  btn.dataset.listenerAttached = '1';
-
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    dropdown.classList.toggle('hidden');
-    btn.classList.toggle('open');
-  });
-  document.addEventListener('click', (e) => {
-    if (!box.contains(e.target)) {
-      dropdown.classList.add('hidden');
-      btn.classList.remove('open');
-    }
-  });
+  _attachAlertDropdown('alertGradeFilterBtn', 'alertGradeDropdown', 'alertGradeFilterBox', 'alertGrade');
 }
 
 function renderAlertGradeList() {
@@ -145,25 +134,103 @@ function clearAllAlertGrades() {
   renderAlertGradeList(); updateAlertGradeLabel();
 }
 
-// ================= LOCAL STORAGE (input ใน Matrix) =================
+// ================= ALERT FILTER (แบบ Gradegrams) =================
+function loadAlertFilter() {
+  renderAlertFilterList();
+  updateAlertFilterLabel();
+  _attachAlertDropdown('alertFilterBtn', 'alertFilterDropdown', 'alertFilterBox', 'alertFilter');
+}
+
+function renderAlertFilterList() {
+  const list = $('alertFilterList');
+  if (!list) return;
+  list.innerHTML = ALERT_ALL_FILTERS.map(f => {
+    const checked = alertSelectedFilters.includes(f.value);
+    return `<label class="item ${checked ? 'checked' : ''}" data-filter="${f.value}">
+      <input type="checkbox" ${checked ? 'checked' : ''}>
+      <span>${f.label}</span>
+    </label>`;
+  }).join('');
+  list.querySelectorAll('.item').forEach(el => {
+    const cb = el.querySelector('input[type="checkbox"]');
+    cb.addEventListener('change', () => {
+      const val = el.dataset.filter;
+      if (cb.checked) {
+        if (!alertSelectedFilters.includes(val)) alertSelectedFilters.push(val);
+      } else {
+        alertSelectedFilters = alertSelectedFilters.filter(x => x !== val);
+      }
+      el.classList.toggle('checked', cb.checked);
+      updateAlertFilterLabel();
+    });
+  });
+}
+
+function updateAlertFilterLabel() {
+  const label = $('alertFilterLabel');
+  if (!label) return;
+  if (alertSelectedFilters.length === 0 || alertSelectedFilters.includes('all')) {
+    label.textContent = 'ทั้งหมด'; label.style.color = '#1e293b';
+  } else if (alertSelectedFilters.length === 1) {
+    const f = ALERT_ALL_FILTERS.find(x => x.value === alertSelectedFilters[0]);
+    label.textContent = f ? f.label : alertSelectedFilters[0];
+    label.style.color = '#1e40af';
+  } else {
+    label.textContent = `เลือก ${alertSelectedFilters.length} เงื่อนไข`;
+    label.style.color = '#1e40af';
+  }
+}
+function selectAllAlertFilters() {
+  alertSelectedFilters = ['all'];
+  renderAlertFilterList(); updateAlertFilterLabel();
+}
+function clearAllAlertFilters() {
+  alertSelectedFilters = [];
+  renderAlertFilterList(); updateAlertFilterLabel();
+}
+
+// ================= DROPDOWN HELPER =================
+function _attachAlertDropdown(btnId, dropdownId, boxId, docKey) {
+  const btn = $(btnId);
+  const dropdown = $(dropdownId);
+  const box = $(boxId);
+  if (!btn || !dropdown || !box) return;
+
+  if (btn.dataset.listenerAttached === '1') return;
+  btn.dataset.listenerAttached = '1';
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dropdown.classList.toggle('hidden');
+    btn.classList.toggle('open');
+  });
+
+  if (!window['_' + docKey + 'DocClick']) {
+    window['_' + docKey + 'DocClick'] = (e) => {
+      const b = $(btnId), d = $(dropdownId), bx = $(boxId);
+      if (!b || !d || !bx) return;
+      if (!bx.contains(e.target)) { d.classList.add('hidden'); b.classList.remove('open'); }
+    };
+    document.addEventListener('click', window['_' + docKey + 'DocClick']);
+  }
+}
+
+// ================= LOCAL STORAGE =================
 function alertLS_Key(gradegram, size) {
   return `${gradegram}|${size}`;
 }
-
 function loadAlertInputs() {
   try {
     const raw = localStorage.getItem(ALERT_LS_KEY);
     return raw ? JSON.parse(raw) : {};
   } catch { return {}; }
 }
-
 function saveAlertInput(key, field, value) {
   const data = loadAlertInputs();
   if (!data[key]) data[key] = {};
   data[key][field] = value;
   localStorage.setItem(ALERT_LS_KEY, JSON.stringify(data));
 }
-
 function getAlertInput(key) {
   const data = loadAlertInputs();
   return data[key] || {};
@@ -175,14 +242,8 @@ async function renderAlert() {
   const stockDate     = $('alertStockDate')?.value;
   const receiveDate   = $('alertReceiveDate')?.value;
 
-  // ✅ Filter Alert แบบ multi-select
-  const filterEl = $('alertFilter');
-  const alertFilters = filterEl
-    ? [...filterEl.selectedOptions].map(o => o.value)
-    : ['all'];
-
   if (!snapshotMonth || !stockDate || !receiveDate) {
-    alert('กรุณาเลือก Snapshot / Stock / Receive ให้ครบ');
+    alert('กรุณาเลือก Stock Level / Stock / Receive ให้ครบ');
     return;
   }
 
@@ -191,13 +252,12 @@ async function renderAlert() {
 
   $('alertReportTitle').innerHTML = `
     🚨 แจ้งเตือนสั่งซื้อ (Roll Alert)<br>
-    Snapshot: ${snapshotMonth}
+    Stock Level: ${snapshotMonth}
     <div class="report-subtitle">(Stock ${thaiDateFull(stockDate)} · Receive ${thaiDateFull(receiveDate)}${gradeLabel})</div>
   `;
   $('alertBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังวิเคราะห์...</p>';
 
   try {
-    // ✅ เรียก RPC
     const { data, error } = await supabase.rpc('get_alert_matrix', {
       p_snapshot_month: snapshotMonth,
       p_stock_date:     stockDate,
@@ -207,7 +267,7 @@ async function renderAlert() {
 
     let result = data || [];
 
-    // เพิ่ม gradegram ให้แต่ละ row
+    // เพิ่ม gradegram
     result = result.map(r => {
       const m = masterCache.find(x =>
         normalizeGrade(x.grade) === normalizeGrade(r.grade) &&
@@ -224,19 +284,17 @@ async function renderAlert() {
       result = result.filter(r => alertSelectedGrades.includes(r.gradegram));
     }
 
-    // ✅ กรองตาม filter (multi-select)
-    let filtered = result;
-    if (!alertFilters.includes('all')) {
-      filtered = result.filter(r => {
+    // ✅ Filter Alert
+    let display = result;
+    if (!alertSelectedFilters.includes('all') && alertSelectedFilters.length > 0) {
+      display = result.filter(r => {
         const a = Number(r.alert) || 0;
-        if (alertFilters.includes('lt0') && a < 0) return true;
-        if (alertFilters.includes('eq0') && a === 0) return true;
-        if (alertFilters.includes('gt0') && a > 0) return true;
+        if (alertSelectedFilters.includes('lt0') && a < 0) return true;
+        if (alertSelectedFilters.includes('eq0') && a === 0) return true;
+        if (alertSelectedFilters.includes('gt0') && a > 0) return true;
         return false;
       });
     }
-
-    const display = filtered;
 
     // Summary
     const totalShortage = result.filter(r => r.alert < 0).length;
@@ -256,24 +314,16 @@ async function renderAlert() {
       return;
     }
 
-    // เรียงตาม gradegram + size
+    // เรียง
     const sorted = [...display].sort((a, b) => {
       if (a.gradegram !== b.gradegram) return a.gradegram.localeCompare(b.gradegram);
       return a.size - b.size;
     });
 
     // ============ FLAT TABLE ============
-    html += '<div class="report-wrap"><table class="alert-flat-table"><thead><tr>';
-    html += '<th>Gradegrams</th>';
-    html += '<th>Size</th>';
-    html += '<th>Snapshot</th>';
-    html += '<th>Stock</th>';
-    html += '<th>Receive</th>';
-    html += '<th>Alert</th>';
-    html += '<th>สถานะ</th>';
-    html += '<th>สั่งซื้อ</th>';
-    html += '<th>Sup.</th>';
-    html += '<th>หมายเหตุ</th>';
+    html += '<div class="report-wrap alert-scroll"><table class="alert-flat-table"><thead><tr>';
+    html += '<th>Gradegrams</th><th>Size</th><th>Snapshot</th><th>Stock</th><th>Receive</th>';
+    html += '<th>Alert</th><th>สถานะ</th><th>สั่งซื้อ</th><th>Sup.</th><th>หมายเหตุ</th>';
     html += '</tr></thead><tbody>';
 
     let grandShortage = 0;
@@ -307,7 +357,6 @@ async function renderAlert() {
       html += '</tr>';
     });
 
-    // Total row
     html += `<tr class="total-row">
       <td colspan="7" style="text-align:right;font-weight:700">จำนวนรวม (ม้วน)</td>
       <td style="font-weight:700;color:#dc2626;font-size:15px">${grandShortage > 0 ? grandShortage : '-'}</td>
@@ -317,7 +366,7 @@ async function renderAlert() {
     html += '</tbody></table></div>';
 
     html += `<div class="report-foot">
-      S = Snapshot · K = Stock · R = Receive · คลิก Gradegrams/Size เพื่อดูรายละเอียด · รวมต้องสั่ง ${grandShortage} ม้วน
+      Stock Level − (Stock + Receive) = Alert · คลิก Gradegrams/Size เพื่อดูรายละเอียด · รวมต้องสั่ง ${grandShortage} ม้วน
     </div>`;
 
     $('alertBody').innerHTML = html;
@@ -328,18 +377,17 @@ async function renderAlert() {
   }
 }
 
-// ================= INPUT HANDLER =================
+// ================= INPUT =================
 function onAlertInput(gradegram, size, field, value) {
   const key = alertLS_Key(gradegram, size);
   saveAlertInput(key, field, value);
 }
 
-// ================= ALERT DETAIL MODAL =================
+// ================= DETAIL MODAL =================
 async function openAlertDetail(gradegram, size) {
   const snapshotMonth = $('alertSnapshotMonth')?.value;
   const stockDate     = $('alertStockDate')?.value;
   const receiveDate   = $('alertReceiveDate')?.value;
-
   const { grade } = parseGradegram(gradegram);
 
   $('alertDetailTitle').innerHTML = `📊 ${esc(gradegram)} · Size ${size}`;
@@ -347,7 +395,6 @@ async function openAlertDetail(gradegram, size) {
   $('alertDetailBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
 
   try {
-    // ดึง RPC
     const { data } = await supabase.rpc('get_alert_matrix', {
       p_snapshot_month: snapshotMonth,
       p_stock_date:     stockDate,
@@ -372,7 +419,7 @@ async function openAlertDetail(gradegram, size) {
     let html = `
       <div class="msg info" style="margin-bottom:14px">
         <b>📊 สรุปการคำนวณ</b><br>
-        Snapshot (${snapshotMonth}) = <b>${row.snapshot}</b><br>
+        Stock Level (${snapshotMonth}) = <b>${row.snapshot}</b><br>
         Stock (${stockDate}) = <b>${row.stock}</b><br>
         Receive (${receiveDate}) = <b>${row.receive}</b><br>
         <hr style="margin:8px 0;border:none;border-top:1px solid #cbd5e1">
@@ -381,12 +428,10 @@ async function openAlertDetail(gradegram, size) {
       </div>
     `;
 
-    // Receives list
     const { data: receives } = await supabase
       .from('po_receive')
       .select('po_no, supplier, quantity, kg_total, remark')
       .eq('po_date', receiveDate)
-      .eq('grade', grade)
       .eq('size', size);
 
     html += `<h4>📥 Receive (${receiveDate})</h4>`;
@@ -406,7 +451,6 @@ async function openAlertDetail(gradegram, size) {
       html += '<p style="color:#94a3b8">ไม่มีรายการรับเข้า</p>';
     }
 
-    // Stock list
     const { data: stocks } = await supabase
       .from('stock_balance')
       .select('sn, dimeter, kgs, supplier, customer, is_customer_roll, roll_status')
