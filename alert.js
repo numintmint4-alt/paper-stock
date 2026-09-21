@@ -169,7 +169,7 @@ function getAlertInput(key) {
   return data[key] || {};
 }
 
-// ================= RENDER ALERT =================
+// ================= RENDER ALERT (Flat Table) =================
 async function renderAlert() {
   const snapshotMonth = $('alertSnapshotMonth')?.value;
   const stockDate     = $('alertStockDate')?.value;
@@ -202,19 +202,6 @@ async function renderAlert() {
 
     let result = data || [];
 
-    // Filter grade
-    if (alertSelectedGrades.length > 0) {
-      result = result.filter(r => {
-        const m = masterCache.find(x =>
-          normalizeGrade(x.grade) === normalizeGrade(r.grade) &&
-          x.size === r.size
-        );
-        if (!m) return false;
-        const gg = normalizeGrade(m.grade) + m.gram;
-        return alertSelectedGrades.includes(gg);
-      });
-    }
-
     // เพิ่ม gradegram ให้แต่ละ row
     result = result.map(r => {
       const m = masterCache.find(x =>
@@ -226,6 +213,11 @@ async function renderAlert() {
         gradegram: m ? (normalizeGrade(m.grade) + m.gram) : r.grade
       };
     });
+
+    // Filter grade
+    if (alertSelectedGrades.length > 0) {
+      result = result.filter(r => alertSelectedGrades.includes(r.gradegram));
+    }
 
     // Filter เฉพาะที่ขาด
     const display = onlyShortage ? result.filter(r => r.alert < 0) : result;
@@ -248,91 +240,68 @@ async function renderAlert() {
       return;
     }
 
-    // จัดกลุ่มตาม gradegram
-    const grouped = {};
-    display.forEach(r => {
-      if (!grouped[r.gradegram]) grouped[r.gradegram] = [];
-      grouped[r.gradegram].push(r);
+    // เรียงตาม gradegram + size
+    const sorted = [...display].sort((a, b) => {
+      if (a.gradegram !== b.gradegram) return a.gradegram.localeCompare(b.gradegram);
+      return a.size - b.size;
     });
 
-    const rowKeys = Object.keys(grouped).sort();
-    const colSet = new Set();
-    display.forEach(r => colSet.add(r.size));
-    const colKeys = [...colSet].sort((a,b) => a - b);
-
-    html += '<div class="report-wrap"><table class="alert-matrix-table"><thead><tr>';
-    html += '<th class="grade-col">Gradegrams</th>';
-    colKeys.forEach(s => html += `<th>${s}</th>`);
-    html += '<th class="total-col">Total</th>';
+    // ============ FLAT TABLE ============
+    html += '<div class="report-wrap"><table class="alert-flat-table"><thead><tr>';
+    html += '<th>Gradegrams</th>';
+    html += '<th>Size</th>';
+    html += '<th>Snapshot</th>';
+    html += '<th>Stock</th>';
+    html += '<th>Receive</th>';
+    html += '<th>Alert</th>';
+    html += '<th>สถานะ</th>';
+    html += '<th>สั่งซื้อ</th>';
+    html += '<th>Sup.</th>';
+    html += '<th>หมายเหตุ</th>';
     html += '</tr></thead><tbody>';
 
     let grandShortage = 0;
-    const colShortage = {};
 
-    rowKeys.forEach(rk => {
-      const items = grouped[rk];
-      let rowShortage = 0;
+    sorted.forEach(r => {
+      const a = Number(r.alert) || 0;
+      let rowCls, statusTxt;
+      if (a < 0)      { rowCls = 'row-red';    statusTxt = `🔴 ขาด ${Math.ceil(Math.abs(a))}`;  grandShortage += Math.abs(a); }
+      else if (a === 0) { rowCls = 'row-yellow'; statusTxt = '🟡 พอดี'; }
+      else             { rowCls = 'row-green';  statusTxt = `🟢 เกิน ${Math.floor(a)}`; }
 
-      html += '<tr>';
-      html += `<td class="grade-col">${esc(rk)}</td>`;
+      const lsKey = alertLS_Key(r.gradegram, r.size);
+      const lsVal = getAlertInput(lsKey);
 
-      colKeys.forEach(s => {
-        const item = items.find(x => x.size === s);
-        if (!item) {
-          html += '<td class="empty">-</td>';
-          return;
-        }
+      const supOptions = alertSupplierCache.map(code =>
+        `<option value="${esc(code)}" ${lsVal.sup === code ? 'selected' : ''}>${esc(code)}</option>`
+      ).join('');
 
-        const a = Number(item.alert) || 0;
-        let statusCls, statusTxt;
-        if (a < 0)      { statusCls = 'alert-red';    statusTxt = `🔴 ขาด ${Math.ceil(Math.abs(a))}`; rowShortage += Math.abs(a); colShortage[s] = (colShortage[s]||0) + Math.abs(a); }
-        else if (a === 0) { statusCls = 'alert-yellow'; statusTxt = '🟡 พอดี'; }
-        else             { statusCls = 'alert-green';  statusTxt = `🟢 เกิน ${Math.floor(a)}`; }
-
-        const lsKey = alertLS_Key(rk, s);
-        const lsVal = getAlertInput(lsKey);
-
-        const supOptions = alertSupplierCache.map(code =>
-          `<option value="${esc(code)}" ${lsVal.sup === code ? 'selected' : ''}>${esc(code)}</option>`
-        ).join('');
-
-        html += `<td class="clickable ${statusCls}">
-          <div class="alert-cell-wrap" onclick="openAlertDetail('${esc(rk)}', ${s})">
-            <div class="alert-cell-alert">${a > 0 ? '+' + a : a}</div>
-            <div class="alert-cell-detail">S:${item.snapshot} · K:${item.stock} · R:${item.receive}</div>
-            <div class="alert-cell-status">${statusTxt}</div>
-          </div>
-          <div class="alert-cell-inputs" onclick="event.stopPropagation()">
-            <input type="number" class="alert-input-qty" placeholder="สั่งซื้อ"
-              value="${lsVal.qty || ''}"
-              onchange="onAlertInput('${esc(rk)}', ${s}, 'qty', this.value)">
-            <select class="alert-input-sup" onchange="onAlertInput('${esc(rk)}', ${s}, 'sup', this.value)">
-              <option value="">-- Sup --</option>
-              ${supOptions}
-            </select>
-            <input type="text" class="alert-input-note" placeholder="หมายเหตุ"
-              value="${esc(lsVal.note || '')}"
-              onchange="onAlertInput('${esc(rk)}', ${s}, 'note', this.value)">
-          </div>
-        </td>`;
-      });
-
-      html += `<td class="total-col">${rowShortage > 0 ? rowShortage : '-'}</td>`;
+      html += `<tr class="${rowCls}">`;
+      html += `<td class="grade-col clickable" onclick="openAlertDetail('${esc(r.gradegram)}', ${r.size})">${esc(r.gradegram)}</td>`;
+      html += `<td class="clickable" onclick="openAlertDetail('${esc(r.gradegram)}', ${r.size})">${r.size}</td>`;
+      html += `<td>${r.snapshot}</td>`;
+      html += `<td>${Number(r.stock).toFixed(2)}</td>`;
+      html += `<td>${r.receive}</td>`;
+      html += `<td class="alert-cell"><b>${a > 0 ? '+' + a : a}</b></td>`;
+      html += `<td class="status-cell">${statusTxt}</td>`;
+      html += `<td><input type="number" class="alert-input-qty" placeholder="-" value="${lsVal.qty || ''}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'qty', this.value)"></td>`;
+      html += `<td><select class="alert-input-sup" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'sup', this.value)">
+        <option value="">-- Sup --</option>${supOptions}</select></td>`;
+      html += `<td><input type="text" class="alert-input-note" placeholder="-" value="${esc(lsVal.note || '')}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'note', this.value)"></td>`;
       html += '</tr>';
-      grandShortage += rowShortage;
     });
 
     // Total row
-    html += '<tr class="total-row"><td class="grade-col">Total</td>';
-    colKeys.forEach(s => {
-      const v = colShortage[s] || 0;
-      html += `<td>${v > 0 ? v : '-'}</td>`;
-    });
-    html += `<td class="total-col">${grandShortage > 0 ? grandShortage : '-'}</td>`;
-    html += '</tr></tbody></table></div>';
+    html += `<tr class="total-row">
+      <td colspan="7" style="text-align:right;font-weight:700">จำนวนรวม (ม้วน)</td>
+      <td style="font-weight:700;color:#dc2626;font-size:15px">${grandShortage > 0 ? grandShortage : '-'}</td>
+      <td colspan="2"></td>
+    </tr>`;
+
+    html += '</tbody></table></div>';
 
     html += `<div class="report-foot">
-      S = Snapshot · K = Stock · R = Receive · คลิก cell เพื่อดูรายละเอียด · รวมต้องสั่ง ${grandShortage} ม้วน
+      S = Snapshot · K = Stock · R = Receive · คลิก Gradegrams/Size เพื่อดูรายละเอียด · รวมต้องสั่ง ${grandShortage} ม้วน
     </div>`;
 
     $('alertBody').innerHTML = html;
