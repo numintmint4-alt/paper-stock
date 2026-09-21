@@ -876,3 +876,22 @@ th{background:#f1f5f9;font-weight:600}
   background: #1e293b;
   color: #fff;
 }
+/* ═══════════════════════════════════════════════════════════ */
+/* ALERT FLAT TABLE — Fix Column Widths */
+/* ═══════════════════════════════════════════════════════════ */
+
+.alert-flat-table {
+  table-layout: fixed;   /* ← สำคัญ: ต้องใช้ fixed ไม่งั้น width ไม่ทำงาน */
+  width: 100%;
+}
+
+.alert-flat-table th:nth-child(1)  { width: 80px;  }   /* Gradegrams */
+.alert-flat-table th:nth-child(2)  { width: 70px;  }   /* Size */
+.alert-flat-table th:nth-child(3)  { width: 70px;  }   /* Snapshot */
+.alert-flat-table th:nth-child(4)  { width: 70px;  }   /* Stock */
+.alert-flat-table th:nth-child(5)  { width: 70px;  }   /* Receive */
+.alert-flat-table th:nth-child(6)  { width: 70px;  }   /* Alert */
+.alert-flat-table th:nth-child(7)  { width: 90px;  }   /* สถานะ */
+.alert-flat-table th:nth-child(8)  { width: 90px;  }   /* สั่งซื้อ */
+.alert-flat-table th:nth-child(9)  { width: 90px;  }   /* Sup. */
+.alert-flat-table th:nth-child(10) { width: 200px; }   /* หมายเหตุ */
