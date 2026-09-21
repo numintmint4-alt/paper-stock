@@ -174,7 +174,12 @@ async function renderAlert() {
   const snapshotMonth = $('alertSnapshotMonth')?.value;
   const stockDate     = $('alertStockDate')?.value;
   const receiveDate   = $('alertReceiveDate')?.value;
-  const onlyShortage  = $('alertOnlyShortage')?.checked ?? true;
+
+  // ✅ Filter Alert แบบ multi-select
+  const filterEl = $('alertFilter');
+  const alertFilters = filterEl
+    ? [...filterEl.selectedOptions].map(o => o.value)
+    : ['all'];
 
   if (!snapshotMonth || !stockDate || !receiveDate) {
     alert('กรุณาเลือก Snapshot / Stock / Receive ให้ครบ');
@@ -219,8 +224,19 @@ async function renderAlert() {
       result = result.filter(r => alertSelectedGrades.includes(r.gradegram));
     }
 
-    // Filter เฉพาะที่ขาด
-    const display = onlyShortage ? result.filter(r => r.alert < 0) : result;
+    // ✅ กรองตาม filter (multi-select)
+    let filtered = result;
+    if (!alertFilters.includes('all')) {
+      filtered = result.filter(r => {
+        const a = Number(r.alert) || 0;
+        if (alertFilters.includes('lt0') && a < 0) return true;
+        if (alertFilters.includes('eq0') && a === 0) return true;
+        if (alertFilters.includes('gt0') && a > 0) return true;
+        return false;
+      });
+    }
+
+    const display = filtered;
 
     // Summary
     const totalShortage = result.filter(r => r.alert < 0).length;
