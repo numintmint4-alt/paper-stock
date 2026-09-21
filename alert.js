@@ -423,7 +423,7 @@ async function openAlertDetail(gradegram, size) {
         Stock (${stockDate}) = <b>${row.stock}</b><br>
         Receive (${receiveDate}) = <b>${row.receive}</b><br>
         <hr style="margin:8px 0;border:none;border-top:1px solid #cbd5e1">
-        Alert = ${row.snapshot} − (${row.stock} + ${row.receive}) = <b>${a}</b><br>
+        Alert = (${row.stock} + ${row.receive}) − ${row.snapshot} = <b>${a}</b><br>
         สถานะ: ${statusHtml}
       </div>
     `;
