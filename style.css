@@ -857,3 +857,22 @@ th{background:#f1f5f9;font-weight:600}
   .alert-flat-table td { padding: 4px 5px; }
   .alert-flat-table .alert-input-note { max-width: 100px; }
 }
+/* ═══════════════════════════════════════════════════════════ */
+/* ========== ALERT SCROLL + STICKY HEADER ========== */
+/* ═══════════════════════════════════════════════════════════ */
+
+.alert-scroll {
+  max-height: 70vh;
+  overflow-y: auto;
+  overflow-x: auto;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+}
+
+.alert-flat-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #1e293b;
+  color: #fff;
+}
