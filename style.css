@@ -839,7 +839,8 @@ th{background:#f1f5f9;font-weight:600}
   max-width: 80px;
 }
 .alert-flat-table .alert-input-note {
-  max-width: 160px;
+  max-width: 100%;
+  width: 100%;
   font-size: 11px;
 }
 .alert-flat-table .alert-input-qty:focus,
