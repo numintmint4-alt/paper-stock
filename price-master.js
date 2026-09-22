@@ -90,8 +90,8 @@ function renderPMList() {
       <td style="text-align:right">${Number(row.nc_discount || 0).toFixed(2)}</td>
       <td style="text-align:right;color:#dc2626;font-weight:700">${ncAuto.toFixed(2)}</td>
       <td>
-        <button onclick="openPMForm('${row.id}')">✏️ Edit</button>
-        <button class="danger" onclick="deletePM('${row.id}')">🗑 ลบ</button>
+        <button onclick="openPMForm(${row.id})">✏️ Edit</button>
+        <button class="danger" onclick="deletePM(${row.id})">🗑 ลบ</button>
       </td>
     </tr>`;
   });
@@ -119,7 +119,7 @@ async function openPMForm(id) {
   gradeSelect.disabled = true;
   gradeSelect.style.background = '#f1f5f9';
 
-  const row = pmCache.find(r => r.id === id);
+  const row = pmCache.find(r => String(r.id) === String(id));
   if (!row) return;
 
   gradeSelect.innerHTML = `<option value="${row.gradegram}">${row.gradegram}</option>`;
@@ -186,7 +186,7 @@ async function savePMForm() {
 
 // ================= DELETE =================
 async function deletePM(id) {
-  const row = pmCache.find(r => r.id === id);
+  const row = pmCache.find(r => String(r.id) === String(id));
   if (!row) return;
 
   if (!confirm(`ยืนยันลบราคา ${row.gradegram} เดือน ${pmSelectedMonth}?`)) return;
