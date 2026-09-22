@@ -71,7 +71,7 @@ function renderPMList() {
   if (!body) return;
 
   if (!pmCache.length) {
-    body.innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">ยังไม่มีราคาในเดือนนี้ — กด "+ เพิ่มราคา" หรือ "🔄 Sync จาก Specs" เพื่อเริ่ม</p>';
+    body.innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">ยังไม่มีราคาในเดือนนี้ — กด "🔄 สร้างราคาทั้งหมด" เพื่อเริ่ม</p>';
     return;
   }
 
@@ -90,7 +90,7 @@ function renderPMList() {
       <td style="text-align:right">${Number(row.nc_discount || 0).toFixed(2)}</td>
       <td style="text-align:right;color:#dc2626;font-weight:700">${ncAuto.toFixed(2)}</td>
       <td>
-        <button onclick="openPMForm('${row.id}')">✏️ แก้ไข</button>
+        <button onclick="openPMForm('${row.id}')">✏️ Edit</button>
         <button class="danger" onclick="deletePM('${row.id}')">🗑 ลบ</button>
       </td>
     </tr>`;
@@ -100,63 +100,37 @@ function renderPMList() {
   body.innerHTML = html;
 }
 
-// ================= OPEN FORM =================
+// ================= OPEN FORM (EDIT ONLY) =================
 async function openPMForm(id) {
-  pmEditingId = id || null;
+  // ✅ ต้องมี id (Edit mode เท่านั้น)
+  if (!id) {
+    alert('ใช้ปุ่ม "🔄 สร้างราคาทั้งหมด" เพื่อเพิ่มเกรดใหม่\nหรือกด "✏️ Edit" ที่แถวเพื่อแก้ราคา');
+    return;
+  }
+
+  pmEditingId = id;
   $('pmFormError').innerHTML = '';
   $('pmfMonth').value = pmSelectedMonth;
 
-  // ✅ สร้าง dropdown gradegram
+  // ✅ สร้าง dropdown gradegram (แสดงแค่ค่าที่มี)
   const gradeSelect = $('pmfGradegram');
   if (!gradeSelect) return;
 
-  // ดึง gradegram จาก masterCache
-  const allGradegrams = [...new Set(
-    masterCache.map(m => normalizeGrade(m.grade) + m.gram)
-  )].sort();
+  gradeSelect.disabled = true;
+  gradeSelect.style.background = '#f1f5f9';
 
-  const isEdit = !!id;
-  gradeSelect.disabled = isEdit;
-  gradeSelect.style.background = isEdit ? '#f1f5f9' : '';
+  const row = pmCache.find(r => r.id === id);
+  if (!row) return;
 
-  const existingGradegrams = pmCache.map(r => r.gradegram);
+  gradeSelect.innerHTML = `<option value="${row.gradegram}">${row.gradegram}</option>`;
 
-  if (isEdit) {
-    // ✅ โหมด Edit — แสดงแค่ gradegram ที่มี
-    const editRow = pmCache.find(r => r.id === id);
-    gradeSelect.innerHTML = `<option value="${editRow?.gradegram || ''}">${editRow?.gradegram || ''}</option>`;
-  } else {
-    // ✅ โหมด Add — แสดงทุก gradegram (ที่มีอยู่แล้ว = disabled)
-    gradeSelect.innerHTML = allGradegrams.map(gg => {
-      const isExisting = existingGradegrams.includes(gg);
-      const disabled = isExisting ? 'disabled' : '';
-      const label = isExisting ? `${gg} (มีแล้ว)` : gg;
-      return `<option value="${gg}" ${disabled}>${label}</option>`;
-    }).join('');
-  }
-
-  if (isEdit) {
-    const row = pmCache.find(r => r.id === id);
-    if (!row) return;
-
-    $('pmFormTitle').textContent = `✏️ แก้ไขราคา — ${row.gradegram}`;
-    gradeSelect.value = row.gradegram;
-    $('pmfNormal').value = row.price_normal;
-    $('pmfF').value = row.price_f || '';
-    $('pmfBT').value = row.price_bt || '';
-    $('pmfKTP').value = row.price_ktp || '';
-    $('pmfNcDiscount').value = row.nc_discount || 1;
-  } else {
-    // ✅ โหมด Add — default = gradegram แรกที่ยังไม่มี
-    const available = allGradegrams.find(gg => !existingGradegrams.includes(gg));
-    $('pmFormTitle').textContent = `➕ เพิ่มราคา — เดือน ${pmSelectedMonth}`;
-    gradeSelect.value = available || '';
-    $('pmfNormal').value = '';
-    $('pmfF').value = '';
-    $('pmfBT').value = '';
-    $('pmfKTP').value = '';
-    $('pmfNcDiscount').value = Number($('pmNcDiscount')?.value) || 1;
-  }
+  $('pmFormTitle').textContent = `✏️ แก้ไขราคา — ${row.gradegram}`;
+  gradeSelect.value = row.gradegram;
+  $('pmfNormal').value = row.price_normal;
+  $('pmfF').value = row.price_f || '';
+  $('pmfBT').value = row.price_bt || '';
+  $('pmfKTP').value = row.price_ktp || '';
+  $('pmfNcDiscount').value = row.nc_discount || 1;
 
   updatePM_NC_Auto();
   $('pmfNormal').oninput = updatePM_NC_Auto;
@@ -172,13 +146,15 @@ function updatePM_NC_Auto() {
   $('pmfNC').value = (normal - disc).toFixed(2);
 }
 
-// ================= SAVE =================
+// ================= SAVE (UPDATE ONLY) =================
 async function savePMForm() {
-  const gradegram = $('pmfGradegram').value;
+  if (!pmEditingId) {
+    $('pmFormError').innerHTML = '<div class="msg err">ไม่พบรายการที่จะแก้ไข</div>';
+    return;
+  }
 
+  const gradegram = $('pmfGradegram').value;
   const payload = {
-    month:        pmSelectedMonth,
-    gradegram:    gradegram,
     price_normal: Number($('pmfNormal').value),
     price_f:      Number($('pmfF').value) || null,
     price_bt:     Number($('pmfBT').value) || null,
@@ -187,43 +163,22 @@ async function savePMForm() {
     updated_at:   new Date().toISOString()
   };
 
-  if (!gradegram) {
-    $('pmFormError').innerHTML = '<div class="msg err">กรุณาเลือก Gradegram</div>';
-    return;
-  }
   if (!payload.price_normal || payload.price_normal <= 0) {
     $('pmFormError').innerHTML = '<div class="msg err">ราคาปกติต้องมากกว่า 0</div>';
     return;
   }
 
   try {
-    if (pmEditingId) {
-      // ✅ Update
-      const { error } = await supabase
-        .from('price_master')
-        .update({
-          price_normal: payload.price_normal,
-          price_f:      payload.price_f,
-          price_bt:     payload.price_bt,
-          price_ktp:    payload.price_ktp,
-          nc_discount:  payload.nc_discount,
-          updated_at:   payload.updated_at
-        })
-        .eq('id', pmEditingId);
-      if (error) throw error;
-      showMsg('pmMsg', `✅ แก้ไขราคา ${gradegram} สำเร็จ`, 'ok');
-    } else {
-      // ✅ Insert
-      const { error } = await supabase
-        .from('price_master')
-        .insert(payload);
-      if (error) throw error;
-      showMsg('pmMsg', `✅ เพิ่มราคา ${gradegram} สำเร็จ`, 'ok');
-    }
+    const { error } = await supabase
+      .from('price_master')
+      .update(payload)
+      .eq('id', pmEditingId);
+    if (error) throw error;
 
     closeModal('modalPM');
     await loadPriceMasterList();
     renderPMList();
+    showMsg('pmMsg', `✅ แก้ไขราคา ${gradegram} สำเร็จ`, 'ok');
   } catch (e) {
     $('pmFormError').innerHTML = `<div class="msg err">${esc(e.message)}</div>`;
   }
