@@ -599,6 +599,7 @@ th{background:#f1f5f9;font-weight:600}
   font-size: 14px;
   line-height: 1.6;
 }
+
 /* ═══════════════════════════════════════════════════════════ */
 /* ========== ALERT MATRIX V7 — Matrix + Input ========== */
 /* ═══════════════════════════════════════════════════════════ */
@@ -858,6 +859,7 @@ th{background:#f1f5f9;font-weight:600}
   .alert-flat-table td { padding: 4px 5px; }
   .alert-flat-table .alert-input-note { max-width: 100px; }
 }
+
 /* ═══════════════════════════════════════════════════════════ */
 /* ========== ALERT SCROLL + STICKY HEADER ========== */
 /* ═══════════════════════════════════════════════════════════ */
@@ -877,6 +879,7 @@ th{background:#f1f5f9;font-weight:600}
   background: #1e293b;
   color: #fff;
 }
+
 /* ═══════════════════════════════════════════════════════════ */
 /* ALERT FLAT TABLE — Fix Column Widths (13 columns) */
 /* ═══════════════════════════════════════════════════════════ */
@@ -1078,4 +1081,87 @@ th{background:#f1f5f9;font-weight:600}
   #modalPOForm .modal {
     padding: 14px;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════ */
+/* ========== ALERT INPUT — สถานะ filled (โทนฟ้า) ========== */
+/* ═══════════════════════════════════════════════════════════ */
+
+/* default = จาง */
+.alert-flat-table .alert-input-qty,
+.alert-flat-table .alert-input-sup,
+.alert-flat-table .alert-input-customer,
+.alert-flat-table .alert-input-quality,
+.alert-flat-table .alert-input-note {
+  background: #f8fafc;
+  color: #94a3b8;
+  border-color: #e2e8f0;
+  transition: all .15s;
+}
+
+/* filled = เด่น (โทนฟ้า) */
+.alert-flat-table .alert-input-qty.filled,
+.alert-flat-table .alert-input-sup.filled,
+.alert-flat-table .alert-input-customer.filled,
+.alert-flat-table .alert-input-quality.filled,
+.alert-flat-table .alert-input-note.filled {
+  background: #eff6ff;
+  color: #1e3a8a;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37,99,235,.12);
+  font-weight: 700;
+}
+
+/* ✅ qty filled — เน้นสีแดงเพื่อให้เห็นจำนวนชัด */
+.alert-flat-table .alert-input-qty.filled {
+  color: #dc2626;
+}
+
+/* ═══════════════════════════════════════════════════════════ */
+/* ========== ALERT — Modal รายละเอียดก่อนสร้าง PO ========== */
+/* ═══════════════════════════════════════════════════════════ */
+
+#modalAlertPODetail .modal {
+  max-width: 900px;
+  max-height: 88vh;
+}
+#modalAlertPODetail .po-detail-summary {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  font-size: 14px;
+}
+#modalAlertPODetail .po-detail-summary b {
+  color: #1e40af;
+  font-size: 15px;
+}
+#modalAlertPODetail table {
+  font-size: 13px;
+  width: 100%;
+  border-collapse: collapse;
+}
+#modalAlertPODetail th {
+  background: #1e293b;
+  color: #fff;
+  padding: 9px 12px;
+  text-align: center;
+  font-size: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+#modalAlertPODetail td {
+  padding: 7px 12px;
+  border: 1px solid #e2e8f0;
+}
+#modalAlertPODetail tfoot td {
+  background: #cbd5e1;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 9px 12px;
 }
