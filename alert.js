@@ -294,6 +294,14 @@ function hasPOEdited() {
   return Object.values(flags).some(f => f.edited === true);
 }
 
+// ================= HELPER: FSC =================
+function isFSCGrade(gradegram) {
+  if (!gradegram) return false;
+  const match = String(gradegram).match(/^([A-Z]+)/);
+  if (!match) return false;
+  return match[1].includes('F');
+}
+
 // ================= RENDER ALERT (Flat Table) =================
 async function renderAlert() {
   const snapshotMonth = $('alertSnapshotMonth')?.value;
@@ -429,7 +437,7 @@ async function renderAlert() {
     html += `<tr class="total-row">
       <td colspan="7" style="text-align:right;font-weight:700">จำนวนรวม (ม้วน)</td>
       <td style="font-weight:700;color:#dc2626;font-size:15px">${grandShortage > 0 ? grandShortage : '-'}</td>
-      <td colspan="4"></td>
+      <td colspan="5"></td>
     </tr>`;
 
     html += '</tbody></table></div>';
@@ -439,6 +447,7 @@ async function renderAlert() {
       <div>Stock Level − (Stock + Receive) = Alert · รวมต้องสั่ง ${grandShortage} ม้วน</div>
       <div style="display:flex;gap:6px">
         <button class="primary" onclick="createPOFromAlert()">📄 สร้าง PO</button>
+        <button class="danger" onclick="clearAlertInputs()">🗑 ล้างค่า</button>
         <button onclick="exportAlert()">📤 Export Excel</button>
         <button onclick="window.print()">🖨 พิมพ์</button>
       </div>
@@ -492,6 +501,25 @@ function dismissPOWarning() {
 function onAlertInput(gradegram, size, field, value) {
   const key = alertLS_Key(gradegram, size);
   saveAlertInput(key, field, value);
+}
+
+// ================= CLEAR ALL ALERT INPUTS =================
+function clearAlertInputs() {
+  if (!confirm('⚠️ ล้างค่าที่กรอกทั้งหมด (สั่งซื้อ / Sup. / ม้วนลูกค้า / คุณภาพ B / หมายเหตุ)?')) return;
+
+  // ✅ ล้าง localStorage
+  localStorage.removeItem(ALERT_LS_KEY);
+
+  // ✅ Render ใหม่
+  renderAlert();
+
+  // ✅ แจ้งเตือน
+  const msg = document.createElement('div');
+  msg.className = 'msg ok';
+  msg.style.cssText = 'position:fixed;top:80px;right:20px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.15)';
+  msg.textContent = '✅ ล้างค่าทั้งหมดแล้ว';
+  document.body.appendChild(msg);
+  setTimeout(() => msg.remove(), 2000);
 }
 
 // ================= CREATE PO FROM ALERT =================
@@ -667,6 +695,7 @@ function exportAlert() {
       Sup: lsVal.sup || '',
       ม้วนลูกค้า: ALERT_CUSTOMER_ROLLS.find(c => c.value === lsVal.customer_roll)?.label || 'ปกติ',
       'คุณภาพ B': ALERT_QUALITY_B.find(q => q.value === lsVal.quality_b)?.label || 'ปกติ',
+      FSC: isFSCGrade(r.gradegram) ? 'FSC' : 'Non-FSC',
       หมายเหตุ: lsVal.note || ''
     };
   });
