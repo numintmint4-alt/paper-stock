@@ -9,6 +9,32 @@ let poPriceMaster = [];
 let poSelectedMonth = '';
 let poEditingId = null;
 
+// ================= STD WEIGHT HELPER =================
+function getStdWeight(gradegram, size) {
+  // ✅ หา std_weight_kg จาก masterCache
+  // gradegram = 'CA105' → grade = 'CA', gram = '105'
+  const match = String(gradegram).match(/^([A-Z]+F?)(\d+)$/);
+  if (!match) return 0;
+
+  const grade = match[1];     // 'CA' หรือ 'CAF'
+  const gram = match[2];      // '105'
+
+  // หา paper_specs ที่ตรง grade + gram + size
+  const spec = masterCache.find(m =>
+    normalizeGrade(m.grade) === grade &&
+    String(m.gram) === gram &&
+    Number(m.size) === Number(size)
+  );
+
+  return spec ? Number(spec.std_weight_kg) || 0 : 0;
+}
+
+// ✅ คำนวณ KG. รวม
+function calcKgTotal(gradegram, size, quantity) {
+  const std = getStdWeight(gradegram, size);
+  return Number((std * Number(quantity)).toFixed(2));
+}
+
 // ================= INIT =================
 async function initPurchaseOrderTab() {
   const today = new Date();
@@ -286,13 +312,16 @@ function renderMultiPOForm(posList, alertData) {
       const custLabel = { normal: 'ปกติ', pump_f: 'ปั้ม F', pump_bt: 'ปั้ม BT', pump_ktp: 'ปั้ม KTP' }[it.customer_roll] || it.customer_roll;
       const qualLabel = { normal: 'ปกติ', nc: 'NC' }[it.quality_b] || it.quality_b;
 
+      // ✅ คำนวณ KG จาก std_weight
+      const kgTotal = calcKgTotal(it.gradegram, it.size, it.quantity);
+
       html += `<tr data-gradegram="${esc(it.gradegram)}" data-size="${it.size}">
         <td>${i + 1}</td>
         <td><input type="text" value="SDPC.01" style="width:80px"></td>
         <td>${esc(it.gradegram)}</td>
         <td>${it.size}</td>
         <td>${it.quantity}</td>
-        <td>${Number(it.quantity * 1000).toLocaleString()}</td>
+        <td>${kgTotal.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
         <td>${price.toFixed(2)}</td>
         <td>${custLabel}</td>
         <td>${qualLabel}</td>
@@ -370,7 +399,7 @@ async function saveAllPOs() {
         size: it.size,
         gradegram_size: it.gradegram_size,
         quantity: it.quantity,
-        kg_total: it.quantity * 1000,
+        kg_total: calcKgTotal(it.gradegram, it.size, it.quantity),   // ✅ ใช้ std_weight
         price: price,
         customer_roll: it.customer_roll || 'normal',
         quality_b: it.quality_b || 'normal',
@@ -672,4 +701,116 @@ function cancelPOForm() {
   // ✅ กลับไป Tab Alert
   const alertBtn = document.querySelector('.nav button[data-tab="alert"]');
   if (alertBtn) alertBtn.click();
+}
+
+// ================= EXPORT PO TO EXCEL =================
+function exportPOToExcel() {
+  if (!poCache || !poCache.length) {
+    alert('ไม่มีข้อมูล PO');
+    return;
+  }
+
+  if (!confirm(`Export ${poCache.length} PO เป็น Excel?`)) return;
+
+  // ✅ ดึง items ของทุก PO
+  exportPOToExcel_Async();
+}
+
+async function exportPOToExcel_Async() {
+  try {
+    const allItems = [];
+    const posWithItems = [];
+
+    for (const po of poCache) {
+      const { data, error } = await supabase.rpc('get_purchase_order_detail', { p_po_id: po.id });
+      if (error) throw error;
+
+      const items = (data.items || []).filter(it => it.status !== 'cancelled');
+
+      posWithItems.push({
+        po: data.header,
+        items: items
+      });
+
+      items.forEach(it => {
+        allItems.push({
+          ...it,
+          po_no: data.header.po_no,
+          sup_code: data.header.sup_code
+        });
+      });
+    }
+
+    if (!allItems.length) {
+      alert('ไม่มีรายการที่จะ export');
+      return;
+    }
+
+    // ✅ สร้าง Sheet
+    const wsData = [];
+
+    // Header row
+    wsData.push([
+      'PC.', 'SUP.', 'Gradegram', 'Size', 'Gradegram-Size',
+      'Quantity', 'KG. รวม', 'BU', 'Department', 'Price', 'หมายเหตุ', 'เลขที่ PO'
+    ]);
+
+    // Data rows
+    posWithItems.forEach((p, poIdx) => {
+      p.items.forEach((it, itemIdx) => {
+        const custLabel = { normal: '', pump_f: 'ปั้ม F', pump_bt: 'ปั้ม BT', pump_ktp: 'ปั้ม KTP' }[it.customer_roll] || '';
+        const qualLabel = { normal: '', nc: 'NC' }[it.quality_b] || '';
+        const noteParts = [custLabel, qualLabel, it.note].filter(x => x && x.trim());
+        const remarkCombined = noteParts.join(',');
+
+        wsData.push([
+          it.pc_code || 'SDPC.01',
+          p.po.sup_code || '',
+          it.gradegram,
+          it.size,
+          it.gradegram_size,
+          it.quantity,
+          Number(it.kg_total || 0),
+          1,
+          '13110',
+          Number(it.price || 0),
+          remarkCombined,
+          itemIdx === 0 ? p.po.po_no : ''   // ✅ แค่บรรทัดแรก
+        ]);
+      });
+    });
+
+    // สร้าง Worksheet
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // ✅ กำหนด column widths
+    ws['!cols'] = [
+      { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 6 }, { wch: 16 },
+      { wch: 10 }, { wch: 12 }, { wch: 5 }, { wch: 12 }, { wch: 10 },
+      { wch: 40 }, { wch: 16 }
+    ];
+
+    // ✅ Number format
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    for (let R = 1; R <= range.e.r; R++) {
+      // KG. รวม (col 6)
+      const kgCell = ws[XLSX.utils.encode_cell({ r: R, c: 6 })];
+      if (kgCell) kgCell.z = '#,##0.00';
+      // Price (col 9)
+      const pCell = ws[XLSX.utils.encode_cell({ r: R, c: 9 })];
+      if (pCell) pCell.z = '0.00';
+    }
+
+    // ✅ สร้าง Workbook
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'PO');
+
+    // ✅ ดาวน์โหลด
+    const month = poSelectedMonth || new Date().toISOString().slice(0, 7);
+    XLSX.writeFile(wb, `PO_${month}.xlsx`);
+
+    alert(`✅ Export ${allItems.length} รายการ จาก ${posWithItems.length} PO สำเร็จ`);
+  } catch (e) {
+    alert('❌ ' + e.message);
+  }
 }
