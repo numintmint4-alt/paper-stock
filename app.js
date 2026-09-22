@@ -245,6 +245,7 @@ function toggleAcc(head, bodyId) {
     if (bodyId === 'accRolluse') renderLatestBatch();
     if (bodyId === 'accUsers' && HAS_EDGE_FUNCTION) loadUsers();
     if (bodyId === 'accArchive') loadArchiveStats();
+if (bodyId === 'accPriceMaster' && typeof initPriceMaster === 'function') initPriceMaster();
   }
 }
 
