@@ -426,21 +426,222 @@ async function saveAllPOs() {
   window._pendingAlertData = null;
 }
 
-// ================= PLACEHOLDER =================
+// ================= RENDER PO FORM (EDIT) =================
 function renderPOFormContent(header, items) {
-  $('poFormBody').innerHTML = '<p style="text-align:center;color:#94a3b8">[อยู่ในขั้นถัดไป]</p>';
+  if (!header) {
+    $('poFormBody').innerHTML = '<p style="text-align:center;color:#94a3b8">ไม่มีข้อมูล</p>';
+    return;
+  }
+
+  let html = `<div class="msg info" style="margin-bottom:14px">
+    <b>${esc(header.po_no)}</b> · Sup: <b>${esc(header.sup_code)}</b><br>
+    วันที่: ${header.po_date || '-'} · สถานะ: <b>${header.status}</b>
+  </div>`;
+
+  html += `<div class="po-form-group">
+    <table class="alert-flat-table" style="font-size:12px">
+      <thead><tr>
+        <th>#</th><th>PC.</th><th>Gradegram</th><th>Size</th><th>Quantity</th><th>Price</th>
+        <th>ม้วนลูกค้า</th><th>คุณภาพ B</th><th>หมายเหตุ</th><th></th>
+      </tr></thead>
+      <tbody>`;
+
+  items.filter(it => it.status !== 'cancelled').forEach((it, i) => {
+    const custLabel = { normal: 'ปกติ', pump_f: 'ปั้ม F', pump_bt: 'ปั้ม BT', pump_ktp: 'ปั้ม KTP' }[it.customer_roll] || 'ปกติ';
+    const qualLabel = { normal: 'ปกติ', nc: 'NC' }[it.quality_b] || 'ปกติ';
+
+    html += `<tr data-item-id="${it.id}">
+      <td>${i + 1}</td>
+      <td><input type="text" value="${esc(it.pc_code) || 'SDPC.01'}" style="width:80px" onchange="onPOItemEdit('${it.id}', 'pc_code', this.value)"></td>
+      <td>${esc(it.gradegram)}</td>
+      <td>${it.size}</td>
+      <td><input type="number" value="${it.quantity}" style="width:60px" onchange="onPOItemEdit('${it.id}', 'quantity', this.value)"></td>
+      <td><input type="number" value="${Number(it.price || 0).toFixed(2)}" step="0.01" style="width:70px" onchange="onPOItemEdit('${it.id}', 'price', this.value)"></td>
+      <td>
+        <select onchange="onPOItemEdit('${it.id}', 'customer_roll', this.value)">
+          <option value="normal" ${it.customer_roll === 'normal' ? 'selected' : ''}>ปกติ</option>
+          <option value="pump_f" ${it.customer_roll === 'pump_f' ? 'selected' : ''}>ปั้ม F</option>
+          <option value="pump_bt" ${it.customer_roll === 'pump_bt' ? 'selected' : ''}>ปั้ม BT</option>
+          <option value="pump_ktp" ${it.customer_roll === 'pump_ktp' ? 'selected' : ''}>ปั้ม KTP</option>
+        </select>
+      </td>
+      <td>
+        <select onchange="onPOItemEdit('${it.id}', 'quality_b', this.value)">
+          <option value="normal" ${it.quality_b === 'normal' ? 'selected' : ''}>ปกติ</option>
+          <option value="nc" ${it.quality_b === 'nc' ? 'selected' : ''}>NC</option>
+        </select>
+      </td>
+      <td><input type="text" value="${esc(it.note) || ''}" style="width:150px" onchange="onPOItemEdit('${it.id}', 'note', this.value)"></td>
+      <td><button class="danger" onclick="cancelPOItem('${it.id}')">❌ ยกเลิก</button></td>
+    </tr>`;
+  });
+
+  html += `</tbody></table></div>`;
+
+  html += `<div class="form-actions" style="margin-top:16px">
+    <button onclick="cancelPOForm()">ยกเลิก</button>
+    <button class="primary" onclick="closeModal('modalPOForm'); renderPOList();">💾 ปิด</button>
+  </div>`;
+
+  $('poFormBody').innerHTML = html;
 }
 
-function openPODetail(poId) {
-  alert('ดูรายละเอียด PO: ' + poId + '\n[จะทำในขั้นถัดไป]');
+// ================= EDIT ITEM =================
+async function onPOItemEdit(itemId, field, value) {
+  try {
+    const payload = {};
+    payload[field] = value;
+
+    const { error } = await supabase.rpc('update_po_item', {
+      p_item_id: itemId,
+      p_data: payload,
+      p_user_id: currentUser?.id
+    });
+    if (error) throw error;
+    // ✅ Silent success
+  } catch (e) {
+    alert('❌ ' + e.message);
+  }
 }
 
+// ================= CANCEL ITEM =================
+async function cancelPOItem(itemId) {
+  const note = prompt('❓ หมายเหตุการยกเลิกรายการ:');
+  if (note === null) return;
+  if (!note.trim()) {
+    alert('กรุณาใส่หมายเหตุ');
+    return;
+  }
+
+  try {
+    const { error } = await supabase.rpc('cancel_po_item', {
+      p_item_id: itemId,
+      p_note: note,
+      p_user_id: currentUser?.id
+    });
+    if (error) throw error;
+
+    // Reload PO detail
+    const poId = poEditingId;
+    if (poId) {
+      const { data } = await supabase.rpc('get_purchase_order_detail', { p_po_id: poId });
+      renderPOFormContent(data.header, data.items);
+    }
+    alert('✅ ยกเลิกรายการสำเร็จ');
+  } catch (e) {
+    alert('❌ ' + e.message);
+  }
+}
+
+// ================= PO DETAIL =================
+async function openPODetail(poId) {
+  $('poDetailTitle').textContent = '📄 รายละเอียด PO';
+  $('poDetailBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
+  openModal('modalPODetail');
+
+  try {
+    const { data, error } = await supabase.rpc('get_purchase_order_detail', { p_po_id: poId });
+    if (error) throw error;
+
+    const header = data.header || {};
+    const items = data.items || [];
+    const logs = data.logs || [];
+
+    $('poDetailTitle').innerHTML = `📄 ${esc(header.po_no)} · ${esc(header.sup_code)}`;
+
+    const statusBadge = {
+      draft: '<span class="badge" style="background:#fef3c7;color:#b45309">📝 Draft</span>',
+      saved: '<span class="badge ok">✅ Saved</span>',
+      sent:  '<span class="badge" style="background:#dbeafe;color:#1e40af">📤 Sent</span>'
+    }[header.status] || header.status;
+
+    // Header
+    let html = `<div class="msg info" style="margin-bottom:14px">
+      <b>${esc(header.po_no)}</b> · ${statusBadge}<br>
+      วันที่: <b>${header.po_date || '-'}</b> · Sup: <b>${esc(header.sup_code)}</b><br>
+      อ้างอิง: Stock Level <b>${header.ref_snapshot || '-'}</b> · Stock <b>${header.ref_stock || '-'}</b> · Receive <b>${header.ref_receive || '-'}</b><br>
+      รวม: <b>${header.total_items || 0}</b> รายการ · <b>${Number(header.total_kg || 0).toLocaleString()}</b> kg
+    </div>`;
+
+    // Items
+    html += '<h4>📦 รายการ</h4>';
+    html += '<div class="data-scroll"><table class="data-table"><thead><tr>';
+    html += '<th>#</th><th>PC.</th><th>Gradegram</th><th>Size</th><th>Qty</th><th>KG รวม</th>';
+    html += '<th>Price</th><th>ม้วนลูกค้า</th><th>คุณภาพ B</th><th>FSC</th><th>หมายเหตุ</th><th>สถานะ</th>';
+    html += '</tr></thead><tbody>';
+
+    items.forEach((it, i) => {
+      const isCancelled = it.status === 'cancelled';
+      const custLabel = { normal: 'ปกติ', pump_f: 'ปั้ม F', pump_bt: 'ปั้ม BT', pump_ktp: 'ปั้ม KTP' }[it.customer_roll] || 'ปกติ';
+      const qualLabel = { normal: 'ปกติ', nc: 'NC' }[it.quality_b] || 'ปกติ';
+      const isFSC = /^([A-Z]+)/.test(it.gradegram) && it.gradegram.match(/^([A-Z]+)/)[1].includes('F');
+      const rowStyle = isCancelled ? 'style="opacity:0.5;text-decoration:line-through"' : '';
+
+      html += `<tr ${rowStyle}>
+        <td>${i + 1}</td>
+        <td>${esc(it.pc_code) || 'SDPC.01'}</td>
+        <td><b>${esc(it.gradegram)}</b></td>
+        <td>${it.size}</td>
+        <td style="text-align:right">${it.quantity}</td>
+        <td style="text-align:right">${Number(it.kg_total || 0).toLocaleString()}</td>
+        <td style="text-align:right">${Number(it.price || 0).toFixed(2)}</td>
+        <td>${custLabel}</td>
+        <td>${qualLabel}</td>
+        <td>${isFSC ? '🟢' : '⚪'}</td>
+        <td>${esc(it.note) || '-'}</td>
+        <td>${isCancelled ? `❌ ยกเลิก: ${esc(it.cancel_note)}` : '✅ ปกติ'}</td>
+      </tr>`;
+    });
+
+    html += '</tbody></table></div>';
+
+    // Logs
+    if (logs.length) {
+      html += '<h4 style="margin-top:16px">📜 ประวัติการแก้ไข</h4>';
+      html += '<div class="data-scroll" style="max-height:200px"><table class="data-table"><thead><tr>';
+      html += '<th>วันที่</th><th>การกระทำ</th><th>รายการ</th><th>หมายเหตุ</th>';
+      html += '</tr></thead><tbody>';
+      logs.forEach(l => {
+        html += `<tr>
+          <td>${new Date(l.changed_at).toLocaleString('th-TH')}</td>
+          <td>${esc(l.action)}</td>
+          <td>${esc(l.field_name || '-')}</td>
+          <td>${esc(l.note || '-')}</td>
+        </tr>`;
+      });
+      html += '</tbody></table></div>';
+    }
+
+    $('poDetailBody').innerHTML = html;
+  } catch (e) {
+    $('poDetailBody').innerHTML = `<div class="msg err">${esc(e.message)}</div>`;
+  }
+}
+
+// ================= DELETE PO =================
 async function deletePO(poId) {
-  if (!confirm('ยืนยันลบ PO?')) return;
+  const po = poCache.find(p => p.id === poId);
+  if (!po) return;
+
+  let password = null;
+
+  // ✅ ถ้า status = saved → ขอรหัสผ่าน
+  if (po.status === 'saved' || po.status === 'sent') {
+    password = prompt(`🔒 PO นี้สถานะ ${po.status.toUpperCase()}\nกรุณาใส่รหัสผ่านเพื่อยืนยัน:`);
+    if (!password) return;
+  }
+
+  const note = prompt('📝 หมายเหตุการลบ:');
+  if (note === null) return;
+
+  if (!confirm(`⚠️ ยืนยันลบ PO ${po.po_no}?\n\n(ไม่สามารถกู้คืนได้)`)) return;
+
   try {
     const { error } = await supabase.rpc('delete_purchase_order', {
       p_po_id: poId,
-      p_user_id: currentUser?.id
+      p_user_id: currentUser?.id,
+      p_password: password,
+      p_note: note
     });
     if (error) throw error;
     alert('✅ ลบสำเร็จ');
