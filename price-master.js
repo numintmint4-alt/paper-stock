@@ -1,11 +1,19 @@
 // ═══════════════════════════════════════════════════════════════
 // STOCK V8 — price-master.js
-// Master ราคา: List + Edit + Save + Import/Export
+// Master ราคา (Price Master) — ราคาต่อ Gradegram รายเดือน
 // ═══════════════════════════════════════════════════════════════
 
 let pmCache = [];
 let pmSelectedMonth = '';
 let pmEditingId = null;
+
+// ================= HELPER: showMsg =================
+function showMsg(elId, text, type = 'ok') {
+  const el = $(elId);
+  if (!el) return;
+  el.innerHTML = `<div class="msg ${type}">${esc(text)}</div>`;
+  setTimeout(() => { el.innerHTML = ''; }, 3000);
+}
 
 // ================= INIT =================
 async function initPriceMaster() {
@@ -13,112 +21,142 @@ async function initPriceMaster() {
   if (!pmSelectedMonth) {
     pmSelectedMonth = `${today.getFullYear()}-${pad(today.getMonth()+1)}`;
   }
+
   const monthEl = $('pmMonth');
   if (monthEl && !monthEl.value) monthEl.value = pmSelectedMonth;
 
+  // ✅ เติม NC discount default จาก localStorage
+  const savedNc = localStorage.getItem('stockv8_pm_nc_discount');
+  if (savedNc && $('pmNcDiscount')) $('pmNcDiscount').value = savedNc;
+
   await loadPriceMasterList();
+  renderPMList();
 }
 
-// ================= LOAD LIST =================
+// ================= LOAD =================
 async function loadPriceMasterList() {
-  const listEl = $('pmBody');
-  if (!listEl) return;
-  listEl.innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
-
   try {
     const { data, error } = await supabase
       .from('price_master')
       .select('*')
       .eq('month', pmSelectedMonth)
-      .eq('is_active', true)
       .order('gradegram');
     if (error) throw error;
-
     pmCache = data || [];
-    if (!pmCache.length) {
-      listEl.innerHTML = '<p style="text-align:center;color:#94a3b8;padding:30px">ยังไม่มีราคาในเดือนนี้</p>';
-      return;
-    }
-
-    // ✅ NC Discount (ใช้ค่าจากแถวแรก)
-    const ncDiscount = Number(pmCache[0].nc_discount) || 1;
-    if ($('pmNcDiscount')) $('pmNcDiscount').value = ncDiscount;
-
-    let html = '<div class="data-scroll"><table class="data-table"><thead><tr>';
-    html += '<th>#</th><th>Gradegram</th><th>ราคาปกติ</th><th>ปั้ม F</th><th>ปั้ม BT</th><th>ปั้ม KTP</th><th>NC (auto)</th><th></th>';
-    html += '</tr></thead><tbody>';
-
-    pmCache.forEach((r, i) => {
-      const ncAuto = (Number(r.price_normal) - Number(r.nc_discount || 0)).toFixed(2);
-      html += `<tr>
-        <td>${i + 1}</td>
-        <td><b>${esc(r.gradegram)}</b></td>
-        <td>${Number(r.price_normal).toFixed(2)}</td>
-        <td>${r.price_f ? Number(r.price_f).toFixed(2) : '-'}</td>
-        <td>${r.price_bt ? Number(r.price_bt).toFixed(2) : '-'}</td>
-        <td>${r.price_ktp ? Number(r.price_ktp).toFixed(2) : '-'}</td>
-        <td style="color:#dc2626;font-weight:700">${ncAuto}</td>
-        <td>
-          <button onclick="openPMForm(${r.id})">✏️ Edit</button>
-        </td>
-      </tr>`;
-    });
-    html += '</tbody></table></div>';
-    html += `<div style="margin-top:8px;font-size:13px;color:#64748b">แสดง ${pmCache.length} รายการ · เดือน ${pmSelectedMonth}</div>`;
-    listEl.innerHTML = html;
   } catch (e) {
-    console.error('loadPriceMasterList:', e);
-    listEl.innerHTML = `<div class="msg err">โหลดไม่สำเร็จ: ${esc(e.message)}</div>`;
+    console.warn('loadPriceMasterList:', e);
+    pmCache = [];
+    $('pmMsg').innerHTML = `<div class="msg err">โหลดไม่สำเร็จ: ${esc(e.message)}</div>`;
   }
 }
 
 // ================= MONTH CHANGE =================
 async function onPMonthChange() {
-  const el = $('pmMonth');
-  if (!el) return;
-  pmSelectedMonth = el.value;
+  const monthEl = $('pmMonth');
+  if (!monthEl) return;
+  pmSelectedMonth = monthEl.value;
   await loadPriceMasterList();
+  renderPMList();
 }
 
-// ================= NC DISCOUNT CHANGE =================
+// ================= NC DISCOUNT (Global) =================
 async function onPMNcDiscountChange() {
-  const newDiscount = Number($('pmNcDiscount').value) || 1;
-  if (!confirm(`เปลี่ยน NC Discount เป็น ${newDiscount} บาท สำหรับทุก gradegram ในเดือนนี้?`)) return;
+  const val = Number($('pmNcDiscount')?.value || 1);
+  localStorage.setItem('stockv8_pm_nc_discount', String(val));
+}
 
-  try {
-    const { error } = await supabase
-      .from('price_master')
-      .update({ nc_discount: newDiscount, updated_at: new Date().toISOString() })
-      .eq('month', pmSelectedMonth);
-    if (error) throw error;
-    await loadPriceMasterList();
-    showMsg('pmMsg', `✅ เปลี่ยน NC Discount เป็น ${newDiscount} บาท`, 'ok');
-  } catch (e) {
-    showMsg('pmMsg', '❌ ' + e.message, 'err');
+// ================= RENDER LIST =================
+function renderPMList() {
+  const body = $('pmBody');
+  if (!body) return;
+
+  if (!pmCache.length) {
+    body.innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">ยังไม่มีราคาในเดือนนี้ — กด "+ เพิ่มราคา" หรือ "🔄 Sync จาก Specs" เพื่อเริ่ม</p>';
+    return;
   }
+
+  let html = '<div class="data-scroll"><table class="data-table"><thead><tr>';
+  html += '<th>Gradegram</th><th>ราคาปกติ</th><th>ปั้ม F</th><th>ปั้ม BT</th><th>ปั้ม KTP</th><th>NC ลด</th><th>NC (auto)</th><th></th>';
+  html += '</tr></thead><tbody>';
+
+  pmCache.forEach(row => {
+    const ncAuto = (Number(row.price_normal) || 0) - (Number(row.nc_discount) || 0);
+    html += `<tr>
+      <td><b>${esc(row.gradegram)}</b></td>
+      <td style="text-align:right">${Number(row.price_normal || 0).toFixed(2)}</td>
+      <td style="text-align:right">${Number(row.price_f || 0).toFixed(2)}</td>
+      <td style="text-align:right">${Number(row.price_bt || 0).toFixed(2)}</td>
+      <td style="text-align:right">${Number(row.price_ktp || 0).toFixed(2)}</td>
+      <td style="text-align:right">${Number(row.nc_discount || 0).toFixed(2)}</td>
+      <td style="text-align:right;color:#dc2626;font-weight:700">${ncAuto.toFixed(2)}</td>
+      <td>
+        <button onclick="openPMForm('${row.id}')">✏️ แก้ไข</button>
+        <button class="danger" onclick="deletePM('${row.id}')">🗑 ลบ</button>
+      </td>
+    </tr>`;
+  });
+
+  html += '</tbody></table></div>';
+  body.innerHTML = html;
 }
 
 // ================= OPEN FORM =================
 async function openPMForm(id) {
   pmEditingId = id || null;
   $('pmFormError').innerHTML = '';
+  $('pmfMonth').value = pmSelectedMonth;
 
-  if (!id) {
-    alert('กรุณาเพิ่มราคาผ่าน Import Excel (ตอนนี้)');
-    return;
+  // ✅ สร้าง dropdown gradegram
+  const gradeSelect = $('pmfGradegram');
+  if (!gradeSelect) return;
+
+  // ดึง gradegram จาก masterCache
+  const allGradegrams = [...new Set(
+    masterCache.map(m => normalizeGrade(m.grade) + m.gram)
+  )].sort();
+
+  const isEdit = !!id;
+  gradeSelect.disabled = isEdit;
+  gradeSelect.style.background = isEdit ? '#f1f5f9' : '';
+
+  const existingGradegrams = pmCache.map(r => r.gradegram);
+
+  if (isEdit) {
+    // ✅ โหมด Edit — แสดงแค่ gradegram ที่มี
+    const editRow = pmCache.find(r => r.id === id);
+    gradeSelect.innerHTML = `<option value="${editRow?.gradegram || ''}">${editRow?.gradegram || ''}</option>`;
+  } else {
+    // ✅ โหมด Add — แสดงทุก gradegram (ที่มีอยู่แล้ว = disabled)
+    gradeSelect.innerHTML = allGradegrams.map(gg => {
+      const isExisting = existingGradegrams.includes(gg);
+      const disabled = isExisting ? 'disabled' : '';
+      const label = isExisting ? `${gg} (มีแล้ว)` : gg;
+      return `<option value="${gg}" ${disabled}>${label}</option>`;
+    }).join('');
   }
 
-  const row = pmCache.find(r => r.id === id);
-  if (!row) return;
+  if (isEdit) {
+    const row = pmCache.find(r => r.id === id);
+    if (!row) return;
 
-  $('pmFormTitle').textContent = `✏️ แก้ไขราคา — ${row.gradegram}`;
-  $('pmfGradegram').value = row.gradegram;
-  $('pmfMonth').value = row.month;
-  $('pmfNormal').value = row.price_normal;
-  $('pmfF').value = row.price_f || '';
-  $('pmfBT').value = row.price_bt || '';
-  $('pmfKTP').value = row.price_ktp || '';
-  $('pmfNcDiscount').value = row.nc_discount || 1;
+    $('pmFormTitle').textContent = `✏️ แก้ไขราคา — ${row.gradegram}`;
+    gradeSelect.value = row.gradegram;
+    $('pmfNormal').value = row.price_normal;
+    $('pmfF').value = row.price_f || '';
+    $('pmfBT').value = row.price_bt || '';
+    $('pmfKTP').value = row.price_ktp || '';
+    $('pmfNcDiscount').value = row.nc_discount || 1;
+  } else {
+    // ✅ โหมด Add — default = gradegram แรกที่ยังไม่มี
+    const available = allGradegrams.find(gg => !existingGradegrams.includes(gg));
+    $('pmFormTitle').textContent = `➕ เพิ่มราคา — เดือน ${pmSelectedMonth}`;
+    gradeSelect.value = available || '';
+    $('pmfNormal').value = '';
+    $('pmfF').value = '';
+    $('pmfBT').value = '';
+    $('pmfKTP').value = '';
+    $('pmfNcDiscount').value = Number($('pmNcDiscount')?.value) || 1;
+  }
 
   updatePM_NC_Auto();
   $('pmfNormal').oninput = updatePM_NC_Auto;
@@ -127,6 +165,7 @@ async function openPMForm(id) {
   openModal('modalPM');
 }
 
+// ✅ อัปเดต NC อัตโนมัติ
 function updatePM_NC_Auto() {
   const normal = Number($('pmfNormal').value) || 0;
   const disc = Number($('pmfNcDiscount').value) || 0;
@@ -135,9 +174,11 @@ function updatePM_NC_Auto() {
 
 // ================= SAVE =================
 async function savePMForm() {
-  if (!pmEditingId) return;
+  const gradegram = $('pmfGradegram').value;
 
   const payload = {
+    month:        pmSelectedMonth,
+    gradegram:    gradegram,
     price_normal: Number($('pmfNormal').value),
     price_f:      Number($('pmfF').value) || null,
     price_bt:     Number($('pmfBT').value) || null,
@@ -146,23 +187,68 @@ async function savePMForm() {
     updated_at:   new Date().toISOString()
   };
 
+  if (!gradegram) {
+    $('pmFormError').innerHTML = '<div class="msg err">กรุณาเลือก Gradegram</div>';
+    return;
+  }
   if (!payload.price_normal || payload.price_normal <= 0) {
     $('pmFormError').innerHTML = '<div class="msg err">ราคาปกติต้องมากกว่า 0</div>';
     return;
   }
 
   try {
-    const { error } = await supabase
-      .from('price_master')
-      .update(payload)
-      .eq('id', pmEditingId);
-    if (error) throw error;
+    if (pmEditingId) {
+      // ✅ Update
+      const { error } = await supabase
+        .from('price_master')
+        .update({
+          price_normal: payload.price_normal,
+          price_f:      payload.price_f,
+          price_bt:     payload.price_bt,
+          price_ktp:    payload.price_ktp,
+          nc_discount:  payload.nc_discount,
+          updated_at:   payload.updated_at
+        })
+        .eq('id', pmEditingId);
+      if (error) throw error;
+      showMsg('pmMsg', `✅ แก้ไขราคา ${gradegram} สำเร็จ`, 'ok');
+    } else {
+      // ✅ Insert
+      const { error } = await supabase
+        .from('price_master')
+        .insert(payload);
+      if (error) throw error;
+      showMsg('pmMsg', `✅ เพิ่มราคา ${gradegram} สำเร็จ`, 'ok');
+    }
 
     closeModal('modalPM');
     await loadPriceMasterList();
-    showMsg('pmMsg', '✅ บันทึกสำเร็จ', 'ok');
+    renderPMList();
   } catch (e) {
     $('pmFormError').innerHTML = `<div class="msg err">${esc(e.message)}</div>`;
+  }
+}
+
+// ================= DELETE =================
+async function deletePM(id) {
+  const row = pmCache.find(r => r.id === id);
+  if (!row) return;
+
+  if (!confirm(`ยืนยันลบราคา ${row.gradegram} เดือน ${pmSelectedMonth}?`)) return;
+
+  try {
+    const { error } = await supabase
+      .from('price_master')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+
+    await loadPriceMasterList();
+    renderPMList();
+
+    showMsg('pmMsg', '✅ ลบสำเร็จ', 'ok');
+  } catch (e) {
+    $('pmMsg').innerHTML = `<div class="msg err">ลบไม่สำเร็จ: ${esc(e.message)}</div>`;
   }
 }
 
@@ -171,60 +257,100 @@ function exportPriceMaster() {
   if (!pmCache.length) return alert('ไม่มีข้อมูล');
 
   const data = pmCache.map(r => ({
-    month: r.month,
-    gradegram: r.gradegram,
-    price_normal: Number(r.price_normal).toFixed(2),
-    price_f:  r.price_f  ? Number(r.price_f).toFixed(2)  : '',
-    price_bt: r.price_bt ? Number(r.price_bt).toFixed(2) : '',
-    price_ktp: r.price_ktp ? Number(r.price_ktp).toFixed(2) : '',
-    nc_discount: Number(r.nc_discount || 0).toFixed(2),
-    nc_auto: (Number(r.price_normal) - Number(r.nc_discount || 0)).toFixed(2)
+    Gradegram: r.gradegram,
+    Month: r.month,
+    'ราคาปกติ': r.price_normal || 0,
+    'ปั้ม F': r.price_f || 0,
+    'ปั้ม BT': r.price_bt || 0,
+    'ปั้ม KTP': r.price_ktp || 0,
+    'NC ลด': r.nc_discount || 0,
+    'NC (auto)': (Number(r.price_normal) || 0) - (Number(r.nc_discount) || 0)
   }));
 
   const ws = XLSX.utils.json_to_sheet(data);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Price Master');
+  XLSX.utils.book_append_sheet(wb, ws, 'PriceMaster');
   XLSX.writeFile(wb, `price_master_${pmSelectedMonth}.xlsx`);
 }
 
 // ================= IMPORT =================
-function importPriceMaster(ev) {
-  const f = ev.target.files[0];
-  if (!f) return;
+async function importPriceMaster(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
 
-  const reader = new FileReader();
-  reader.onload = async (e) => {
-    try {
-      const wb = XLSX.read(e.target.result, { type: 'array' });
-      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
 
-      const payload = rows.map(row => ({
-        month: pmSelectedMonth,
-        gradegram: String(row['gradegram'] || row['Gradegram'] || '').trim(),
-        price_normal: Number(row['price_normal'] || row['ราคาปกติ'] || 0),
-        price_f:  Number(row['price_f']  || row['ปั้ม F']  || 0) || null,
-        price_bt: Number(row['price_bt'] || row['ปั้ม BT'] || 0) || null,
-        price_ktp: Number(row['price_ktp'] || row['ปั้ม KTP'] || 0) || null,
-        nc_discount: Number(row['nc_discount'] || 1)
-      })).filter(r => r.gradegram && r.price_normal > 0);
-
-      if (!payload.length) {
-        showMsg('pmMsg', '⚠ ไม่มีแถวที่บันทึกได้', 'err');
-        return;
-      }
-
-      // Upsert
-      const { error } = await supabase
-        .from('price_master')
-        .upsert(payload, { onConflict: 'month,gradegram' });
-      if (error) throw error;
-
-      showMsg('pmMsg', `✅ Import สำเร็จ ${payload.length} แถว`, 'ok');
-      await loadPriceMasterList();
-    } catch (ex) {
-      showMsg('pmMsg', '❌ ' + ex.message, 'err');
+    if (!rows.length) {
+      $('pmMsg').innerHTML = '<div class="msg err">ไม่มีข้อมูลในไฟล์</div>';
+      return;
     }
-  };
-  reader.readAsArrayBuffer(f);
-  ev.target.value = '';
+
+    const payloads = rows.map(r => ({
+      gradegram: String(r.Gradegram || r.gradegram || '').trim().toUpperCase(),
+      month: String(r.Month || r.month || pmSelectedMonth).trim(),
+      price_normal: Number(r['ราคาปกติ'] || r.price_normal || 0),
+      price_f: Number(r['ปั้ม F'] || r.price_f || 0),
+      price_bt: Number(r['ปั้ม BT'] || r.price_bt || 0),
+      price_ktp: Number(r['ปั้ม KTP'] || r.price_ktp || 0),
+      nc_discount: Number(r['NC ลด'] || r.nc_discount || 0),
+      is_active: true
+    })).filter(p => p.gradegram && p.month);
+
+    if (!payloads.length) {
+      $('pmMsg').innerHTML = '<div class="msg err">ไม่มีแถวที่ valid (ต้องมี Gradegram + Month)</div>';
+      return;
+    }
+
+    const { error } = await supabase
+      .from('price_master')
+      .upsert(payloads, { onConflict: 'gradegram,month' });
+    if (error) throw error;
+
+    await loadPriceMasterList();
+    renderPMList();
+
+    $('pmMsg').innerHTML = `<div class="msg ok">✅ Import สำเร็จ ${payloads.length} รายการ</div>`;
+    setTimeout(() => { const el = $('pmMsg'); if (el) el.innerHTML = ''; }, 3000);
+  } catch (e) {
+    $('pmMsg').innerHTML = `<div class="msg err">Import ล้มเหลว: ${esc(e.message)}</div>`;
+  } finally {
+    event.target.value = '';
+  }
+}
+
+// ================= SYNC FROM SPECS =================
+async function syncPriceMaster() {
+  if (!pmSelectedMonth) {
+    alert('เลือกเดือนก่อน');
+    return;
+  }
+
+  if (!confirm(
+    `สร้างราคาสำหรับทุก gradegram ในเดือน ${pmSelectedMonth}?\n\n` +
+    `• รายการที่มีอยู่แล้ว → ไม่เขียนทับ\n` +
+    `• รายการใหม่ → copy จากเดือนก่อน (ถ้ามี)\n` +
+    `• ถ้าเดือนก่อนไม่มี → ราคาเริ่มต้น = 0`
+  )) return;
+
+  try {
+    const { data, error } = await supabase.rpc('sync_price_master_from_specs', {
+      p_month: pmSelectedMonth
+    });
+    if (error) throw error;
+
+    let msg = `✅ สร้างเสร็จ: `;
+    msg += `เพิ่มใหม่ ${data.inserted} แถว`;
+    if (data.copied > 0) msg += ` (copy จาก ${data.prev_month} ${data.copied} แถว)`;
+    msg += ` · มีอยู่แล้ว ${data.existing} แถว`;
+
+    showMsg('pmMsg', msg, 'ok');
+    await loadPriceMasterList();
+    renderPMList();
+  } catch (e) {
+    showMsg('pmMsg', '❌ ' + e.message, 'err');
+  }
 }
