@@ -29,7 +29,6 @@
     <strong>📦 Stock ม้วนกระดาษ</strong>
     <button data-tab="matrix" class="active">Stock Level</button>
     <button data-tab="stock">Stock</button>
-    <!-- ✅ ลบปุ่ม Summary ออกแล้ว -->
     <button data-tab="receive">Receive</button>
     <button data-tab="alert">Alert</button>
     <button data-tab="purchase-order">Purchase Order</button>
@@ -263,8 +262,6 @@
       </div>
     </div>
 
-    <!-- ========== TAB 3: SUMMARY — ✅ ลบออกแล้ว ========== -->
-
     <!-- ========== TAB 4: RECEIVE (Roll Receive) ========== -->
     <div id="tab-receive" class="hidden">
       <div class="card">
@@ -333,7 +330,6 @@
           <button class="primary" onclick="renderReceive()">🔍 ค้นหา</button>
           <button class="admin-only" onclick="openReceiveImportModal()">📥 Import Excel</button>
           <input type="file" id="fileReceive" accept=".xlsx,.xls" class="hidden" onchange="importReceive(event)">
-          <!-- ✅ เพิ่มปุ่ม Export Excel -->
           <button onclick="exportReceive()">📤 Export Excel</button>
           <button onclick="window.print()">🖨 พิมพ์ (A4 แนวนอน)</button>
         </div>
@@ -544,6 +540,34 @@
           </div>
         </div>
 
+        <!-- ✅ Master ราคา (V8) -->
+        <div class="acc-item">
+          <div class="acc-head" onclick="toggleAcc(this, 'accPriceMaster')">
+            <span>💰 Master ราคา (Price Master)</span>
+            <span class="arrow">▶</span>
+          </div>
+          <div class="acc-body hidden" id="accPriceMaster">
+            <p class="hint">ราคาต่อ <b>Gradegram</b> (ไม่รวม Size) · ตั้งได้ทุกเดือน · NC = ราคาปกติ − ส่วนลด</p>
+
+            <div class="filters">
+              <label>📅 เดือน
+                <input type="month" id="pmMonth" onchange="onPMonthChange()">
+              </label>
+              <label>NC ลด
+                <input type="number" id="pmNcDiscount" value="1" step="0.01" style="width:80px" onchange="onPMNcDiscountChange()">
+                บาท
+              </label>
+              <button class="primary" onclick="openPMForm()">+ เพิ่มราคา</button>
+              <button onclick="exportPriceMaster()">📤 Export Excel</button>
+              <input type="file" id="filePriceMaster" accept=".xlsx,.xls" class="hidden" onchange="importPriceMaster(event)">
+              <button class="admin-only" onclick="document.getElementById('filePriceMaster').click()">📥 Import Excel</button>
+            </div>
+
+            <div id="pmMsg"></div>
+            <div id="pmBody"></div>
+          </div>
+        </div>
+
         <div class="acc-item" id="accUsersWrap">
           <div class="acc-head" onclick="toggleAcc(this, 'accUsers')">
             <span>👥 ผู้ใช้</span>
@@ -645,8 +669,6 @@
   </div>
 </div>
 
-<!-- ✅ ลบ modalSummaryDetail ออกแล้ว เพราะไม่มี Tab Summary -->
-
 <!-- Modal: PO Form -->
 <div class="modal-bg" id="modalPOForm">
   <div class="modal" style="max-width:1400px">
@@ -709,6 +731,28 @@
   </div>
 </div>
 
+<!-- ✅ Modal: แก้ไข Master ราคา -->
+<div class="modal-bg" id="modalPM">
+  <div class="modal" style="max-width:600px">
+    <h3 id="pmFormTitle">แก้ไขราคา</h3>
+    <div id="pmFormError"></div>
+    <div class="form-grid">
+      <label>Gradegram <input id="pmfGradegram" disabled style="background:#f1f5f9"></label>
+      <label>เดือน <input id="pmfMonth" disabled style="background:#f1f5f9"></label>
+      <label>ราคาปกติ <input id="pmfNormal" type="number" step="0.01"></label>
+      <label>ปั้ม F <input id="pmfF" type="number" step="0.01"></label>
+      <label>ปั้ม BT <input id="pmfBT" type="number" step="0.01"></label>
+      <label>ปั้ม KTP <input id="pmfKTP" type="number" step="0.01"></label>
+      <label>NC ลด (บาท) <input id="pmfNcDiscount" type="number" step="0.01" value="1"></label>
+      <label>NC (auto) <input id="pmfNC" disabled style="background:#f1f5f9;color:#dc2626;font-weight:700"></label>
+    </div>
+    <div class="form-actions">
+      <button onclick="closeModal('modalPM')">ยกเลิก</button>
+      <button class="primary" onclick="savePMForm()">💾 บันทึก</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg" id="modalDeleteMonth">
   <div class="modal" style="max-width:560px">
     <h3>🗑 ลบ Usage ตามเดือน</h3>
@@ -736,5 +780,6 @@
 <script src="summary.js"></script>
 <script src="alert.js"></script>
 <script src="purchase-order.js"></script>
+<script src="price-master.js"></script>
 </body>
 </html>
