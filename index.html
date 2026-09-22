@@ -400,7 +400,6 @@
           <label><input type="checkbox" id="alertIncludeCustomer"> รวมม้วนลูกค้า</label>
 
           <button class="primary" onclick="renderAlert()">🔍 วิเคราะห์</button>
-          <button onclick="exportAlert()">📤 Export Excel</button>
           <button onclick="window.print()">🖨 พิมพ์</button>
         </div>
 
@@ -770,6 +769,21 @@
       <button onclick="closeModal('modalDeleteMonth')">ยกเลิก</button>
       <button onclick="exportMonthBeforeDelete()">📤 Export ก่อนลบ</button>
       <button class="danger" onclick="confirmDeleteMonth()">ลบเดือนนี้</button>
+    </div>
+  </div>
+</div>
+
+<!-- ✅ Modal: รายละเอียดก่อนสร้าง PO (จาก Alert) -->
+<div class="modal-bg" id="modalAlertPODetail">
+  <div class="modal" style="max-width:900px">
+    <div class="modal-head">
+      <h3>📋 ตรวจสอบรายการก่อนสร้าง PO</h3>
+      <button onclick="closeModal('modalAlertPODetail')">ปิด</button>
+    </div>
+    <div id="alertPODetailBody"></div>
+    <div class="form-actions" style="position:sticky;bottom:0;background:#fff;padding-top:10px;border-top:1px solid #e2e8f0;margin-top:16px">
+      <button onclick="closeModal('modalAlertPODetail')">ยกเลิก</button>
+      <button class="primary" onclick="confirmCreatePO()">✅ ยืนยันสร้าง PO</button>
     </div>
   </div>
 </div>
