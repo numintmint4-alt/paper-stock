@@ -178,6 +178,14 @@ function autoGroupPOItems(items) {
   // ✅ เรียงตามลำดับ Sup: EKP → MKP → SCK
   const supOrder = { EKP: 1, MKP: 2, SCK: 3 };
 
+  // ✅ ฟังก์ชันตรวจ FSC (จาก gradegram prefix)
+  function isFSC(gradegram) {
+    if (!gradegram) return false;
+    const match = String(gradegram).match(/^([A-Z]+)/);
+    if (!match) return false;
+    return match[1].includes('F');
+  }
+
   // ✅ แยกตาม Sup
   const bySup = {};
   items.forEach(it => {
@@ -193,15 +201,16 @@ function autoGroupPOItems(items) {
   sortedSups.forEach(sup => {
     const supItems = bySup[sup];
 
-    // ✅ แยกตาม 3 กลุ่ม: FSC → ปกติ → NC
+    // ✅ แยก 4 กลุ่ม: FSC+ปกติ, FSC+NC, Non-FSC+ปกติ, Non-FSC+NC
     const groups = {
-      fsc:    supItems.filter(i => i.customer_roll === 'pump_f' && i.quality_b === 'normal'),
-      normal: supItems.filter(i => i.customer_roll === 'normal' && i.quality_b === 'normal'),
-      nc:     supItems.filter(i => i.quality_b === 'nc')
+      fsc_normal:    supItems.filter(i => isFSC(i.gradegram) && i.quality_b === 'normal'),
+      fsc_nc:        supItems.filter(i => isFSC(i.gradegram) && i.quality_b === 'nc'),
+      nonfsc_normal: supItems.filter(i => !isFSC(i.gradegram) && i.quality_b === 'normal'),
+      nonfsc_nc:     supItems.filter(i => !isFSC(i.gradegram) && i.quality_b === 'nc')
     };
 
-    // ✅ สร้าง PO ตามกลุ่ม (FSC → ปกติ → NC)
-    ['fsc', 'normal', 'nc'].forEach(grp => {
+    // ✅ ลำดับ: FSC+ปกติ → FSC+NC → Non-FSC+ปกติ → Non-FSC+NC
+    ['fsc_normal', 'fsc_nc', 'nonfsc_normal', 'nonfsc_nc'].forEach(grp => {
       const grpItems = groups[grp];
       if (!grpItems.length) return;
 
@@ -238,7 +247,12 @@ function renderMultiPOForm(posList, alertData) {
   </div>`;
 
   posList.forEach((po, idx) => {
-    const groupLabel = { fsc: '🟢 FSC', normal: '⚪ ปกติ', nc: '🔴 NC' }[po.group] || '';
+    const groupLabel = {
+      fsc_normal:    '🟢 FSC · ปกติ',
+      fsc_nc:        '🟢 FSC · 🔴 NC',
+      nonfsc_normal: '⚪ Non-FSC · ปกติ',
+      nonfsc_nc:     '⚪ Non-FSC · 🔴 NC'
+    }[po.group] || po.group;
 
     html += `<div class="po-form-group" style="border:1px solid #cbd5e1;border-radius:8px;padding:12px;margin-bottom:12px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
@@ -290,7 +304,7 @@ function renderMultiPOForm(posList, alertData) {
   });
 
   html += `<div class="form-actions" style="margin-top:16px">
-    <button onclick="closeModal('modalPOForm')">ยกเลิก</button>
+    <button onclick="cancelPOForm()">ยกเลิก</button>
     <button class="primary" onclick="saveAllPOs()">💾 บันทึกทั้งหมด</button>
   </div>`;
 
@@ -400,6 +414,11 @@ async function saveAllPOs() {
   }
 
   closeModal('modalPOForm');
+
+  // ✅ ไปหน้า PO List
+  const poBtn = document.querySelector('.nav button[data-tab="purchase-order"]');
+  if (poBtn) poBtn.click();
+
   await renderPOList();
 
   // ล้าง pending
@@ -438,4 +457,18 @@ async function onPOMonthChange() {
   poSelectedMonth = monthEl.value;
   await loadPriceMaster();
   await renderPOList();
+}
+
+// ================= CANCEL PO FORM =================
+function cancelPOForm() {
+  // ✅ ปิด modal
+  closeModal('modalPOForm');
+
+  // ✅ ล้าง pending
+  window._pendingPOs = null;
+  window._pendingAlertData = null;
+
+  // ✅ กลับไป Tab Alert
+  const alertBtn = document.querySelector('.nav button[data-tab="alert"]');
+  if (alertBtn) alertBtn.click();
 }
