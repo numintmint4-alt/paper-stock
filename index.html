@@ -557,6 +557,7 @@
                 <input type="number" id="pmNcDiscount" value="1" step="0.01" style="width:80px" onchange="onPMNcDiscountChange()">
                 บาท
               </label>
+             <button class="primary" onclick="syncPriceMaster()">🔄 สร้างราคาทั้งหมด</button>
               <button class="primary" onclick="openPMForm()">+ เพิ่มราคา</button>
               <button onclick="exportPriceMaster()">📤 Export Excel</button>
               <input type="file" id="filePriceMaster" accept=".xlsx,.xls" class="hidden" onchange="importPriceMaster(event)">
