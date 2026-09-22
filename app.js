@@ -296,7 +296,7 @@ $('logoutBtn').onclick = async () => {
 
 // ================= TABS =================
 // ✅ แก้ 1: ลบ 'summary' ออกจาก TAB_LIST
-const TAB_LIST = ['matrix','stock','receive','alert','data','settings'];
+const TAB_LIST = ['matrix','stock','receive','alert','purchase-order','data','settings'];
 
 document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
   btn.onclick = () => {
@@ -309,6 +309,7 @@ document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
     // ✅ แก้ 2: ลบบรรทัด initSummaryTab() ออก
     if (t === 'receive' && typeof initReceiveTab === 'function') initReceiveTab();
     if (t === 'alert' && typeof initAlertTab === 'function') initAlertTab();
+    if (t === 'purchase-order' && typeof initPurchaseOrderTab === 'function') initPurchaseOrderTab();
     if (t === 'data') renderData();
   };
 });
