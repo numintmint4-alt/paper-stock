@@ -15,6 +15,9 @@ async function initPurchaseOrderTab() {
   if (!poSelectedMonth) {
     poSelectedMonth = `${today.getFullYear()}-${pad(today.getMonth()+1)}`;
   }
+  // ✅ set ค่าใน input poMonth
+  const monthEl = $('poMonth');
+  if (monthEl && !monthEl.value) monthEl.value = poSelectedMonth;
 
   await loadPOSuppliers();
   await loadPriceMaster();
@@ -426,4 +429,13 @@ async function deletePO(poId) {
   } catch (e) {
     alert('❌ ' + e.message);
   }
+}
+
+// ================= PO MONTH CHANGE =================
+async function onPOMonthChange() {
+  const monthEl = $('poMonth');
+  if (!monthEl) return;
+  poSelectedMonth = monthEl.value;
+  await loadPriceMaster();
+  await renderPOList();
 }
