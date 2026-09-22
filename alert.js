@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// STOCK V8 — alert.js (Flat Table + Filter + PO + Lock Date)
+// STOCK V8 — alert.js (Flat Table + Filter + PO + Lock Date + FSC)
 // ═══════════════════════════════════════════════════════════════
 
 let alertSelectedGrades = [];
@@ -390,7 +390,7 @@ async function renderAlert() {
     html += '<div class="report-wrap alert-scroll"><table class="alert-flat-table"><thead><tr>';
     html += '<th>Gradegrams</th><th>Size</th><th>Snapshot</th><th>Stock</th><th>Receive</th>';
     html += '<th>Alert</th><th>สถานะ</th><th>สั่งซื้อ</th><th>Sup.</th>';
-    html += '<th>ม้วนลูกค้า</th><th>คุณภาพ B</th><th>หมายเหตุ</th>';
+    html += '<th>ม้วนลูกค้า</th><th>คุณภาพ B</th><th>FSC</th><th>หมายเหตุ</th>';
     html += '</tr></thead><tbody>';
 
     let grandShortage = 0;
@@ -417,6 +417,12 @@ async function renderAlert() {
         `<option value="${q.value}" ${lsVal.quality_b === q.value ? 'selected' : ''}>${q.label}</option>`
       ).join('');
 
+      // ✅ FSC (auto จาก grade)
+      const isFSC = isFSCGrade(r.gradegram);
+      const fscBadge = isFSC
+        ? '<span class="badge ok" style="font-size:10px">🟢 FSC</span>'
+        : '<span class="badge" style="background:#f1f5f9;color:#64748b;font-size:10px">⚪ Non-FSC</span>';
+
       html += `<tr class="${rowCls}">`;
       html += `<td class="grade-col clickable" onclick="openAlertDetail('${esc(r.gradegram)}', ${r.size})">${esc(r.gradegram)}</td>`;
       html += `<td class="clickable" onclick="openAlertDetail('${esc(r.gradegram)}', ${r.size})">${r.size}</td>`;
@@ -430,6 +436,7 @@ async function renderAlert() {
         <option value="">-- Sup --</option>${supOptions}</select></td>`;
       html += `<td><select class="alert-input-customer" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'customer_roll', this.value)">${custOptions}</select></td>`;
       html += `<td><select class="alert-input-quality" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'quality_b', this.value)">${qualOptions}</select></td>`;
+      html += `<td class="fsc-cell">${fscBadge}</td>`;
       html += `<td><input type="text" class="alert-input-note" placeholder="-" value="${esc(lsVal.note || '')}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'note', this.value)"></td>`;
       html += '</tr>';
     });
