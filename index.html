@@ -32,6 +32,7 @@
     <!-- ✅ ลบปุ่ม Summary ออกแล้ว -->
     <button data-tab="receive">Receive</button>
     <button data-tab="alert">Alert</button>
+    <button data-tab="purchase-order">Purchase Order</button>
     <button data-tab="data">Data</button>
     <button data-tab="settings">⚙ ตั้งค่า</button>
     <span class="spacer"></span>
@@ -411,6 +412,50 @@
       </div>
     </div>
 
+    <!-- ========== TAB 5.5: PURCHASE ORDER ========== -->
+    <div id="tab-purchase-order" class="hidden">
+      <div class="card">
+        <div class="report-head">
+          <div></div>
+          <div class="report-title" id="poReportTitle">
+            🧾 Purchase Order<br>
+            รายการสั่งซื้อ
+          </div>
+          <div class="report-doc">FQ-ษ6-06-09 rev.01</div>
+        </div>
+
+        <div class="filters no-print">
+          <label>📅 เดือน
+            <input type="month" id="poMonth" onchange="onPOMonthChange()">
+          </label>
+
+          <label>Sup.
+            <select id="poFilterSup">
+              <option value="">ทั้งหมด</option>
+              <option value="EKP">EKP</option>
+              <option value="MKP">MKP</option>
+              <option value="SCK">SCK</option>
+            </select>
+          </label>
+
+          <label>สถานะ
+            <select id="poFilterStatus">
+              <option value="">ทั้งหมด</option>
+              <option value="draft">Draft</option>
+              <option value="saved">Saved</option>
+              <option value="sent">Sent</option>
+            </select>
+          </label>
+
+          <button class="primary" onclick="renderPOList()">🔍 ค้นหา</button>
+          <button class="primary" onclick="openPOForm()">+ สร้าง PO ใหม่</button>
+          <button onclick="window.print()">🖨 พิมพ์</button>
+        </div>
+
+        <div id="poListBody"></div>
+      </div>
+    </div>
+
     <!-- ========== TAB 6: DATA ========== -->
     <div id="tab-data" class="hidden">
       <div class="card">
@@ -602,6 +647,28 @@
 
 <!-- ✅ ลบ modalSummaryDetail ออกแล้ว เพราะไม่มี Tab Summary -->
 
+<!-- Modal: PO Form -->
+<div class="modal-bg" id="modalPOForm">
+  <div class="modal" style="max-width:1400px">
+    <div class="modal-head">
+      <h3 id="poFormTitle">🧾 สร้าง PO ใหม่</h3>
+      <button onclick="closeModal('modalPOForm')">ปิด</button>
+    </div>
+    <div id="poFormBody"></div>
+  </div>
+</div>
+
+<!-- Modal: PO Detail -->
+<div class="modal-bg" id="modalPODetail">
+  <div class="modal" style="max-width:1200px">
+    <div class="modal-head">
+      <h3 id="poDetailTitle">📄 รายละเอียด PO</h3>
+      <button onclick="closeModal('modalPODetail')">ปิด</button>
+    </div>
+    <div id="poDetailBody"></div>
+  </div>
+</div>
+
 <div class="modal-bg" id="modalAlertDetail">
   <div class="modal" style="max-width:1000px">
     <div class="modal-head">
@@ -668,5 +735,6 @@
 <script src="receive.js"></script>
 <script src="summary.js"></script>
 <script src="alert.js"></script>
+<script src="purchase-order.js"></script>
 </body>
 </html>
