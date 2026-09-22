@@ -33,6 +33,9 @@ const ALERT_QUALITY_B = [
 const ALERT_LS_KEY = 'stockv8_alert_inputs';
 const ALERT_PO_FLAG_KEY = 'stockv8_alert_po_created';
 
+// ✅ เก็บ items รอไว้ก่อนยืนยัน PO
+let _pendingPOItems = [];
+
 // ================= INIT =================
 async function initAlertTab() {
   const today = toISODate(new Date());
@@ -56,6 +59,7 @@ async function initAlertTab() {
   await loadSnapshotMonths();
   await loadAlertGradeFilter();
   loadAlertFilter();
+  // ✅ ไม่ต้องเช็ค hasPOEdited() ที่นี่ — ให้ renderAlert() จัดการ
   await renderAlert();
 }
 
@@ -248,21 +252,27 @@ function loadAlertInputs() {
     return raw ? JSON.parse(raw) : {};
   } catch { return {}; }
 }
+
+// ✅ แก้จุดที่ 1: mark เฉพาะ field ที่กำหนด + ต้องมี PO flag อยู่แล้ว
 function saveAlertInput(key, field, value) {
   const data = loadAlertInputs();
   if (!data[key]) data[key] = {};
   data[key][field] = value;
   localStorage.setItem(ALERT_LS_KEY, JSON.stringify(data));
 
-  // ✅ Mark ว่ามีการแก้ไข (ถ้าเคยสร้าง PO แล้ว)
-  markAlertPOEdited();
+  // ✅ Mark ว่ามีการแก้ไข เฉพาะ field ที่กำหนด + ต้องมี PO flag อยู่แล้ว
+  const MARK_FIELDS = ['qty', 'sup', 'customer_roll', 'quality_b', 'note'];
+  if (MARK_FIELDS.includes(field) && hasPOCreated()) {
+    markAlertPOEdited();
+  }
 }
+
 function getAlertInput(key) {
   const data = loadAlertInputs();
   return data[key] || {};
 }
 
-// ✅ PO Flag (เก็บว่าสร้าง PO แล้วหรือยัง)
+// ================= PO FLAG =================
 function loadPOFlag() {
   try {
     const raw = localStorage.getItem(ALERT_PO_FLAG_KEY);
@@ -272,11 +282,19 @@ function loadPOFlag() {
 function savePOFlag(data) {
   localStorage.setItem(ALERT_PO_FLAG_KEY, JSON.stringify(data));
 }
+
 function markAlertPOCreated(refKey) {
   const flags = loadPOFlag();
   flags[refKey] = { created_at: new Date().toISOString(), edited: false };
   savePOFlag(flags);
 }
+
+// ✅ แก้จุดที่ 2: เพิ่ม hasPOCreated()
+function hasPOCreated() {
+  const flags = loadPOFlag();
+  return Object.values(flags).some(f => f && f.created_at);
+}
+
 function markAlertPOEdited() {
   const flags = loadPOFlag();
   let changed = false;
@@ -289,9 +307,15 @@ function markAlertPOEdited() {
   });
   if (changed) savePOFlag(flags);
 }
+
 function hasPOEdited() {
   const flags = loadPOFlag();
   return Object.values(flags).some(f => f.edited === true);
+}
+
+// ✅ แก้จุดที่ 2: เพิ่ม clearPOFlags() (เรียกหลังยืนยันสร้าง PO สำเร็จถ้าต้องการรีเซ็ต)
+function clearPOFlags() {
+  localStorage.removeItem(ALERT_PO_FLAG_KEY);
 }
 
 // ================= HELPER: FSC =================
@@ -423,6 +447,13 @@ async function renderAlert() {
         ? '<span class="badge ok" style="font-size:10px">🟢 FSC</span>'
         : '<span class="badge" style="background:#f1f5f9;color:#64748b;font-size:10px">⚪ Non-FSC</span>';
 
+      // ✅ แก้จุดที่ 3: เพิ่ม class "filled" ถ้ามีค่า
+      const clsQty   = (lsVal.qty && Number(lsVal.qty) > 0) ? ' filled' : '';
+      const clsSup   = lsVal.sup ? ' filled' : '';
+      const clsCust  = (lsVal.customer_roll && lsVal.customer_roll !== 'normal') ? ' filled' : '';
+      const clsQual  = (lsVal.quality_b && lsVal.quality_b !== 'normal') ? ' filled' : '';
+      const clsNote  = lsVal.note ? ' filled' : '';
+
       html += `<tr class="${rowCls}">`;
       html += `<td class="grade-col clickable" onclick="openAlertDetail('${esc(r.gradegram)}', ${r.size})">${esc(r.gradegram)}</td>`;
       html += `<td class="clickable" onclick="openAlertDetail('${esc(r.gradegram)}', ${r.size})">${r.size}</td>`;
@@ -431,13 +462,13 @@ async function renderAlert() {
       html += `<td>${r.receive}</td>`;
       html += `<td class="alert-cell"><b>${a > 0 ? '+' + a : a}</b></td>`;
       html += `<td class="status-cell">${statusTxt}</td>`;
-      html += `<td><input type="number" class="alert-input-qty" placeholder="-" value="${lsVal.qty || ''}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'qty', this.value)"></td>`;
-      html += `<td><select class="alert-input-sup" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'sup', this.value)">
+      html += `<td><input type="number" class="alert-input-qty${clsQty}" placeholder="-" value="${lsVal.qty || ''}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'qty', this.value, this)"></td>`;
+      html += `<td><select class="alert-input-sup${clsSup}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'sup', this.value, this)">
         <option value="">-- Sup --</option>${supOptions}</select></td>`;
-      html += `<td><select class="alert-input-customer" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'customer_roll', this.value)">${custOptions}</select></td>`;
-      html += `<td><select class="alert-input-quality" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'quality_b', this.value)">${qualOptions}</select></td>`;
+      html += `<td><select class="alert-input-customer${clsCust}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'customer_roll', this.value, this)">${custOptions}</select></td>`;
+      html += `<td><select class="alert-input-quality${clsQual}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'quality_b', this.value, this)">${qualOptions}</select></td>`;
       html += `<td class="fsc-cell">${fscBadge}</td>`;
-      html += `<td><input type="text" class="alert-input-note" placeholder="-" value="${esc(lsVal.note || '')}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'note', this.value)"></td>`;
+      html += `<td><input type="text" class="alert-input-note${clsNote}" placeholder="-" value="${esc(lsVal.note || '')}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'note', this.value, this)"></td>`;
       html += '</tr>';
     });
 
@@ -449,13 +480,12 @@ async function renderAlert() {
 
     html += '</tbody></table></div>';
 
-    // ปุ่มด้านล่าง
+    // ✅ แก้จุดที่ 3: ตัด Export ออก + เพิ่ม Modal popup check
     html += `<div class="report-foot" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
       <div>Stock Level − (Stock + Receive) = Alert · รวมต้องสั่ง ${grandShortage} ม้วน</div>
       <div style="display:flex;gap:6px">
         <button class="primary" onclick="createPOFromAlert()">📄 สร้าง PO</button>
         <button class="danger" onclick="clearAlertInputs()">🗑 ล้างค่า</button>
-        <button onclick="exportAlert()">📤 Export Excel</button>
         <button onclick="window.print()">🖨 พิมพ์</button>
       </div>
     </div>`;
@@ -463,9 +493,13 @@ async function renderAlert() {
     $('alertBody').innerHTML = html;
     alertCache = display;
 
-    // ✅ ตรวจสอบว่ามีการแก้ไขหลังสร้าง PO ไหม
+    // ✅ ตรวจสอบ Popup แจ้งเตือน: เฉพาะกรณี "แก้ไขหลังสร้าง PO"
     if (hasPOEdited()) {
       showPOEditedWarning();
+      // รีเซ็ต edited flag หลังแสดง popup แล้ว (แสดงครั้งเดียว)
+      const flags = loadPOFlag();
+      Object.keys(flags).forEach(k => { if (flags[k]) flags[k].edited = false; });
+      savePOFlag(flags);
     }
   } catch (err) {
     console.error('renderAlert error:', err);
@@ -475,7 +509,6 @@ async function renderAlert() {
 
 // ================= PO Edited Warning =================
 function showPOEditedWarning() {
-  // ✅ ใช้ modal popup (B)
   let modal = document.getElementById('modalPOEditedWarning');
   if (!modal) {
     modal = document.createElement('div');
@@ -505,22 +538,28 @@ function dismissPOWarning() {
 }
 
 // ================= INPUT =================
-function onAlertInput(gradegram, size, field, value) {
+// ✅ แก้จุดที่ 7: ใช้ this แทน event.target + toggle filled class ทันที
+function onAlertInput(gradegram, size, field, value, el) {
   const key = alertLS_Key(gradegram, size);
   saveAlertInput(key, field, value);
+
+  // ✅ toggle class "filled" ทันที
+  if (el) {
+    const isFilled = (field === 'customer_roll' || field === 'quality_b')
+      ? (value && value !== 'normal')
+      : (value && String(value).trim() !== '');
+    el.classList.toggle('filled', !!isFilled);
+  }
 }
 
 // ================= CLEAR ALL ALERT INPUTS =================
 function clearAlertInputs() {
   if (!confirm('⚠️ ล้างค่าที่กรอกทั้งหมด (สั่งซื้อ / Sup. / ม้วนลูกค้า / คุณภาพ B / หมายเหตุ)?')) return;
 
-  // ✅ ล้าง localStorage
   localStorage.removeItem(ALERT_LS_KEY);
 
-  // ✅ Render ใหม่
   renderAlert();
 
-  // ✅ แจ้งเตือน
   const msg = document.createElement('div');
   msg.className = 'msg ok';
   msg.style.cssText = 'position:fixed;top:80px;right:20px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.15)';
@@ -530,6 +569,7 @@ function clearAlertInputs() {
 }
 
 // ================= CREATE PO FROM ALERT =================
+// ✅ แก้จุดที่ 6: เปิด Modal แทนการยืนยันทันที
 async function createPOFromAlert() {
   if (!alertCache || !alertCache.length) {
     alert('ไม่มีข้อมูล Alert');
@@ -563,20 +603,81 @@ async function createPOFromAlert() {
     return;
   }
 
-  // ✅ Lock วันที่วิเคราะห์ = today
+  // ✅ เปิด Modal แสดงรายละเอียดก่อนยืนยัน
+  _pendingPOItems = items;
+  renderAlertPODetail(items);
+  openModal('modalAlertPODetail');
+}
+
+// ✅ Render Modal รายละเอียดก่อนสร้าง PO
+function renderAlertPODetail(items) {
+  const labelCustomer = v => ALERT_CUSTOMER_ROLLS.find(c => c.value === v)?.label || 'ปกติ';
+  const labelQuality  = v => ALERT_QUALITY_B.find(q => q.value === v)?.label || 'ปกติ';
+
+  let totalQty = 0;
+  let html = `
+    <div class="po-detail-summary">
+      <div>📦 <b>${items.length}</b> รายการ</div>
+      <div>🔢 รวม <b>${items.reduce((s, i) => s + i.quantity, 0)}</b> ม้วน</div>
+    </div>
+    <div style="max-height:55vh;overflow:auto;border:1px solid #e2e8f0;border-radius:8px">
+    <table>
+      <thead><tr>
+        <th style="width:50px">#</th>
+        <th>Gradegram-Size</th>
+        <th style="width:90px;text-align:right">Quantity</th>
+        <th>หมายเหตุ</th>
+      </tr></thead>
+      <tbody>`;
+
+  items.forEach((it, idx) => {
+    totalQty += it.quantity;
+    // ✅ รวม (ม้วนลูกค้า),(คุณภาพ B),(หมายเหตุ) ด้วย ,
+    const parts = [
+      labelCustomer(it.customer_roll),
+      labelQuality(it.quality_b),
+      it.note || ''
+    ].filter(x => x && x.trim() !== '');
+    const remarkCombined = parts.join(',');
+
+    html += `<tr>
+      <td style="text-align:center">${idx + 1}</td>
+      <td><b>${esc(it.gradegram_size)}</b></td>
+      <td style="text-align:right;font-weight:700;color:#1e40af">${it.quantity}</td>
+      <td>${esc(remarkCombined)}</td>
+    </tr>`;
+  });
+
+  html += `</tbody>
+    <tfoot><tr style="background:#cbd5e1;font-weight:700">
+      <td colspan="2" style="text-align:right">จำนวนรวม (ม้วน)</td>
+      <td style="text-align:right;color:#dc2626;font-size:15px">${totalQty}</td>
+      <td></td>
+    </tr></tfoot>
+    </table></div>`;
+
+  $('alertPODetailBody').innerHTML = html;
+}
+
+// ✅ ยืนยันสร้าง PO
+function confirmCreatePO() {
+  if (!_pendingPOItems || !_pendingPOItems.length) return;
+
   const analyzedDate = toISODate(new Date());
 
-  // ส่งไปหน้า PO Form
   sessionStorage.setItem('alert_to_po', JSON.stringify({
-    items,
+    items: _pendingPOItems,
     analyzed_date: analyzedDate,
     ref_snapshot: $('alertSnapshotMonth')?.value,
     ref_stock: $('alertStockDate')?.value,
     ref_receive: $('alertReceiveDate')?.value
   }));
 
-  // ✅ Mark flag
+  // ✅ Mark flag ก่อนเปลี่ยน tab
   markAlertPOCreated(`ref_${Date.now()}`);
+
+  closeModal('modalAlertPODetail');
+  _pendingPOItems = [];
 
   // ไป Tab PO
   const poBtn = document.querySelector('.nav button[data-tab="purchase-order"]');
@@ -684,7 +785,7 @@ async function openAlertDetail(gradegram, size) {
   }
 }
 
-// ================= EXPORT =================
+// ================= EXPORT (ยังเก็บไว้เผื่อเรียกจากที่อื่น) =================
 function exportAlert() {
   if (!alertCache || !alertCache.length) return alert('ไม่มีข้อมูล');
 
