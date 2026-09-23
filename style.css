@@ -85,11 +85,9 @@ th{background:#f1f5f9;font-weight:600}
 .report-subtitle{text-align:center;font-size:13px;color:#64748b;font-weight:400;margin-top:4px}
 .report-doc{font-size:12px;color:#475569;white-space:nowrap}
 
-/* Report wrap — Matrix เต็มหน้า */
 .report-wrap{overflow-x:auto;overflow-y:visible;width:100%}
 .report-table{font-size:11px;table-layout:auto;width:100%}
 .report-table th,.report-table td{border:1px solid #94a3b8;padding:2px 4px;text-align:center;white-space:nowrap}
-/* ✅ Size column — fix 56px (ยกเว้น grade-col และ total-col) */
 .report-table thead th:not(.grade-col):not(.total-col),
 .report-table tbody td:not(.grade-col):not(.total-col):not(.empty){
   min-width:56px;
@@ -107,7 +105,6 @@ th{background:#f1f5f9;font-weight:600}
 .report-table .total-row .total-col{background:#a5b4fc}
 .report-foot{margin-top:10px;font-size:12px;color:#64748b;text-align:right}
 
-/* Cell ที่มี (เต็ม+เศษ) */
 .report-table td .cell-content{display:flex;flex-direction:column;align-items:center;gap:2px}
 .report-table td .cell-main{font-weight:700;color:#1e293b;font-size:12px}
 
@@ -132,7 +129,6 @@ th{background:#f1f5f9;font-weight:600}
 .alert-summary .item.yellow{background:#fef3c7;color:#b45309}
 .alert-summary .item.green{background:#dcfce7;color:#166534}
 
-/* ✅ วันที่รับสินค้า — แสดงในกรอบเดียวกับ summary */
 #alertReceiveDateBox {
   background: #fff;
   border: 1px solid #cbd5e1;
@@ -215,7 +211,6 @@ th{background:#f1f5f9;font-weight:600}
 #receiveDetailBody td,
 #summaryDetailBody td{padding:7px 11px;border:1px solid #e2e8f0}
 
-/* ✅ Stock Detail Modal — หัวข้อ Gradegrams · Size */
 #stockDetailTitle{
   font-size:17px;
   font-weight:700;
@@ -229,13 +224,11 @@ th{background:#f1f5f9;font-weight:600}
   margin-left:6px;
 }
 
-/* ✅ Stock Detail Modal — info box */
 #stockDetailBody .msg.info{
   font-size:13.5px;
   padding:11px 15px;
 }
 
-/* ✅ Stock Detail Modal — ตารางใน modal */
 #stockDetailBody td:first-child{font-weight:600;color:#475569}
 #stockDetailBody td:nth-child(3){font-weight:600;color:#1e40af}
 #stockDetailBody td:nth-child(4){font-weight:600;color:#166534}
@@ -263,7 +256,7 @@ th{background:#f1f5f9;font-weight:600}
   box-shadow:0 0 0 2px rgba(37,99,235,.15);
 }
 
-/* ========== MONTH FILTER (pattern เดียวกับ grade filter) ========== */
+/* ========== MONTH FILTER ========== */
 .month-filter-wrap{position:relative;display:flex;gap:6px;align-items:center}
 .month-filter-box{position:relative}
 
@@ -364,7 +357,6 @@ th{background:#f1f5f9;font-weight:600}
   .card { box-shadow: none; padding: 0; margin: 0; border: none; }
   .container { padding: 0; max-width: 100%; }
   
-  /* ✅ report-head — จัด 3 คอลัมน์ ให้เลขเอกสารอยู่ขวาบน */
   .report-head {
     display: grid !important;
     grid-template-columns: 1fr auto 1fr !important;
@@ -373,7 +365,6 @@ th{background:#f1f5f9;font-weight:600}
     width: 100%;
   }
   
-  /* ✅ หัวข้อตาราง — 16px */
   .report-title {
     text-align: center;
     font-size: 16px;
@@ -381,7 +372,6 @@ th{background:#f1f5f9;font-weight:600}
     line-height: 1.4;
   }
   
-  /* ✅ title-select ปกติ (กรณีไม่ถูกแทนที่ด้วย span) */
   .report-title .title-select {
     display: inline;
     border: none;
@@ -400,7 +390,6 @@ th{background:#f1f5f9;font-weight:600}
     text-align-last: center;
   }
   
-  /* ✅ title-select-print — span ที่สร้างจาก JS ตอนพิมพ์ */
   .report-title .title-select-print {
     display: inline;
     margin: 0 4px;
@@ -419,7 +408,6 @@ th{background:#f1f5f9;font-weight:600}
     white-space: nowrap;
   }
   
-  /* ✅ ตารางให้พอดี A4 */
   .report-wrap {
     max-height: none;
     overflow: visible;
@@ -443,7 +431,6 @@ th{background:#f1f5f9;font-weight:600}
     text-overflow: ellipsis;
   }
   
-  /* ✅ Grade column — คงเดิม */
   .report-table .grade-col {
     width: 50px;
     min-width: 50px;
@@ -454,7 +441,6 @@ th{background:#f1f5f9;font-weight:600}
     font-weight: 700;
   }
   
-  /* ✅ Total column — คงเดิม */
   .report-table .total-col {
     width: 45px;
     min-width: 45px;
@@ -463,14 +449,12 @@ th{background:#f1f5f9;font-weight:600}
     font-weight: 700;
   }
   
-  /* ✅ Total row — คงเดิม */
   .report-table .total-row td {
     background: #1e293b !important;
     color: #fff !important;
     font-weight: 700;
   }
   
-  /* ✅ thead — 9px + ตัวหนา */
   .report-table thead th {
     position: static;
     background: #1e293b !important;
@@ -506,34 +490,30 @@ th{background:#f1f5f9;font-weight:600}
 
 /* ═══════════════════════════════════════════════════════════ */
 /* ========== RECEIVE — ล็อก Gradegrams/Total = 100px ========== */
-/* ========== font-size +2 จากค่าล่าสุด ========== */
 /* ═══════════════════════════════════════════════════════════ */
 
-/* --- Supplier Summary (-1.5) --- */
 #receiveBody .supplier-summary h4 {
-  font-size: 24px;        /* 26 - 1.5 */
-  margin-bottom: 14px;    /* 16 - 1.5 */
+  font-size: 24px;
+  margin-bottom: 14px;
   line-height: 1.2;
 }
 #receiveBody .supplier-summary table {
-  font-size: 20px;        /* 22 - 1.5 */
-  min-width: 638px;       /* 640 - 1.5 */
+  font-size: 20px;
+  min-width: 638px;
 }
 #receiveBody .supplier-summary th,
 #receiveBody .supplier-summary td {
-  padding: 11px 16px;   /* 13-1.5 , 18-1.5 */
+  padding: 11px 16px;
 }
 
-/* --- Report wrap: ไม่ให้ scroll แนวนอน --- */
 #receiveBody .report-wrap {
   overflow-x: hidden;
   overflow-y: visible;
   width: 100%;
 }
 
-/* --- Matrix: บีบให้พอดีหน้าจอ --- */
 #receiveBody .report-table {
-  font-size: 15px;            /* 13 → 15 (+2) */
+  font-size: 15px;
   width: 100%;
   table-layout: fixed;
   border-collapse: collapse;
@@ -547,7 +527,6 @@ th{background:#f1f5f9;font-weight:600}
   white-space: nowrap;
 }
 
-/* --- Gradegrams column: ล็อก 100px --- */
 #receiveBody .report-table .grade-col {
   width: 100px;
   min-width: 100px;
@@ -567,7 +546,6 @@ th{background:#f1f5f9;font-weight:600}
   font-weight: 700;
 }
 
-/* --- Size column: auto แบ่งพื้นที่ที่เหลือ --- */
 #receiveBody .report-table thead th:not(.grade-col):not(.total-col),
 #receiveBody .report-table tbody td:not(.grade-col):not(.total-col):not(.empty) {
   width: auto;
@@ -576,7 +554,6 @@ th{background:#f1f5f9;font-weight:600}
   font-size: 15px;
 }
 
-/* --- Total column: ล็อก 100px --- */
 #receiveBody .report-table .total-col {
   width: 100px;
   min-width: 100px;
@@ -590,13 +567,11 @@ th{background:#f1f5f9;font-weight:600}
   z-index: 6;
 }
 
-/* --- cell-main (qty) --- */
 #receiveBody .report-table td .cell-main {
   font-size: 15px;
   font-weight: 700;
 }
 
-/* --- List (ตารางรายการ): 12 → 14 (+2) --- */
 #receiveBody .data-table {
   font-size: 14px;
   width: 100%;
@@ -614,14 +589,13 @@ th{background:#f1f5f9;font-weight:600}
   max-height: 70vh;
 }
 
-/* --- report-foot: 12 → 14 (+2) --- */
 #receiveBody .report-foot {
   font-size: 14px;
   line-height: 1.6;
 }
 
 /* ═══════════════════════════════════════════════════════════ */
-/* ========== ALERT MATRIX V7 — Matrix + Input ========== */
+/* ========== ALERT MATRIX V7 ========== */
 /* ═══════════════════════════════════════════════════════════ */
 
 .alert-matrix-table {
@@ -681,7 +655,6 @@ th{background:#f1f5f9;font-weight:600}
   background: #f8fafc;
 }
 
-/* ========== Cell ที่มีข้อมูล ========== */
 .alert-matrix-table td.alert-red    { background: #fee2e2; }
 .alert-matrix-table td.alert-yellow { background: #fef3c7; }
 .alert-matrix-table td.alert-green  { background: #f0fdf4; }
@@ -711,7 +684,6 @@ th{background:#f1f5f9;font-weight:600}
   margin-top: 2px;
 }
 
-/* ========== Input ภายใน Cell ========== */
 .alert-cell-inputs {
   display: flex;
   flex-direction: column;
@@ -745,7 +717,6 @@ th{background:#f1f5f9;font-weight:600}
   box-shadow: 0 0 0 2px rgba(37,99,235,.15);
 }
 
-/* ========== Mobile ========== */
 @media (max-width: 640px) {
   .alert-matrix-table { font-size: 10px; }
   .alert-cell-alert { font-size: 13px; }
@@ -795,7 +766,6 @@ th{background:#f1f5f9;font-weight:600}
   background: #dbeafe;
 }
 
-/* สีตามสถานะ */
 .alert-flat-table tr.row-red td {
   background: #fef2f2;
 }
@@ -819,7 +789,6 @@ th{background:#f1f5f9;font-weight:600}
   font-weight: 600;
 }
 
-/* Alert cell */
 .alert-flat-table td.alert-cell {
   font-size: 15px;
   font-weight: 700;
@@ -829,7 +798,6 @@ th{background:#f1f5f9;font-weight:600}
   font-size: 12px;
 }
 
-/* Total row */
 .alert-flat-table tr.total-row td {
   background: #cbd5e1;
   font-weight: 700;
@@ -837,7 +805,6 @@ th{background:#f1f5f9;font-weight:600}
   padding: 10px 8px;
 }
 
-/* Input ใน Flat Table */
 .alert-flat-table .alert-input-qty,
 .alert-flat-table .alert-input-sup,
 .alert-flat-table .alert-input-note {
@@ -872,7 +839,6 @@ th{background:#f1f5f9;font-weight:600}
   box-shadow: 0 0 0 2px rgba(37,99,235,.15);
 }
 
-/* Mobile */
 @media (max-width: 640px) {
   .alert-flat-table { font-size: 11px; }
   .alert-flat-table th,
@@ -905,22 +871,22 @@ th{background:#f1f5f9;font-weight:600}
 /* ═══════════════════════════════════════════════════════════ */
 
 .alert-flat-table {
-  table-layout: fixed;   /* ← สำคัญ: ต้องใช้ fixed ไม่งั้น width ไม่ทำงาน */
+  table-layout: fixed;
   width: 100%;
 }
 
-.alert-flat-table th:nth-child(1)  { width: 80px;  }   /* Gradegrams */
-.alert-flat-table th:nth-child(2)  { width: 70px;  }   /* Size */
+.alert-flat-table th:nth-child(1)  { width: 110px; }   /* Gradegrams (มี filter) */
+.alert-flat-table th:nth-child(2)  { width: 90px;  }   /* Size (มี filter) */
 .alert-flat-table th:nth-child(3)  { width: 70px;  }   /* Snapshot */
 .alert-flat-table th:nth-child(4)  { width: 70px;  }   /* Stock */
 .alert-flat-table th:nth-child(5)  { width: 70px;  }   /* Receive */
-.alert-flat-table th:nth-child(6)  { width: 70px;  }   /* Alert */
+.alert-flat-table th:nth-child(6)  { width: 90px;  }   /* Alert (มี filter) */
 .alert-flat-table th:nth-child(7)  { width: 90px;  }   /* สถานะ */
 .alert-flat-table th:nth-child(8)  { width: 90px;  }   /* สั่งซื้อ */
 .alert-flat-table th:nth-child(9)  { width: 90px;  }   /* Sup. */
 .alert-flat-table th:nth-child(10) { width: 90px;  }   /* ม้วนลูกค้า */
 .alert-flat-table th:nth-child(11) { width: 90px;  }   /* คุณภาพ B */
-.alert-flat-table th:nth-child(12) { width: 90px;  }   /* FSC ← ใหม่ */
+.alert-flat-table th:nth-child(12) { width: 90px;  }   /* FSC */
 .alert-flat-table th:nth-child(13) { width: 200px; }   /* หมายเหตุ */
 
 /* ========== FSC Cell ========== */
@@ -934,10 +900,78 @@ th{background:#f1f5f9;font-weight:600}
 }
 
 /* ═══════════════════════════════════════════════════════════ */
+/* ========== ALERT FLAT TABLE — Filter ในหัวคอลัมน์ ========== */
+/* ═══════════════════════════════════════════════════════════ */
+
+.alert-flat-table .th-with-filter {
+  position: relative;
+  padding: 4px 6px !important;
+  text-align: center;
+}
+
+.alert-flat-table .th-filter-wrap {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+
+.alert-flat-table .th-filter-btn {
+  width: 100%;
+  background: transparent;
+  border: 1px solid #475569;
+  color: #fff;
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px;
+  transition: all .15s;
+}
+.alert-flat-table .th-filter-btn:hover {
+  background: #334155;
+  border-color: #94a3b8;
+}
+.alert-flat-table .th-filter-btn .arrow {
+  font-size: 9px;
+  transition: transform .2s;
+}
+.alert-flat-table .th-filter-btn.open .arrow {
+  transform: rotate(180deg);
+}
+.alert-flat-table .th-filter-btn span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  text-align: left;
+}
+
+/* ✅ dropdown ที่หัวคอลัมน์ — position absolute */
+.alert-flat-table .th-filter-wrap .grade-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  z-index: 100;
+  text-align: left;
+  font-weight: 400;
+  color: #222;
+}
+
+/* ✅ หัวคอลัมน์ที่มี filter — z-index สูงกว่า เพื่อ dropdown ลอยได้ */
+.alert-flat-table thead th.th-with-filter {
+  z-index: 15;
+}
+
+/* ═══════════════════════════════════════════════════════════ */
 /* PURCHASE ORDER V8 — List + Form + Group */
 /* ═══════════════════════════════════════════════════════════ */
 
-/* ========== PO List ========== */
 #tab-purchase-order .card {
   padding: 16px;
 }
@@ -956,7 +990,6 @@ th{background:#f1f5f9;font-weight:600}
   font-size: 11px;
 }
 
-/* ========== PO Form ========== */
 .po-form-group {
   background: #fff;
   border: 1px solid #e2e8f0 !important;
@@ -979,7 +1012,6 @@ th{background:#f1f5f9;font-weight:600}
   border-color: #93c5fd;
 }
 
-/* ========== Table ใน PO Form ========== */
 .po-form-group .alert-flat-table {
   font-size: 12px;
   width: 100%;
@@ -1011,7 +1043,6 @@ th{background:#f1f5f9;font-weight:600}
   box-sizing: border-box;
 }
 
-/* ========== Modal PO Form ========== */
 #modalPOForm .modal {
   max-height: 90vh;
   overflow-y: auto;
@@ -1030,7 +1061,6 @@ th{background:#f1f5f9;font-weight:600}
   margin-top: 16px;
 }
 
-/* ========== Modal PO Detail ========== */
 #modalPODetail .modal-head {
   border-bottom: 2px solid #1e293b;
   padding-bottom: 10px;
@@ -1050,13 +1080,11 @@ th{background:#f1f5f9;font-weight:600}
   border: 1px solid #e2e8f0;
 }
 
-/* ========== ปุ่มใน Footer Alert ========== */
 .report-foot button {
   padding: 6px 12px;
   font-size: 13px;
 }
 
-/* ========== Alert — 2 คอลัมน์ใหม่ (ม้วนลูกค้า + คุณภาพ B) ========== */
 .alert-flat-table th:nth-child(9),
 .alert-flat-table th:nth-child(10) {
   min-width: 90px;
@@ -1080,7 +1108,6 @@ th{background:#f1f5f9;font-weight:600}
   box-shadow: 0 0 0 2px rgba(37,99,235,.15);
 }
 
-/* ========== Responsive ========== */
 @media (max-width: 1024px) {
   .po-form-group .alert-flat-table {
     font-size: 11px;
@@ -1107,7 +1134,6 @@ th{background:#f1f5f9;font-weight:600}
 /* ========== ALERT INPUT — สถานะ filled (โทนฟ้า) ========== */
 /* ═══════════════════════════════════════════════════════════ */
 
-/* default = จาง */
 .alert-flat-table .alert-input-qty,
 .alert-flat-table .alert-input-sup,
 .alert-flat-table .alert-input-customer,
@@ -1119,7 +1145,6 @@ th{background:#f1f5f9;font-weight:600}
   transition: all .15s;
 }
 
-/* filled = เด่น (โทนฟ้า) */
 .alert-flat-table .alert-input-qty.filled,
 .alert-flat-table .alert-input-sup.filled,
 .alert-flat-table .alert-input-customer.filled,
@@ -1132,7 +1157,6 @@ th{background:#f1f5f9;font-weight:600}
   font-weight: 700;
 }
 
-/* ✅ qty filled — เน้นสีแดงเพื่อให้เห็นจำนวนชัด */
 .alert-flat-table .alert-input-qty.filled {
   color: #dc2626;
 }
@@ -1184,7 +1208,6 @@ th{background:#f1f5f9;font-weight:600}
   padding: 7px 10px;
 }
 
-/* ✅ ปุ่มใน Modal */
 #modalAlertPODetail .form-actions button {
   padding: 8px 18px;
   font-size: 14px;
