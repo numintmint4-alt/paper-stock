@@ -32,6 +32,10 @@ const ALERT_QUALITY_B = [
 
 const ALERT_LS_KEY = 'stockv8_alert_inputs';
 const ALERT_PO_FLAG_KEY = 'stockv8_alert_po_created';
+const ALERT_RECEIVE_DATES_KEY = 'stockv8_alert_receive_dates';
+
+// ✅ วันที่รับสินค้า (array ของ string YYYY-MM-DD)
+let alertReceiveDates = [];
 
 // ✅ เก็บ items รอไว้ก่อนยืนยัน PO
 let _pendingPOItems = [];
@@ -59,6 +63,7 @@ async function initAlertTab() {
   await loadSnapshotMonths();
   await loadAlertGradeFilter();
   loadAlertFilter();
+  initAlertReceiveDates();  // ✅ เพิ่มบรรทัดนี้
   // ✅ ไม่ต้องเช็ค hasPOEdited() ที่นี่ — ให้ renderAlert() จัดการ
   await renderAlert();
 }
@@ -318,6 +323,106 @@ function clearPOFlags() {
   localStorage.removeItem(ALERT_PO_FLAG_KEY);
 }
 
+// ================= วันที่รับสินค้า =================
+
+// ✅ คำนวณวันถัดไป ไม่รวมอาทิตย์
+// ศุกร์→เสาร์, เสาร์→จันทร์, อาทิตย์→จันทร์
+function getNextWorkingDay(baseDate = new Date()) {
+  const d = new Date(baseDate);
+  d.setDate(d.getDate() + 1);
+  // ถ้าเป็นอาทิตย์ (0) → เลื่อนไปจันทร์
+  if (d.getDay() === 0) d.setDate(d.getDate() + 1);
+  return toISODate(d);
+}
+
+// ✅ โหลดวันที่จาก localStorage
+function loadAlertReceiveDates() {
+  try {
+    const raw = localStorage.getItem(ALERT_RECEIVE_DATES_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch { return []; }
+}
+
+// ✅ บันทึกวันที่
+function saveAlertReceiveDates() {
+  localStorage.setItem(ALERT_RECEIVE_DATES_KEY, JSON.stringify(alertReceiveDates));
+}
+
+// ✅ เพิ่มวันที่ใหม่
+function addAlertReceiveDate() {
+  const next = getNextWorkingDay();
+  // ✅ default = วันถัดไป (ถ้ามีอยู่แล้ว +1 วัน จากวันสุดท้าย)
+  let defaultDate = next;
+  if (alertReceiveDates.length > 0) {
+    const last = alertReceiveDates[alertReceiveDates.length - 1];
+    const d = new Date(last);
+    d.setDate(d.getDate() + 1);
+    if (d.getDay() === 0) d.setDate(d.getDate() + 1);
+    defaultDate = toISODate(d);
+  }
+  alertReceiveDates.push(defaultDate);
+  saveAlertReceiveDates();
+  renderAlertReceiveDates();
+}
+
+// ✅ ลบวันที่
+function removeAlertReceiveDate(idx) {
+  alertReceiveDates.splice(idx, 1);
+  saveAlertReceiveDates();
+  renderAlertReceiveDates();
+}
+
+// ✅ แก้ไขวันที่
+function onAlertReceiveDateChange(idx, value) {
+  if (!value) return;
+  alertReceiveDates[idx] = value;
+  saveAlertReceiveDates();
+}
+
+// ✅ Render ช่องวันที่ + ปุ่ม
+function renderAlertReceiveDates() {
+  const box = $('alertReceiveDateBox');
+  if (!box) return;
+
+  let html = '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">';
+  html += '<span style="font-size:13px;color:#475569;font-weight:600">📅 วันที่รับสินค้า:</span>';
+
+  if (alertReceiveDates.length === 0) {
+    html += '<span style="font-size:12px;color:#94a3b8">(ยังไม่ได้กำหนด)</span>';
+  } else {
+    alertReceiveDates.forEach((d, i) => {
+      // ✅ format DD/MM/YYYY
+      const dObj = new Date(d);
+      const dd = String(dObj.getDate()).padStart(2, '0');
+      const mm = String(dObj.getMonth() + 1).padStart(2, '0');
+      const yyyy = dObj.getFullYear() + 543;
+      const display = `${dd}/${mm}/${yyyy}`;
+
+      html += `<span style="display:inline-flex;align-items:center;gap:4px;background:#eff6ff;border:1px solid #2563eb;border-radius:6px;padding:4px 8px;font-size:13px">
+        <input type="date" value="${d}" onchange="onAlertReceiveDateChange(${i}, this.value)" style="border:none;background:transparent;font-size:13px;color:#1e3a8a;font-weight:600;width:130px;cursor:pointer">
+        <button type="button" onclick="removeAlertReceiveDate(${i})" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:14px;padding:0 2px">✕</button>
+      </span>`;
+    });
+  }
+
+  html += `<button type="button" onclick="addAlertReceiveDate()" class="primary" style="padding:4px 10px;font-size:12px">+ เพิ่มวันที่รับสินค้า</button>`;
+  html += '</div>';
+
+  box.innerHTML = html;
+}
+
+// ✅ โหลด + Render ตอน init
+function initAlertReceiveDates() {
+  alertReceiveDates = loadAlertReceiveDates();
+  // ถ้ายังไม่มี → default 1 วัน = วันถัดไป
+  if (alertReceiveDates.length === 0) {
+    alertReceiveDates.push(getNextWorkingDay());
+    saveAlertReceiveDates();
+  }
+  renderAlertReceiveDates();
+}
+
 // ================= HELPER: FSC =================
 function isFSCGrade(gradegram) {
   if (!gradegram) return false;
@@ -395,11 +500,13 @@ async function renderAlert() {
       <div class="item red">🔴 ขาด: ${totalShortage} รายการ</div>
       <div class="item yellow">🟡 พอดี: ${totalOK} รายการ</div>
       <div class="item green">🟢 เกิน: ${totalOver} รายการ</div>
+      <div id="alertReceiveDateBox" style="margin-left:auto"></div>
     </div>`;
 
     if (!display.length) {
       html += '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่มีรายการ 🎉</p>';
       $('alertBody').innerHTML = html;
+      renderAlertReceiveDates();  // ✅ render วันที่หลังจาก DOM พร้อม
       alertCache = [];
       return;
     }
@@ -491,6 +598,7 @@ async function renderAlert() {
     </div>`;
 
     $('alertBody').innerHTML = html;
+    renderAlertReceiveDates();  // ✅ render วันที่หลังจาก DOM พร้อม
     alertCache = display;
 
     // ✅ ตรวจสอบ Popup แจ้งเตือน: เฉพาะกรณี "แก้ไขหลังสร้าง PO"
@@ -615,24 +723,33 @@ function renderAlertPODetail(items) {
   const labelQuality  = v => ALERT_QUALITY_B.find(q => q.value === v)?.label || 'ปกติ';
 
   let totalQty = 0;
+
+  // ✅ แสดงวันที่รับสินค้า (DD/MM/YYYY)
+  const datesHtml = alertReceiveDates.map(d => {
+    const dObj = new Date(d);
+    const dd = String(dObj.getDate()).padStart(2, '0');
+    const mm = String(dObj.getMonth() + 1).padStart(2, '0');
+    const yyyy = dObj.getFullYear() + 543;
+    return `${dd}/${mm}/${yyyy}`;
+  }).join(' · ');
+
   let html = `
     <div class="po-detail-summary">
       <div>📦 <b>${items.length}</b> รายการ</div>
       <div>🔢 รวม <b>${items.reduce((s, i) => s + i.quantity, 0)}</b> ม้วน</div>
+      <div>📅 วันที่รับสินค้า: <b style="color:#1e40af">${esc(datesHtml) || '(ยังไม่ได้กำหนด)'}</b></div>
     </div>
-    <div style="max-height:55vh;overflow:auto;border:1px solid #e2e8f0;border-radius:8px">
     <table>
       <thead><tr>
         <th style="width:50px">#</th>
-        <th>Gradegram-Size</th>
-        <th style="width:90px;text-align:right">Quantity</th>
+        <th style="width:180px">Gradegram-Size</th>
+        <th style="width:90px;text-align:center">Quantity</th>
         <th>หมายเหตุ</th>
       </tr></thead>
       <tbody>`;
 
   items.forEach((it, idx) => {
     totalQty += it.quantity;
-    // ✅ รวม (ม้วนลูกค้า),(คุณภาพ B),(หมายเหตุ) ด้วย ,
     const parts = [
       labelCustomer(it.customer_roll),
       labelQuality(it.quality_b),
@@ -643,7 +760,7 @@ function renderAlertPODetail(items) {
     html += `<tr>
       <td style="text-align:center">${idx + 1}</td>
       <td><b>${esc(it.gradegram_size)}</b></td>
-      <td style="text-align:right;font-weight:700;color:#1e40af">${it.quantity}</td>
+      <td style="text-align:center;font-weight:700;color:#1e40af">${it.quantity}</td>
       <td>${esc(remarkCombined)}</td>
     </tr>`;
   });
@@ -651,10 +768,10 @@ function renderAlertPODetail(items) {
   html += `</tbody>
     <tfoot><tr style="background:#cbd5e1;font-weight:700">
       <td colspan="2" style="text-align:right">จำนวนรวม (ม้วน)</td>
-      <td style="text-align:right;color:#dc2626;font-size:15px">${totalQty}</td>
+      <td style="text-align:center;color:#dc2626;font-size:15px">${totalQty}</td>
       <td></td>
     </tr></tfoot>
-    </table></div>`;
+    </table>`;
 
   $('alertPODetailBody').innerHTML = html;
 }
@@ -663,11 +780,17 @@ function renderAlertPODetail(items) {
 function confirmCreatePO() {
   if (!_pendingPOItems || !_pendingPOItems.length) return;
 
+  if (alertReceiveDates.length === 0) {
+    alert('กรุณากำหนดวันที่รับสินค้าอย่างน้อย 1 วัน');
+    return;
+  }
+
   const analyzedDate = toISODate(new Date());
 
   sessionStorage.setItem('alert_to_po', JSON.stringify({
     items: _pendingPOItems,
     analyzed_date: analyzedDate,
+    receive_dates: [...alertReceiveDates],   // ✅ ส่งวันที่รับทั้งหมด
     ref_snapshot: $('alertSnapshotMonth')?.value,
     ref_stock: $('alertStockDate')?.value,
     ref_receive: $('alertReceiveDate')?.value
