@@ -363,40 +363,6 @@
             <input type="month" id="alertSnapshotMonth">
           </label>
 
-          <label class="grade-filter-wrap">
-            Gradegrams
-            <div class="grade-filter-box" id="alertGradeFilterBox">
-              <button type="button" class="grade-filter-btn" id="alertGradeFilterBtn">
-                <span id="alertGradeFilterLabel">ทั้งหมด</span>
-                <span class="arrow">▼</span>
-              </button>
-              <div class="grade-dropdown hidden" id="alertGradeDropdown">
-                <div class="grade-actions">
-                  <button type="button" onclick="selectAllAlertGrades()">✓ เลือกทั้งหมด</button>
-                  <button type="button" onclick="clearAllAlertGrades()">✗ ล้างทั้งหมด</button>
-                </div>
-                <div class="grade-list" id="alertGradeList"></div>
-              </div>
-            </div>
-          </label>
-
-          <label class="grade-filter-wrap">
-            🔎 Alert
-            <div class="grade-filter-box" id="alertFilterBox">
-              <button type="button" class="grade-filter-btn" id="alertFilterBtn">
-                <span id="alertFilterLabel">ทั้งหมด</span>
-                <span class="arrow">▼</span>
-              </button>
-              <div class="grade-dropdown hidden" id="alertFilterDropdown">
-                <div class="grade-actions">
-                  <button type="button" onclick="selectAllAlertFilters()">✓ เลือกทั้งหมด</button>
-                  <button type="button" onclick="clearAllAlertFilters()">✗ ล้างทั้งหมด</button>
-                </div>
-                <div class="grade-list" id="alertFilterList"></div>
-              </div>
-            </div>
-          </label>
-
           <label><input type="checkbox" id="alertIncludeCustomer"> รวมม้วนลูกค้า</label>
 
           <button class="primary" onclick="renderAlert()">🔍 วิเคราะห์</button>
