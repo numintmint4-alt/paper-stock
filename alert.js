@@ -7,7 +7,7 @@ let alertAllGrades = [];
 let alertCache = [];
 let alertSupplierCache = [];
 
-// ✅ Size Filter (ใหม่)
+// ✅ Size Filter
 let alertSelectedSizes = [];
 let alertAllSizes = [];
 
@@ -530,9 +530,6 @@ async function renderAlert() {
     Stock Level: ${snapshotMonth}
     <div class="report-subtitle">(Stock ${thaiDateFull(stockDate)} · Receive ${thaiDateFull(receiveDate)}${gradeLabel})</div>
   `;
-
-  // ✅ Render Tab วันที่ (ด้านบนตาราง)
-  renderAlertDateTabs();
 
   $('alertBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังวิเคราะห์...</p>';
 
