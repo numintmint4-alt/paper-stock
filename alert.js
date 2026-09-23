@@ -465,7 +465,7 @@ function renderAlertDateTabs() {
     const display = `${dd}/${mm}/${yyyy}`;
     const active = i === alertActiveDateIdx ? 'active' : '';
 
-    html += `<span class="alert-date-tab-wrap">
+    html += `<span class="alert-date-tab-wrap ${active ? 'is-active' : ''}">
       <button type="button" class="alert-date-tab ${active}" onclick="switchAlertDate(${i})">
         📅 วันที่ : ${display}
       </button>
