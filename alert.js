@@ -34,7 +34,7 @@ const ALERT_QUALITY_B = [
   { value: 'nc',     label: 'NC' }
 ];
 
-// ✅ แยกตามวันที่ (รอบที่ 3)
+// ✅ แยกตามวันที่
 const ALERT_LS_KEY_PREFIX = 'stockv8_alert_inputs_v';
 const ALERT_PO_FLAG_KEY = 'stockv8_alert_po_created';
 const ALERT_RECEIVE_DATES_KEY = 'stockv8_alert_receive_dates';
@@ -406,8 +406,7 @@ function addAlertReceiveDate() {
   }
   alertReceiveDates.push(defaultDate);
   saveAlertReceiveDates();
-  renderAlertReceiveDates();
-  renderAlertDateTabs();
+  renderAlertDateTabs();   // ✅ render Tab (รวมปุ่ม +)
 }
 
 function removeAlertReceiveDate(idx) {
@@ -427,7 +426,6 @@ function removeAlertReceiveDate(idx) {
 
   alertReceiveDates.splice(idx, 1);
   saveAlertReceiveDates();
-  renderAlertReceiveDates();
   renderAlertDateTabs();
   renderAlert();
 }
@@ -439,28 +437,10 @@ function onAlertReceiveDateChange(idx, value) {
   renderAlertDateTabs();
 }
 
+// ✅ Render วันที่ — ย้ายไปรวมใน renderAlertDateTabs() แล้ว
 function renderAlertReceiveDates() {
-  const box = $('alertReceiveDateBox');
-  if (!box) return;
-
-  let html = '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">';
-  html += '<span style="font-size:13px;color:#475569;font-weight:600">📅 วันที่รับสินค้า:</span>';
-
-  if (alertReceiveDates.length === 0) {
-    html += '<span style="font-size:12px;color:#94a3b8">(ยังไม่ได้กำหนด)</span>';
-  } else {
-    alertReceiveDates.forEach((d, i) => {
-      html += `<span style="display:inline-flex;align-items:center;gap:4px;background:#eff6ff;border:1px solid #2563eb;border-radius:6px;padding:4px 8px;font-size:13px">
-        <input type="date" value="${d}" onchange="onAlertReceiveDateChange(${i}, this.value)" style="border:none;background:transparent;font-size:13px;color:#1e3a8a;font-weight:600;width:130px;cursor:pointer">
-        <button type="button" onclick="removeAlertReceiveDate(${i})" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:14px;padding:0 2px">✕</button>
-      </span>`;
-    });
-  }
-
-  html += `<button type="button" onclick="addAlertReceiveDate()" class="primary" style="padding:4px 10px;font-size:12px">+ เพิ่มวันที่รับสินค้า</button>`;
-  html += '</div>';
-
-  box.innerHTML = html;
+  // ✅ ไม่ต้อง render ที่นี่แล้ว — ย้ายไปรวมใน renderAlertDateTabs()
+  renderAlertDateTabs();
 }
 
 // ================= TAB วันที่ =================
@@ -475,7 +455,8 @@ function renderAlertDateTabs() {
   const box = $('alertDateTabsBox');
   if (!box) return;
 
-  let html = '';
+  let html = '<span class="alert-date-label">📅 วันที่รับสินค้า:</span>';
+
   alertReceiveDates.forEach((d, i) => {
     const dObj = new Date(d);
     const dd = String(dObj.getDate()).padStart(2, '0');
@@ -484,10 +465,16 @@ function renderAlertDateTabs() {
     const display = `${dd}/${mm}/${yyyy}`;
     const active = i === alertActiveDateIdx ? 'active' : '';
 
-    html += `<button type="button" class="alert-date-tab ${active}" onclick="switchAlertDate(${i})">
-      📅 วันที่ ${i + 1}: ${display}
-    </button>`;
+    html += `<span class="alert-date-tab-wrap">
+      <button type="button" class="alert-date-tab ${active}" onclick="switchAlertDate(${i})">
+        📅 วันที่ : ${display}
+      </button>
+      <button type="button" class="alert-date-tab-close" onclick="removeAlertReceiveDate(${i})" title="ลบวันนี้">✕</button>
+    </span>`;
   });
+
+  // ✅ ปุ่ม "+ เพิ่มวันที่รับสินค้า" ต่อท้าย Tab
+  html += `<button type="button" class="alert-date-add-btn" onclick="addAlertReceiveDate()">+ เพิ่มวันที่รับสินค้า</button>`;
 
   box.innerHTML = html;
 }
@@ -499,7 +486,6 @@ function initAlertReceiveDates() {
     saveAlertReceiveDates();
   }
   alertActiveDateIdx = 0;
-  renderAlertReceiveDates();
   renderAlertDateTabs();
 }
 
@@ -586,19 +572,17 @@ async function renderAlert() {
     const totalOK       = result.filter(r => r.alert === 0).length;
     const totalOver     = result.filter(r => r.alert > 0).length;
 
-    // ✅ เพิ่ม alertDateTabsBox ไว้บนสุด
+    // ✅ ลบ alertReceiveDateBox ออกจาก alert-summary
     let html = `<div id="alertDateTabsBox" class="alert-date-tabs"></div>
       <div class="alert-summary">
         <div class="item red">🔴 ขาด: ${totalShortage} รายการ</div>
         <div class="item yellow">🟡 พอดี: ${totalOK} รายการ</div>
         <div class="item green">🟢 เกิน: ${totalOver} รายการ</div>
-        <div id="alertReceiveDateBox" style="margin-left:auto"></div>
       </div>`;
 
     if (!display.length) {
       html += '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่มีรายการ 🎉</p>';
       $('alertBody').innerHTML = html;
-      renderAlertReceiveDates();
       renderAlertDateTabs();
       alertCache = [];
       return;
@@ -679,7 +663,7 @@ async function renderAlert() {
       else             { rowCls = 'row-green';  statusTxt = `🟢 เกิน ${Math.floor(a)}`; }
 
       const lsKey = alertLS_Key(r.gradegram, r.size);
-      const lsVal = getAlertInput(lsKey);  // ✅ ใช้ alertActiveDateIdx
+      const lsVal = getAlertInput(lsKey);
 
       const supOptions = alertSupplierCache.map(code =>
         `<option value="${esc(code)}" ${lsVal.sup === code ? 'selected' : ''}>${esc(code)}</option>`
@@ -753,9 +737,8 @@ async function renderAlert() {
     _attachAlertDropdown('alertSizeFilterBtn', 'alertSizeDropdown', 'alertSizeFilterBox', 'alertSize');
     _attachAlertDropdown('alertFilterBtn', 'alertFilterDropdown', 'alertFilterBox', 'alertFilter');
 
-    // ✅ Render Tab วันที่ + วันที่รับสินค้า
+    // ✅ Render Tab วันที่
     renderAlertDateTabs();
-    renderAlertReceiveDates();
 
     if (hasPOEdited()) {
       showPOEditedWarning();
@@ -842,7 +825,7 @@ async function createPOFromAlert() {
     const dateKey = alertReceiveDates[dateIdx];
     for (const r of alertCache) {
       const lsKey = alertLS_Key(r.gradegram, r.size);
-      const lsVal = getAlertInput(lsKey, dateIdx);   // ✅ ใช้ dateIdx ของวันนั้น
+      const lsVal = getAlertInput(lsKey, dateIdx);
 
       if (!lsVal.qty || Number(lsVal.qty) <= 0) continue;
       if (!lsVal.sup) continue;
@@ -886,7 +869,6 @@ function renderAlertPODetail(items) {
     return `${dd}/${mm}/${yyyy}`;
   };
 
-  // ✅ แยกตามวันที่รับ
   const byDate = {};
   items.forEach(it => {
     const d = it.receive_date || 'unknown';
@@ -902,7 +884,6 @@ function renderAlertPODetail(items) {
       <div>📅 <b>${Object.keys(byDate).length}</b> วันรับสินค้า</div>
     </div>`;
 
-  // ✅ ตารางแยกตามวัน
   Object.keys(byDate).sort().forEach(dateKey => {
     const dayItems = byDate[dateKey];
     const dayTotal = dayItems.reduce((s, i) => s + i.quantity, 0);
@@ -946,7 +927,6 @@ function renderAlertPODetail(items) {
       </div>`;
   });
 
-  // ✅ Grand total
   html += `<div class="po-detail-grand-total">
     <b>รวมทั้งหมด: ${totalQty} ม้วน</b>
   </div>`;
@@ -966,7 +946,7 @@ function confirmCreatePO() {
   const analyzedDate = toISODate(new Date());
 
   sessionStorage.setItem('alert_to_po', JSON.stringify({
-    items: _pendingPOItems,                    // ✅ มี receive_date ในแต่ละ item แล้ว
+    items: _pendingPOItems,
     analyzed_date: analyzedDate,
     receive_dates: [...alertReceiveDates],
     ref_snapshot: $('alertSnapshotMonth')?.value,
