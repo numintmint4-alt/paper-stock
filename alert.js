@@ -52,6 +52,21 @@ function getAlertLSKey(dateIdx = alertActiveDateIdx) {
 
 // ================= DATE HELPERS =================
 
+// ✅ Helper: parse "YYYY-MM-DD" → Date แบบ local (กัน timezone เพี้ยน)
+function _parseLocalDate(iso) {
+  if (!iso) return null;
+  const [y, m, d] = String(iso).split('-').map(Number);
+  return new Date(y, m - 1, d);   // local midnight
+}
+
+// ✅ Helper: หาวันที่ถัดไป (ข้ามอาทิตย์)
+function _nextWorkingDay(fromDate) {
+  const d = new Date(fromDate);
+  d.setDate(d.getDate() + 1);
+  if (d.getDay() === 0) d.setDate(d.getDate() + 1);
+  return d;
+}
+
 // ✅ คำนวณ Stock วันที่ = analyzed − 1 (ถ้าอาทิตย์ → ถอยอีก 1)
 function calcStockDate(analyzedDate) {
   if (!analyzedDate) return '';
@@ -283,19 +298,13 @@ function setAlertLocked(locked, analyzedDate) {
     // ✅ Remove class
     if (body) body.classList.remove('alert-locked');
 
-    // ✅ Enable วันที่ (ยกเว้น Stock + Receive — คำนวณอัตโนมัติ)
-    ['alertDate', 'alertIncludeCustomer'].forEach(id => {
-      const el = $(id);
-      if (el) el.disabled = false;
-    });
-
-    // ✅ Stock วันที่ + Receive วันที่ — ล็อกเสมอ (คำนวณอัตโนมัติ)
-    ['alertStockDate', 'alertReceiveDate'].forEach(id => {
+    // ✅ Enable วันที่ทั้งหมด (ยังไม่เซฟ → แก้ได้)
+    ['alertDate', 'alertStockDate', 'alertReceiveDate', 'alertSnapshotMonth', 'alertIncludeCustomer'].forEach(id => {
       const el = $(id);
       if (el) {
-        el.disabled = true;
-        el.style.background = '#f1f5f9';
-        el.style.cursor = 'not-allowed';
+        el.disabled = false;
+        el.style.background = '';
+        el.style.cursor = '';
       }
     });
 
@@ -826,17 +835,54 @@ function saveAlertReceiveDates() {
   localStorage.setItem(ALERT_RECEIVE_DATES_KEY, JSON.stringify(alertReceiveDates));
 }
 
+// ✅ เพิ่มวันที่รับสินค้า — auto-fill วันที่ขาด (ต่อเนื่องจากวันสุดท้าย)
 function addAlertReceiveDate() {
-  const next = getNextWorkingDay();
-  let defaultDate = next;
-  if (alertReceiveDates.length > 0) {
-    const last = alertReceiveDates[alertReceiveDates.length - 1];
-    const d = new Date(last);
-    d.setDate(d.getDate() + 1);
-    if (d.getDay() === 0) d.setDate(d.getDate() + 1);
-    defaultDate = toISODate(d);
+  const analyzedDate = $('alertDate')?.value;
+  if (!analyzedDate) {
+    alert('กรุณาเลือกวันที่วิเคราะห์ก่อน');
+    return;
   }
-  alertReceiveDates.push(defaultDate);
+
+  // 1) เรียงวันที่ที่มีอยู่
+  const sorted = [...alertReceiveDates]
+    .map(_parseLocalDate)
+    .filter(Boolean)
+    .sort((a, b) => a - b);
+
+  if (sorted.length === 0) {
+    // ยังไม่มี → เริ่มที่ analyzedDate
+    alertReceiveDates.push(analyzedDate);
+    saveAlertReceiveDates();
+    renderAlertDateTabs();
+    return;
+  }
+
+  // 2) หาวันที่ขาด ระหว่าง analyzedDate → วันสุดท้าย
+  const analyzedD = _parseLocalDate(analyzedDate);
+  const lastD = sorted[sorted.length - 1];
+  const existing = new Set(sorted.map(d => toISODate(d)));
+
+  let cursor = new Date(analyzedD);
+  while (cursor <= lastD) {
+    // ข้ามอาทิตย์
+    if (cursor.getDay() !== 0) {
+      const iso = toISODate(cursor);
+      if (!existing.has(iso)) {
+        // เจอวันที่ขาด → เติมแล้วจบ
+        alertReceiveDates.push(iso);
+        alertReceiveDates.sort((a, b) => _parseLocalDate(a) - _parseLocalDate(b));
+        saveAlertReceiveDates();
+        renderAlertDateTabs();
+        return;
+      }
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  // 3) ไม่มีวันขาด → เติมวันถัดไปจากวันสุดท้าย (ข้ามอาทิตย์)
+  const nextD = _nextWorkingDay(lastD);
+  alertReceiveDates.push(toISODate(nextD));
+  alertReceiveDates.sort((a, b) => _parseLocalDate(a) - _parseLocalDate(b));
   saveAlertReceiveDates();
   renderAlertDateTabs();
 }
