@@ -27,16 +27,19 @@ function loadMonthFilter() {
     allMonthsList.push(`${yearCE}-${pad(m)}`);
   }
 
-  // ✅ default: เดือนปัจจุบัน (ถ้าปีที่เลือก = ปีปัจจุบัน)
+  // default: 3 เดือนก่อนเดือนปัจจุบัน
   if (selectedMonths.length === 0) {
     const now = new Date();
     const curY = now.getFullYear();
     const curM = now.getMonth() + 1;
     if (curY === yearCE) {
-      selectedMonths = [`${yearCE}-${pad(curM)}`];
-    } else {
-      // ✅ ถ้าเลือกปีอื่น → default เดือน 1 ของปีนั้น
-      selectedMonths = [`${yearCE}-01`];
+      let m = curM;
+      for (let i = 0; i < 3; i++) {
+        m -= 1;
+        if (m <= 0) m += 12;
+        selectedMonths.push(`${yearCE}-${pad(m)}`);
+      }
+      selectedMonths.sort();
     }
   }
 
@@ -553,24 +556,6 @@ async function saveStockLevelSnapshot() {
       return;
     }
     finalTitle = `${title}/${n}`;
-  }
-
-  // ✅ Validation: months ต้องมีเดือนของ title อยู่ด้วย
-  const mEl = $('titleMonth');
-  const yEl = $('titleYear');
-  const titleMonthYM = `${Number(yEl.value) - 543}-${pad(Number(mEl.value))}`;
-
-  if (!selectedMonths.includes(titleMonthYM)) {
-    if (msgEl) {
-      msgEl.innerHTML = `<div class="msg err">
-        ⚠ <b>ไม่สามารถบันทึกได้</b><br>
-        Title บอก "<b>${THAI_MONTHS[Number(mEl.value)-1]} ${yEl.value}</b>" (= <code>${titleMonthYM}</code>)<br>
-        แต่ months ที่เลือกคือ <code>[${selectedMonths.join(', ')}]</code><br><br>
-        → กรุณาติ๊กเลือกเดือน <b>${titleMonthYM}</b> ใน filter "เดือน" ก่อนกดบันทึก
-      </div>`;
-    }
-    alert(`⚠ ไม่สามารถบันทึกได้\n\nเดือนใน Title (${titleMonthYM}) ไม่ตรงกับ months ที่เลือก\nกรุณาติ๊กเลือกเดือนให้ตรงกันก่อน`);
-    return;
   }
 
   const payload = {
