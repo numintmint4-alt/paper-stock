@@ -296,7 +296,6 @@ $('logoutBtn').onclick = async () => {
 };
 
 // ================= TABS =================
-// ✅ แก้ 1: ลบ 'summary' ออกจาก TAB_LIST
 const TAB_LIST = ['matrix','stock','receive','alert','purchase-order','data','settings'];
 
 document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
@@ -307,7 +306,6 @@ document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
     const t = btn.dataset.tab;
     if (t === 'matrix' && typeof renderMatrix === 'function') renderMatrix();
     if (t === 'stock' && typeof initStockTab === 'function') initStockTab();
-    // ✅ แก้ 2: ลบบรรทัด initSummaryTab() ออก
     if (t === 'receive' && typeof initReceiveTab === 'function') initReceiveTab();
     if (t === 'alert' && typeof initAlertTab === 'function') initAlertTab();
     if (t === 'purchase-order' && typeof initPurchaseOrderTab === 'function') initPurchaseOrderTab();
@@ -329,7 +327,6 @@ async function refreshAll() {
   if (typeof loadSizeFilter === 'function') loadSizeFilter();
   if (typeof loadMonthFilter === 'function') loadMonthFilter();
   if (typeof loadStockGradeFilter === 'function') await loadStockGradeFilter();
-  // ✅ แก้ 3: ลบบรรทัด loadSummaryGradeFilter() ออก
   if (typeof loadReceiveGradeFilter === 'function') await loadReceiveGradeFilter();
   if (typeof loadAlertGradeFilter === 'function') await loadAlertGradeFilter();
   if (typeof loadStockLevelSnapshots === 'function') await loadStockLevelSnapshots();
@@ -1045,8 +1042,23 @@ async function loadArchiveStats() {
 
 // ================= USERS =================
 async function callAdmin(action, payload = {}) {
-  const { data: { session } } = await supabase.auth.getSession();
+  // ✅ ดึง session ปัจจุบัน
+  let { data: { session } } = await supabase.auth.getSession();
+
+  // ✅ Auto-refresh ถ้าหมดอายุ หรือใกล้หมดใน 60 วินาที
+  if (session && session.expires_at * 1000 < Date.now() + 60000) {
+    const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
+    if (refreshErr) {
+      console.warn('refreshSession failed:', refreshErr);
+      // ถ้า refresh ไม่ได้ → ล้าง session แล้วแจ้ง login ใหม่
+      await supabase.auth.signOut();
+      throw new Error('Session หมดอายุ กรุณา login ใหม่');
+    }
+    session = refreshed?.session;
+  }
+
   if (!session) throw new Error('ไม่ได้ login');
+
   const res = await fetch(EDGE_FUNCTION_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
