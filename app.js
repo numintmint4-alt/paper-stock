@@ -139,6 +139,41 @@ function esc(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+// ================= TOAST =================
+function showToast(message, type = 'info', duration = 3000) {
+  const colors = {
+    info:    { bg: '#dbeafe', color: '#1e40af', border: '#93c5fd' },
+    ok:      { bg: '#dcfce7', color: '#166534', border: '#86efac' },
+    warn:    { bg: '#fef3c7', color: '#b45309', border: '#fcd34d' },
+    err:     { bg: '#fee2e2', color: '#dc2626', border: '#fca5a5' }
+  };
+  const c = colors[type] || colors.info;
+
+  let toast = document.getElementById('__toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = '__toast';
+    toast.style.cssText = `
+      position:fixed; top:20px; left:50%; transform:translateX(-50%);
+      padding:12px 22px; border-radius:8px; font-weight:600; font-size:14px;
+      box-shadow:0 4px 16px rgba(0,0,0,.15); z-index:99999;
+      transition:opacity .3s; opacity:0; pointer-events:none;
+      font-family:'Sarabun',sans-serif;
+    `;
+    document.body.appendChild(toast);
+  }
+  toast.style.background = c.bg;
+  toast.style.color = c.color;
+  toast.style.border = `1px solid ${c.border}`;
+  toast.textContent = message;
+  toast.style.opacity = '1';
+
+  clearTimeout(toast.__timer);
+  toast.__timer = setTimeout(() => {
+    toast.style.opacity = '0';
+  }, duration);
+}
+
 // ================= PAGINATION =================
 async function fetchAllRows(buildQuery, pageSize = 1000, onProgress = null) {
   const all = [];
@@ -1042,7 +1077,6 @@ async function loadArchiveStats() {
 
 // ================= USERS =================
 async function callAdmin(action, payload = {}) {
-  // ✅ ดึง session ปัจจุบัน
   let { data: { session } } = await supabase.auth.getSession();
 
   // ✅ Auto-refresh ถ้าหมดอายุ หรือใกล้หมดใน 60 วินาที
@@ -1050,14 +1084,24 @@ async function callAdmin(action, payload = {}) {
     const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
     if (refreshErr) {
       console.warn('refreshSession failed:', refreshErr);
-      // ถ้า refresh ไม่ได้ → ล้าง session แล้วแจ้ง login ใหม่
-      await supabase.auth.signOut();
-      throw new Error('Session หมดอายุ กรุณา login ใหม่');
+      return handleSessionExpired();
     }
     session = refreshed?.session;
   }
 
-  if (!session) throw new Error('ไม่ได้ login');
+  if (!session) return handleSessionExpired();
+
+  // ✅ เช็ค session กับ Server จริง — กันเคส session ถูกลบที่ server
+  try {
+    const { data: { user }, error: userErr } = await supabase.auth.getUser();
+    if (userErr || !user) {
+      console.warn('Session invalid at server:', userErr?.message);
+      return handleSessionExpired();
+    }
+  } catch (e) {
+    console.warn('getUser error:', e);
+    // ไม่ throw ต่อ — ปล่อยให้ fetch ด้านล่าง handle
+  }
 
   const res = await fetch(EDGE_FUNCTION_URL, {
     method: 'POST',
@@ -1067,6 +1111,20 @@ async function callAdmin(action, payload = {}) {
   const json = await res.json();
   if (!res.ok) throw new Error(json.error || 'Edge function error');
   return json;
+}
+
+// ✅ Handle session หมดอายุ: clear + toast + reload
+async function handleSessionExpired() {
+  showToast('Session หมดอายุ กำลังกลับหน้า login...', 'warn', 2000);
+  try {
+    await supabase.auth.signOut({ scope: 'global' });
+  } catch (e) {
+    console.warn('signOut error:', e);
+  }
+  localStorage.clear();
+  sessionStorage.clear();
+  setTimeout(() => location.reload(), 1500);
+  throw new Error('Session หมดอายุ');
 }
 
 async function loadUsers() {
