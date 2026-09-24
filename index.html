@@ -749,6 +749,36 @@
   </div>
 </div>
 
+<!-- ==================== MODAL VERIFY PASSWORD (NEW) ==================== -->
+<div class="modal-bg" id="modalVerifyPassword">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-head">
+      <h3 id="verifyPasswordTitle">🔒 ยืนยันรหัสผ่าน</h3>
+      <button onclick="closeModal('modalVerifyPassword'); window._verifyOnConfirm=null;">ปิด</button>
+    </div>
+
+    <div id="verifyPasswordMessage" class="msg info" style="margin-bottom:14px"></div>
+
+    <input type="hidden" id="verifyPasswordUsername">
+
+    <div class="form-grid" style="grid-template-columns:1fr">
+      <label>🔑 รหัสผ่าน
+        <input type="password" id="verifyPasswordInput" placeholder="••••••" autocomplete="current-password">
+      </label>
+      <label>📝 หมายเหตุ (บังคับ)
+        <input type="text" id="verifyPasswordNote" placeholder="เช่น แก้ไขราคาตามใบเสนอราคา">
+      </label>
+    </div>
+
+    <div id="verifyPasswordError" style="margin-top:10px"></div>
+
+    <div class="form-actions" style="margin-top:16px">
+      <button onclick="closeModal('modalVerifyPassword'); window._verifyOnConfirm=null;">ยกเลิก</button>
+      <button class="primary" id="verifyPasswordConfirmBtn" onclick="confirmVerifyPassword()">✅ ยืนยัน</button>
+    </div>
+  </div>
+</div>
+
 <script src="app.js"></script>
 <script src="stock-level.js"></script>
 <script src="stock.js"></script>
@@ -757,5 +787,19 @@
 <script src="alert.js"></script>
 <script src="purchase-order.js"></script>
 <script src="price-master.js"></script>
+
+<!-- ✅ Enter submit ใน modal verify password -->
+<script>
+document.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter' && document.getElementById('modalVerifyPassword')?.classList.contains('show')) {
+    const active = document.activeElement;
+    if (active?.id === 'verifyPasswordInput' || active?.id === 'verifyPasswordNote') {
+      e.preventDefault();
+      confirmVerifyPassword();
+    }
+  }
+});
+</script>
+
 </body>
 </html>
