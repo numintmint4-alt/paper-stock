@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 // STOCK V8 — purchase-order.js
 // Purchase Order Management (List + Form + Auto-Split + Export)
+// + Date Split + Verify Password + Mark Saved (V9)
 // ═══════════════════════════════════════════════════════════════
 
 let poCache = [];
@@ -11,15 +12,12 @@ let poEditingId = null;
 
 // ================= STD WEIGHT HELPER =================
 function getStdWeight(gradegram, size) {
-  // ✅ หา std_weight_kg จาก masterCache
-  // gradegram = 'CA105' → grade = 'CA', gram = '105'
   const match = String(gradegram).match(/^([A-Z]+F?)(\d+)$/);
   if (!match) return 0;
 
-  const grade = match[1];     // 'CA' หรือ 'CAF'
-  const gram = match[2];      // '105'
+  const grade = match[1];
+  const gram = match[2];
 
-  // หา paper_specs ที่ตรง grade + gram + size
   const spec = masterCache.find(m =>
     normalizeGrade(m.grade) === grade &&
     String(m.gram) === gram &&
@@ -29,19 +27,28 @@ function getStdWeight(gradegram, size) {
   return spec ? Number(spec.std_weight_kg) || 0 : 0;
 }
 
-// ✅ คำนวณ KG. รวม
 function calcKgTotal(gradegram, size, quantity) {
   const std = getStdWeight(gradegram, size);
   return Number((std * Number(quantity)).toFixed(2));
+}
+
+// ================= DATE FORMAT HELPER =================
+function fmtDateTH(d) {
+  if (!d) return '-';
+  const dObj = new Date(d);
+  if (isNaN(dObj.getTime())) return String(d);
+  const dd = String(dObj.getDate()).padStart(2, '0');
+  const mm = String(dObj.getMonth() + 1).padStart(2, '0');
+  const yyyy = dObj.getFullYear() + 543;
+  return `${dd}/${mm}/${yyyy}`;
 }
 
 // ================= INIT =================
 async function initPurchaseOrderTab() {
   const today = new Date();
   if (!poSelectedMonth) {
-    poSelectedMonth = `${today.getFullYear()}-${pad(today.getMonth()+1)}`;
+    poSelectedMonth = `${today.getFullYear()}-${pad(today.getMonth() + 1)}`;
   }
-  // ✅ set ค่าใน input poMonth
   const monthEl = $('poMonth');
   if (monthEl && !monthEl.value) monthEl.value = poSelectedMonth;
 
@@ -49,7 +56,6 @@ async function initPurchaseOrderTab() {
   await loadPriceMaster();
   await renderPOList();
 
-  // ✅ ตรวจสอบว่ามีข้อมูลจาก Alert ส่งมาไหม
   const fromAlert = sessionStorage.getItem('alert_to_po');
   if (fromAlert) {
     try {
@@ -131,8 +137,9 @@ async function renderPOList() {
       return;
     }
 
+    // ✅ จุดที่ 5: เพิ่มคอลัมน์ "วันที่รับ"
     let html = '<div class="data-scroll"><table class="data-table"><thead><tr>';
-    html += '<th>PO No.</th><th>วันที่</th><th>Sup.</th><th>จำนวน</th><th>KG รวม</th><th>สถานะ</th><th></th>';
+    html += '<th>PO No.</th><th>วันที่ออก</th><th>วันที่รับ</th><th>Sup.</th><th>จำนวน</th><th>KG รวม</th><th>สถานะ</th><th></th>';
     html += '</tr></thead><tbody>';
 
     poCache.forEach(po => {
@@ -142,16 +149,23 @@ async function renderPOList() {
         sent:  '<span class="badge" style="background:#dbeafe;color:#1e40af">📤 Sent</span>'
       }[po.status] || po.status;
 
+      // ✅ จุดที่ 4: ปุ่ม "บันทึกเป็น Saved" เฉพาะ draft
+      const saveBtn = po.status === 'draft'
+        ? `<button class="primary" onclick="markPOSaved('${po.id}')">✅ บันทึกเป็น Saved</button>`
+        : '';
+
       html += `<tr>
         <td><b>${esc(po.po_no)}</b></td>
-        <td>${po.po_date || '-'}</td>
+        <td>${fmtDateTH(po.po_date)}</td>
+        <td>${fmtDateTH(po.ref_receive)}</td>
         <td>${esc(po.sup_code)}</td>
         <td style="text-align:right">${po.total_items || 0}</td>
-        <td style="text-align:right">${Number(po.total_kg || 0).toLocaleString('en-US', {minimumFractionDigits:2})}</td>
+        <td style="text-align:right">${Number(po.total_kg || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
         <td>${statusBadge}</td>
         <td>
           <button onclick="openPODetail('${po.id}')">📄 ดู</button>
-          <button onclick="openPOForm('${po.id}')">✏️ แก้ไข</button>
+          <button onclick="openPOFormWithVerify('${po.id}')">✏️ แก้ไข</button>
+          ${saveBtn}
           <button class="danger" onclick="deletePO('${po.id}')">🗑 ลบ</button>
         </td>
       </tr>`;
@@ -184,15 +198,167 @@ async function openPOForm(poId) {
   }
 }
 
+// ================= OPEN PO FORM WITH VERIFY =================
+async function openPOFormWithVerify(poId) {
+  const po = poCache.find(p => p.id === poId);
+  if (!po) return;
+
+  // ✅ ถ้าเป็น saved/sent → ต้อง verify ก่อน
+  if (po.status === 'saved' || po.status === 'sent') {
+    const username = (currentUser?.email || '').split('@')[0] || '';
+    openVerifyModal({
+      username,
+      title: `🔒 ยืนยันการแก้ไข PO ${po.po_no}`,
+      message: `PO นี้สถานะ ${po.status.toUpperCase()} — ต้องยืนยันรหัสผ่าน + ใส่หมายเหตุก่อนแก้ไข`,
+      onConfirm: (password, note) => verifyAndOpen(po, password, note)
+    });
+    return;
+  }
+
+  // ✅ draft → เปิดฟอร์มตรง ๆ
+  openPOForm(poId);
+}
+
+async function verifyAndOpen(po, password, note) {
+  try {
+    const username = (currentUser?.email || '').split('@')[0] || '';
+
+    const res = await callAdmin('verifyPassword', { username, password });
+    if (!res || !res.ok) {
+      return { ok: false, error: res?.error || 'รหัสผ่านไม่ถูกต้อง' };
+    }
+
+    // ✅ log (ไม่ throw ถ้าตารางไม่มี)
+    try {
+      await supabase.from('po_change_log').insert({
+        po_id: po.id,
+        changed_by: currentUser?.id,
+        action: 'edit_verified',
+        note: note || '(ไม่ระบุ)'
+      });
+    } catch (logErr) {
+      console.warn('po_change_log insert failed:', logErr);
+    }
+
+    openPOForm(po.id);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+// ================= MARK PO AS SAVED =================
+async function markPOSaved(poId) {
+  const po = poCache.find(p => p.id === poId);
+  if (!po) return;
+  if (po.status !== 'draft') {
+    alert('PO นี้ไม่ใช่ draft');
+    return;
+  }
+
+  if (!confirm(`ยืนยันบันทึก PO ${po.po_no} เป็น Saved?\n\n⚠️ หลังจากนี้จะแก้ไขไม่ได้โดยไม่ต้องใส่รหัสผ่าน`)) return;
+
+  try {
+    const { error } = await supabase
+      .from('purchase_orders')
+      .update({ status: 'saved', updated_at: new Date().toISOString() })
+      .eq('id', poId);
+    if (error) throw error;
+
+    alert(`✅ บันทึก ${po.po_no} เป็น Saved สำเร็จ`);
+    await renderPOList();
+  } catch (e) {
+    alert('❌ ' + e.message);
+  }
+}
+
+// ================= VERIFY PASSWORD MODAL =================
+function openVerifyModal({ username, title, message, onConfirm }) {
+  $('verifyPasswordTitle').textContent = title || '🔒 ยืนยันรหัสผ่าน';
+  $('verifyPasswordMessage').textContent = message || '';
+  $('verifyPasswordUsername').value = username || '';
+  $('verifyPasswordInput').value = '';
+  $('verifyPasswordNote').value = '';
+  $('verifyPasswordError').innerHTML = '';
+
+  window._verifyOnConfirm = onConfirm;
+
+  openModal('modalVerifyPassword');
+
+  setTimeout(() => $('verifyPasswordInput')?.focus(), 100);
+}
+
+async function confirmVerifyPassword() {
+  const password = $('verifyPasswordInput').value;
+  const note = $('verifyPasswordNote').value.trim();
+
+  if (!password) {
+    $('verifyPasswordError').innerHTML = '<div class="msg err">กรุณากรอกรหัสผ่าน</div>';
+    return;
+  }
+  if (!note) {
+    $('verifyPasswordError').innerHTML = '<div class="msg err">กรุณากรอกหมายเหตุ</div>';
+    return;
+  }
+
+  const btn = $('verifyPasswordConfirmBtn');
+  btn.disabled = true;
+  btn.textContent = 'กำลังตรวจสอบ...';
+
+  try {
+    const onConfirm = window._verifyOnConfirm;
+    if (typeof onConfirm !== 'function') {
+      throw new Error('ไม่พบ callback');
+    }
+    const result = await onConfirm(password, note);
+
+    if (result && result.ok === false) {
+      $('verifyPasswordError').innerHTML = `<div class="msg err">${esc(result.error)}</div>`;
+      btn.disabled = false;
+      btn.textContent = '✅ ยืนยัน';
+      return;
+    }
+
+    // ✅ สำเร็จ → ปิด modal + ล้าง callback
+    closeModal('modalVerifyPassword');
+    window._verifyOnConfirm = null;
+  } catch (e) {
+    $('verifyPasswordError').innerHTML = `<div class="msg err">${esc(e.message)}</div>`;
+  }
+
+  btn.disabled = false;
+  btn.textContent = '✅ ยืนยัน';
+}
+
 // ================= OPEN PO FORM FROM ALERT =================
 async function openPOFormFromAlert(alertData) {
   poEditingId = null;
 
-  // ✅ แยก PO อัตโนมัติ
-  const pos = autoGroupPOItems(alertData.items);
+  // ✅ จุดที่ 1: แยก items ตามวันรับก่อน
+  const items = alertData.items || [];
+  const byDate = {};
+  items.forEach(it => {
+    const d = it.receive_date || alertData.ref_receive || 'unknown';
+    if (!byDate[d]) byDate[d] = [];
+    byDate[d].push(it);
+  });
+
+  // ✅ เรียงวันจากน้อยไปมาก
+  const sortedDates = Object.keys(byDate).sort();
+
+  // ✅ ในแต่ละวัน → autoGroupPOItems()
+  const pos = [];
+  sortedDates.forEach(dateKey => {
+    const dayItems = byDate[dateKey];
+    const dayPOs = autoGroupPOItems(dayItems);
+    dayPOs.forEach(po => {
+      po.receive_date = dateKey;
+      pos.push(po);
+    });
+  });
 
   // เปิด PO แรก
-  $('poFormTitle').textContent = `🧾 สร้าง PO (${pos.length} ฉบับ)`;
+  $('poFormTitle').textContent = `🧾 สร้าง PO (${pos.length} ฉบับ · ${sortedDates.length} วันรับ)`;
   $('poFormBody').innerHTML = '<p>กำลังสร้าง...</p>';
   openModal('modalPOForm');
 
@@ -201,10 +367,8 @@ async function openPOFormFromAlert(alertData) {
 
 // ================= AUTO GROUP PO =================
 function autoGroupPOItems(items) {
-  // ✅ เรียงตามลำดับ Sup: EKP → MKP → SCK
   const supOrder = { EKP: 1, MKP: 2, SCK: 3 };
 
-  // ✅ ฟังก์ชันตรวจ FSC (จาก gradegram prefix)
   function isFSC(gradegram) {
     if (!gradegram) return false;
     const match = String(gradegram).match(/^([A-Z]+)/);
@@ -212,14 +376,12 @@ function autoGroupPOItems(items) {
     return match[1].includes('F');
   }
 
-  // ✅ แยกตาม Sup
   const bySup = {};
   items.forEach(it => {
     if (!bySup[it.sup]) bySup[it.sup] = [];
     bySup[it.sup].push(it);
   });
 
-  // ✅ เรียง Sup
   const sortedSups = Object.keys(bySup).sort((a, b) => (supOrder[a] || 99) - (supOrder[b] || 99));
 
   const pos = [];
@@ -227,7 +389,6 @@ function autoGroupPOItems(items) {
   sortedSups.forEach(sup => {
     const supItems = bySup[sup];
 
-    // ✅ แยก 4 กลุ่ม: FSC+ปกติ, FSC+NC, Non-FSC+ปกติ, Non-FSC+NC
     const groups = {
       fsc_normal:    supItems.filter(i => isFSC(i.gradegram) && i.quality_b === 'normal'),
       fsc_nc:        supItems.filter(i => isFSC(i.gradegram) && i.quality_b === 'nc'),
@@ -235,12 +396,10 @@ function autoGroupPOItems(items) {
       nonfsc_nc:     supItems.filter(i => !isFSC(i.gradegram) && i.quality_b === 'nc')
     };
 
-    // ✅ ลำดับ: FSC+ปกติ → FSC+NC → Non-FSC+ปกติ → Non-FSC+NC
     ['fsc_normal', 'fsc_nc', 'nonfsc_normal', 'nonfsc_nc'].forEach(grp => {
       const grpItems = groups[grp];
       if (!grpItems.length) return;
 
-      // แยกเป็น chunks ละ 15
       for (let i = 0; i < grpItems.length; i += 15) {
         const chunk = grpItems.slice(i, i + 15);
         pos.push({
@@ -261,7 +420,6 @@ function renderMultiPOForm(posList, alertData) {
 
   let html = '';
 
-  // อ้างอิง
   html += `<div class="msg info" style="margin-bottom:14px">
     <b>📋 ข้อมูลอ้างอิงจาก Alert</b><br>
     วันที่วิเคราะห์: <b>${analyzedDate}</b> (ล็อก)<br>
@@ -269,7 +427,7 @@ function renderMultiPOForm(posList, alertData) {
   </div>`;
 
   html += `<div class="msg warn" style="margin-bottom:14px">
-    ⚠️ ระบบแยกเป็น <b>${posList.length} PO</b> ตามเงื่อนไข (Sup + กลุ่ม + 15 รายการ/PO)
+    ⚠️ ระบบแยกเป็น <b>${posList.length} PO</b> ตามเงื่อนไข (วันรับ + Sup + กลุ่ม + 15 รายการ/PO)
   </div>`;
 
   posList.forEach((po, idx) => {
@@ -284,6 +442,7 @@ function renderMultiPOForm(posList, alertData) {
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <div>
           <b>PO #${idx + 1}</b> · Sup: <b>${esc(po.sup_code)}</b> · ${groupLabel} · ${po.items.length} รายการ
+          ${po.receive_date ? `<br><span style="color:#1e40af;font-size:12px">📅 วันที่รับ: <b>${fmtDateTH(po.receive_date)}</b></span>` : ''}
         </div>
         <div>
           PO No.: <input type="text" class="po-input-po-no" value="" placeholder="auto" style="width:150px">
@@ -312,7 +471,6 @@ function renderMultiPOForm(posList, alertData) {
       const custLabel = { normal: 'ปกติ', pump_f: 'ปั้ม F', pump_bt: 'ปั้ม BT', pump_ktp: 'ปั้ม KTP' }[it.customer_roll] || it.customer_roll;
       const qualLabel = { normal: 'ปกติ', nc: 'NC' }[it.quality_b] || it.quality_b;
 
-      // ✅ คำนวณ KG จาก std_weight
       const kgTotal = calcKgTotal(it.gradegram, it.size, it.quantity);
 
       html += `<tr data-gradegram="${esc(it.gradegram)}" data-size="${it.size}">
@@ -321,7 +479,7 @@ function renderMultiPOForm(posList, alertData) {
         <td>${esc(it.gradegram)}</td>
         <td>${it.size}</td>
         <td>${it.quantity}</td>
-        <td>${kgTotal.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+        <td>${kgTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
         <td>${price.toFixed(2)}</td>
         <td>${custLabel}</td>
         <td>${qualLabel}</td>
@@ -334,10 +492,9 @@ function renderMultiPOForm(posList, alertData) {
 
   html += `<div class="form-actions" style="margin-top:16px">
     <button onclick="cancelPOForm()">ยกเลิก</button>
-    <button class="primary" onclick="saveAllPOs()">💾 บันทึกทั้งหมด</button>
+    <button class="primary" onclick="saveAllPOs(this)">💾 บันทึกทั้งหมด</button>
   </div>`;
 
-  // เก็บข้อมูลไว้ใช้ตอน save
   window._pendingPOs = posList;
   window._pendingAlertData = alertData;
 
@@ -345,7 +502,7 @@ function renderMultiPOForm(posList, alertData) {
 }
 
 // ================= SAVE ALL POs =================
-async function saveAllPOs() {
+async function saveAllPOs(btnEl) {
   const posList = window._pendingPOs || [];
   const alertData = window._pendingAlertData || {};
 
@@ -354,11 +511,53 @@ async function saveAllPOs() {
     return;
   }
 
-  if (!confirm(`ยืนยันบันทึก ${posList.length} PO?`)) return;
+  // ✅ จุดที่ 7: ถ้า poEditingId มีค่า → เป็นการแก้ไข PO เดิม → ต้อง verify
+  if (poEditingId) {
+    const po = poCache.find(p => p.id === poEditingId);
+    if (po && (po.status === 'saved' || po.status === 'sent')) {
+      const username = (currentUser?.email || '').split('@')[0] || '';
+      openVerifyModal({
+        username,
+        title: `🔒 ยืนยันการบันทึก PO ${po.po_no}`,
+        message: 'PO นี้ Saved แล้ว — ต้องยืนยันรหัสผ่าน + หมายเหตุ',
+        onConfirm: async (password, note) => {
+          const res = await callAdmin('verifyPassword', { username, password });
+          if (!res || !res.ok) {
+            return { ok: false, error: res?.error || 'รหัสผ่านไม่ถูกต้อง' };
+          }
+          // ✅ log (ไม่ throw ถ้าตารางไม่มี)
+          try {
+            await supabase.from('po_change_log').insert({
+              po_id: po.id,
+              changed_by: currentUser?.id,
+              action: 'save_verified',
+              note: note
+            });
+          } catch (logErr) {
+            console.warn('po_change_log insert failed:', logErr);
+          }
+          // ✅ ผ่าน → ดำเนินการ save ต่อ
+          await _doSaveAllPOs(posList, alertData, btnEl);
+          return { ok: true };
+        }
+      });
+      return;
+    }
+  }
 
-  const btn = event.target;
-  btn.disabled = true;
-  btn.textContent = 'กำลังบันทึก...';
+  // ✅ draft ธรรมดา → ไม่ต้อง verify
+  if (!confirm(`ยืนยันบันทึก ${posList.length} PO?`)) return;
+  await _doSaveAllPOs(posList, alertData, btnEl);
+}
+
+// ✅ แยกออกมาเป็นฟังก์ชัน
+async function _doSaveAllPOs(posList, alertData, btnEl) {
+  // ✅ ใช้ btnEl ที่ส่งมา ถ้าไม่มีค่อย fallback
+  const btn = btnEl || document.querySelector('#modalPOForm .form-actions .primary');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'กำลังบันทึก...';
+  }
 
   let successCount = 0;
   let errorMsg = '';
@@ -379,7 +578,7 @@ async function saveAllPOs() {
       if (errNext) throw errNext;
       poNo = nextNo;
     } catch (e) {
-      errorMsg += `PO #${i+1}: ${e.message}; `;
+      errorMsg += `PO #${i + 1}: ${e.message}; `;
       continue;
     }
 
@@ -399,7 +598,7 @@ async function saveAllPOs() {
         size: it.size,
         gradegram_size: it.gradegram_size,
         quantity: it.quantity,
-        kg_total: calcKgTotal(it.gradegram, it.size, it.quantity),   // ✅ ใช้ std_weight
+        kg_total: calcKgTotal(it.gradegram, it.size, it.quantity),
         price: price,
         customer_roll: it.customer_roll || 'normal',
         quality_b: it.quality_b || 'normal',
@@ -408,15 +607,15 @@ async function saveAllPOs() {
       };
     });
 
-    // ✅ header
+    // ✅ จุดที่ 3: header — po_date = analyzed_date, ref_receive = วันที่รับของ PO นั้น
     const header = {
       po_no: poNo,
-      po_date: toISODate(new Date()),
+      po_date: alertData.analyzed_date || toISODate(new Date()),
       sup_code: po.sup_code,
       status: 'draft',
       ref_snapshot: alertData.ref_snapshot,
       ref_stock: alertData.ref_stock,
-      ref_receive: alertData.ref_receive,
+      ref_receive: po.receive_date || alertData.ref_receive,
       remark: '',
       created_by: currentUser?.id
     };
@@ -429,12 +628,14 @@ async function saveAllPOs() {
       if (error) throw error;
       successCount++;
     } catch (e) {
-      errorMsg += `PO #${i+1}: ${e.message}; `;
+      errorMsg += `PO #${i + 1}: ${e.message}; `;
     }
   }
 
-  btn.disabled = false;
-  btn.textContent = '💾 บันทึกทั้งหมด';
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = '💾 บันทึกทั้งหมด';
+  }
 
   if (errorMsg) {
     alert(`✅ สำเร็จ ${successCount}/${posList.length}\n❌ Error: ${errorMsg}`);
@@ -444,13 +645,11 @@ async function saveAllPOs() {
 
   closeModal('modalPOForm');
 
-  // ✅ ไปหน้า PO List
   const poBtn = document.querySelector('.nav button[data-tab="purchase-order"]');
   if (poBtn) poBtn.click();
 
   await renderPOList();
 
-  // ล้าง pending
   window._pendingPOs = null;
   window._pendingAlertData = null;
 }
@@ -464,7 +663,7 @@ function renderPOFormContent(header, items) {
 
   let html = `<div class="msg info" style="margin-bottom:14px">
     <b>${esc(header.po_no)}</b> · Sup: <b>${esc(header.sup_code)}</b><br>
-    วันที่: ${header.po_date || '-'} · สถานะ: <b>${header.status}</b>
+    วันที่ออก: ${fmtDateTH(header.po_date)} · วันที่รับ: <b>${fmtDateTH(header.ref_receive)}</b> · สถานะ: <b>${header.status}</b>
   </div>`;
 
   html += `<div class="po-form-group">
@@ -527,7 +726,6 @@ async function onPOItemEdit(itemId, field, value) {
       p_user_id: currentUser?.id
     });
     if (error) throw error;
-    // ✅ Silent success
   } catch (e) {
     alert('❌ ' + e.message);
   }
@@ -550,7 +748,6 @@ async function cancelPOItem(itemId) {
     });
     if (error) throw error;
 
-    // Reload PO detail
     const poId = poEditingId;
     if (poId) {
       const { data } = await supabase.rpc('get_purchase_order_detail', { p_po_id: poId });
@@ -584,15 +781,13 @@ async function openPODetail(poId) {
       sent:  '<span class="badge" style="background:#dbeafe;color:#1e40af">📤 Sent</span>'
     }[header.status] || header.status;
 
-    // Header
     let html = `<div class="msg info" style="margin-bottom:14px">
       <b>${esc(header.po_no)}</b> · ${statusBadge}<br>
-      วันที่: <b>${header.po_date || '-'}</b> · Sup: <b>${esc(header.sup_code)}</b><br>
+      วันที่ออก: <b>${fmtDateTH(header.po_date)}</b> · วันที่รับ: <b>${fmtDateTH(header.ref_receive)}</b> · Sup: <b>${esc(header.sup_code)}</b><br>
       อ้างอิง: Stock Level <b>${header.ref_snapshot || '-'}</b> · Stock <b>${header.ref_stock || '-'}</b> · Receive <b>${header.ref_receive || '-'}</b><br>
       รวม: <b>${header.total_items || 0}</b> รายการ · <b>${Number(header.total_kg || 0).toLocaleString()}</b> kg
     </div>`;
 
-    // Items
     html += '<h4>📦 รายการ</h4>';
     html += '<div class="data-scroll"><table class="data-table"><thead><tr>';
     html += '<th>#</th><th>PC.</th><th>Gradegram</th><th>Size</th><th>Qty</th><th>KG รวม</th>';
@@ -624,7 +819,6 @@ async function openPODetail(poId) {
 
     html += '</tbody></table></div>';
 
-    // Logs
     if (logs.length) {
       html += '<h4 style="margin-top:16px">📜 ประวัติการแก้ไข</h4>';
       html += '<div class="data-scroll" style="max-height:200px"><table class="data-table"><thead><tr>';
@@ -654,7 +848,6 @@ async function deletePO(poId) {
 
   let password = null;
 
-  // ✅ ถ้า status = saved → ขอรหัสผ่าน
   if (po.status === 'saved' || po.status === 'sent') {
     password = prompt(`🔒 PO นี้สถานะ ${po.status.toUpperCase()}\nกรุณาใส่รหัสผ่านเพื่อยืนยัน:`);
     if (!password) return;
@@ -691,14 +884,11 @@ async function onPOMonthChange() {
 
 // ================= CANCEL PO FORM =================
 function cancelPOForm() {
-  // ✅ ปิด modal
   closeModal('modalPOForm');
 
-  // ✅ ล้าง pending
   window._pendingPOs = null;
   window._pendingAlertData = null;
 
-  // ✅ กลับไป Tab Alert
   const alertBtn = document.querySelector('.nav button[data-tab="alert"]');
   if (alertBtn) alertBtn.click();
 }
@@ -712,7 +902,6 @@ function exportPOToExcel() {
 
   if (!confirm(`Export ${poCache.length} PO เป็น Excel?`)) return;
 
-  // ✅ ดึง items ของทุก PO
   exportPOToExcel_Async();
 }
 
@@ -746,17 +935,14 @@ async function exportPOToExcel_Async() {
       return;
     }
 
-    // ✅ สร้าง Sheet
     const wsData = [];
 
-    // Header row
     wsData.push([
       'PC.', 'SUP.', 'Gradegram', 'Size', 'Gradegram-Size',
       'Quantity', 'KG. รวม', 'BU', 'Department', 'Price', 'หมายเหตุ', 'เลขที่ PO'
     ]);
 
-    // Data rows
-    posWithItems.forEach((p, poIdx) => {
+    posWithItems.forEach((p) => {
       p.items.forEach((it, itemIdx) => {
         const custLabel = { normal: '', pump_f: 'ปั้ม F', pump_bt: 'ปั้ม BT', pump_ktp: 'ปั้ม KTP' }[it.customer_roll] || '';
         const qualLabel = { normal: '', nc: 'NC' }[it.quality_b] || '';
@@ -775,37 +961,30 @@ async function exportPOToExcel_Async() {
           '13110',
           Number(it.price || 0),
           remarkCombined,
-          itemIdx === 0 ? p.po.po_no : ''   // ✅ แค่บรรทัดแรก
+          itemIdx === 0 ? p.po.po_no : ''
         ]);
       });
     });
 
-    // สร้าง Worksheet
     const ws = XLSX.utils.aoa_to_sheet(wsData);
 
-    // ✅ กำหนด column widths
     ws['!cols'] = [
       { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 6 }, { wch: 16 },
       { wch: 10 }, { wch: 12 }, { wch: 5 }, { wch: 12 }, { wch: 10 },
       { wch: 40 }, { wch: 16 }
     ];
 
-    // ✅ Number format
     const range = XLSX.utils.decode_range(ws['!ref']);
     for (let R = 1; R <= range.e.r; R++) {
-      // KG. รวม (col 6)
       const kgCell = ws[XLSX.utils.encode_cell({ r: R, c: 6 })];
       if (kgCell) kgCell.z = '#,##0.00';
-      // Price (col 9)
       const pCell = ws[XLSX.utils.encode_cell({ r: R, c: 9 })];
       if (pCell) pCell.z = '0.00';
     }
 
-    // ✅ สร้าง Workbook
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'PO');
 
-    // ✅ ดาวน์โหลด
     const month = poSelectedMonth || new Date().toISOString().slice(0, 7);
     XLSX.writeFile(wb, `PO_${month}.xlsx`);
 
