@@ -1,13 +1,10 @@
 // ═══════════════════════════════════════════════════════════════
-// STOCK V6 — receive.js (V8 - Tab + Auto-fetch PO)
+// STOCK V6 — receive.js (V9 - Auto-fetch from PO, ไม่มี Tab)
 // ═══════════════════════════════════════════════════════════════
 
 let receiveSelectedGrades = [];
 let receiveAllGrades = [];
 let receiveCache = [];
-
-// ✅ Tab state (1 = รายการรับเข้า, 2 = ประวัติ PO ที่ถูกลบ)
-let receiveActiveTab = 1;
 
 // ✅ Helper: ฟอร์แมตตัวเลข KG → 0,000,000.00
 function fmtKg(n) {
@@ -32,37 +29,8 @@ async function initReceiveTab() {
   const dateInput = $('receiveDate');
   if (dateInput && !dateInput.value) dateInput.value = toISODate(new Date());
   await loadReceiveGradeFilter();
-  receiveActiveTab = 1;
-  renderReceiveTabs();
+  // ✅ Auto-fetch ทันทีที่เข้า Tab
   await renderReceive();
-}
-
-// ✅ สลับ Tab
-function switchReceiveTab(tabNum) {
-  receiveActiveTab = tabNum;
-  renderReceiveTabs();
-  // ✅ ซ่อน/แสดง Filter ตาม Tab
-  const filterBox = $('receiveFilterBox');
-  if (filterBox) filterBox.style.display = (tabNum === 1) ? '' : 'none';
-  if (tabNum === 1) {
-    renderReceive();
-  } else {
-    renderDeletedPOList();
-  }
-}
-
-// ✅ Render Tab bar
-function renderReceiveTabs() {
-  const box = $('receiveTabsBox');
-  if (!box) return;
-  box.innerHTML = `
-    <button type="button" class="receive-tab ${receiveActiveTab === 1 ? 'active' : ''}" onclick="switchReceiveTab(1)">
-      📥 รายการรับเข้า
-    </button>
-    <button type="button" class="receive-tab ${receiveActiveTab === 2 ? 'active' : ''}" onclick="switchReceiveTab(2)">
-      📜 ประวัติ PO ที่ถูกลบ
-    </button>
-  `;
 }
 
 // ================= GRADE FILTER =================
@@ -201,12 +169,10 @@ async function renderReceive() {
     if (!existCount || existCount === 0) {
       const fetchResult = await fetchFromPO(receiveDate, { silent: true });
       if (!fetchResult.ok) {
-        // ถ้า fetch ไม่สำเร็จ หรือไม่มี PO → แสดงข้อความ (ไม่ error)
         if (fetchResult.reason === 'no_po') {
           $('receiveBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่พบ PO ของวันนี้ — ไม่มีข้อมูลให้แสดง</p>';
           return;
         }
-        // error อื่น → แสดง error
         throw new Error(fetchResult.error || 'ดึงจาก PO ไม่สำเร็จ');
       }
     }
@@ -342,134 +308,6 @@ async function refreshFromPO() {
   }
 
   await renderReceive();
-}
-
-// ================= ประวัติ PO ที่ถูกลบ =================
-async function renderDeletedPOList() {
-  const listEl = $('receiveBody');
-  if (!listEl) return;
-  listEl.innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
-
-  $('receiveReportTitle').innerHTML = `📜 ประวัติ PO ที่ถูกลบ`;
-
-  try {
-    const { data, error } = await supabase
-      .from('purchase_orders')
-      .select('id, po_no, po_date, ref_receive, sup_code, total_items, total_kg, status, deleted_at, deleted_by, delete_note')
-      .not('deleted_at', 'is', null)
-      .order('deleted_at', { ascending: false });
-
-    if (error) throw error;
-
-    if (!data || !data.length) {
-      listEl.innerHTML = '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่มีประวัติ PO ที่ถูกลบ 🎉</p>';
-      return;
-    }
-
-    let html = '<div class="data-scroll"><table class="data-table"><thead><tr>';
-    html += '<th>PO No.</th><th>วันที่ออก</th><th>วันที่รับ</th><th>Sup.</th><th>จำนวน</th><th>KG รวม</th><th>วันที่ลบ</th><th>หมายเหตุ</th><th></th>';
-    html += '</tr></thead><tbody>';
-
-    data.forEach(po => {
-      html += `<tr>
-        <td><b>${esc(po.po_no)}</b></td>
-        <td>${fmtDateThai(po.po_date)}</td>
-        <td>${fmtDateThai(po.ref_receive)}</td>
-        <td>${esc(po.sup_code)}</td>
-        <td style="text-align:right">${po.total_items || 0}</td>
-        <td style="text-align:right">${fmtKg(po.total_kg)}</td>
-        <td>${po.deleted_at ? new Date(po.deleted_at).toLocaleString('th-TH') : '-'}</td>
-        <td>${esc(po.delete_note) || '-'}</td>
-        <td>
-          <button onclick="openDeletedPODetail('${po.id}')">📄 ดูรายละเอียด</button>
-        </td>
-      </tr>`;
-    });
-
-    html += '</tbody></table></div>';
-    html += `<div class="report-foot" style="margin-top:8px">
-      แสดง ${data.length} รายการ · คลิก "ดูรายละเอียด" เพื่อดูข้อมูลทั้งหมด
-    </div>`;
-
-    listEl.innerHTML = html;
-  } catch (e) {
-    console.error('renderDeletedPOList:', e);
-    listEl.innerHTML = `<div class="msg err">โหลดไม่สำเร็จ: ${esc(e.message)}</div>`;
-  }
-}
-
-// ✅ เปิด Modal ประวัติ PO
-async function openDeletedPODetail(poId) {
-  $('receiveDetailTitle').textContent = '📄 รายละเอียด PO ที่ถูกลบ';
-  openModal('modalReceiveDetail');
-  $('receiveDetailBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
-
-  try {
-    const { data, error } = await supabase.rpc('get_purchase_order_detail', { p_po_id: poId });
-    if (error) throw error;
-
-    const header = data.header || {};
-    const items = data.items || [];
-    const logs = data.logs || [];
-
-    $('receiveDetailTitle').innerHTML = `📄 ${esc(header.po_no)} · ${esc(header.sup_code)} <span style="color:#dc2626;font-weight:400;font-size:14px">(ถูกลบ)</span>`;
-
-    // ✅ Header
-    let html = `<div class="msg err" style="margin-bottom:14px">
-      <b>⚠️ PO นี้ถูกลบแล้ว</b><br>
-      <b>PO No.:</b> ${esc(header.po_no)}<br>
-      <b>วันที่ออก:</b> ${fmtDateThai(header.po_date)} · 
-      <b>วันที่รับ:</b> ${fmtDateThai(header.ref_receive)}<br>
-      <b>Sup.:</b> ${esc(header.sup_code)} · 
-      <b>รวม:</b> ${header.total_items || 0} รายการ · ${fmtKg(header.total_kg)} kg<br>
-      <b>ลบเมื่อ:</b> ${header.deleted_at ? new Date(header.deleted_at).toLocaleString('th-TH') : '-'}<br>
-      <b>หมายเหตุการลบ:</b> ${esc(header.delete_note) || '-'}
-    </div>`;
-
-    // ✅ Items
-    html += '<h4>📦 รายการ</h4>';
-    html += '<div class="data-scroll"><table class="data-table"><thead><tr>';
-    html += '<th>#</th><th>PC.</th><th>Gradegram</th><th>Size</th><th>Qty</th><th>KG รวม</th><th>Price</th><th>หมายเหตุ</th>';
-    html += '</tr></thead><tbody>';
-
-    items.forEach((it, i) => {
-      const isCancelled = it.status === 'cancelled';
-      const rowStyle = isCancelled ? 'style="opacity:0.5;text-decoration:line-through"' : '';
-      html += `<tr ${rowStyle}>
-        <td>${i + 1}</td>
-        <td>${esc(it.pc_code) || 'SDPC.01'}</td>
-        <td><b>${esc(it.gradegram)}</b></td>
-        <td>${it.size}</td>
-        <td style="text-align:right">${it.quantity}</td>
-        <td style="text-align:right">${fmtKg(it.kg_total)}</td>
-        <td style="text-align:right">${Number(it.price || 0).toFixed(2)}</td>
-        <td>${esc(it.remark_combined || it.note) || '-'}</td>
-      </tr>`;
-    });
-
-    html += '</tbody></table></div>';
-
-    // ✅ Logs
-    if (logs.length) {
-      html += '<h4 style="margin-top:16px">📜 ประวัติการแก้ไข</h4>';
-      html += '<div class="data-scroll" style="max-height:300px"><table class="data-table"><thead><tr>';
-      html += '<th>วันที่</th><th>การกระทำ</th><th>รายการ</th><th>หมายเหตุ</th>';
-      html += '</tr></thead><tbody>';
-      logs.forEach(l => {
-        html += `<tr>
-          <td>${new Date(l.changed_at).toLocaleString('th-TH')}</td>
-          <td>${esc(l.action)}</td>
-          <td>${esc(l.field_name || '-')}</td>
-          <td>${esc(l.note || '-')}</td>
-        </tr>`;
-      });
-      html += '</tbody></table></div>';
-    }
-
-    $('receiveDetailBody').innerHTML = html;
-  } catch (e) {
-    $('receiveDetailBody').innerHTML = `<div class="msg err">${esc(e.message)}</div>`;
-  }
 }
 
 // ================= MATRIX =================
@@ -642,9 +480,7 @@ function exportReceive() {
     return;
   }
   const receiveDate = $('receiveDate')?.value || '';
-  const dateThai = receiveDate ? thaiDateFull(receiveDate) : '';
 
-  // สรุป Supplier
   const supMap = {};
   receiveCache.forEach(r => {
     const sup = r.supplier || '(ไม่ระบุ)';
@@ -700,6 +536,5 @@ function exportReceive() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ⚠️ IMPORT RECEIVE — ถูกลบตาม patch
-// (importReceive, openReceiveImportModal)
+// ✅ จบ receive.js — ประวัติ PO ย้ายไป purchase-order.js
 // ═══════════════════════════════════════════════════════════════
