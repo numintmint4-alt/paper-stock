@@ -41,6 +41,9 @@ async function initReceiveTab() {
 function switchReceiveTab(tabNum) {
   receiveActiveTab = tabNum;
   renderReceiveTabs();
+  // ✅ ซ่อน/แสดง Filter ตาม Tab
+  const filterBox = $('receiveFilterBox');
+  if (filterBox) filterBox.style.display = (tabNum === 1) ? '' : 'none';
   if (tabNum === 1) {
     renderReceive();
   } else {
