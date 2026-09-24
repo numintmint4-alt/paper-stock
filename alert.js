@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// STOCK V8 — alert.js (Flat Table + Filter + PO + Lock Date + FSC + History)
+// STOCK V8 — alert.js (Flat Table + Filter + PO + Lock Date + FSC + History + Lock)
 // ═══════════════════════════════════════════════════════════════
 
 let alertSelectedGrades = [];
@@ -50,6 +50,41 @@ function getAlertLSKey(dateIdx = alertActiveDateIdx) {
   return `${ALERT_LS_KEY_PREFIX}${dateIdx + 1}`;
 }
 
+// ================= DATE HELPERS =================
+
+// ✅ คำนวณ Stock วันที่ = analyzed − 1 (ถ้าอาทิตย์ → ถอยอีก 1)
+function calcStockDate(analyzedDate) {
+  if (!analyzedDate) return '';
+  const d = new Date(analyzedDate);
+  d.setDate(d.getDate() - 1);            // ถอย 1 วัน
+  if (d.getDay() === 0) {                // ถ้าเป็นอาทิตย์ (0)
+    d.setDate(d.getDate() - 1);          // ถอยอีก 1
+  }
+  return toISODate(d);
+}
+
+// ✅ Receive วันที่ = analyzed
+function calcReceiveDate(analyzedDate) {
+  return analyzedDate || '';
+}
+
+// ✅ Stock Level เดือน = เดือนของ analyzed
+function calcSnapshotMonth(analyzedDate) {
+  if (!analyzedDate) return '';
+  const d = new Date(analyzedDate);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+}
+
+// ✅ แปลงวันที่เป็น DD/MM/YYYY (พ.ศ.)
+function fmtDateThai(d) {
+  if (!d) return '-';
+  const dObj = new Date(d);
+  const dd = String(dObj.getDate()).padStart(2, '0');
+  const mm = String(dObj.getMonth() + 1).padStart(2, '0');
+  const yyyy = dObj.getFullYear() + 543;
+  return `${dd}/${mm}/${yyyy}`;
+}
+
 // ✅ เก็บ items รอไว้ก่อนยืนยัน PO
 let _pendingPOItems = [];
 
@@ -57,26 +92,51 @@ let _pendingPOItems = [];
 async function initAlertTab() {
   const today = toISODate(new Date());
 
-  // ✅ ปลดล็อกวันที่วิเคราะห์ — default = วันนี้
+  // ✅ ตั้งวันที่วิเคราะห์ (default = วันนี้)
   const alertDateEl = $('alertDate');
-  if (alertDateEl) {
-    if (!alertDateEl.value) alertDateEl.value = today;
-    alertDateEl.disabled = false;                     // ✅ ปลดล็อก
-    alertDateEl.style.background = '';                // ✅ รีเซ็ต
-    alertDateEl.style.cursor = '';
-  }
+  if (alertDateEl && !alertDateEl.value) alertDateEl.value = today;
 
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  if ($('alertStockDate') && !$('alertStockDate').value) $('alertStockDate').value = toISODate(yesterday);
-  if ($('alertReceiveDate') && !$('alertReceiveDate').value) $('alertReceiveDate').value = today;
+  // ✅ Auto-calculate dates
+  applyCalculatedDates($('alertDate')?.value || today);
+
+  // ✅ ผูก event listener
+  attachAlertDateListener();
 
   await loadAlertSuppliers();
   await loadSnapshotMonths();
   await loadAlertGradeFilter();
   loadAlertFilter();
   initAlertReceiveDates();
-  await renderAlert();
+
+  // ✅ Auto-analyze หรือโหลด snapshot
+  await onAlertDateChange();
+}
+
+// ✅ คำนวณ + set dates อัตโนมัติ
+function applyCalculatedDates(analyzedDate) {
+  if (!analyzedDate) return;
+
+  const stockDate = calcStockDate(analyzedDate);
+  const receiveDate = calcReceiveDate(analyzedDate);
+  const snapshotMonth = calcSnapshotMonth(analyzedDate);
+
+  if ($('alertStockDate')) $('alertStockDate').value = stockDate;
+  if ($('alertReceiveDate')) $('alertReceiveDate').value = receiveDate;
+  if ($('alertSnapshotMonth') && !$('alertSnapshotMonth').value) {
+    $('alertSnapshotMonth').value = snapshotMonth;
+  }
+}
+
+// ✅ ผูก event listener กับ alertDate (ครั้งเดียว)
+function attachAlertDateListener() {
+  const el = $('alertDate');
+  if (el && el.dataset.listenerAttached !== '1') {
+    el.dataset.listenerAttached = '1';
+    el.addEventListener('change', () => {
+      applyCalculatedDates(el.value);
+      onAlertDateChange();
+    });
+  }
 }
 
 // ================= ALERT HISTORY =================
@@ -160,36 +220,98 @@ async function loadAlertSnapshot(analyzedDate) {
   }
 }
 
-// ✅ เปลี่ยนวันที่วิเคราะห์ → โหลด snapshot
+// ✅ เปลี่ยนวันที่วิเคราะห์ → โหลด snapshot / auto-analyze + lock
 async function onAlertDateChange() {
   const analyzedDate = $('alertDate')?.value;
   if (!analyzedDate) return;
 
-  // ✅ Clear ตารางปัจจุบัน
-  $('alertBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด snapshot...</p>';
+  // ✅ Lock/Unlock UI ตามว่ามี snapshot หรือไม่
+  $('alertBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
 
-  // ✅ โหลด snapshot ของวันนั้น
+  // ✅ โหลด snapshot
   const snapshot = await loadAlertSnapshot(analyzedDate);
 
-  if (!snapshot) {
-    // ✅ ไม่มีข้อมูล → ปล่อยโล่ง
-    $('alertBody').innerHTML = `
-      <div class="msg info" style="text-align:center;padding:30px">
-        📭 ยังไม่มีข้อมูลของวันที่ ${analyzedDate}<br>
-        <span style="font-size:13px;color:#64748b">กด "🔍 วิเคราะห์" เพื่อสร้างข้อมูลใหม่</span>
-      </div>`;
-    alertCache = [];
-    return;
+  if (snapshot) {
+    // ✅ มี snapshot → แสดงผล + ล็อก
+    await applyAlertSnapshot(snapshot);
+    setAlertLocked(true, analyzedDate);
+  } else {
+    // ✅ ไม่มี snapshot → auto-analyze
+    setAlertLocked(false);
+    await autoAnalyzeAlert();
   }
+}
 
-  // ✅ มีข้อมูล → โหลดค่ากลับ
-  await applyAlertSnapshot(snapshot);
+// ✅ Auto-analyze (เรียก renderAlert ปกติ)
+async function autoAnalyzeAlert() {
+  // ✅ Reset ค่าที่กรอกไว้ (ของวันใหม่)
+  await renderAlert();
+}
+
+// ✅ ล็อก/ปลดล็อก UI
+function setAlertLocked(locked, analyzedDate) {
+  const lockBanner = $('alertLockBanner');
+  const body = $('alertBody');
+
+  if (locked) {
+    // ✅ แสดง banner
+    if (lockBanner) {
+      lockBanner.innerHTML = `🔒 ข้อมูลวันที่ <b>${fmtDateThai(analyzedDate)}</b> — สร้าง PO แล้ว ดูได้อย่างเดียว`;
+      lockBanner.classList.remove('hidden');
+    }
+
+    // ✅ เพิ่ม class locked
+    if (body) body.classList.add('alert-locked');
+
+    // ✅ Disable วันที่ + filter
+    ['alertDate', 'alertStockDate', 'alertReceiveDate', 'alertSnapshotMonth', 'alertIncludeCustomer'].forEach(id => {
+      const el = $(id);
+      if (el) el.disabled = true;
+    });
+
+    // ✅ Disable ปุ่ม
+    document.querySelectorAll('[onclick*="createPOFromAlert"], [onclick*="clearAlertInputs"]').forEach(btn => {
+      btn.disabled = true;
+      btn.style.opacity = '0.4';
+      btn.style.cursor = 'not-allowed';
+    });
+
+  } else {
+    // ✅ ซ่อน banner
+    if (lockBanner) lockBanner.classList.add('hidden');
+
+    // ✅ Remove class
+    if (body) body.classList.remove('alert-locked');
+
+    // ✅ Enable วันที่ (ยกเว้น Stock + Receive — คำนวณอัตโนมัติ)
+    ['alertDate', 'alertIncludeCustomer'].forEach(id => {
+      const el = $(id);
+      if (el) el.disabled = false;
+    });
+
+    // ✅ Stock วันที่ + Receive วันที่ — ล็อกเสมอ (คำนวณอัตโนมัติ)
+    ['alertStockDate', 'alertReceiveDate'].forEach(id => {
+      const el = $(id);
+      if (el) {
+        el.disabled = true;
+        el.style.background = '#f1f5f9';
+        el.style.cursor = 'not-allowed';
+      }
+    });
+
+    // ✅ Enable ปุ่ม
+    document.querySelectorAll('[onclick*="createPOFromAlert"], [onclick*="clearAlertInputs"]').forEach(btn => {
+      btn.disabled = false;
+      btn.style.opacity = '';
+      btn.style.cursor = '';
+    });
+  }
 }
 
 // ✅ Apply snapshot → แสดงผล + คืนค่า inputs
 async function applyAlertSnapshot(snapshot) {
   try {
-    // ✅ คืนค่า filter ต่างๆ
+    // ✅ Set ค่าตาม snapshot (ไม่ต้องแก้ — แค่ set ค่า)
     if (snapshot.snapshot_month) $('alertSnapshotMonth').value = snapshot.snapshot_month;
     if (snapshot.stock_date)     $('alertStockDate').value = snapshot.stock_date;
     if (snapshot.receive_date)   $('alertReceiveDate').value = snapshot.receive_date;
@@ -1393,12 +1515,3 @@ function exportAlert() {
   XLSX.utils.book_append_sheet(wb, ws, 'Alert');
   XLSX.writeFile(wb, `alert_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
-
-// ================= ATTACH EVENT LISTENERS (ครั้งเดียว) =================
-(function attachAlertDateListener() {
-  const el = $('alertDate');
-  if (el && !el.dataset.listenerAttached) {
-    el.dataset.listenerAttached = '1';
-    el.addEventListener('change', onAlertDateChange);
-  }
-})();
