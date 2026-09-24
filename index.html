@@ -273,7 +273,11 @@
           <div class="report-doc">FQ-ษ6-06-07 rev.01</div>
         </div>
 
-        <div class="filters no-print">
+        <!-- ✅ Tab bar: รายการรับเข้า / ประวัติ PO ที่ถูกลบ -->
+        <div class="receive-tabs" id="receiveTabsBox"></div>
+
+        <!-- ✅ Filter (แสดงเฉพาะ Tab 1) -->
+        <div class="filters no-print" id="receiveFilterBox">
           <label>📅 วันที่รับเข้า <input type="date" id="receiveDate"></label>
 
           <label class="grade-filter-wrap">
@@ -328,8 +332,7 @@
           </label>
 
           <button class="primary" onclick="renderReceive()">🔍 ค้นหา</button>
-          <button class="admin-only" onclick="openReceiveImportModal()">📥 Import Excel</button>
-          <input type="file" id="fileReceive" accept=".xlsx,.xls" class="hidden" onchange="importReceive(event)">
+          <button class="primary" onclick="refreshFromPO()">🔄 รีเฟรชจาก PO</button>
           <button onclick="exportReceive()">📤 Export Excel</button>
           <button onclick="window.print()">🖨 พิมพ์ (A4 แนวนอน)</button>
         </div>
@@ -609,21 +612,6 @@
   </div>
 </div>
 
-<div class="modal-bg" id="modalReceiveImport">
-  <div class="modal" style="max-width:480px">
-    <h3>📥 Import Roll Receive</h3>
-    <div id="receiveImportError"></div>
-    <div class="form-grid" style="grid-template-columns:1fr">
-      <label>วันที่รับเข้า <input type="date" id="receiveImportDate"></label>
-    </div>
-    <div class="hint">ค่าเริ่มต้น = วันนี้</div>
-    <div class="form-actions">
-      <button onclick="closeModal('modalReceiveImport')">ยกเลิก</button>
-      <button class="primary" onclick="document.getElementById('fileReceive').click()">เลือกไฟล์ Excel</button>
-    </div>
-  </div>
-</div>
-
 <div class="modal-bg" id="modalReceiveDetail">
   <div class="modal" style="max-width:1000px">
     <div class="modal-head">
@@ -749,7 +737,7 @@
   </div>
 </div>
 
-<!-- ==================== MODAL VERIFY PASSWORD (NEW) ==================== -->
+<!-- ==================== MODAL VERIFY PASSWORD ==================== -->
 <div class="modal-bg" id="modalVerifyPassword">
   <div class="modal" style="max-width:520px">
     <div class="modal-head">
