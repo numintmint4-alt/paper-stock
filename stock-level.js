@@ -558,11 +558,16 @@ async function saveStockLevelSnapshot() {
     finalTitle = `${title}/${n}`;
   }
 
+  // ✅ ใช้เดือนของ Title เป็น months (ไม่ใช่ selectedMonths ที่เป็นเดือนที่คำนวณ)
+  const mEl = $('titleMonth');
+  const yEl = $('titleYear');
+  const titleMonthYM = `${Number(yEl.value) - 543}-${pad(Number(mEl.value))}`;
+
   const payload = {
     title: finalTitle,
-    months: selectedMonths,
+    months: [titleMonthYM],                          // ← ✅ เก็บแค่เดือนของ title
     mode: document.querySelector('input[name="mode"]:checked').value,
-    customer: getSelectedCustomers().join(','),  // ✅ join เป็น string
+    customer: getSelectedCustomers().join(','),
     grades: getSelectedGrades(),
     sizes: getSelectedSizes(),
     matrix_data: currentSnapshotData,
