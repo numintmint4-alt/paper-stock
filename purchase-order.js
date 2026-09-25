@@ -129,7 +129,7 @@ function getPriceFromMaster(gradegram, customerRoll, qualityB) {
   return Number(base.toFixed(2));
 }
 
-// ================= RENDER PO LIST (with column filters) =================
+// ================= RENDER PO LIST =================
 async function renderPOList() {
   const listEl = $('poListBody');
   if (!listEl) return;
@@ -1056,6 +1056,7 @@ function renderPOFormTable() {
     </div>
   </div>`;
 
+  // ✅ แก้ปุ่ม "ยกเลิก" → ใช้ closePOForm()
   html += `<div class="form-actions" style="margin-top:16px;border-top:1px solid #e2e8f0;padding-top:14px">
     <button onclick="closePOForm()">ยกเลิก</button>
     <button class="primary" onclick="saveEditPOItems(this)">💾 บันทึกการแก้ไข</button>
@@ -1137,7 +1138,7 @@ async function removeEditRow(uid) {
   }
 }
 
-// ✅ บันทึกการแก้ไข (ทั้ง old ที่เปลี่ยน + new ที่เพิ่ม)
+// ✅ บันทึกการแก้ไข
 async function saveEditPOItems(btnEl) {
   if (!poEditingId) {
     alert('ไม่พบ PO ที่กำลังแก้ไข');
@@ -1657,7 +1658,7 @@ async function exportPOToExcel_Async() {
 
     posWithItems.forEach((p) => {
       p.items.forEach((it, itemIdx) => {
-        const custLabel = { normal: '', pump_f: 'ปั๊ม F', pump_bt: 'ปั๊ม BT', pump_ktp: 'ปั๊ม KTP' }[it.customer_roll] || '';
+        const custLabel = { normal: '', pump_f: 'ปั้ม F', pump_bt: 'ปั้ม BT', pump_ktp: 'ปั้ม KTP' }[it.customer_roll] || '';
         const qualLabel = { normal: '', nc: 'NC' }[it.quality_b] || '';
         const noteParts = [custLabel, qualLabel, it.note].filter(x => x && x.trim());
         const remarkCombined = noteParts.join(',');
