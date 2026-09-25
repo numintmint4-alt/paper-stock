@@ -281,25 +281,124 @@ input:focus,select:focus {
 .filters label{font-size:13px;display:flex;gap:5px;align-items:center}
 
 /* ═══════════════════════════════════════════════════════════ */
-/* ========== GRADE FILTER ========== */
+/* ========== GRADE FILTER (checkbox) ========== */
 /* ═══════════════════════════════════════════════════════════ */
-.grade-filter-wrap{position:relative;display:flex;gap:6px;align-items:center}
-.grade-filter-box{position:relative}
-.grade-filter-btn{display:flex;justify-content:space-between;align-items:center;gap:8px;min-width:200px;padding:9px 12px;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius-md);cursor:pointer;font-size:13px;font-family:inherit;transition:var(--transition);font-weight:600}
-.grade-filter-btn:hover{background:var(--primary-soft);border-color:var(--primary)}
-.grade-filter-btn .arrow{font-size:10px;color:var(--text-muted);transition:transform .2s}
-.grade-filter-btn.open .arrow{transform:rotate(180deg)}
-.grade-filter-btn span:first-child{font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px}
+.grade-filter-wrap{
+  position: relative;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.grade-filter-box{
+  position: relative;
+}
+.grade-filter-btn{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  min-width: 200px;
+  padding: 9px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--text);
+  transition: var(--transition);
+}
+.grade-filter-btn:hover{
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--primary-dark);
+}
+.grade-filter-btn .arrow{
+  font-size: 10px;
+  color: var(--text-muted);
+  transition: transform .2s;
+}
+.grade-filter-btn.open .arrow{
+  transform: rotate(180deg);
+}
+.grade-filter-btn span:first-child{
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
+}
 
-.grade-dropdown{position:absolute;top:100%;left:0;margin-top:4px;min-width:240px;max-width:340px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);box-shadow:var(--shadow-lg);z-index:100;overflow:hidden}
-.grade-actions{display:flex;gap:6px;padding:8px;background:var(--surface-soft);border-bottom:1px solid var(--border)}
-.grade-actions button{flex:1;padding:5px 8px;font-size:12px;border-radius:var(--radius-sm);background:var(--surface);border:1px solid var(--border);cursor:pointer;font-family:inherit;font-weight:600}
-.grade-actions button:hover{background:var(--primary-soft);border-color:var(--primary);color:var(--primary)}
-.grade-list{max-height:280px;overflow-y:auto;padding:4px 0}
-.grade-list .item{display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;font-size:13px;user-select:none;transition:var(--transition)}
-.grade-list .item:hover{background:var(--surface-soft)}
-.grade-list .item input[type="checkbox"]{width:16px;height:16px;cursor:pointer;accent-color:var(--primary)}
-.grade-list .item.checked{background:var(--primary-soft);color:var(--primary);font-weight:600}
+.grade-dropdown{
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 6px;
+  min-width: 240px;
+  max-width: 340px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: 100;
+  overflow: hidden;
+}
+.grade-actions{
+  display: flex;
+  gap: 6px;
+  padding: 10px;
+  background: var(--surface-soft);
+  border-bottom: 1px solid var(--border);
+}
+.grade-actions button{
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--text);
+  transition: var(--transition);
+}
+.grade-actions button:hover{
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--primary-dark);
+}
+.grade-list{
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+.grade-list .item{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  user-select: none;
+  transition: var(--transition);
+}
+.grade-list .item:hover{
+  background: var(--primary-soft);
+}
+.grade-list .item input[type="checkbox"]{
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+.grade-list .item.checked{
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  font-weight: 700;
+}
 
 /* ═══════════════════════════════════════════════════════════ */
 /* ========== MESSAGES ========== */
@@ -339,9 +438,24 @@ input:focus,select:focus {
 /* ═══════════════════════════════════════════════════════════ */
 /* ========== TABLE (general) ========== */
 /* ═══════════════════════════════════════════════════════════ */
-table{border-collapse:collapse;width:100%;font-size:13px}
-th,td{border:1px solid var(--border);padding:8px 10px;text-align:left}
-th{background:var(--surface-soft);font-weight:700;color:var(--text)}
+table{
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+th,td{
+  border: 1px solid var(--border);
+  padding: 10px 12px;
+  text-align: left;
+}
+th{
+  background: var(--surface-soft);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
 
 /* ═══════════════════════════════════════════════════════════ */
 /* ========== REPORT / MATRIX ========== */
@@ -435,12 +549,49 @@ th{background:var(--surface-soft);font-weight:700;color:var(--text)}
 /* ═══════════════════════════════════════════════════════════ */
 /* ========== ACCORDION ========== */
 /* ═══════════════════════════════════════════════════════════ */
-.acc-item{border:1px solid var(--border);border-radius:var(--radius-md);margin-bottom:10px;overflow:hidden;background:var(--surface)}
-.acc-head{background:var(--surface-soft);padding:14px 18px;cursor:pointer;font-weight:700;display:flex;justify-content:space-between;align-items:center;user-select:none;transition:var(--transition)}
-.acc-head:hover{background:var(--primary-soft)}
-.acc-head .arrow{transition:transform .2s}
-.acc-head.open .arrow{transform:rotate(90deg)}
-.acc-body{padding:16px 18px}
+.acc-item{
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: 10px;
+  overflow: hidden;
+  transition: var(--transition);
+}
+.acc-item:hover{
+  border-color: var(--primary);
+  box-shadow: var(--shadow-sm);
+}
+.acc-head{
+  background: var(--surface-soft);
+  padding: 16px 20px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+  transition: var(--transition);
+}
+.acc-head:hover{
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+}
+.acc-head .arrow{
+  transition: transform .2s;
+  color: var(--text-muted);
+}
+.acc-head.open{
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+}
+.acc-head.open .arrow{
+  transform: rotate(90deg);
+  color: var(--primary);
+}
+.acc-body{
+  padding: 20px;
+}
 
 /* ═══════════════════════════════════════════════════════════ */
 /* ========== PROGRESS ========== */
