@@ -253,7 +253,6 @@ async function onAlertDateChange() {
     await applyAlertSnapshot(snapshot);
 
     // ✅ Lock เฉพาะเมื่อ "ข้ามวัน" แล้ว
-    // เทียบ: วันที่สร้าง snapshot < วันนี้ → lock
     const createdDate = snapshot.created_at ? toISODate(new Date(snapshot.created_at)) : null;
     const today = toISODate(new Date());
     const shouldLock = createdDate && createdDate < today;
@@ -267,7 +266,6 @@ async function onAlertDateChange() {
 
 // ✅ Auto-analyze (เรียก renderAlert ปกติ)
 async function autoAnalyzeAlert() {
-  // ✅ Reset ค่าที่กรอกไว้ (ของวันใหม่)
   await renderAlert();
 }
 
@@ -277,22 +275,18 @@ function setAlertLocked(locked, analyzedDate) {
   const body = $('alertBody');
 
   if (locked) {
-    // ✅ แสดง banner
     if (lockBanner) {
       lockBanner.innerHTML = `🔒 ข้อมูลวันที่ <b>${fmtDateThai(analyzedDate)}</b> — สร้าง PO แล้ว ดูได้อย่างเดียว`;
       lockBanner.classList.remove('hidden');
     }
 
-    // ✅ เพิ่ม class locked
     if (body) body.classList.add('alert-locked');
 
-    // ✅ Disable วันที่ + filter
     ['alertDate', 'alertStockDate', 'alertReceiveDate', 'alertSnapshotMonth', 'alertIncludeCustomer'].forEach(id => {
       const el = $(id);
       if (el) el.disabled = true;
     });
 
-    // ✅ Disable ปุ่ม
     document.querySelectorAll('[onclick*="createPOFromAlert"], [onclick*="clearAlertInputs"]').forEach(btn => {
       btn.disabled = true;
       btn.style.opacity = '0.4';
@@ -300,13 +294,9 @@ function setAlertLocked(locked, analyzedDate) {
     });
 
   } else {
-    // ✅ ซ่อน banner
     if (lockBanner) lockBanner.classList.add('hidden');
-
-    // ✅ Remove class
     if (body) body.classList.remove('alert-locked');
 
-    // ✅ Enable วันที่ทั้งหมด (ยังไม่เซฟ → แก้ได้)
     ['alertDate', 'alertStockDate', 'alertReceiveDate', 'alertSnapshotMonth', 'alertIncludeCustomer'].forEach(id => {
       const el = $(id);
       if (el) {
@@ -316,7 +306,6 @@ function setAlertLocked(locked, analyzedDate) {
       }
     });
 
-    // ✅ Enable ปุ่ม
     document.querySelectorAll('[onclick*="createPOFromAlert"], [onclick*="clearAlertInputs"]').forEach(btn => {
       btn.disabled = false;
       btn.style.opacity = '';
@@ -328,23 +317,18 @@ function setAlertLocked(locked, analyzedDate) {
 // ✅ Apply snapshot → แสดงผล + คืนค่า inputs
 async function applyAlertSnapshot(snapshot) {
   try {
-    // ✅ Set ค่าตาม snapshot (ไม่ต้องแก้ — แค่ set ค่า)
     if (snapshot.snapshot_month) $('alertSnapshotMonth').value = snapshot.snapshot_month;
     if (snapshot.stock_date)     $('alertStockDate').value = snapshot.stock_date;
     if (snapshot.receive_date)   $('alertReceiveDate').value = snapshot.receive_date;
 
-    // ✅ คืนค่าวันที่รับ (Tab)
     if (snapshot.receive_dates && Array.isArray(snapshot.receive_dates)) {
       alertReceiveDates = [...snapshot.receive_dates];
       saveAlertReceiveDates();
       renderAlertDateTabs();
     }
 
-    // ✅ ไม่คืน inputs จาก snapshot แล้ว (เพราะไม่บันทึก inputs_json)
-    // ✅ เคลียร์ inputs เก่าใน localStorage เพื่อไม่ให้ค้างจากรอบก่อน
     clearAllAlertInputsAllDates();
 
-    // ✅ แสดงผลจาก result_json
     alertCache = snapshot.result_json || [];
     renderAlertFromCache();
   } catch (e) {
@@ -360,12 +344,13 @@ function renderAlertFromCache() {
     return;
   }
 
-  // ✅ นับ summary
+  // ✅ เก็บ full cache
+  window._alertFullCache = [...alertCache];
+
   const totalShortage = alertCache.filter(r => Number(r.alert) < 0).length;
   const totalOK       = alertCache.filter(r => Number(r.alert) === 0).length;
   const totalOver     = alertCache.filter(r => Number(r.alert) > 0).length;
 
-  // ✅ Render
   let html = `<div id="alertDateTabsBox" class="alert-date-tabs"></div>
     <div class="alert-summary">
       <div class="item red">🔴 ขาด: ${totalShortage} รายการ</div>
@@ -373,13 +358,11 @@ function renderAlertFromCache() {
       <div class="item green">🟢 เกิน: ${totalOver} รายการ</div>
     </div>`;
 
-  // ✅ เรียง
   const sorted = [...alertCache].sort((a, b) => {
     if (a.gradegram !== b.gradegram) return a.gradegram.localeCompare(b.gradegram);
     return a.size - b.size;
   });
 
-  // ✅ Render ตาราง
   html += '<div class="report-wrap alert-scroll"><table class="alert-flat-table"><thead><tr>';
   html += `<th class="th-with-filter">
     <div class="th-filter-wrap" id="alertGradeFilterBox">
@@ -429,7 +412,6 @@ function renderAlertFromCache() {
   </th>`;
   html += '<th>สถานะ</th>';
 
-  // ✅ Filter "สั่งซื้อ"
   html += `<th class="th-with-filter">
     <div class="th-filter-wrap" id="alertOrderFilterBox">
       <button type="button" class="th-filter-btn" id="alertOrderFilterBtn">
@@ -446,7 +428,6 @@ function renderAlertFromCache() {
     </div>
   </th>`;
 
-  // ✅ Filter "Sup."
   html += `<th class="th-with-filter">
     <div class="th-filter-wrap" id="alertSupFilterBox">
       <button type="button" class="th-filter-btn" id="alertSupFilterBtn">
@@ -527,7 +508,6 @@ function renderAlertFromCache() {
 
   html += '</tbody></table></div>';
 
-  // ✅ ปุ่มด้านล่าง
   html += `<div class="report-foot" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
     <div>Stock Level − (Stock + Receive) = Alert · รวมต้องสั่ง ${grandShortage} ม้วน</div>
     <div style="display:flex;gap:6px">
@@ -539,7 +519,6 @@ function renderAlertFromCache() {
 
   $('alertBody').innerHTML = html;
 
-  // ✅ Render tabs + filters
   renderAlertDateTabs();
   renderAlertGradeList();
   renderAlertSizeList();
@@ -557,6 +536,9 @@ function renderAlertFromCache() {
   _attachAlertDropdown('alertOrderFilterBtn', 'alertOrderFilterDropdown', 'alertOrderFilterBox', 'alertOrderFilter');
   _attachAlertDropdown('alertSupFilterBtn', 'alertSupFilterDropdown', 'alertSupFilterBox', 'alertSupFilter');
   renderAlertReceiveDates();
+
+  // ✅ Apply filter แล้ว render ใหม่
+  applyAlertFiltersAndRender();
 }
 
 // ================= SUPPLIERS =================
@@ -632,7 +614,7 @@ function renderAlertGradeList() {
       }
       el.classList.toggle('checked', cb.checked);
       updateAlertGradeLabel();
-      applyAlertFiltersAndRender();    // ← ✅ เพิ่ม
+      applyAlertFiltersAndRender();
     });
   });
 }
@@ -685,7 +667,7 @@ function renderAlertSizeList() {
       }
       el.classList.toggle('checked', cb.checked);
       updateAlertSizeLabel();
-      applyAlertFiltersAndRender();    // ← ✅ เพิ่ม
+      applyAlertFiltersAndRender();
     });
   });
 }
@@ -743,7 +725,7 @@ function renderAlertFilterList() {
       }
       el.classList.toggle('checked', cb.checked);
       updateAlertFilterLabel();
-      applyAlertFiltersAndRender();    // ← ✅ เพิ่ม
+      applyAlertFiltersAndRender();
     });
   });
 }
@@ -793,7 +775,6 @@ function renderAlertOrderFilterList() {
       }
       el.classList.toggle('checked', cb.checked);
       updateAlertOrderFilterLabel();
-      // ✅ Auto-trigger
       applyAlertFiltersAndRender();
     });
   });
@@ -830,7 +811,6 @@ function renderAlertSupFilterList() {
     list.innerHTML = '<div style="padding:10px;text-align:center;color:#94a3b8;font-size:13px">ไม่มีข้อมูล</div>';
     return;
   }
-  // รวม __NONE__ (ยังไม่เลือก Sup)
   const displayList = ['__NONE__', ...alertAllSupsInData];
   list.innerHTML = displayList.map(s => {
     const checked = alertSelectedSupFilters.includes(s);
@@ -851,7 +831,6 @@ function renderAlertSupFilterList() {
       }
       el.classList.toggle('checked', cb.checked);
       updateAlertSupFilterLabel();
-      // ✅ Auto-trigger
       applyAlertFiltersAndRender();
     });
   });
@@ -880,7 +859,7 @@ function clearAllAlertSupFilters() {
 }
 
 // ================= APPLY FILTERS + RE-RENDER =================
-// ✅ กรองด้วย filter ทั้งหมด แล้ว re-render ตาราง (client-side)
+// ✅ กรองด้วย filter ทั้งหมด แล้ว re-render เฉพาะ tbody
 function applyAlertFiltersAndRender() {
   if (!window._alertFullCache || !window._alertFullCache.length) return;
 
@@ -931,8 +910,102 @@ function applyAlertFiltersAndRender() {
   }
 
   alertCache = result;
-  renderAlertFromCache();   // ← re-render ทั้งตาราง (รวม filter header)
-  // ✅ filter header จะยังติ๊กค้างอยู่ เพราะ render จาก state
+
+  // ✅ Render ใหม่เฉพาะ summary + tbody
+  renderAlertTableBody(result);
+}
+
+// ✅ Render ใหม่เฉพาะ summary + tbody (thead คงเดิม → filter ไม่หาย)
+function renderAlertTableBody(rows) {
+  // ✅ อัปเดต summary
+  const totalShortage = window._alertFullCache.filter(r => Number(r.alert) < 0).length;
+  const totalOK       = window._alertFullCache.filter(r => Number(r.alert) === 0).length;
+  const totalOver     = window._alertFullCache.filter(r => Number(r.alert) > 0).length;
+
+  const summaryBox = document.querySelector('.alert-summary');
+  if (summaryBox) {
+    summaryBox.innerHTML = `
+      <div class="item red">🔴 ขาด: ${totalShortage} รายการ</div>
+      <div class="item yellow">🟡 พอดี: ${totalOK} รายการ</div>
+      <div class="item green">🟢 เกิน: ${totalOver} รายการ</div>
+    `;
+  }
+
+  // ✅ อัปเดต tbody
+  const tbody = document.querySelector('.alert-flat-table tbody');
+  if (!tbody) return;
+
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;color:#94a3b8;padding:30px">ไม่มีรายการ 🎉</td></tr>';
+    return;
+  }
+
+  const sorted = [...rows].sort((a, b) => {
+    if (a.gradegram !== b.gradegram) return a.gradegram.localeCompare(b.gradegram);
+    return a.size - b.size;
+  });
+
+  let html = '';
+  let grandShortage = 0;
+
+  sorted.forEach(r => {
+    const a = Number(r.alert) || 0;
+    let rowCls, statusTxt;
+    if (a < 0)      { rowCls = 'row-red';    statusTxt = `🔴 ขาด ${Math.ceil(Math.abs(a))}`;  grandShortage += Math.abs(a); }
+    else if (a === 0) { rowCls = 'row-yellow'; statusTxt = '🟡 พอดี'; }
+    else             { rowCls = 'row-green';  statusTxt = `🟢 เกิน ${Math.floor(a)}`; }
+
+    const lsKey = alertLS_Key(r.gradegram, r.size);
+    const lsVal = getAlertInput(lsKey);
+
+    const supOptions = alertSupplierCache.map(code =>
+      `<option value="${esc(code)}" ${lsVal.sup === code ? 'selected' : ''}>${esc(code)}</option>`
+    ).join('');
+
+    const custOptions = ALERT_CUSTOMER_ROLLS.map(c =>
+      `<option value="${c.value}" ${lsVal.customer_roll === c.value ? 'selected' : ''}>${c.label}</option>`
+    ).join('');
+
+    const qualOptions = ALERT_QUALITY_B.map(q =>
+      `<option value="${q.value}" ${lsVal.quality_b === q.value ? 'selected' : ''}>${q.label}</option>`
+    ).join('');
+
+    const isFSC = isFSCGrade(r.gradegram);
+    const fscBadge = isFSC
+      ? '<span class="badge ok" style="font-size:10px">🟢 FSC</span>'
+      : '<span class="badge" style="background:#f1f5f9;color:#64748b;font-size:10px">⚪ Non-FSC</span>';
+
+    const clsQty   = (lsVal.qty && Number(lsVal.qty) > 0) ? ' filled' : '';
+    const clsSup   = lsVal.sup ? ' filled' : '';
+    const clsCust  = (lsVal.customer_roll && lsVal.customer_roll !== 'normal') ? ' filled' : '';
+    const clsQual  = (lsVal.quality_b && lsVal.quality_b !== 'normal') ? ' filled' : '';
+    const clsNote  = lsVal.note ? ' filled' : '';
+
+    html += `<tr class="${rowCls}">`;
+    html += `<td class="grade-col clickable" onclick="openAlertDetail('${esc(r.gradegram)}', ${r.size})">${esc(r.gradegram)}</td>`;
+    html += `<td class="clickable" onclick="openAlertDetail('${esc(r.gradegram)}', ${r.size})">${r.size}</td>`;
+    html += `<td>${r.snapshot}</td>`;
+    html += `<td>${Number(r.stock).toFixed(2)}</td>`;
+    html += `<td>${r.receive}</td>`;
+    html += `<td class="alert-cell"><b>${a > 0 ? '+' + a : a}</b></td>`;
+    html += `<td class="status-cell">${statusTxt}</td>`;
+    html += `<td><input type="number" class="alert-input-qty${clsQty}" placeholder="-" value="${lsVal.qty || ''}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'qty', this.value, this)"></td>`;
+    html += `<td><select class="alert-input-sup${clsSup}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'sup', this.value, this)">
+      <option value="">-- Sup --</option>${supOptions}</select></td>`;
+    html += `<td><select class="alert-input-customer${clsCust}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'customer_roll', this.value, this)">${custOptions}</select></td>`;
+    html += `<td><select class="alert-input-quality${clsQual}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'quality_b', this.value, this)">${qualOptions}</select></td>`;
+    html += `<td class="fsc-cell">${fscBadge}</td>`;
+    html += `<td><input type="text" class="alert-input-note${clsNote}" placeholder="-" value="${esc(lsVal.note || '')}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'note', this.value, this)"></td>`;
+    html += '</tr>';
+  });
+
+  html += `<tr class="total-row">
+    <td colspan="7" style="text-align:right;font-weight:700">จำนวนรวม (ม้วน)</td>
+    <td style="font-weight:700;color:#dc2626;font-size:15px">${grandShortage > 0 ? grandShortage : '-'}</td>
+    <td colspan="5"></td>
+  </tr>`;
+
+  tbody.innerHTML = html;
 }
 
 // ================= DROPDOWN HELPER =================
@@ -942,11 +1015,17 @@ function _attachAlertDropdown(btnId, dropdownId, boxId, docKey) {
   const box = $(boxId);
   if (!btn || !dropdown || !box) return;
 
-  btn.addEventListener('click', (e) => {
+  // ✅ ลบ listener เก่า (ถ้ามี)
+  if (btn._alertDropdownClick) {
+    btn.removeEventListener('click', btn._alertDropdownClick);
+  }
+
+  btn._alertDropdownClick = (e) => {
     e.stopPropagation();
     dropdown.classList.toggle('hidden');
     btn.classList.toggle('open');
-  });
+  };
+  btn.addEventListener('click', btn._alertDropdownClick);
 
   if (!window['_' + docKey + 'DocClick']) {
     window['_' + docKey + 'DocClick'] = (e) => {
@@ -1056,32 +1135,27 @@ function addAlertReceiveDate() {
     return;
   }
 
-  // 1) เรียงวันที่ที่มีอยู่
   const sorted = [...alertReceiveDates]
     .map(_parseLocalDate)
     .filter(Boolean)
     .sort((a, b) => a - b);
 
   if (sorted.length === 0) {
-    // ยังไม่มี → เริ่มที่ analyzedDate
     alertReceiveDates.push(analyzedDate);
     saveAlertReceiveDates();
     renderAlertDateTabs();
     return;
   }
 
-  // 2) หาวันที่ขาด ระหว่าง analyzedDate → วันสุดท้าย
   const analyzedD = _parseLocalDate(analyzedDate);
   const lastD = sorted[sorted.length - 1];
   const existing = new Set(sorted.map(d => toISODate(d)));
 
   let cursor = new Date(analyzedD);
   while (cursor <= lastD) {
-    // ข้ามอาทิตย์
     if (cursor.getDay() !== 0) {
       const iso = toISODate(cursor);
       if (!existing.has(iso)) {
-        // เจอวันที่ขาด → เติมแล้วจบ
         alertReceiveDates.push(iso);
         alertReceiveDates.sort((a, b) => _parseLocalDate(a) - _parseLocalDate(b));
         saveAlertReceiveDates();
@@ -1092,7 +1166,6 @@ function addAlertReceiveDate() {
     cursor.setDate(cursor.getDate() + 1);
   }
 
-  // 3) ไม่มีวันขาด → เติมวันถัดไปจากวันสุดท้าย (ข้ามอาทิตย์)
   const nextD = _nextWorkingDay(lastD);
   alertReceiveDates.push(toISODate(nextD));
   alertReceiveDates.sort((a, b) => _parseLocalDate(a) - _parseLocalDate(b));
@@ -1126,7 +1199,6 @@ function onAlertReceiveDateChange(idx, value) {
   renderAlertDateTabs();
 }
 
-// ✅ Render วันที่
 function renderAlertReceiveDates() {
   renderAlertDateTabs();
 }
@@ -1227,28 +1299,15 @@ async function renderAlert() {
       };
     });
 
+    // ✅ เก็บข้อมูลเต็ม (ก่อนกรอง)
+    window._alertFullCache = [...result];
+
     alertAllSizes = [...new Set(result.map(r => Number(r.size)))].sort((a, b) => a - b);
     renderAlertSizeList();
     updateAlertSizeLabel();
 
-    if (alertSelectedGrades.length > 0) {
-      result = result.filter(r => alertSelectedGrades.includes(r.gradegram));
-    }
-
-    if (alertSelectedSizes.length > 0) {
-      result = result.filter(r => alertSelectedSizes.includes(Number(r.size)));
-    }
-
-    let display = result;
-    if (!alertSelectedFilters.includes('all') && alertSelectedFilters.length > 0) {
-      display = result.filter(r => {
-        const a = Number(r.alert) || 0;
-        if (alertSelectedFilters.includes('lt0') && a < 0) return true;
-        if (alertSelectedFilters.includes('eq0') && a === 0) return true;
-        if (alertSelectedFilters.includes('gt0') && a > 0) return true;
-        return false;
-      });
-    }
+    // ✅ ใช้ result เต็ม render (การกรองจะทำใน renderAlertTableBody)
+    const display = result;
 
     const totalShortage = result.filter(r => r.alert < 0).length;
     const totalOK       = result.filter(r => r.alert === 0).length;
@@ -1328,7 +1387,6 @@ async function renderAlert() {
 
     html += '<th>สถานะ</th>';
 
-    // ✅ Filter "สั่งซื้อ"
     html += `<th class="th-with-filter">
       <div class="th-filter-wrap" id="alertOrderFilterBox">
         <button type="button" class="th-filter-btn" id="alertOrderFilterBtn">
@@ -1345,7 +1403,6 @@ async function renderAlert() {
       </div>
     </th>`;
 
-    // ✅ Filter "Sup."
     html += `<th class="th-with-filter">
       <div class="th-filter-wrap" id="alertSupFilterBox">
         <button type="button" class="th-filter-btn" id="alertSupFilterBtn">
@@ -1437,8 +1494,7 @@ async function renderAlert() {
 
     $('alertBody').innerHTML = html;
 
-    // ✅ เก็บ full cache ก่อนกรอง
-    window._alertFullCache = [...display];   // ✅ เก็บของเดิมไว้
+    // ✅ alertCache = ข้อมูลเต็ม (สำหรับ createPO)
     alertCache = display;
 
     // ✅ อัปเดตรายชื่อ Sup ที่มีในข้อมูล
@@ -1450,6 +1506,7 @@ async function renderAlert() {
       }).filter(Boolean)
     )].sort();
 
+    // ✅ Render filter ทั้งหมด
     renderAlertGradeList();
     renderAlertFilterList();
     renderAlertSizeList();
@@ -1465,8 +1522,10 @@ async function renderAlert() {
     _attachAlertDropdown('alertFilterBtn', 'alertFilterDropdown', 'alertFilterBox', 'alertFilter');
     _attachAlertDropdown('alertOrderFilterBtn', 'alertOrderFilterDropdown', 'alertOrderFilterBox', 'alertOrderFilter');
     _attachAlertDropdown('alertSupFilterBtn', 'alertSupFilterDropdown', 'alertSupFilterBox', 'alertSupFilter');
-
     renderAlertDateTabs();
+
+    // ✅ Apply filter แล้ว render ใหม่ (ถ้ามี filter ค้างอยู่)
+    applyAlertFiltersAndRender();
 
     if (hasPOEdited()) {
       showPOEditedWarning();
@@ -1527,6 +1586,13 @@ function onAlertInput(gradegram, size, field, value, el) {
     alertAllSupsInData.push(value);
     alertAllSupsInData.sort();
     renderAlertSupFilterList();
+  }
+
+  // ✅ ถ้ามี filter "สั่งซื้อ" หรือ "Sup." อยู่ → re-apply filter
+  const hasOrderFilter = !alertSelectedOrderFilters.includes('all') && alertSelectedOrderFilters.length > 0;
+  const hasSupFilter = alertSelectedSupFilters.length > 0;
+  if (field === 'qty' || field === 'sup' || hasOrderFilter || hasSupFilter) {
+    applyAlertFiltersAndRender();
   }
 }
 
