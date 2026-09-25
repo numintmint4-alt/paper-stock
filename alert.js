@@ -165,13 +165,6 @@ async function saveAlertSnapshot(receiveDates) {
   }
 
   try {
-    // ✅ รวบรวม inputs ของทุกวัน
-    const inputsAll = {};
-    for (let dateIdx = 0; dateIdx < alertReceiveDates.length; dateIdx++) {
-      const inputs = loadAlertInputs(dateIdx);
-      inputsAll[`date_${dateIdx}`] = inputs;
-    }
-
     // ✅ Summary
     const summary = {
       shortage: alertCache.filter(r => Number(r.alert) < 0).length,
@@ -195,10 +188,10 @@ async function saveAlertSnapshot(receiveDates) {
       receive_dates:  receiveDates || [...alertReceiveDates],
       summary_json:   summary,
       result_json:    alertCache,
-      inputs_json:    inputsAll,
       filters_json:   filters,
       analyzed_by:    currentUser?.id || null,
       updated_at:     new Date().toISOString()
+      // ✅ ไม่บันทึก inputs_json แล้ว
     };
 
     // ✅ UPSERT by analyzed_date
@@ -240,18 +233,21 @@ async function onAlertDateChange() {
   const analyzedDate = $('alertDate')?.value;
   if (!analyzedDate) return;
 
-  // ✅ Lock/Unlock UI ตามว่ามี snapshot หรือไม่
   $('alertBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
 
-  // ✅ โหลด snapshot
   const snapshot = await loadAlertSnapshot(analyzedDate);
 
   if (snapshot) {
-    // ✅ มี snapshot → แสดงผล + ล็อก
     await applyAlertSnapshot(snapshot);
-    setAlertLocked(true, analyzedDate);
+
+    // ✅ Lock เฉพาะเมื่อ "ข้ามวัน" แล้ว
+    // เทียบ: วันที่สร้าง snapshot < วันนี้ → lock
+    const createdDate = snapshot.created_at ? toISODate(new Date(snapshot.created_at)) : null;
+    const today = toISODate(new Date());
+    const shouldLock = createdDate && createdDate < today;
+
+    setAlertLocked(shouldLock, analyzedDate);
   } else {
-    // ✅ ไม่มี snapshot → auto-analyze
     setAlertLocked(false);
     await autoAnalyzeAlert();
   }
@@ -332,18 +328,9 @@ async function applyAlertSnapshot(snapshot) {
       renderAlertDateTabs();
     }
 
-    // ✅ คืนค่า inputs ทุกวัน → localStorage
-    if (snapshot.inputs_json) {
-      Object.keys(snapshot.inputs_json).forEach(key => {
-        // key = "date_0", "date_1" ...
-        const idxMatch = key.match(/^date_(\d+)$/);
-        if (idxMatch) {
-          const dateIdx = Number(idxMatch[1]);
-          const inputs = snapshot.inputs_json[key] || {};
-          localStorage.setItem(`${ALERT_LS_KEY_PREFIX}${dateIdx + 1}`, JSON.stringify(inputs));
-        }
-      });
-    }
+    // ✅ ไม่คืน inputs จาก snapshot แล้ว (เพราะไม่บันทึก inputs_json)
+    // ✅ เคลียร์ inputs เก่าใน localStorage เพื่อไม่ให้ค้างจากรอบก่อน
+    clearAllAlertInputsAllDates();
 
     // ✅ แสดงผลจาก result_json
     alertCache = snapshot.result_json || [];
@@ -1273,6 +1260,13 @@ function clearAlertInputs() {
   setTimeout(() => msg.remove(), 2000);
 }
 
+// ✅ ล้าง inputs ของทุกวัน (qty, sup, customer_roll, quality_b, note)
+function clearAllAlertInputsAllDates() {
+  for (let i = 0; i < alertReceiveDates.length; i++) {
+    localStorage.removeItem(getAlertLSKey(i));
+  }
+}
+
 // ================= CREATE PO FROM ALERT =================
 async function createPOFromAlert() {
   if (!alertCache || !alertCache.length) {
@@ -1421,6 +1415,14 @@ function confirmCreatePO() {
   saveAlertSnapshot([...alertReceiveDates]).then(res => {
     if (res.ok) {
       console.log('✅ Alert snapshot saved:', res.data);
+
+      // ✅ ล้าง inputs ของทุกวัน หลัง save สำเร็จ
+      clearAllAlertInputsAllDates();
+
+      // ✅ Re-render → ตารางจะว่าง inputs
+      renderAlert();
+
+      console.log('✅ Alert inputs cleared (all dates)');
     } else {
       console.warn('❌ Alert snapshot save failed:', res.error);
     }
