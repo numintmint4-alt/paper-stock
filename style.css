@@ -865,8 +865,8 @@ th{background:#f1f5f9;font-weight:600}
 .alert-flat-table th:nth-child(5)  { width: 70px;  }   /* Receive */
 .alert-flat-table th:nth-child(6)  { width: 90px;  }   /* Alert (มี filter) */
 .alert-flat-table th:nth-child(7)  { width: 90px;  }   /* สถานะ */
-.alert-flat-table th:nth-child(8)  { width: 90px;  }   /* สั่งซื้อ */
-.alert-flat-table th:nth-child(9)  { width: 90px;  }   /* Sup. */
+.alert-flat-table th:nth-child(8)  { width: 90px;  }   /* สั่งซื้อ (มี filter) */
+.alert-flat-table th:nth-child(9)  { width: 90px;  }   /* Sup. (มี filter) */
 .alert-flat-table th:nth-child(10) { width: 90px;  }   /* ม้วนลูกค้า */
 .alert-flat-table th:nth-child(11) { width: 90px;  }   /* คุณภาพ B */
 .alert-flat-table th:nth-child(12) { width: 90px;  }   /* FSC */
@@ -887,13 +887,13 @@ th{background:#f1f5f9;font-weight:600}
 /* ═══════════════════════════════════════════════════════════ */
 
 .alert-flat-table .th-with-filter {
-  position: relative;
+  /* ✅ ไม่ต้อง position — ใช้ sticky จาก thead th */
   padding: 4px 6px !important;
   text-align: center;
 }
 
 .alert-flat-table .th-filter-wrap {
-  position: relative;
+  position: relative;      /* ← คงไว้ — ให้ dropdown ยึด */
   display: inline-block;
   width: 100%;
 }
@@ -947,6 +947,7 @@ th{background:#f1f5f9;font-weight:600}
 
 .alert-flat-table thead th.th-with-filter {
   z-index: 15;
+  /* ✅ ไม่ต้อง position — ใช้ sticky จาก thead th */
 }
 
 /* ═══════════════════════════════════════════════════════════ */
