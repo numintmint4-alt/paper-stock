@@ -1547,11 +1547,12 @@ function renderAddPOItemsTable() {
 // ✅ ดึง size ที่มีใน masterCache
 function getAvailableSizesFor(gradegram) {
   if (!gradegram) return [];
-  const { grade, gram } = parseGradegram(gradegram);
+  // ✅ ใช้ string comparison ตรงๆ — ไม่ใช้ parseGradegram (มี bug)
   return [...new Set(
     masterCache
-      .filter(m => normalizeGrade(m.grade) === grade && String(m.gram) === String(gram))
+      .filter(m => (normalizeGrade(m.grade) + m.gram) === gradegram)
       .map(m => Number(m.size))
+      .filter(n => !isNaN(n) && n > 0)
   )].sort((a, b) => a - b);
 }
 
