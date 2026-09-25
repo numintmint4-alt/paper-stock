@@ -273,9 +273,6 @@
           <div class="report-doc">FQ-ษ6-06-07 rev.01</div>
         </div>
 
-        <!-- ✅ Tab bar: รายการรับเข้า / ประวัติ PO ที่ถูกลบ -->
-
-        <!-- ✅ Filter (แสดงเฉพาะ Tab 1) -->
         <div class="filters no-print" id="receiveFilterBox">
           <label>📅 วันที่รับเข้า <input type="date" id="receiveDate"></label>
 
@@ -371,12 +368,11 @@
           <button onclick="window.print()">🖨 พิมพ์</button>
         </div>
 
-        <!-- ✅ Banner แจ้งว่าล็อกแล้ว -->
         <div id="alertLockBanner" class="alert-lock-banner hidden"></div>
 
         <div id="alertBody"></div>
-      </div>              <!-- ← ปิด .card -->
-    </div>                <!-- ← ✅ ปิด #tab-alert -->
+      </div>
+    </div>
 
     <!-- ========== TAB 5.5: PURCHASE ORDER ========== -->
     <div id="tab-purchase-order" class="hidden">
@@ -395,27 +391,6 @@
             <input type="month" id="poMonth" onchange="onPOMonthChange()">
           </label>
 
-          <label>Sup.
-            <select id="poFilterSup">
-              <option value="">ทั้งหมด</option>
-              <option value="EKP">EKP</option>
-              <option value="MKP">MKP</option>
-              <option value="SCK">SCK</option>
-            </select>
-          </label>
-
-          <label>สถานะ
-            <select id="poFilterStatus">
-              <option value="">ทั้งหมด</option>
-              <option value="draft">Draft</option>
-              <option value="saved">Saved</option>
-              <option value="sent">Sent</option>
-            </select>
-          </label>
-
-          <button class="primary" onclick="renderPOList()">🔍 ค้นหา</button>
-          <button class="primary" onclick="openPOForm()">+ สร้าง PO ใหม่</button>
-          <button onclick="openDeletedPOList()">📜 ประวัติ PO ที่ถูกลบ</button>
           <button onclick="exportPOToExcel()">📤 Export Excel</button>
           <button onclick="window.print()">🖨 พิมพ์</button>
         </div>
@@ -779,7 +754,6 @@
 <script src="purchase-order.js"></script>
 <script src="price-master.js"></script>
 
-<!-- ✅ Enter submit ใน modal verify password -->
 <script>
 document.addEventListener('keypress', (e) => {
   if (e.key === 'Enter' && document.getElementById('modalVerifyPassword')?.classList.contains('show')) {
