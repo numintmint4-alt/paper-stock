@@ -3,6 +3,7 @@
 // Purchase Order Management (List + Form + Auto-Split + Export)
 // + Date Split + Verify Password + Mark Saved + Deleted History
 // + Column Filters (PO No. / วันที่ออก / วันที่รับ / Sup. / สถานะ)
+// + Filter Label ด้านบน (PO No. / วันที่ออก / วันที่รับ)
 // ═══════════════════════════════════════════════════════════════
 
 let poCache = [];
@@ -147,29 +148,32 @@ async function renderPOList() {
 
     let html = '<div class="data-scroll po-list-scroll"><table class="data-table po-list-table"><thead><tr>';
 
-    // ✅ Filter: PO No.
+    // ✅ Filter: PO No. (label ด้านบน)
     html += `<th class="th-with-filter">
-      <div class="th-filter-wrap">
+      <div class="th-filter-wrap po-filter-stack">
+        <span class="po-filter-label">PO No.</span>
         <input type="text" id="poFilterPONoInput" class="po-filter-input"
-               placeholder="PO No." value="${esc(poFilterPONo)}"
+               value="${esc(poFilterPONo)}"
                oninput="onPOFilterChange()">
       </div>
     </th>`;
 
-    // ✅ Filter: วันที่ออก
+    // ✅ Filter: วันที่ออก (label ด้านบน)
     html += `<th class="th-with-filter">
-      <div class="th-filter-wrap">
+      <div class="th-filter-wrap po-filter-stack">
+        <span class="po-filter-label">วันที่ออก</span>
         <input type="date" id="poFilterDateFrom" class="po-filter-input"
-               placeholder="วันที่ออก" value="${esc(poFilterDateFrom)}"
+               value="${esc(poFilterDateFrom)}"
                onchange="onPOFilterChange()">
       </div>
     </th>`;
 
-    // ✅ Filter: วันที่รับ
+    // ✅ Filter: วันที่รับ (label ด้านบน)
     html += `<th class="th-with-filter">
-      <div class="th-filter-wrap">
+      <div class="th-filter-wrap po-filter-stack">
+        <span class="po-filter-label">วันที่รับ</span>
         <input type="date" id="poFilterDateTo" class="po-filter-input"
-               placeholder="วันที่รับ" value="${esc(poFilterDateTo)}"
+               value="${esc(poFilterDateTo)}"
                onchange="onPOFilterChange()">
       </div>
     </th>`;
