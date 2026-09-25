@@ -4,6 +4,7 @@
 // + Date Split + Verify Password + Mark Saved + Deleted History
 // + Column Filters (PO No. / วันที่ออก / วันที่รับ / Sup. / สถานะ)
 // + Filter Label ด้านบน (PO No. / วันที่ออก / วันที่รับ)
+// + Add PO Items (Phase 3)
 // ═══════════════════════════════════════════════════════════════
 
 let poCache = [];
@@ -148,7 +149,6 @@ async function renderPOList() {
 
     let html = '<div class="data-scroll po-list-scroll"><table class="data-table po-list-table"><thead><tr>';
 
-    // ✅ Filter: PO No. (label ด้านบน)
     html += `<th class="th-with-filter">
       <div class="th-filter-wrap po-filter-stack">
         <span class="po-filter-label">PO No.</span>
@@ -158,7 +158,6 @@ async function renderPOList() {
       </div>
     </th>`;
 
-    // ✅ Filter: วันที่ออก (label ด้านบน)
     html += `<th class="th-with-filter">
       <div class="th-filter-wrap po-filter-stack">
         <span class="po-filter-label">วันที่ออก</span>
@@ -168,7 +167,6 @@ async function renderPOList() {
       </div>
     </th>`;
 
-    // ✅ Filter: วันที่รับ (label ด้านบน)
     html += `<th class="th-with-filter">
       <div class="th-filter-wrap po-filter-stack">
         <span class="po-filter-label">วันที่รับ</span>
@@ -178,7 +176,6 @@ async function renderPOList() {
       </div>
     </th>`;
 
-    // ✅ Filter: Sup.
     const supList = [...new Set(poCache.map(p => p.sup_code))].sort();
     html += `<th class="th-with-filter">
       <div class="th-filter-wrap" id="poFilterSupBox">
@@ -199,7 +196,6 @@ async function renderPOList() {
     html += '<th style="text-align:right">จำนวน</th>';
     html += '<th style="text-align:right">KG รวม</th>';
 
-    // ✅ Filter: สถานะ
     html += `<th class="th-with-filter">
       <div class="th-filter-wrap" id="poFilterStatusBox">
         <button type="button" class="th-filter-btn" id="poFilterStatusBtn">
@@ -230,7 +226,7 @@ async function renderPOList() {
   }
 }
 
-// ✅ Render rows (เรียกซ้ำได้เวลา filter)
+// ✅ Render rows
 function renderPOListRows(rows) {
   const tbody = $('poListTbody');
   if (!tbody) return;
@@ -271,7 +267,7 @@ function renderPOListRows(rows) {
   tbody.innerHTML = html;
 }
 
-// ✅ Filter Change Handler (auto-trigger)
+// ✅ Filter Change Handler
 function onPOFilterChange() {
   const ponoEl = $('poFilterPONoInput');
   const fromEl = $('poFilterDateFrom');
@@ -284,7 +280,7 @@ function onPOFilterChange() {
   applyPOFiltersAndRender();
 }
 
-// ✅ Apply filters + render rows
+// ✅ Apply filters
 function applyPOFiltersAndRender() {
   let result = [...poCache];
 
@@ -964,6 +960,23 @@ function renderPOFormContent(header, items) {
 
   html += `</tbody></table></div>`;
 
+  // ✅ ปุ่ม "+ เพิ่มรายการ" (แสดงเฉพาะตอนแก้ไข PO — ไม่ใช่ตอนสร้างใหม่)
+  if (poEditingId) {
+    const activeCount = items.filter(it => it.status !== 'cancelled').length;
+    const remaining = 15 - activeCount;
+    const disabled = remaining <= 0 ? 'disabled' : '';
+    const btnText = remaining <= 0 
+      ? `⚠️ ครบ 15 รายการแล้ว` 
+      : `➕ เพิ่มรายการ (เหลือ ${remaining})`;
+
+    html += `<div style="margin-top:12px;text-align:center">
+      <button class="primary" onclick="openAddPOItemsModal()" ${disabled} 
+              style="padding:10px 24px;font-size:14px">
+        ${btnText}
+      </button>
+    </div>`;
+  }
+
   html += `<div class="form-actions" style="margin-top:16px">
     <button onclick="cancelPOForm()">ยกเลิก</button>
     <button class="primary" onclick="closeModal('modalPOForm'); renderPOList();">💾 ปิด</button>
@@ -1379,4 +1392,318 @@ async function exportPOToExcel_Async() {
   } catch (e) {
     alert('❌ ' + e.message);
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ================= ADD PO ITEMS (Phase 3) =====================
+// ═══════════════════════════════════════════════════════════════
+
+// ✅ State: รายการที่กำลังเพิ่ม
+let _addItemsRows = [];
+
+// ✅ เปิด Modal เพิ่มรายการ
+async function openAddPOItemsModal() {
+  if (!poEditingId) {
+    alert('ไม่พบ PO ที่กำลังแก้ไข');
+    return;
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('get_purchase_order_detail', { p_po_id: poEditingId });
+    if (error) throw error;
+
+    const header = data.header || {};
+    const items = (data.items || []).filter(it => it.status !== 'cancelled');
+    const remaining = 15 - items.length;
+
+    if (remaining <= 0) {
+      alert('⚠️ PO นี้มี 15 รายการแล้ว — ไม่สามารถเพิ่มได้');
+      return;
+    }
+
+    _addItemsRows = [createEmptyAddRow()];
+
+    renderAddPOItemsModal(header, items.length, remaining);
+
+    openModal('modalAddPOItems');
+
+  } catch (e) {
+    alert('❌ ' + e.message);
+  }
+}
+
+// ✅ สร้างแถวเปล่า
+function createEmptyAddRow() {
+  return {
+    uid: `row_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    pc_code: 'SDPC.01',
+    gradegram: '',
+    size: '',
+    quantity: '',
+    price: 0,
+    customer_roll: 'normal',
+    quality_b: 'normal',
+    note: ''
+  };
+}
+
+// ✅ Render Modal
+function renderAddPOItemsModal(header, currentCount, remaining) {
+  const titleEl = $('addPOItemsTitle');
+  if (titleEl) titleEl.innerHTML = `➕ เพิ่มรายการ — ${esc(header.po_no)}`;
+
+  const infoBar = $('addPOItemsInfo');
+  if (infoBar) {
+    infoBar.innerHTML = `
+      <div>📦 มีอยู่ <b>${currentCount}</b> รายการ · เพิ่มได้อีก <b style="color:#dc2626">${remaining}</b> รายการ</div>
+      <div>Sup: <b>${esc(header.sup_code)}</b> · วันที่รับ: <b>${fmtDateTH(header.ref_receive)}</b></div>
+    `;
+  }
+
+  renderAddPOItemsTable();
+}
+
+// ✅ Render ตาราง items ใน Modal
+function renderAddPOItemsTable() {
+  const tbody = $('addPOItemsTbody');
+  if (!tbody) return;
+
+  const gradegramOptions = masterCache.map(m => normalizeGrade(m.grade) + m.gram);
+  const uniqueGradegrams = [...new Set(gradegramOptions)].sort();
+
+  let html = '';
+  _addItemsRows.forEach((row, idx) => {
+    const availableSizes = getAvailableSizesFor(row.gradegram);
+
+    const autoPrice = row.gradegram 
+      ? getPriceFromMaster(row.gradegram, row.customer_roll, row.quality_b) 
+      : 0;
+
+    const gradegramOpts = uniqueGradegrams.map(g => 
+      `<option value="${esc(g)}" ${row.gradegram === g ? 'selected' : ''}>${esc(g)}</option>`
+    ).join('');
+
+    const sizeOpts = availableSizes.map(s => 
+      `<option value="${s}" ${Number(row.size) === s ? 'selected' : ''}>${s}</option>`
+    ).join('');
+
+    const canRemove = _addItemsRows.length > 1;
+
+    html += `<tr data-row-uid="${row.uid}">
+      <td style="text-align:center">${idx + 1}</td>
+      <td>
+        <select onchange="onAddRowChange('${row.uid}', 'gradegram', this.value)" style="width:100%;max-width:120px">
+          <option value="">-- เลือก --</option>
+          ${gradegramOpts}
+        </select>
+      </td>
+      <td>
+        <select onchange="onAddRowChange('${row.uid}', 'size', this.value)" style="width:80px" ${!row.gradegram ? 'disabled' : ''}>
+          <option value="">--</option>
+          ${sizeOpts}
+        </select>
+      </td>
+      <td>
+        <input type="number" value="${row.quantity || ''}" min="1" step="1"
+               onchange="onAddRowChange('${row.uid}', 'quantity', this.value)"
+               style="width:70px;text-align:center">
+      </td>
+      <td style="text-align:right;color:#dc2626;font-weight:700">
+        ${autoPrice > 0 ? autoPrice.toFixed(2) : '-'}
+      </td>
+      <td>
+        <select onchange="onAddRowChange('${row.uid}', 'customer_roll', this.value)" style="width:100%">
+          <option value="normal"   ${row.customer_roll === 'normal' ? 'selected' : ''}>ปกติ</option>
+          <option value="pump_f"   ${row.customer_roll === 'pump_f' ? 'selected' : ''}>ปั้ม F</option>
+          <option value="pump_bt"  ${row.customer_roll === 'pump_bt' ? 'selected' : ''}>ปั้ม BT</option>
+          <option value="pump_ktp" ${row.customer_roll === 'pump_ktp' ? 'selected' : ''}>ปั้ม KTP</option>
+        </select>
+      </td>
+      <td>
+        <select onchange="onAddRowChange('${row.uid}', 'quality_b', this.value)" style="width:100%">
+          <option value="normal" ${row.quality_b === 'normal' ? 'selected' : ''}>ปกติ</option>
+          <option value="nc"     ${row.quality_b === 'nc' ? 'selected' : ''}>NC</option>
+        </select>
+      </td>
+      <td>
+        <input type="text" value="${esc(row.note || '')}" 
+               onchange="onAddRowChange('${row.uid}', 'note', this.value)"
+               style="width:100%;min-width:100px">
+      </td>
+      <td style="text-align:center">
+        <button class="danger" onclick="removeAddRow('${row.uid}')" 
+                ${!canRemove ? 'disabled title="ต้องมีอย่างน้อย 1 แถว"' : ''}
+                style="padding:4px 8px">✕</button>
+      </td>
+    </tr>`;
+  });
+
+  tbody.innerHTML = html;
+
+  const remaining = 15 - (getCurrentPOItemCount() + _addItemsRows.length);
+  updateAddItemsRemaining(remaining);
+}
+
+// ✅ ดึง size ที่มีใน masterCache
+function getAvailableSizesFor(gradegram) {
+  if (!gradegram) return [];
+  const { grade, gram } = parseGradegram(gradegram);
+  return [...new Set(
+    masterCache
+      .filter(m => normalizeGrade(m.grade) === grade && String(m.gram) === String(gram))
+      .map(m => Number(m.size))
+  )].sort((a, b) => a - b);
+}
+
+// ✅ ดึงจำนวน items ปัจจุบันของ PO
+function getCurrentPOItemCount() {
+  const tbody = document.querySelector('#poFormBody table tbody');
+  if (!tbody) return 0;
+  return tbody.querySelectorAll('tr[data-item-id]').length;
+}
+
+// ✅ อัปเดต label remaining
+function updateAddItemsRemaining(remaining) {
+  const label = $('addPOItemsRemaining');
+  if (label) {
+    if (remaining <= 0) {
+      label.innerHTML = `⚠️ <b style="color:#dc2626">ครบ 15 รายการ</b> — ไม่สามารถเพิ่มได้`;
+      const addBtn = $('addPOItemsAddBtn');
+      if (addBtn) addBtn.disabled = true;
+    } else {
+      label.innerHTML = `สามารถเพิ่มได้อีก <b>${remaining}</b> รายการ`;
+      const addBtn = $('addPOItemsAddBtn');
+      if (addBtn) addBtn.disabled = false;
+    }
+  }
+}
+
+// ✅ Change handler ในแถว
+function onAddRowChange(uid, field, value) {
+  const row = _addItemsRows.find(r => r.uid === uid);
+  if (!row) return;
+
+  row[field] = value;
+
+  if (field === 'gradegram') {
+    row.size = '';
+  }
+
+  renderAddPOItemsTable();
+}
+
+// ✅ เพิ่มแถว
+function addAddRow() {
+  const currentTotal = getCurrentPOItemCount() + _addItemsRows.length;
+  if (currentTotal >= 15) {
+    alert('⚠️ เกินขีดจำกัด 15 รายการ');
+    return;
+  }
+  _addItemsRows.push(createEmptyAddRow());
+  renderAddPOItemsTable();
+}
+
+// ✅ ลบแถว
+function removeAddRow(uid) {
+  if (_addItemsRows.length <= 1) {
+    alert('ต้องมีอย่างน้อย 1 แถว');
+    return;
+  }
+  _addItemsRows = _addItemsRows.filter(r => r.uid !== uid);
+  renderAddPOItemsTable();
+}
+
+// ✅ บันทึก (เรียก RPC)
+async function saveAddPOItems() {
+  if (!poEditingId) return;
+
+  const validRows = [];
+  for (const row of _addItemsRows) {
+    if (!row.gradegram || !row.size || !row.quantity) continue;
+    if (Number(row.quantity) <= 0) {
+      alert(`⚠️ แถวที่มี ${row.gradegram} ${row.size}: จำนวนต้อง > 0`);
+      return;
+    }
+    validRows.push(row);
+  }
+
+  if (!validRows.length) {
+    alert('กรุณากรอกข้อมูลอย่างน้อย 1 แถว');
+    return;
+  }
+
+  const currentCount = getCurrentPOItemCount();
+  const totalAfter = currentCount + validRows.length;
+  if (totalAfter > 15) {
+    alert(`⚠️ เกินขีดจำกัด 15 รายการ\nมีอยู่ ${currentCount} + ใหม่ ${validRows.length} = ${totalAfter}`);
+    return;
+  }
+
+  const itemsPayload = validRows.map(r => {
+    const price = getPriceFromMaster(r.gradegram, r.customer_roll, r.quality_b);
+    const kgTotal = calcKgTotal(r.gradegram, r.size, r.quantity);
+
+    const custLabel = { normal: '', pump_f: 'ปั้ม F', pump_bt: 'ปั้ม BT', pump_ktp: 'ปั้ม KTP' }[r.customer_roll] || '';
+    const qualLabel = { normal: '', nc: 'NC' }[r.quality_b] || '';
+    const remarkParts = [custLabel, qualLabel, r.note].filter(x => x && String(x).trim());
+    const remarkCombined = remarkParts.join(',');
+
+    return {
+      pc_code: r.pc_code || 'SDPC.01',
+      gradegram: r.gradegram,
+      size: Number(r.size),
+      gradegram_size: `${r.gradegram}-${Number(r.size).toFixed(2)}`,
+      quantity: Number(r.quantity),
+      kg_total: kgTotal,
+      price: price,
+      customer_roll: r.customer_roll,
+      quality_b: r.quality_b,
+      note: r.note || '',
+      remark_combined: remarkCombined
+    };
+  });
+
+  const btn = document.querySelector('#modalAddPOItems .form-actions .primary');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'กำลังบันทึก...';
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('add_po_items', {
+      p_po_id: poEditingId,
+      p_items: itemsPayload,
+      p_user_id: currentUser?.id
+    });
+    if (error) throw error;
+
+    if (!data || !data.success) {
+      throw new Error(data?.error || 'บันทึกไม่สำเร็จ');
+    }
+
+    alert(`✅ เพิ่ม ${data.added} รายการสำเร็จ (รวม ${data.total} รายการ)`);
+
+    closeModal('modalAddPOItems');
+    _addItemsRows = [];
+
+    const { data: detail } = await supabase.rpc('get_purchase_order_detail', { p_po_id: poEditingId });
+    if (detail) renderPOFormContent(detail.header, detail.items);
+
+  } catch (e) {
+    alert('❌ ' + e.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '💾 บันทึกการแก้ไข';
+    }
+  }
+}
+
+// ✅ ปิด Modal
+function closeAddPOItemsModal() {
+  if (_addItemsRows.some(r => r.gradegram || r.size || r.quantity)) {
+    if (!confirm('⚠️ มีข้อมูลที่กรอกไว้ — ต้องการปิดหรือไม่?')) return;
+  }
+  closeModal('modalAddPOItems');
+  _addItemsRows = [];
 }
