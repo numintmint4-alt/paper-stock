@@ -5,6 +5,7 @@
 // + Column Filters (PO No. / วันที่ออก / วันที่รับ / Sup. / สถานะ)
 // + Filter Label ด้านบน (PO No. / วันที่ออก / วันที่รับ)
 // + Add PO Items (Phase 3)
+// + Inline Edit Items (Phase 3E)
 // ═══════════════════════════════════════════════════════════════
 
 let poCache = [];
@@ -908,6 +909,10 @@ async function _doSaveAllPOs(posList, alertData, btnEl) {
   window._pendingAlertData = null;
 }
 
+// ================= STATE: Edit Items =================
+let _editItemsRows = [];
+let _editPOHeader = null;
+
 // ================= RENDER PO FORM (EDIT) =================
 function renderPOFormContent(header, items) {
   if (!header) {
@@ -915,77 +920,391 @@ function renderPOFormContent(header, items) {
     return;
   }
 
-  let html = `<div class="msg info" style="margin-bottom:14px">
-    <b>${esc(header.po_no)}</b> · Sup: <b>${esc(header.sup_code)}</b><br>
-    วันที่ออก: ${fmtDateTH(header.po_date)} · วันที่รับ: <b>${fmtDateTH(header.ref_receive)}</b> · สถานะ: <b>${header.status}</b>
+  _editPOHeader = header;
+
+  // ✅ สร้าง state จาก items เดิม (เฉพาะ active)
+  const activeItems = items.filter(it => it.status !== 'cancelled');
+  _editItemsRows = activeItems.map((it, idx) => ({
+    uid: `old_${it.id}`,
+    id: it.id,
+    isNew: false,
+    original: { ...it },
+    gradegram: it.gradegram,
+    size: it.size,
+    quantity: Number(it.quantity),
+    price: Number(it.price || 0),
+    customer_roll: it.customer_roll || 'normal',
+    quality_b: it.quality_b || 'normal',
+    note: it.note || '',
+    removed: false
+  }));
+
+  renderPOFormTable();
+}
+
+// ✅ Render ตาราง items + ปุ่ม
+function renderPOFormTable() {
+  const container = $('poFormBody');
+  if (!container) return;
+
+  const header = _editPOHeader;
+  const activeRows = _editItemsRows.filter(r => !r.removed);
+  const totalCount = activeRows.length;
+  const remaining = 15 - totalCount;
+
+  // ✅ Info bar
+  let html = `<div class="msg info" style="margin-bottom:12px">
+    <b>✏️ แก้ไข PO — ${esc(header.po_no)}</b><br>
+    📦 มีอยู่ <b>${totalCount}</b> รายการ · เพิ่มได้อีก <b style="color:#dc2626">${remaining > 0 ? remaining : 0}</b> รายการ<br>
+    Sup: <b>${esc(header.sup_code)}</b> · วันที่รับ: <b>${fmtDateTH(header.ref_receive)}</b> · สถานะ: <b>${header.status}</b>
   </div>`;
 
-  html += `<div class="po-form-group">
-    <table class="alert-flat-table" style="font-size:12px">
-      <thead><tr>
-        <th>#</th><th>PC.</th><th>Gradegram</th><th>Size</th><th>Quantity</th><th>Price</th>
-        <th>ม้วนลูกค้า</th><th>คุณภาพ B</th><th>หมายเหตุ</th><th></th>
-      </tr></thead>
+  // ✅ ตาราง
+  html += `<div class="report-wrap" style="max-height:55vh;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px">
+    <table class="add-items-table">
+      <thead>
+        <tr>
+          <th style="width:40px">#</th>
+          <th style="width:130px">Gradegram</th>
+          <th style="width:80px">Size</th>
+          <th style="width:80px">Quantity</th>
+          <th style="width:80px;text-align:right">Price</th>
+          <th style="width:100px">ม้วนลูกค้า</th>
+          <th style="width:90px">คุณภาพ B</th>
+          <th>หมายเหตุ</th>
+          <th style="width:50px"></th>
+        </tr>
+      </thead>
       <tbody>`;
 
-  items.filter(it => it.status !== 'cancelled').forEach((it, i) => {
-    const custLabel = { normal: 'ปกติ', pump_f: 'ปั้ม F', pump_bt: 'ปั้ม BT', pump_ktp: 'ปั้ม KTP' }[it.customer_roll] || 'ปกติ';
-    const qualLabel = { normal: 'ปกติ', nc: 'NC' }[it.quality_b] || 'ปกติ';
+  const uniqueGradegrams = [...new Set(masterCache.map(m => normalizeGrade(m.grade) + m.gram))].sort();
 
-    html += `<tr data-item-id="${it.id}">
-      <td>${i + 1}</td>
-      <td><input type="text" value="${esc(it.pc_code) || 'SDPC.01'}" style="width:80px" onchange="onPOItemEdit('${it.id}', 'pc_code', this.value)"></td>
-      <td>${esc(it.gradegram)}</td>
-      <td>${it.size}</td>
-      <td><input type="number" value="${it.quantity}" style="width:60px" onchange="onPOItemEdit('${it.id}', 'quantity', this.value)"></td>
-      <td><input type="number" value="${Number(it.price || 0).toFixed(2)}" step="0.01" style="width:70px" onchange="onPOItemEdit('${it.id}', 'price', this.value)"></td>
+  activeRows.forEach((row, idx) => {
+    const autoPrice = row.gradegram
+      ? getPriceFromMaster(row.gradegram, row.customer_roll, row.quality_b)
+      : 0;
+
+    // ✅ เก่า → ใช้ row.price (ที่บันทึกไว้) | ใหม่ → ใช้ autoPrice
+    const displayPrice = row.isNew ? autoPrice : row.price;
+
+    // ✅ Size options
+    const availableSizes = getAvailableSizesFor(row.gradegram);
+    const gradegramOpts = uniqueGradegrams.map(g =>
+      `<option value="${esc(g)}" ${row.gradegram === g ? 'selected' : ''}>${esc(g)}</option>`
+    ).join('');
+    const sizeOpts = availableSizes.map(s =>
+      `<option value="${s}" ${Number(row.size) === s ? 'selected' : ''}>${s}</option>`
+    ).join('');
+
+    // ✅ เก่า → ล็อก gradegram/size | ใหม่ → dropdown
+    const gradegramCell = row.isNew
+      ? `<select onchange="onEditRowChange('${row.uid}', 'gradegram', this.value)">
+           <option value="">-- เลือก --</option>${gradegramOpts}
+         </select>`
+      : `<b style="color:#1e293b">${esc(row.gradegram)}</b>`;
+
+    const sizeCell = row.isNew
+      ? `<select onchange="onEditRowChange('${row.uid}', 'size', this.value)" style="width:80px" ${!row.gradegram ? 'disabled' : ''}>
+           <option value="">--</option>${sizeOpts}
+         </select>`
+      : `<b>${row.size}</b>`;
+
+    html += `<tr data-row-uid="${row.uid}" ${row.isNew ? 'style="background:#eff6ff"' : ''}>
+      <td style="text-align:center">${idx + 1}</td>
+      <td>${gradegramCell}</td>
+      <td>${sizeCell}</td>
       <td>
-        <select onchange="onPOItemEdit('${it.id}', 'customer_roll', this.value)">
-          <option value="normal" ${it.customer_roll === 'normal' ? 'selected' : ''}>ปกติ</option>
-          <option value="pump_f" ${it.customer_roll === 'pump_f' ? 'selected' : ''}>ปั้ม F</option>
-          <option value="pump_bt" ${it.customer_roll === 'pump_bt' ? 'selected' : ''}>ปั้ม BT</option>
-          <option value="pump_ktp" ${it.customer_roll === 'pump_ktp' ? 'selected' : ''}>ปั้ม KTP</option>
+        <input type="number" value="${row.quantity || ''}" min="1" step="1"
+               onchange="onEditRowChange('${row.uid}', 'quantity', this.value)"
+               style="width:70px;text-align:center">
+      </td>
+      <td style="text-align:right;color:#dc2626;font-weight:700">
+        <input type="number" value="${Number(displayPrice).toFixed(2)}" step="0.01"
+               onchange="onEditRowChange('${row.uid}', 'price', this.value)"
+               style="width:80px;text-align:right;color:#dc2626;font-weight:700">
+      </td>
+      <td>
+        <select onchange="onEditRowChange('${row.uid}', 'customer_roll', this.value)">
+          <option value="normal" ${row.customer_roll === 'normal' ? 'selected' : ''}>ปกติ</option>
+          <option value="pump_f" ${row.customer_roll === 'pump_f' ? 'selected' : ''}>ปั้ม F</option>
+          <option value="pump_bt" ${row.customer_roll === 'pump_bt' ? 'selected' : ''}>ปั้ม BT</option>
+          <option value="pump_ktp" ${row.customer_roll === 'pump_ktp' ? 'selected' : ''}>ปั้ม KTP</option>
         </select>
       </td>
       <td>
-        <select onchange="onPOItemEdit('${it.id}', 'quality_b', this.value)">
-          <option value="normal" ${it.quality_b === 'normal' ? 'selected' : ''}>ปกติ</option>
-          <option value="nc" ${it.quality_b === 'nc' ? 'selected' : ''}>NC</option>
+        <select onchange="onEditRowChange('${row.uid}', 'quality_b', this.value)">
+          <option value="normal" ${row.quality_b === 'normal' ? 'selected' : ''}>ปกติ</option>
+          <option value="nc" ${row.quality_b === 'nc' ? 'selected' : ''}>NC</option>
         </select>
       </td>
-      <td><input type="text" value="${esc(it.note) || ''}" style="width:150px" onchange="onPOItemEdit('${it.id}', 'note', this.value)"></td>
-      <td><button class="danger" onclick="cancelPOItem('${it.id}')">❌ ยกเลิก</button></td>
+      <td>
+        <input type="text" value="${esc(row.note || '')}"
+               onchange="onEditRowChange('${row.uid}', 'note', this.value)"
+               style="width:100%;min-width:100px">
+      </td>
+      <td style="text-align:center">
+        <button class="danger" onclick="removeEditRow('${row.uid}')"
+                style="padding:4px 10px;font-size:12px">✕</button>
+      </td>
     </tr>`;
   });
 
   html += `</tbody></table></div>`;
 
-  // ✅ ปุ่ม "+ เพิ่มรายการ" (แสดงเฉพาะตอนแก้ไข PO — ไม่ใช่ตอนสร้างใหม่)
-  if (poEditingId) {
-    const activeCount = items.filter(it => it.status !== 'cancelled').length;
-    const remaining = 15 - activeCount;
-    const disabled = remaining <= 0 ? 'disabled' : '';
-    const btnText = remaining <= 0 
-      ? `⚠️ ครบ 15 รายการแล้ว` 
-      : `➕ เพิ่มรายการ (เหลือ ${remaining})`;
-
-    html += `<div style="margin-top:12px;text-align:center">
-      <button class="primary" onclick="openAddPOItemsModal()" ${disabled} 
-              style="padding:10px 24px;font-size:14px">
-        ${btnText}
-      </button>
-    </div>`;
-  }
-
-  html += `<div class="form-actions" style="margin-top:16px">
-    <button onclick="cancelPOForm()">ยกเลิก</button>
-    <button class="primary" onclick="closeModal('modalPOForm'); renderPOList();">💾 ปิด</button>
+  // ✅ ปุ่มเพิ่มแถว + remaining
+  html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;gap:8px;flex-wrap:wrap">
+    <button type="button" onclick="addEditRow()" ${remaining <= 0 ? 'disabled' : ''}
+            style="border:1px dashed #2563eb;color:#1e40af;background:#eff6ff;padding:8px 18px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">
+      ➕ เพิ่มแถว
+    </button>
+    <div style="font-size:13px;color:${remaining <= 0 ? '#dc2626' : '#475569'}">
+      ${remaining <= 0 ? '⚠️ <b>ครบ 15 รายการ</b> — ไม่สามารถเพิ่มได้' : `สามารถเพิ่มได้อีก <b>${remaining}</b> รายการ`}
+    </div>
   </div>`;
 
-  $('poFormBody').innerHTML = html;
+  // ✅ ปุ่ม action
+  html += `<div class="form-actions" style="margin-top:16px;border-top:1px solid #e2e8f0;padding-top:14px">
+    <button onclick="cancelPOForm()">ยกเลิก</button>
+    <button class="primary" onclick="saveEditPOItems(this)">💾 บันทึกการแก้ไข</button>
+  </div>`;
+
+  container.innerHTML = html;
 }
 
-// ================= EDIT ITEM =================
+// ✅ Add row ใหม่
+function addEditRow() {
+  const activeCount = _editItemsRows.filter(r => !r.removed).length;
+  if (activeCount >= 15) {
+    alert('⚠️ ครบ 15 รายการแล้ว');
+    return;
+  }
+  _editItemsRows.push({
+    uid: `new_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    id: null,
+    isNew: true,
+    gradegram: '',
+    size: '',
+    quantity: '',
+    price: 0,
+    customer_roll: 'normal',
+    quality_b: 'normal',
+    note: '',
+    removed: false
+  });
+  renderPOFormTable();
+}
+
+// ✅ Change handler
+function onEditRowChange(uid, field, value) {
+  const row = _editItemsRows.find(r => r.uid === uid);
+  if (!row) return;
+
+  row[field] = value;
+
+  if (field === 'gradegram') {
+    row.size = '';
+  }
+
+  // ✅ Re-render (เพื่ออัปเดต size + price)
+  renderPOFormTable();
+}
+
+// ✅ Remove row
+async function removeEditRow(uid) {
+  const row = _editItemsRows.find(r => r.uid === uid);
+  if (!row) return;
+
+  if (row.isNew) {
+    // ใหม่ → ลบออกจาก array
+    _editItemsRows = _editItemsRows.filter(r => r.uid !== uid);
+    renderPOFormTable();
+    return;
+  }
+
+  // เก่า → ต้องยืนยัน + ใส่หมายเหตุ
+  if (!confirm(`⚠️ ต้องการลบรายการ ${row.gradegram} ${row.size} ออกจาก PO?\n(จะถูกบันทึกเป็น "ยกเลิก")`)) return;
+
+  const note = prompt('📝 หมายเหตุการยกเลิก:');
+  if (note === null) return;
+  if (!note.trim()) {
+    alert('กรุณาใส่หมายเหตุ');
+    return;
+  }
+
+  try {
+    const { error } = await supabase.rpc('cancel_po_item', {
+      p_item_id: row.id,
+      p_note: note,
+      p_user_id: currentUser?.id
+    });
+    if (error) throw error;
+
+    // ✅ Mark removed
+    row.removed = true;
+    renderPOFormTable();
+    alert('✅ ยกเลิกรายการสำเร็จ');
+  } catch (e) {
+    alert('❌ ' + e.message);
+  }
+}
+
+// ✅ บันทึกการแก้ไข (ทั้ง old ที่เปลี่ยน + new ที่เพิ่ม)
+async function saveEditPOItems(btnEl) {
+  if (!poEditingId) {
+    alert('ไม่พบ PO ที่กำลังแก้ไข');
+    return;
+  }
+
+  // ✅ ตรวจสอบข้อมูล
+  const activeRows = _editItemsRows.filter(r => !r.removed);
+
+  // ✅ ตรวจ new rows
+  for (const row of activeRows) {
+    if (row.isNew) {
+      if (!row.gradegram || !row.size || !row.quantity) {
+        alert('⚠️ กรุณากรอกรายการใหม่ให้ครบ (Gradegram / Size / Quantity)');
+        return;
+      }
+      if (Number(row.quantity) <= 0) {
+        alert(`⚠️ จำนวนต้อง > 0 (${row.gradegram} ${row.size})`);
+        return;
+      }
+    }
+  }
+
+  // ✅ แยก: rows ที่มีการแก้ไข (old) + rows ใหม่
+  const updatedOld = [];
+  const newRows = [];
+
+  activeRows.forEach(row => {
+    if (row.isNew) {
+      newRows.push(row);
+    } else {
+      const orig = row.original;
+      const changed =
+        Number(row.quantity) !== Number(orig.quantity) ||
+        Number(row.price) !== Number(orig.price) ||
+        row.customer_roll !== (orig.customer_roll || 'normal') ||
+        row.quality_b !== (orig.quality_b || 'normal') ||
+        (row.note || '') !== (orig.note || '');
+
+      if (changed) {
+        updatedOld.push(row);
+      }
+    }
+  });
+
+  if (!updatedOld.length && !newRows.length) {
+    alert('ไม่มีการเปลี่ยนแปลง');
+    return;
+  }
+
+  const totalMsg = [];
+  if (updatedOld.length) totalMsg.push(`แก้ไข ${updatedOld.length} รายการ`);
+  if (newRows.length) totalMsg.push(`เพิ่ม ${newRows.length} รายการ`);
+
+  if (!confirm(`ยืนยันบันทึก?\n\n${totalMsg.join(' · ')}`)) return;
+
+  // ✅ Disable ปุ่ม
+  const btn = btnEl || document.querySelector('#poFormBody .form-actions .primary');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'กำลังบันทึก...';
+  }
+
+  let errorMsg = '';
+
+  // ✅ 1) อัปเดต old items ทีละรายการ
+  for (const row of updatedOld) {
+    try {
+      const payload = {
+        quantity: Number(row.quantity),
+        price: Number(row.price),
+        customer_roll: row.customer_roll,
+        quality_b: row.quality_b,
+        note: row.note || '',
+        kg_total: calcKgTotal(row.gradegram, row.size, row.quantity)
+      };
+
+      const { error } = await supabase.rpc('update_po_item', {
+        p_item_id: row.id,
+        p_data: payload,
+        p_user_id: currentUser?.id
+      });
+      if (error) throw error;
+    } catch (e) {
+      errorMsg += `แก้ไข ${row.gradegram} ${row.size}: ${e.message}; `;
+    }
+  }
+
+  // ✅ 2) เพิ่ม new items (ถ้ามี)
+  if (newRows.length) {
+    try {
+      const itemsPayload = newRows.map(r => {
+        const price = Number(r.price) || getPriceFromMaster(r.gradegram, r.customer_roll, r.quality_b);
+        const kgTotal = calcKgTotal(r.gradegram, r.size, r.quantity);
+
+        const custLabel = { normal: '', pump_f: 'ปั้ม F', pump_bt: 'ปั้ม BT', pump_ktp: 'ปั้ม KTP' }[r.customer_roll] || '';
+        const qualLabel = { normal: '', nc: 'NC' }[r.quality_b] || '';
+        const remarkParts = [custLabel, qualLabel, r.note].filter(x => x && String(x).trim());
+        const remarkCombined = remarkParts.join(',');
+
+        return {
+          pc_code: 'SDPC.01',
+          gradegram: r.gradegram,
+          size: Number(r.size),
+          gradegram_size: `${r.gradegram}-${Number(r.size).toFixed(2)}`,
+          quantity: Number(r.quantity),
+          kg_total: kgTotal,
+          price: price,
+          customer_roll: r.customer_roll,
+          quality_b: r.quality_b,
+          note: r.note || '',
+          remark_combined: remarkCombined
+        };
+      });
+
+      const { data, error } = await supabase.rpc('add_po_items', {
+        p_po_id: poEditingId,
+        p_items: itemsPayload,
+        p_user_id: currentUser?.id
+      });
+      if (error) throw error;
+
+      if (!data || !data.success) {
+        throw new Error(data?.error || 'เพิ่มรายการไม่สำเร็จ');
+      }
+    } catch (e) {
+      errorMsg += `เพิ่มรายการใหม่: ${e.message}; `;
+    }
+  }
+
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = '💾 บันทึกการแก้ไข';
+  }
+
+  if (errorMsg) {
+    alert(`⚠️ มีข้อผิดพลาด:\n${errorMsg}`);
+  } else {
+    const summary = [];
+    if (updatedOld.length) summary.push(`แก้ไข ${updatedOld.length}`);
+    if (newRows.length) summary.push(`เพิ่ม ${newRows.length}`);
+    alert(`✅ บันทึกสำเร็จ (${summary.join(' · ')})`);
+  }
+
+  // ✅ Refresh
+  try {
+    const { data: detail } = await supabase.rpc('get_purchase_order_detail', { p_po_id: poEditingId });
+    if (detail) renderPOFormContent(detail.header, detail.items);
+  } catch (e) {
+    console.warn('refresh after save:', e);
+  }
+
+  await renderPOList();
+}
+
+// ================= EDIT ITEM (single field — legacy) =================
 async function onPOItemEdit(itemId, field, value) {
   try {
     const payload = {};
@@ -1289,6 +1608,9 @@ function cancelPOForm() {
   window._pendingPOs = null;
   window._pendingAlertData = null;
 
+  _editItemsRows = [];
+  _editPOHeader = null;
+
   const alertBtn = document.querySelector('.nav button[data-tab="alert"]');
   if (alertBtn) alertBtn.click();
 }
@@ -1398,10 +1720,8 @@ async function exportPOToExcel_Async() {
 // ================= ADD PO ITEMS (Phase 3) =====================
 // ═══════════════════════════════════════════════════════════════
 
-// ✅ State: รายการที่กำลังเพิ่ม
 let _addItemsRows = [];
 
-// ✅ เปิด Modal เพิ่มรายการ
 async function openAddPOItemsModal() {
   if (!poEditingId) {
     alert('ไม่พบ PO ที่กำลังแก้ไข');
@@ -1432,7 +1752,6 @@ async function openAddPOItemsModal() {
   }
 }
 
-// ✅ สร้างแถวเปล่า
 function createEmptyAddRow() {
   return {
     uid: `row_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -1447,7 +1766,6 @@ function createEmptyAddRow() {
   };
 }
 
-// ✅ Render Modal
 function renderAddPOItemsModal(header, currentCount, remaining) {
   const titleEl = $('addPOItemsTitle');
   if (titleEl) titleEl.innerHTML = `➕ เพิ่มรายการ — ${esc(header.po_no)}`;
@@ -1463,7 +1781,6 @@ function renderAddPOItemsModal(header, currentCount, remaining) {
   renderAddPOItemsTable();
 }
 
-// ✅ Render ตาราง items ใน Modal
 function renderAddPOItemsTable() {
   const tbody = $('addPOItemsTbody');
   if (!tbody) return;
@@ -1544,26 +1861,22 @@ function renderAddPOItemsTable() {
   updateAddItemsRemaining(remaining);
 }
 
-// ✅ ดึง size ที่มีใน masterCache
 function getAvailableSizesFor(gradegram) {
   if (!gradegram) return [];
-  // ✅ ใช้ string comparison ตรงๆ — ไม่ใช้ parseGradegram (มี bug)
+  const { grade, gram } = parseGradegram(gradegram);
   return [...new Set(
     masterCache
-      .filter(m => (normalizeGrade(m.grade) + m.gram) === gradegram)
+      .filter(m => normalizeGrade(m.grade) === grade && String(m.gram) === String(gram))
       .map(m => Number(m.size))
-      .filter(n => !isNaN(n) && n > 0)
   )].sort((a, b) => a - b);
 }
 
-// ✅ ดึงจำนวน items ปัจจุบันของ PO
 function getCurrentPOItemCount() {
   const tbody = document.querySelector('#poFormBody table tbody');
   if (!tbody) return 0;
   return tbody.querySelectorAll('tr[data-item-id]').length;
 }
 
-// ✅ อัปเดต label remaining
 function updateAddItemsRemaining(remaining) {
   const label = $('addPOItemsRemaining');
   if (label) {
@@ -1579,7 +1892,6 @@ function updateAddItemsRemaining(remaining) {
   }
 }
 
-// ✅ Change handler ในแถว
 function onAddRowChange(uid, field, value) {
   const row = _addItemsRows.find(r => r.uid === uid);
   if (!row) return;
@@ -1593,7 +1905,6 @@ function onAddRowChange(uid, field, value) {
   renderAddPOItemsTable();
 }
 
-// ✅ เพิ่มแถว
 function addAddRow() {
   const currentTotal = getCurrentPOItemCount() + _addItemsRows.length;
   if (currentTotal >= 15) {
@@ -1604,7 +1915,6 @@ function addAddRow() {
   renderAddPOItemsTable();
 }
 
-// ✅ ลบแถว
 function removeAddRow(uid) {
   if (_addItemsRows.length <= 1) {
     alert('ต้องมีอย่างน้อย 1 แถว');
@@ -1614,7 +1924,6 @@ function removeAddRow(uid) {
   renderAddPOItemsTable();
 }
 
-// ✅ บันทึก (เรียก RPC)
 async function saveAddPOItems() {
   if (!poEditingId) return;
 
@@ -1700,7 +2009,6 @@ async function saveAddPOItems() {
   }
 }
 
-// ✅ ปิด Modal
 function closeAddPOItemsModal() {
   if (_addItemsRows.some(r => r.gradegram || r.size || r.quantity)) {
     if (!confirm('⚠️ มีข้อมูลที่กรอกไว้ — ต้องการปิดหรือไม่?')) return;
