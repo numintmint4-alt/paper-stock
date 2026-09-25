@@ -1433,3 +1433,101 @@ th{background:#f1f5f9;font-weight:600}
   pointer-events: none;
   opacity: 0.5;
 }
+/* ═══════════════════════════════════════════════════════════ */
+/* ========== PO LIST — Filter หัวคอลัมน์ ========== */
+/* ═══════════════════════════════════════════════════════════ */
+
+.po-list-scroll {
+  height: 65vh;
+  min-height: 400px;
+  max-height: 750px;
+  overflow-y: auto;
+  overflow-x: auto;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+}
+
+.po-list-table {
+  table-layout: auto;
+  width: 100%;
+}
+
+.po-list-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #1e293b;
+  color: #fff;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.po-list-table thead th.th-with-filter {
+  z-index: 15;
+  padding: 4px 6px !important;
+}
+
+/* ✅ Input filter เล็กในหัวคอลัมน์ */
+.po-filter-input {
+  width: 100%;
+  min-width: 80px;
+  max-width: 130px;
+  padding: 4px 6px;
+  font-size: 11px;
+  border: 1px solid #475569;
+  border-radius: 4px;
+  background: #334155;
+  color: #fff;
+  font-family: inherit;
+}
+.po-filter-input::placeholder {
+  color: #94a3b8;
+}
+.po-filter-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  background: #1e40af;
+}
+
+/* ✅ Filter button ในหัวคอลัมน์ PO */
+.po-list-table .th-filter-btn {
+  width: 100%;
+  background: transparent;
+  border: 1px solid #475569;
+  color: #fff;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px;
+}
+.po-list-table .th-filter-btn:hover {
+  background: #334155;
+  border-color: #94a3b8;
+}
+.po-list-table .th-filter-btn .arrow {
+  font-size: 9px;
+  transition: transform .2s;
+}
+.po-list-table .th-filter-btn.open .arrow {
+  transform: rotate(180deg);
+}
+.po-list-table .th-filter-wrap {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+.po-list-table .th-filter-wrap .grade-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  z-index: 100;
+  text-align: left;
+  font-weight: 400;
+  color: #222;
+}
