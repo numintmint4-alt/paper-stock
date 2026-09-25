@@ -145,7 +145,6 @@ async function renderPOList() {
       return;
     }
 
-    // ✅ Render ตารางพร้อม filter header
     let html = '<div class="data-scroll po-list-scroll"><table class="data-table po-list-table"><thead><tr>';
 
     // ✅ Filter: PO No.
@@ -217,7 +216,6 @@ async function renderPOList() {
     html += '</tr></thead><tbody id="poListTbody"></tbody></table></div>';
     listEl.innerHTML = html;
 
-    // ✅ Render rows + filter lists
     renderPOListRows(poCache);
     renderPOSupFilterList(supList);
     renderPOStatusFilterList();
@@ -286,27 +284,22 @@ function onPOFilterChange() {
 function applyPOFiltersAndRender() {
   let result = [...poCache];
 
-  // 1) PO No.
   if (poFilterPONo) {
     result = result.filter(p => String(p.po_no).toLowerCase().includes(poFilterPONo.toLowerCase()));
   }
 
-  // 2) วันที่ออก
   if (poFilterDateFrom) {
     result = result.filter(p => p.po_date && p.po_date.slice(0, 10) === poFilterDateFrom);
   }
 
-  // 3) วันที่รับ
   if (poFilterDateTo) {
     result = result.filter(p => p.ref_receive && p.ref_receive.slice(0, 10) === poFilterDateTo);
   }
 
-  // 4) Sup.
   if (poFilterSup.length > 0) {
     result = result.filter(p => poFilterSup.includes(p.sup_code));
   }
 
-  // 5) สถานะ
   if (poFilterStatus.length > 0) {
     result = result.filter(p => poFilterStatus.includes(p.status));
   }
@@ -340,7 +333,6 @@ function renderPOSupFilterList(supList) {
     });
   });
 
-  // attach dropdown
   _attachPOFilterDropdown('poFilterSupBtn', 'poFilterSupDropdown', 'poFilterSupBox', 'poSup');
   updatePOSupFilterLabel();
 }
@@ -357,7 +349,7 @@ function selectAllPOSups() {
   const list = $('poFilterSupList');
   if (!list) return;
   poFilterSup = [...list.querySelectorAll('.item')].map(el => el.dataset.sup);
-  renderPOSupFilterList(poFilterSup.map(s => s)); // re-render
+  renderPOSupFilterList(poFilterSup.map(s => s));
   applyPOFiltersAndRender();
 }
 
@@ -432,7 +424,7 @@ function clearAllPOStatuses() {
   applyPOFiltersAndRender();
 }
 
-// ✅ Dropdown helper ( reuse จาก alert.js )
+// ✅ Dropdown helper
 function _attachPOFilterDropdown(btnId, dropdownId, boxId, docKey) {
   const btn = $(btnId);
   const dropdown = $(dropdownId);
