@@ -1195,7 +1195,7 @@ th{background:#f1f5f9;font-weight:600}
 }
 
 /* ═══════════════════════════════════════════════════════════ */
-/* ========== ALERT DATE TABS — แถบซ้าย scroll + summary ขวา ========== */
+/* ========== ALERT DATE TABS ========== */
 /* ═══════════════════════════════════════════════════════════ */
 
 .alert-date-tabs {
@@ -1548,4 +1548,91 @@ th{background:#f1f5f9;font-weight:600}
   text-align: center;
   white-space: nowrap;
   line-height: 1.2;
+}
+
+/* ═══════════════════════════════════════════════════════════ */
+/* ========== MODAL ADD PO ITEMS ========== */
+/* ═══════════════════════════════════════════════════════════ */
+
+.add-items-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  background: #fff;
+}
+
+.add-items-table thead th {
+  background: #1e293b;
+  color: #fff;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  border: 1px solid #475569;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.add-items-table tbody td {
+  border: 1px solid #e2e8f0;
+  padding: 6px 8px;
+  vertical-align: middle;
+}
+
+.add-items-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.add-items-table select,
+.add-items-table input[type="number"],
+.add-items-table input[type="text"] {
+  width: 100%;
+  padding: 5px 7px;
+  font-size: 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  font-family: inherit;
+  background: #fff;
+}
+
+.add-items-table select:focus,
+.add-items-table input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37,99,235,.15);
+}
+
+.add-items-table button.danger {
+  padding: 4px 10px;
+  font-size: 12px;
+  background: #dc2626;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.add-items-table button.danger:hover:not(:disabled) {
+  background: #b91c1c;
+}
+.add-items-table button.danger:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+#addPOItemsRemaining b {
+  color: #1e40af;
+}
+
+@media (max-width: 768px) {
+  #modalAddPOItems .modal {
+    padding: 12px;
+  }
+  .add-items-table {
+    font-size: 11px;
+  }
+  .add-items-table thead th,
+  .add-items-table tbody td {
+    padding: 4px 5px;
+  }
 }
