@@ -1862,13 +1862,21 @@ function renderAddPOItemsTable() {
 }
 
 function getAvailableSizesFor(gradegram) {
-  if (!gradegram) return [];
-  const { grade, gram } = parseGradegram(gradegram);
-  return [...new Set(
+  console.log('[getAvailableSizesFor] input:', JSON.stringify(gradegram), '| type:', typeof gradegram);
+  if (!gradegram) {
+    console.log('[getAvailableSizesFor] return [] — input ว่าง');
+    return [];
+  }
+
+  const result = [...new Set(
     masterCache
-      .filter(m => normalizeGrade(m.grade) === grade && String(m.gram) === String(gram))
+      .filter(m => (normalizeGrade(m.grade) + m.gram) === gradegram)
       .map(m => Number(m.size))
+      .filter(n => !isNaN(n) && n > 0)
   )].sort((a, b) => a - b);
+
+  console.log('[getAvailableSizesFor] result:', result.length, 'sizes');
+  return result;
 }
 
 function getCurrentPOItemCount() {
