@@ -20,6 +20,18 @@ const ALERT_ALL_FILTERS = [
   { value: 'gt0', label: '🟢 เกิน (> 0)' }
 ];
 
+// ✅ Filter "สั่งซื้อ" (Order Qty)
+let alertSelectedOrderFilters = ['all'];
+const ALERT_ORDER_FILTERS = [
+  { value: 'all',      label: 'ทั้งหมด' },
+  { value: 'filled',   label: '✅ กรอกแล้ว' },
+  { value: 'not_filled', label: '⬜ ยังไม่กรอก' }
+];
+
+// ✅ Filter "Sup." (Supplier)
+let alertSelectedSupFilters = [];   // [] = ทั้งหมด
+let alertAllSupsInData = [];        // รายชื่อ Sup ที่มีในข้อมูล
+
 // ✅ Customer Roll (ม้วนลูกค้า)
 const ALERT_CUSTOMER_ROLLS = [
   { value: 'normal',   label: 'ปกติ' },
@@ -415,7 +427,42 @@ function renderAlertFromCache() {
       </div>
     </div>
   </th>`;
-  html += '<th>สถานะ</th><th>สั่งซื้อ</th><th>Sup.</th>';
+  html += '<th>สถานะ</th>';
+
+  // ✅ Filter "สั่งซื้อ"
+  html += `<th class="th-with-filter">
+    <div class="th-filter-wrap" id="alertOrderFilterBox">
+      <button type="button" class="th-filter-btn" id="alertOrderFilterBtn">
+        <span id="alertOrderFilterLabel">สั่งซื้อ</span>
+        <span class="arrow">▼</span>
+      </button>
+      <div class="grade-dropdown hidden" id="alertOrderFilterDropdown" style="min-width:180px">
+        <div class="grade-actions">
+          <button type="button" onclick="selectAllAlertOrderFilters()">✓ เลือกทั้งหมด</button>
+          <button type="button" onclick="clearAllAlertOrderFilters()">✗ ล้างทั้งหมด</button>
+        </div>
+        <div class="grade-list" id="alertOrderFilterList"></div>
+      </div>
+    </div>
+  </th>`;
+
+  // ✅ Filter "Sup."
+  html += `<th class="th-with-filter">
+    <div class="th-filter-wrap" id="alertSupFilterBox">
+      <button type="button" class="th-filter-btn" id="alertSupFilterBtn">
+        <span id="alertSupFilterLabel">Sup.</span>
+        <span class="arrow">▼</span>
+      </button>
+      <div class="grade-dropdown hidden" id="alertSupFilterDropdown" style="min-width:180px">
+        <div class="grade-actions">
+          <button type="button" onclick="selectAllAlertSupFilters()">✓ เลือกทั้งหมด</button>
+          <button type="button" onclick="clearAllAlertSupFilters()">✗ ล้างทั้งหมด</button>
+        </div>
+        <div class="grade-list" id="alertSupFilterList"></div>
+      </div>
+    </div>
+  </th>`;
+
   html += '<th>ม้วนลูกค้า</th><th>คุณภาพ B</th><th>FSC</th><th>หมายเหตุ</th>';
   html += '</tr></thead><tbody>';
 
@@ -497,12 +544,18 @@ function renderAlertFromCache() {
   renderAlertGradeList();
   renderAlertSizeList();
   renderAlertFilterList();
+  renderAlertOrderFilterList();
+  renderAlertSupFilterList();
   updateAlertGradeLabel();
   updateAlertSizeLabel();
   updateAlertFilterLabel();
+  updateAlertOrderFilterLabel();
+  updateAlertSupFilterLabel();
   _attachAlertDropdown('alertGradeFilterBtn', 'alertGradeDropdown', 'alertGradeFilterBox', 'alertGrade');
   _attachAlertDropdown('alertSizeFilterBtn', 'alertSizeDropdown', 'alertSizeFilterBox', 'alertSize');
   _attachAlertDropdown('alertFilterBtn', 'alertFilterDropdown', 'alertFilterBox', 'alertFilter');
+  _attachAlertDropdown('alertOrderFilterBtn', 'alertOrderFilterDropdown', 'alertOrderFilterBox', 'alertOrderFilter');
+  _attachAlertDropdown('alertSupFilterBtn', 'alertSupFilterDropdown', 'alertSupFilterBox', 'alertSupFilter');
   renderAlertReceiveDates();
 }
 
@@ -579,6 +632,7 @@ function renderAlertGradeList() {
       }
       el.classList.toggle('checked', cb.checked);
       updateAlertGradeLabel();
+      applyAlertFiltersAndRender();    // ← ✅ เพิ่ม
     });
   });
 }
@@ -597,10 +651,12 @@ function updateAlertGradeLabel() {
 function selectAllAlertGrades() {
   alertSelectedGrades = [...alertAllGrades];
   renderAlertGradeList(); updateAlertGradeLabel();
+  applyAlertFiltersAndRender();
 }
 function clearAllAlertGrades() {
   alertSelectedGrades = [];
   renderAlertGradeList(); updateAlertGradeLabel();
+  applyAlertFiltersAndRender();
 }
 
 // ================= SIZE FILTER =================
@@ -629,6 +685,7 @@ function renderAlertSizeList() {
       }
       el.classList.toggle('checked', cb.checked);
       updateAlertSizeLabel();
+      applyAlertFiltersAndRender();    // ← ✅ เพิ่ม
     });
   });
 }
@@ -651,10 +708,12 @@ function updateAlertSizeLabel() {
 function selectAllAlertSizes() {
   alertSelectedSizes = [...alertAllSizes];
   renderAlertSizeList(); updateAlertSizeLabel();
+  applyAlertFiltersAndRender();
 }
 function clearAllAlertSizes() {
   alertSelectedSizes = [];
   renderAlertSizeList(); updateAlertSizeLabel();
+  applyAlertFiltersAndRender();
 }
 
 // ================= ALERT FILTER =================
@@ -684,6 +743,7 @@ function renderAlertFilterList() {
       }
       el.classList.toggle('checked', cb.checked);
       updateAlertFilterLabel();
+      applyAlertFiltersAndRender();    // ← ✅ เพิ่ม
     });
   });
 }
@@ -703,10 +763,176 @@ function updateAlertFilterLabel() {
 function selectAllAlertFilters() {
   alertSelectedFilters = ['all'];
   renderAlertFilterList(); updateAlertFilterLabel();
+  applyAlertFiltersAndRender();
 }
 function clearAllAlertFilters() {
   alertSelectedFilters = [];
   renderAlertFilterList(); updateAlertFilterLabel();
+  applyAlertFiltersAndRender();
+}
+
+// ================= ORDER FILTER =================
+function renderAlertOrderFilterList() {
+  const list = $('alertOrderFilterList');
+  if (!list) return;
+  list.innerHTML = ALERT_ORDER_FILTERS.map(f => {
+    const checked = alertSelectedOrderFilters.includes(f.value);
+    return `<label class="item ${checked ? 'checked' : ''}" data-order-filter="${f.value}">
+      <input type="checkbox" ${checked ? 'checked' : ''}>
+      <span>${f.label}</span>
+    </label>`;
+  }).join('');
+  list.querySelectorAll('.item').forEach(el => {
+    const cb = el.querySelector('input[type="checkbox"]');
+    cb.addEventListener('change', () => {
+      const val = el.dataset.orderFilter;
+      if (cb.checked) {
+        if (!alertSelectedOrderFilters.includes(val)) alertSelectedOrderFilters.push(val);
+      } else {
+        alertSelectedOrderFilters = alertSelectedOrderFilters.filter(x => x !== val);
+      }
+      el.classList.toggle('checked', cb.checked);
+      updateAlertOrderFilterLabel();
+      // ✅ Auto-trigger
+      applyAlertFiltersAndRender();
+    });
+  });
+}
+
+function updateAlertOrderFilterLabel() {
+  const label = $('alertOrderFilterLabel');
+  if (!label) return;
+  if (alertSelectedOrderFilters.length === 0 || alertSelectedOrderFilters.includes('all')) {
+    label.textContent = 'สั่งซื้อ';
+  } else if (alertSelectedOrderFilters.length === 1) {
+    const f = ALERT_ORDER_FILTERS.find(x => x.value === alertSelectedOrderFilters[0]);
+    label.textContent = f ? f.label : alertSelectedOrderFilters[0];
+  } else {
+    label.textContent = `สั่งซื้อ (${alertSelectedOrderFilters.length})`;
+  }
+}
+function selectAllAlertOrderFilters() {
+  alertSelectedOrderFilters = ['all'];
+  renderAlertOrderFilterList(); updateAlertOrderFilterLabel();
+  applyAlertFiltersAndRender();
+}
+function clearAllAlertOrderFilters() {
+  alertSelectedOrderFilters = [];
+  renderAlertOrderFilterList(); updateAlertOrderFilterLabel();
+  applyAlertFiltersAndRender();
+}
+
+// ================= SUP FILTER =================
+function renderAlertSupFilterList() {
+  const list = $('alertSupFilterList');
+  if (!list) return;
+  if (!alertAllSupsInData.length) {
+    list.innerHTML = '<div style="padding:10px;text-align:center;color:#94a3b8;font-size:13px">ไม่มีข้อมูล</div>';
+    return;
+  }
+  // รวม __NONE__ (ยังไม่เลือก Sup)
+  const displayList = ['__NONE__', ...alertAllSupsInData];
+  list.innerHTML = displayList.map(s => {
+    const checked = alertSelectedSupFilters.includes(s);
+    const label = s === '__NONE__' ? '— ยังไม่ระบุ —' : s;
+    return `<label class="item ${checked ? 'checked' : ''}" data-sup="${esc(s)}">
+      <input type="checkbox" ${checked ? 'checked' : ''}>
+      <span>${esc(label)}</span>
+    </label>`;
+  }).join('');
+  list.querySelectorAll('.item').forEach(el => {
+    const cb = el.querySelector('input[type="checkbox"]');
+    cb.addEventListener('change', () => {
+      const val = el.dataset.sup;
+      if (cb.checked) {
+        if (!alertSelectedSupFilters.includes(val)) alertSelectedSupFilters.push(val);
+      } else {
+        alertSelectedSupFilters = alertSelectedSupFilters.filter(x => x !== val);
+      }
+      el.classList.toggle('checked', cb.checked);
+      updateAlertSupFilterLabel();
+      // ✅ Auto-trigger
+      applyAlertFiltersAndRender();
+    });
+  });
+}
+
+function updateAlertSupFilterLabel() {
+  const label = $('alertSupFilterLabel');
+  if (!label) return;
+  if (alertSelectedSupFilters.length === 0) {
+    label.textContent = 'Sup.';
+  } else if (alertSelectedSupFilters.length === 1) {
+    label.textContent = alertSelectedSupFilters[0] === '__NONE__' ? 'ยังไม่ระบุ' : alertSelectedSupFilters[0];
+  } else {
+    label.textContent = `Sup. (${alertSelectedSupFilters.length})`;
+  }
+}
+function selectAllAlertSupFilters() {
+  alertSelectedSupFilters = [...alertAllSupsInData];
+  renderAlertSupFilterList(); updateAlertSupFilterLabel();
+  applyAlertFiltersAndRender();
+}
+function clearAllAlertSupFilters() {
+  alertSelectedSupFilters = [];
+  renderAlertSupFilterList(); updateAlertSupFilterLabel();
+  applyAlertFiltersAndRender();
+}
+
+// ================= APPLY FILTERS + RE-RENDER =================
+// ✅ กรองด้วย filter ทั้งหมด แล้ว re-render ตาราง (client-side)
+function applyAlertFiltersAndRender() {
+  if (!window._alertFullCache || !window._alertFullCache.length) return;
+
+  let result = [...window._alertFullCache];
+
+  // 1) Gradegrams
+  if (alertSelectedGrades.length > 0) {
+    result = result.filter(r => alertSelectedGrades.includes(r.gradegram));
+  }
+
+  // 2) Size
+  if (alertSelectedSizes.length > 0) {
+    result = result.filter(r => alertSelectedSizes.includes(Number(r.size)));
+  }
+
+  // 3) Alert (lt0/eq0/gt0)
+  if (!alertSelectedFilters.includes('all') && alertSelectedFilters.length > 0) {
+    result = result.filter(r => {
+      const a = Number(r.alert) || 0;
+      if (alertSelectedFilters.includes('lt0') && a < 0) return true;
+      if (alertSelectedFilters.includes('eq0') && a === 0) return true;
+      if (alertSelectedFilters.includes('gt0') && a > 0) return true;
+      return false;
+    });
+  }
+
+  // 4) สั่งซื้อ
+  if (!alertSelectedOrderFilters.includes('all') && alertSelectedOrderFilters.length > 0) {
+    result = result.filter(r => {
+      const lsKey = alertLS_Key(r.gradegram, r.size);
+      const lsVal = getAlertInput(lsKey);
+      const hasQty = lsVal.qty && Number(lsVal.qty) > 0;
+      if (alertSelectedOrderFilters.includes('filled') && hasQty) return true;
+      if (alertSelectedOrderFilters.includes('not_filled') && !hasQty) return true;
+      return false;
+    });
+  }
+
+  // 5) Sup.
+  if (alertSelectedSupFilters.length > 0) {
+    result = result.filter(r => {
+      const lsKey = alertLS_Key(r.gradegram, r.size);
+      const lsVal = getAlertInput(lsKey);
+      const sup = lsVal.sup || '';
+      if (!sup && alertSelectedSupFilters.includes('__NONE__')) return true;
+      return alertSelectedSupFilters.includes(sup);
+    });
+  }
+
+  alertCache = result;
+  renderAlertFromCache();   // ← re-render ทั้งตาราง (รวม filter header)
+  // ✅ filter header จะยังติ๊กค้างอยู่ เพราะ render จาก state
 }
 
 // ================= DROPDOWN HELPER =================
@@ -1100,7 +1326,42 @@ async function renderAlert() {
       </div>
     </th>`;
 
-    html += '<th>สถานะ</th><th>สั่งซื้อ</th><th>Sup.</th>';
+    html += '<th>สถานะ</th>';
+
+    // ✅ Filter "สั่งซื้อ"
+    html += `<th class="th-with-filter">
+      <div class="th-filter-wrap" id="alertOrderFilterBox">
+        <button type="button" class="th-filter-btn" id="alertOrderFilterBtn">
+          <span id="alertOrderFilterLabel">สั่งซื้อ</span>
+          <span class="arrow">▼</span>
+        </button>
+        <div class="grade-dropdown hidden" id="alertOrderFilterDropdown" style="min-width:180px">
+          <div class="grade-actions">
+            <button type="button" onclick="selectAllAlertOrderFilters()">✓ เลือกทั้งหมด</button>
+            <button type="button" onclick="clearAllAlertOrderFilters()">✗ ล้างทั้งหมด</button>
+          </div>
+          <div class="grade-list" id="alertOrderFilterList"></div>
+        </div>
+      </div>
+    </th>`;
+
+    // ✅ Filter "Sup."
+    html += `<th class="th-with-filter">
+      <div class="th-filter-wrap" id="alertSupFilterBox">
+        <button type="button" class="th-filter-btn" id="alertSupFilterBtn">
+          <span id="alertSupFilterLabel">Sup.</span>
+          <span class="arrow">▼</span>
+        </button>
+        <div class="grade-dropdown hidden" id="alertSupFilterDropdown" style="min-width:180px">
+          <div class="grade-actions">
+            <button type="button" onclick="selectAllAlertSupFilters()">✓ เลือกทั้งหมด</button>
+            <button type="button" onclick="clearAllAlertSupFilters()">✗ ล้างทั้งหมด</button>
+          </div>
+          <div class="grade-list" id="alertSupFilterList"></div>
+        </div>
+      </div>
+    </th>`;
+
     html += '<th>ม้วนลูกค้า</th><th>คุณภาพ B</th><th>FSC</th><th>หมายเหตุ</th>';
     html += '</tr></thead><tbody>';
 
@@ -1175,17 +1436,35 @@ async function renderAlert() {
     </div>`;
 
     $('alertBody').innerHTML = html;
+
+    // ✅ เก็บ full cache ก่อนกรอง
+    window._alertFullCache = [...display];   // ✅ เก็บของเดิมไว้
     alertCache = display;
+
+    // ✅ อัปเดตรายชื่อ Sup ที่มีในข้อมูล
+    alertAllSupsInData = [...new Set(
+      display.map(r => {
+        const lsKey = alertLS_Key(r.gradegram, r.size);
+        const lsVal = getAlertInput(lsKey);
+        return lsVal.sup || '';
+      }).filter(Boolean)
+    )].sort();
 
     renderAlertGradeList();
     renderAlertFilterList();
     renderAlertSizeList();
+    renderAlertOrderFilterList();
+    renderAlertSupFilterList();
     updateAlertGradeLabel();
     updateAlertFilterLabel();
     updateAlertSizeLabel();
+    updateAlertOrderFilterLabel();
+    updateAlertSupFilterLabel();
     _attachAlertDropdown('alertGradeFilterBtn', 'alertGradeDropdown', 'alertGradeFilterBox', 'alertGrade');
     _attachAlertDropdown('alertSizeFilterBtn', 'alertSizeDropdown', 'alertSizeFilterBox', 'alertSize');
     _attachAlertDropdown('alertFilterBtn', 'alertFilterDropdown', 'alertFilterBox', 'alertFilter');
+    _attachAlertDropdown('alertOrderFilterBtn', 'alertOrderFilterDropdown', 'alertOrderFilterBox', 'alertOrderFilter');
+    _attachAlertDropdown('alertSupFilterBtn', 'alertSupFilterDropdown', 'alertSupFilterBox', 'alertSupFilter');
 
     renderAlertDateTabs();
 
@@ -1241,6 +1520,13 @@ function onAlertInput(gradegram, size, field, value, el) {
       ? (value && value !== 'normal')
       : (value && String(value).trim() !== '');
     el.classList.toggle('filled', !!isFilled);
+  }
+
+  // ✅ ถ้ากรอก Sup → อัปเดตรายชื่อ Sup ใน filter
+  if (field === 'sup' && value && !alertAllSupsInData.includes(value)) {
+    alertAllSupsInData.push(value);
+    alertAllSupsInData.sort();
+    renderAlertSupFilterList();
   }
 }
 
