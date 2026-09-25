@@ -203,7 +203,6 @@ async function saveAlertSnapshot(receiveDates) {
       filters_json:   filters,
       analyzed_by:    currentUser?.id || null,
       updated_at:     new Date().toISOString()
-      // ✅ ไม่บันทึก inputs_json แล้ว
     };
 
     // ✅ UPSERT by analyzed_date
@@ -252,7 +251,6 @@ async function onAlertDateChange() {
   if (snapshot) {
     await applyAlertSnapshot(snapshot);
 
-    // ✅ Lock เฉพาะเมื่อ "ข้ามวัน" แล้ว
     const createdDate = snapshot.created_at ? toISODate(new Date(snapshot.created_at)) : null;
     const today = toISODate(new Date());
     const shouldLock = createdDate && createdDate < today;
@@ -347,16 +345,8 @@ function renderAlertFromCache() {
   // ✅ เก็บ full cache
   window._alertFullCache = [...alertCache];
 
-  const totalShortage = alertCache.filter(r => Number(r.alert) < 0).length;
-  const totalOK       = alertCache.filter(r => Number(r.alert) === 0).length;
-  const totalOver     = alertCache.filter(r => Number(r.alert) > 0).length;
-
-  let html = `<div id="alertDateTabsBox" class="alert-date-tabs"></div>
-    <div class="alert-summary">
-      <div class="item red">🔴 ขาด: ${totalShortage} รายการ</div>
-      <div class="item yellow">🟡 พอดี: ${totalOK} รายการ</div>
-      <div class="item green">🟢 เกิน: ${totalOver} รายการ</div>
-    </div>`;
+  // ✅ Render (summary ย้ายไปอยู่ใน date tabs แล้ว)
+  let html = `<div id="alertDateTabsBox" class="alert-date-tabs"></div>`;
 
   const sorted = [...alertCache].sort((a, b) => {
     if (a.gradegram !== b.gradegram) return a.gradegram.localeCompare(b.gradegram);
@@ -917,19 +907,8 @@ function applyAlertFiltersAndRender() {
 
 // ✅ Render ใหม่เฉพาะ summary + tbody (thead คงเดิม → filter ไม่หาย)
 function renderAlertTableBody(rows) {
-  // ✅ อัปเดต summary
-  const totalShortage = window._alertFullCache.filter(r => Number(r.alert) < 0).length;
-  const totalOK       = window._alertFullCache.filter(r => Number(r.alert) === 0).length;
-  const totalOver     = window._alertFullCache.filter(r => Number(r.alert) > 0).length;
-
-  const summaryBox = document.querySelector('.alert-summary');
-  if (summaryBox) {
-    summaryBox.innerHTML = `
-      <div class="item red">🔴 ขาด: ${totalShortage} รายการ</div>
-      <div class="item yellow">🟡 พอดี: ${totalOK} รายการ</div>
-      <div class="item green">🟢 เกิน: ${totalOver} รายการ</div>
-    `;
-  }
+  // ✅ อัปเดต summary ใหม่ (เรียก renderAlertDateTabs ซ้ำ)
+  renderAlertDateTabs();
 
   // ✅ อัปเดต tbody
   const tbody = document.querySelector('.alert-flat-table tbody');
@@ -1015,7 +994,6 @@ function _attachAlertDropdown(btnId, dropdownId, boxId, docKey) {
   const box = $(boxId);
   if (!btn || !dropdown || !box) return;
 
-  // ✅ ลบ listener เก่า (ถ้ามี)
   if (btn._alertDropdownClick) {
     btn.removeEventListener('click', btn._alertDropdownClick);
   }
@@ -1211,11 +1189,19 @@ function switchAlertDate(idx) {
   renderAlert();
 }
 
+// ✅ Render date tabs + summary ฝั่งขวา
 function renderAlertDateTabs() {
   const box = $('alertDateTabsBox');
   if (!box) return;
 
-  let html = '<span class="alert-date-label">📅 วันที่รับสินค้า:</span>';
+  // ✅ คำนวณ summary
+  const cache = window._alertFullCache || alertCache || [];
+  const totalShortage = cache.filter(r => Number(r.alert) < 0).length;
+  const totalOK       = cache.filter(r => Number(r.alert) === 0).length;
+  const totalOver     = cache.filter(r => Number(r.alert) > 0).length;
+
+  let html = '<div class="alert-date-tabs-left">';
+  html += '<span class="alert-date-label">📅 วันที่รับสินค้า:</span>';
 
   alertReceiveDates.forEach((d, i) => {
     const dObj = new Date(d);
@@ -1234,6 +1220,14 @@ function renderAlertDateTabs() {
   });
 
   html += `<button type="button" class="alert-date-add-btn" onclick="addAlertReceiveDate()">+ เพิ่มวันที่รับสินค้า</button>`;
+  html += '</div>';
+
+  // ✅ Summary ฝั่งขวา
+  html += '<div class="alert-date-tabs-right">';
+  html += `<span class="item red">🔴 ${totalShortage}</span>`;
+  html += `<span class="item yellow">🟡 ${totalOK}</span>`;
+  html += `<span class="item green">🟢 ${totalOver}</span>`;
+  html += '</div>';
 
   box.innerHTML = html;
 }
@@ -1309,16 +1303,8 @@ async function renderAlert() {
     // ✅ ใช้ result เต็ม render (การกรองจะทำใน renderAlertTableBody)
     const display = result;
 
-    const totalShortage = result.filter(r => r.alert < 0).length;
-    const totalOK       = result.filter(r => r.alert === 0).length;
-    const totalOver     = result.filter(r => r.alert > 0).length;
-
-    let html = `<div id="alertDateTabsBox" class="alert-date-tabs"></div>
-      <div class="alert-summary">
-        <div class="item red">🔴 ขาด: ${totalShortage} รายการ</div>
-        <div class="item yellow">🟡 พอดี: ${totalOK} รายการ</div>
-        <div class="item green">🟢 เกิน: ${totalOver} รายการ</div>
-      </div>`;
+    // ✅ Summary block ถูกลบออก (ย้ายไปอยู่ใน renderAlertDateTabs)
+    let html = `<div id="alertDateTabsBox" class="alert-date-tabs"></div>`;
 
     if (!display.length) {
       html += '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่มีรายการ 🎉</p>';
@@ -1763,15 +1749,12 @@ function confirmCreatePO() {
 
   markAlertPOCreated(`ref_${Date.now()}`);
 
-  // ✅ บันทึก snapshot ลง DB (หลังยืนยันสร้าง PO)
   saveAlertSnapshot([...alertReceiveDates]).then(res => {
     if (res.ok) {
       console.log('✅ Alert snapshot saved:', res.data);
 
-      // ✅ ล้าง inputs ของทุกวัน หลัง save สำเร็จ
       clearAllAlertInputsAllDates();
 
-      // ✅ Re-render → ตารางจะว่าง inputs
       renderAlert();
 
       console.log('✅ Alert inputs cleared (all dates)');
