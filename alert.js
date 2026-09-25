@@ -23,8 +23,8 @@ const ALERT_ALL_FILTERS = [
 // ✅ Filter "สั่งซื้อ" (Order Qty)
 let alertSelectedOrderFilters = ['all'];
 const ALERT_ORDER_FILTERS = [
-  { value: 'all',      label: 'ทั้งหมด' },
-  { value: 'filled',   label: '✅ กรอกแล้ว' },
+  { value: 'all',        label: 'ทั้งหมด' },
+  { value: 'filled',     label: '✅ กรอกแล้ว' },
   { value: 'not_filled', label: '⬜ ยังไม่กรอก' }
 ];
 
