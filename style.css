@@ -1433,6 +1433,7 @@ th{background:#f1f5f9;font-weight:600}
   pointer-events: none;
   opacity: 0.5;
 }
+
 /* ═══════════════════════════════════════════════════════════ */
 /* ========== PO LIST — Filter หัวคอลัมน์ ========== */
 /* ═══════════════════════════════════════════════════════════ */
@@ -1530,4 +1531,21 @@ th{background:#f1f5f9;font-weight:600}
   text-align: left;
   font-weight: 400;
   color: #222;
+}
+
+/* ✅ Stack: label บน + input ล่าง */
+.po-filter-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: stretch;
+}
+
+.po-filter-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  text-align: center;
+  white-space: nowrap;
+  line-height: 1.2;
 }
