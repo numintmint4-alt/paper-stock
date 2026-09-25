@@ -847,7 +847,6 @@ th{background:#f1f5f9;font-weight:600}
   z-index: 10;
   background: #1e293b;
   color: #fff;
-  /* ✅ เพิ่ม: ให้ filter header ไม่ลอยทับ */
   box-shadow: 0 2px 0 0 #cbd5e1;
 }
 
@@ -860,19 +859,19 @@ th{background:#f1f5f9;font-weight:600}
   width: 100%;
 }
 
-.alert-flat-table th:nth-child(1)  { width: 110px; }   /* Gradegrams (มี filter) */
-.alert-flat-table th:nth-child(2)  { width: 90px;  }   /* Size (มี filter) */
-.alert-flat-table th:nth-child(3)  { width: 70px;  }   /* Snapshot */
-.alert-flat-table th:nth-child(4)  { width: 70px;  }   /* Stock */
-.alert-flat-table th:nth-child(5)  { width: 70px;  }   /* Receive */
-.alert-flat-table th:nth-child(6)  { width: 90px;  }   /* Alert (มี filter) */
-.alert-flat-table th:nth-child(7)  { width: 90px;  }   /* สถานะ */
-.alert-flat-table th:nth-child(8)  { width: 90px;  }   /* สั่งซื้อ (มี filter) */
-.alert-flat-table th:nth-child(9)  { width: 90px;  }   /* Sup. (มี filter) */
-.alert-flat-table th:nth-child(10) { width: 90px;  }   /* ม้วนลูกค้า */
-.alert-flat-table th:nth-child(11) { width: 90px;  }   /* คุณภาพ B */
-.alert-flat-table th:nth-child(12) { width: 90px;  }   /* FSC */
-.alert-flat-table th:nth-child(13) { width: 200px; }   /* หมายเหตุ */
+.alert-flat-table th:nth-child(1)  { width: 110px; }
+.alert-flat-table th:nth-child(2)  { width: 90px;  }
+.alert-flat-table th:nth-child(3)  { width: 70px;  }
+.alert-flat-table th:nth-child(4)  { width: 70px;  }
+.alert-flat-table th:nth-child(5)  { width: 70px;  }
+.alert-flat-table th:nth-child(6)  { width: 90px;  }
+.alert-flat-table th:nth-child(7)  { width: 90px;  }
+.alert-flat-table th:nth-child(8)  { width: 90px;  }
+.alert-flat-table th:nth-child(9)  { width: 90px;  }
+.alert-flat-table th:nth-child(10) { width: 90px;  }
+.alert-flat-table th:nth-child(11) { width: 90px;  }
+.alert-flat-table th:nth-child(12) { width: 90px;  }
+.alert-flat-table th:nth-child(13) { width: 200px; }
 
 /* ========== FSC Cell ========== */
 .alert-flat-table .fsc-cell {
@@ -889,13 +888,12 @@ th{background:#f1f5f9;font-weight:600}
 /* ═══════════════════════════════════════════════════════════ */
 
 .alert-flat-table .th-with-filter {
-  /* ✅ ไม่ต้อง position — ใช้ sticky จาก thead th */
   padding: 4px 6px !important;
   text-align: center;
 }
 
 .alert-flat-table .th-filter-wrap {
-  position: relative;      /* ← คงไว้ — ให้ dropdown ยึด */
+  position: relative;
   display: inline-block;
   width: 100%;
 }
@@ -949,7 +947,6 @@ th{background:#f1f5f9;font-weight:600}
 
 .alert-flat-table thead th.th-with-filter {
   z-index: 15;
-  /* ✅ ไม่ต้อง position — ใช้ sticky จาก thead th */
 }
 
 /* ═══════════════════════════════════════════════════════════ */
@@ -1211,10 +1208,8 @@ th{background:#f1f5f9;font-weight:600}
   background: #f1f5f9;
   border-radius: 8px;
   border: 1px solid #e2e8f0;
-  /* ✅ ความสูงเท่าเดิม (auto ตามเนื้อหา) */
 }
 
-/* ✅ ฝั่งซ้าย — scroll แนวนอน */
 .alert-date-tabs-left {
   display: flex;
   gap: 8px;
@@ -1232,7 +1227,6 @@ th{background:#f1f5f9;font-weight:600}
   scrollbar-color: #cbd5e1 transparent;
 }
 
-/* ✅ Scrollbar (Chrome/Safari) */
 .alert-date-tabs-left::-webkit-scrollbar {
   height: 6px;
 }
@@ -1250,7 +1244,6 @@ th{background:#f1f5f9;font-weight:600}
   background: #94a3b8;
 }
 
-/* ✅ ฝั่งขวา — fix ตามเนื้อหา */
 .alert-date-tabs-right {
   display: flex;
   gap: 6px;
@@ -1269,7 +1262,6 @@ th{background:#f1f5f9;font-weight:600}
 .alert-date-tabs-right .item.yellow { background: #fef3c7; color: #b45309; }
 .alert-date-tabs-right .item.green  { background: #dcfce7; color: #166534; }
 
-/* ✅ หัวข้อ "📅 วันที่รับสินค้า:" */
 .alert-date-label {
   font-size: 13px;
   color: #475569;
@@ -1278,7 +1270,6 @@ th{background:#f1f5f9;font-weight:600}
   white-space: nowrap;
 }
 
-/* ✅ wrap ของ Tab + ✕ */
 .alert-date-tab-wrap {
   display: inline-flex;
   align-items: stretch;
@@ -1292,7 +1283,6 @@ th{background:#f1f5f9;font-weight:600}
   border-color: #2563eb;
 }
 
-/* ✅ Tab */
 .alert-date-tab {
   padding: 7px 14px;
   font-size: 13px;
@@ -1314,7 +1304,6 @@ th{background:#f1f5f9;font-weight:600}
   color: #fff;
 }
 
-/* ✅ ปุ่ม ✕ */
 .alert-date-tab-close {
   padding: 0 8px;
   border: none;
@@ -1331,7 +1320,6 @@ th{background:#f1f5f9;font-weight:600}
   color: #991b1b;
 }
 
-/* ✅ สถานะ active — ใช้ class .is-active ที่ JS เติมให้ wrap */
 .alert-date-tab-wrap.is-active {
   border-color: #1e40af;
 }
@@ -1345,7 +1333,6 @@ th{background:#f1f5f9;font-weight:600}
   color: #fff;
 }
 
-/* ✅ ปุ่ม + เพิ่มวันที่ */
 .alert-date-add-btn {
   padding: 7px 14px;
   font-size: 13px;
@@ -1414,7 +1401,6 @@ th{background:#f1f5f9;font-weight:600}
   text-align: center;
 }
 
-/* ✅ ล็อกทั้งตาราง */
 .alert-locked {
   position: relative;
   background: #f8fafc;
@@ -1425,7 +1411,6 @@ th{background:#f1f5f9;font-weight:600}
   opacity: 0.85;
 }
 
-/* ✅ Input ภายในตารางที่ล็อก — disabled */
 .alert-locked .alert-input-qty,
 .alert-locked .alert-input-sup,
 .alert-locked .alert-input-customer,
@@ -1437,7 +1422,6 @@ th{background:#f1f5f9;font-weight:600}
   border-color: #cbd5e1 !important;
 }
 
-/* ✅ Filter header button ที่ล็อก */
 .alert-locked .th-filter-btn {
   background: #e2e8f0 !important;
   color: #64748b !important;
@@ -1445,7 +1429,6 @@ th{background:#f1f5f9;font-weight:600}
   opacity: 0.6;
 }
 
-/* ✅ Dropdown ที่ล็อก */
 .alert-locked .grade-dropdown {
   pointer-events: none;
   opacity: 0.5;
