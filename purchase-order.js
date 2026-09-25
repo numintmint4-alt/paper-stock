@@ -2,6 +2,7 @@
 // STOCK V9 — purchase-order.js
 // Purchase Order Management (List + Form + Auto-Split + Export)
 // + Date Split + Verify Password + Mark Saved + Deleted History
+// + Column Filters (PO No. / วันที่ออก / วันที่รับ / Sup. / สถานะ)
 // ═══════════════════════════════════════════════════════════════
 
 let poCache = [];
@@ -9,6 +10,13 @@ let poSuppliers = [];
 let poPriceMaster = [];
 let poSelectedMonth = '';
 let poEditingId = null;
+
+// ✅ Filter state
+let poFilterPONo = '';
+let poFilterDateFrom = '';
+let poFilterDateTo = '';
+let poFilterSup = [];
+let poFilterStatus = [];
 
 // ================= STD WEIGHT HELPER =================
 function getStdWeight(gradegram, size) {
@@ -117,7 +125,7 @@ function getPriceFromMaster(gradegram, customerRoll, qualityB) {
   return Number(base.toFixed(2));
 }
 
-// ================= RENDER PO LIST =================
+// ================= RENDER PO LIST (with column filters) =================
 async function renderPOList() {
   const listEl = $('poListBody');
   if (!listEl) return;
@@ -137,42 +145,315 @@ async function renderPOList() {
       return;
     }
 
-    let html = '<div class="data-scroll"><table class="data-table"><thead><tr>';
-    html += '<th>PO No.</th><th>วันที่ออก</th><th>วันที่รับ</th><th>Sup.</th><th>จำนวน</th><th>KG รวม</th><th>สถานะ</th><th></th>';
-    html += '</tr></thead><tbody>';
+    // ✅ Render ตารางพร้อม filter header
+    let html = '<div class="data-scroll po-list-scroll"><table class="data-table po-list-table"><thead><tr>';
 
-    poCache.forEach(po => {
-      const statusBadge = {
-        draft: '<span class="badge" style="background:#fef3c7;color:#b45309">📝 Draft</span>',
-        saved: '<span class="badge ok">✅ Saved</span>',
-        sent:  '<span class="badge" style="background:#dbeafe;color:#1e40af">📤 Sent</span>'
-      }[po.status] || po.status;
+    // ✅ Filter: PO No.
+    html += `<th class="th-with-filter">
+      <div class="th-filter-wrap">
+        <input type="text" id="poFilterPONoInput" class="po-filter-input"
+               placeholder="PO No." value="${esc(poFilterPONo)}"
+               oninput="onPOFilterChange()">
+      </div>
+    </th>`;
 
-      const saveBtn = po.status === 'draft'
-        ? `<button class="primary" onclick="markPOSaved('${po.id}')">✅ บันทึกเป็น Saved</button>`
-        : '';
+    // ✅ Filter: วันที่ออก
+    html += `<th class="th-with-filter">
+      <div class="th-filter-wrap">
+        <input type="date" id="poFilterDateFrom" class="po-filter-input"
+               placeholder="วันที่ออก" value="${esc(poFilterDateFrom)}"
+               onchange="onPOFilterChange()">
+      </div>
+    </th>`;
 
-      html += `<tr>
-        <td><b>${esc(po.po_no)}</b></td>
-        <td>${fmtDateTH(po.po_date)}</td>
-        <td>${fmtDateTH(po.ref_receive)}</td>
-        <td>${esc(po.sup_code)}</td>
-        <td style="text-align:right">${po.total_items || 0}</td>
-        <td style="text-align:right">${Number(po.total_kg || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-        <td>${statusBadge}</td>
-        <td>
-          <button onclick="openPODetail('${po.id}')">📄 ดู</button>
-          <button onclick="openPOFormWithVerify('${po.id}')">✏️ แก้ไข</button>
-          ${saveBtn}
-          <button class="danger" onclick="deletePO('${po.id}')">🗑 ลบ</button>
-        </td>
-      </tr>`;
-    });
-    html += '</tbody></table></div>';
+    // ✅ Filter: วันที่รับ
+    html += `<th class="th-with-filter">
+      <div class="th-filter-wrap">
+        <input type="date" id="poFilterDateTo" class="po-filter-input"
+               placeholder="วันที่รับ" value="${esc(poFilterDateTo)}"
+               onchange="onPOFilterChange()">
+      </div>
+    </th>`;
+
+    // ✅ Filter: Sup.
+    const supList = [...new Set(poCache.map(p => p.sup_code))].sort();
+    html += `<th class="th-with-filter">
+      <div class="th-filter-wrap" id="poFilterSupBox">
+        <button type="button" class="th-filter-btn" id="poFilterSupBtn">
+          <span id="poFilterSupLabel">Sup.</span>
+          <span class="arrow">▼</span>
+        </button>
+        <div class="grade-dropdown hidden" id="poFilterSupDropdown" style="min-width:160px">
+          <div class="grade-actions">
+            <button type="button" onclick="selectAllPOSups()">✓ เลือกทั้งหมด</button>
+            <button type="button" onclick="clearAllPOSups()">✗ ล้างทั้งหมด</button>
+          </div>
+          <div class="grade-list" id="poFilterSupList"></div>
+        </div>
+      </div>
+    </th>`;
+
+    html += '<th style="text-align:right">จำนวน</th>';
+    html += '<th style="text-align:right">KG รวม</th>';
+
+    // ✅ Filter: สถานะ
+    html += `<th class="th-with-filter">
+      <div class="th-filter-wrap" id="poFilterStatusBox">
+        <button type="button" class="th-filter-btn" id="poFilterStatusBtn">
+          <span id="poFilterStatusLabel">สถานะ</span>
+          <span class="arrow">▼</span>
+        </button>
+        <div class="grade-dropdown hidden" id="poFilterStatusDropdown" style="min-width:180px">
+          <div class="grade-actions">
+            <button type="button" onclick="selectAllPOStatuses()">✓ เลือกทั้งหมด</button>
+            <button type="button" onclick="clearAllPOStatuses()">✗ ล้างทั้งหมด</button>
+          </div>
+          <div class="grade-list" id="poFilterStatusList"></div>
+        </div>
+      </div>
+    </th>`;
+
+    html += '<th></th>';
+    html += '</tr></thead><tbody id="poListTbody"></tbody></table></div>';
     listEl.innerHTML = html;
+
+    // ✅ Render rows + filter lists
+    renderPOListRows(poCache);
+    renderPOSupFilterList(supList);
+    renderPOStatusFilterList();
+
   } catch (e) {
     console.error('renderPOList:', e);
     listEl.innerHTML = `<div class="msg err">โหลดไม่สำเร็จ: ${esc(e.message)}</div>`;
+  }
+}
+
+// ✅ Render rows (เรียกซ้ำได้เวลา filter)
+function renderPOListRows(rows) {
+  const tbody = $('poListTbody');
+  if (!tbody) return;
+
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:30px">ไม่พบ PO ที่ตรงเงื่อนไข 🎉</td></tr>';
+    return;
+  }
+
+  let html = '';
+  rows.forEach(po => {
+    const statusBadge = {
+      draft: '<span class="badge" style="background:#fef3c7;color:#b45309">📝 Draft</span>',
+      saved: '<span class="badge ok">✅ Saved</span>',
+      sent:  '<span class="badge" style="background:#dbeafe;color:#1e40af">📤 Sent</span>'
+    }[po.status] || po.status;
+
+    const saveBtn = po.status === 'draft'
+      ? `<button class="primary" onclick="markPOSaved('${po.id}')">✅ บันทึกเป็น Saved</button>`
+      : '';
+
+    html += `<tr>
+      <td><b>${esc(po.po_no)}</b></td>
+      <td>${fmtDateTH(po.po_date)}</td>
+      <td>${fmtDateTH(po.ref_receive)}</td>
+      <td>${esc(po.sup_code)}</td>
+      <td style="text-align:right;font-weight:700;color:#1e40af">${Number(po.total_rolls || 0).toLocaleString()}</td>
+      <td style="text-align:right">${Number(po.total_kg || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+      <td>${statusBadge}</td>
+      <td>
+        <button onclick="openPODetail('${po.id}')">📄 ดู</button>
+        <button onclick="openPOFormWithVerify('${po.id}')">✏️ แก้ไข</button>
+        ${saveBtn}
+        <button class="danger" onclick="deletePO('${po.id}')">🗑 ลบ</button>
+      </td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
+// ✅ Filter Change Handler (auto-trigger)
+function onPOFilterChange() {
+  const ponoEl = $('poFilterPONoInput');
+  const fromEl = $('poFilterDateFrom');
+  const toEl = $('poFilterDateTo');
+
+  poFilterPONo = ponoEl ? ponoEl.value.trim() : '';
+  poFilterDateFrom = fromEl ? fromEl.value : '';
+  poFilterDateTo = toEl ? toEl.value : '';
+
+  applyPOFiltersAndRender();
+}
+
+// ✅ Apply filters + render rows
+function applyPOFiltersAndRender() {
+  let result = [...poCache];
+
+  // 1) PO No.
+  if (poFilterPONo) {
+    result = result.filter(p => String(p.po_no).toLowerCase().includes(poFilterPONo.toLowerCase()));
+  }
+
+  // 2) วันที่ออก
+  if (poFilterDateFrom) {
+    result = result.filter(p => p.po_date && p.po_date.slice(0, 10) === poFilterDateFrom);
+  }
+
+  // 3) วันที่รับ
+  if (poFilterDateTo) {
+    result = result.filter(p => p.ref_receive && p.ref_receive.slice(0, 10) === poFilterDateTo);
+  }
+
+  // 4) Sup.
+  if (poFilterSup.length > 0) {
+    result = result.filter(p => poFilterSup.includes(p.sup_code));
+  }
+
+  // 5) สถานะ
+  if (poFilterStatus.length > 0) {
+    result = result.filter(p => poFilterStatus.includes(p.status));
+  }
+
+  renderPOListRows(result);
+}
+
+// ✅ Sup. filter list
+function renderPOSupFilterList(supList) {
+  const list = $('poFilterSupList');
+  if (!list) return;
+  list.innerHTML = supList.map(s => {
+    const checked = poFilterSup.includes(s);
+    return `<label class="item ${checked ? 'checked' : ''}" data-sup="${esc(s)}">
+      <input type="checkbox" ${checked ? 'checked' : ''}>
+      <span>${esc(s)}</span>
+    </label>`;
+  }).join('');
+  list.querySelectorAll('.item').forEach(el => {
+    const cb = el.querySelector('input[type="checkbox"]');
+    cb.addEventListener('change', () => {
+      const val = el.dataset.sup;
+      if (cb.checked) {
+        if (!poFilterSup.includes(val)) poFilterSup.push(val);
+      } else {
+        poFilterSup = poFilterSup.filter(x => x !== val);
+      }
+      el.classList.toggle('checked', cb.checked);
+      updatePOSupFilterLabel();
+      applyPOFiltersAndRender();
+    });
+  });
+
+  // attach dropdown
+  _attachPOFilterDropdown('poFilterSupBtn', 'poFilterSupDropdown', 'poFilterSupBox', 'poSup');
+  updatePOSupFilterLabel();
+}
+
+function updatePOSupFilterLabel() {
+  const label = $('poFilterSupLabel');
+  if (!label) return;
+  if (poFilterSup.length === 0) label.textContent = 'Sup.';
+  else if (poFilterSup.length === 1) label.textContent = poFilterSup[0];
+  else label.textContent = `Sup. (${poFilterSup.length})`;
+}
+
+function selectAllPOSups() {
+  const list = $('poFilterSupList');
+  if (!list) return;
+  poFilterSup = [...list.querySelectorAll('.item')].map(el => el.dataset.sup);
+  renderPOSupFilterList(poFilterSup.map(s => s)); // re-render
+  applyPOFiltersAndRender();
+}
+
+function clearAllPOSups() {
+  poFilterSup = [];
+  const list = $('poFilterSupList');
+  if (list) {
+    list.querySelectorAll('.item').forEach(el => {
+      el.classList.remove('checked');
+      const cb = el.querySelector('input[type="checkbox"]');
+      if (cb) cb.checked = false;
+    });
+  }
+  updatePOSupFilterLabel();
+  applyPOFiltersAndRender();
+}
+
+// ✅ Status filter list
+function renderPOStatusFilterList() {
+  const list = $('poFilterStatusList');
+  if (!list) return;
+  const statuses = [
+    { value: 'draft', label: '📝 Draft' },
+    { value: 'saved', label: '✅ Saved' },
+    { value: 'sent',  label: '📤 Sent' }
+  ];
+  list.innerHTML = statuses.map(s => {
+    const checked = poFilterStatus.includes(s.value);
+    return `<label class="item ${checked ? 'checked' : ''}" data-status="${s.value}">
+      <input type="checkbox" ${checked ? 'checked' : ''}>
+      <span>${s.label}</span>
+    </label>`;
+  }).join('');
+  list.querySelectorAll('.item').forEach(el => {
+    const cb = el.querySelector('input[type="checkbox"]');
+    cb.addEventListener('change', () => {
+      const val = el.dataset.status;
+      if (cb.checked) {
+        if (!poFilterStatus.includes(val)) poFilterStatus.push(val);
+      } else {
+        poFilterStatus = poFilterStatus.filter(x => x !== val);
+      }
+      el.classList.toggle('checked', cb.checked);
+      updatePOStatusFilterLabel();
+      applyPOFiltersAndRender();
+    });
+  });
+
+  _attachPOFilterDropdown('poFilterStatusBtn', 'poFilterStatusDropdown', 'poFilterStatusBox', 'poStatus');
+  updatePOStatusFilterLabel();
+}
+
+function updatePOStatusFilterLabel() {
+  const label = $('poFilterStatusLabel');
+  if (!label) return;
+  if (poFilterStatus.length === 0) label.textContent = 'สถานะ';
+  else if (poFilterStatus.length === 1) {
+    const s = { draft: '📝 Draft', saved: '✅ Saved', sent: '📤 Sent' }[poFilterStatus[0]];
+    label.textContent = s || poFilterStatus[0];
+  } else label.textContent = `สถานะ (${poFilterStatus.length})`;
+}
+
+function selectAllPOStatuses() {
+  poFilterStatus = ['draft', 'saved', 'sent'];
+  renderPOStatusFilterList();
+  applyPOFiltersAndRender();
+}
+
+function clearAllPOStatuses() {
+  poFilterStatus = [];
+  renderPOStatusFilterList();
+  applyPOFiltersAndRender();
+}
+
+// ✅ Dropdown helper ( reuse จาก alert.js )
+function _attachPOFilterDropdown(btnId, dropdownId, boxId, docKey) {
+  const btn = $(btnId);
+  const dropdown = $(dropdownId);
+  const box = $(boxId);
+  if (!btn || !dropdown || !box) return;
+
+  if (btn._poDropdownClick) btn.removeEventListener('click', btn._poDropdownClick);
+  btn._poDropdownClick = (e) => {
+    e.stopPropagation();
+    dropdown.classList.toggle('hidden');
+    btn.classList.toggle('open');
+  };
+  btn.addEventListener('click', btn._poDropdownClick);
+
+  if (!window['_' + docKey + 'DocClick']) {
+    window['_' + docKey + 'DocClick'] = (e) => {
+      const b = $(btnId), d = $(dropdownId), bx = $(boxId);
+      if (!b || !d || !bx) return;
+      if (!bx.contains(e.target)) { d.classList.add('hidden'); b.classList.remove('open'); }
+    };
+    document.addEventListener('click', window['_' + docKey + 'DocClick']);
   }
 }
 
@@ -823,7 +1104,7 @@ async function openPODetail(poId) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ================= ประวัติ PO ที่ถูกลบ (ย้ายมาจาก receive.js) =================
+// ================= ประวัติ PO ที่ถูกลบ =================
 // ═══════════════════════════════════════════════════════════════
 
 async function openDeletedPOList() {
