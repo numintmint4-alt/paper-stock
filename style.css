@@ -832,7 +832,9 @@ th{background:#f1f5f9;font-weight:600}
 /* ═══════════════════════════════════════════════════════════ */
 
 .alert-scroll {
-  max-height: 70vh;
+  height: 65vh;
+  min-height: 400px;
+  max-height: 750px;
   overflow-y: auto;
   overflow-x: auto;
   border: 1px solid #cbd5e1;
@@ -1196,20 +1198,76 @@ th{background:#f1f5f9;font-weight:600}
 }
 
 /* ═══════════════════════════════════════════════════════════ */
-/* ========== ALERT DATE TABS (รอบที่ 4.1 — Fix :has()) ========== */
+/* ========== ALERT DATE TABS — แถบซ้าย scroll + summary ขวา ========== */
 /* ═══════════════════════════════════════════════════════════ */
 
 .alert-date-tabs {
   display: flex;
+  justify-content: space-between;
+  align-items: center;
   gap: 8px;
   margin: 10px 0 14px;
   padding: 8px 12px;
   background: #f1f5f9;
   border-radius: 8px;
-  flex-wrap: wrap;
   border: 1px solid #e2e8f0;
-  align-items: center;
+  /* ✅ ความสูงเท่าเดิม (auto ตามเนื้อหา) */
 }
+
+/* ✅ ฝั่งซ้าย — scroll แนวนอน */
+.alert-date-tabs-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+  min-width: 0;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color .2s;
+}
+.alert-date-tabs-left:hover {
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+/* ✅ Scrollbar (Chrome/Safari) */
+.alert-date-tabs-left::-webkit-scrollbar {
+  height: 6px;
+}
+.alert-date-tabs-left::-webkit-scrollbar-track {
+  background: transparent;
+}
+.alert-date-tabs-left::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+}
+.alert-date-tabs-left:hover::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+.alert-date-tabs-left::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* ✅ ฝั่งขวา — fix ตามเนื้อหา */
+.alert-date-tabs-right {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.alert-date-tabs-right .item {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.alert-date-tabs-right .item.red    { background: #fee2e2; color: #dc2626; }
+.alert-date-tabs-right .item.yellow { background: #fef3c7; color: #b45309; }
+.alert-date-tabs-right .item.green  { background: #dcfce7; color: #166534; }
 
 /* ✅ หัวข้อ "📅 วันที่รับสินค้า:" */
 .alert-date-label {
@@ -1228,6 +1286,7 @@ th{background:#f1f5f9;font-weight:600}
   overflow: hidden;
   border: 1px solid #cbd5e1;
   background: #fff;
+  flex-shrink: 0;
 }
 .alert-date-tab-wrap:hover {
   border-color: #2563eb;
@@ -1244,6 +1303,7 @@ th{background:#f1f5f9;font-weight:600}
   color: #475569;
   cursor: pointer;
   transition: all .15s;
+  white-space: nowrap;
 }
 .alert-date-tab:hover {
   background: #dbeafe;
@@ -1297,6 +1357,8 @@ th{background:#f1f5f9;font-weight:600}
   border-radius: 6px;
   cursor: pointer;
   transition: all .15s;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .alert-date-add-btn:hover {
   background: #2563eb;
