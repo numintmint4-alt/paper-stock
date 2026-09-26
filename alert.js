@@ -2373,8 +2373,11 @@ function renderUsagePlanImportModal() {
   const body = $('usagePlanImportBody');
   if (!body) return;
 
+    // ✅ ใช้คอลัมน์แรก-สุดท้าย (หลังจาก sort แล้ว)
   const minDate = _usagePlanDateCols[0].iso;
   const maxDate = _usagePlanDateCols[_usagePlanDateCols.length - 1].iso;
+
+  console.log('📅 min:', minDate, 'max:', maxDate);
 
   let html = `
     <div class="msg info" style="margin-bottom:12px">
