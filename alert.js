@@ -1921,11 +1921,18 @@ function renderAlertPODetail(items) {
 
     dayItems.forEach((it, idx) => {
       totalQty += it.quantity;
-      const parts = [
-        labelCustomer(it.customer_roll),
-        labelQuality(it.quality_b),
-        it.note || ''
-      ].filter(x => x && x.trim() !== '');
+
+      // ✅ แสดงหมายเหตุเฉพาะที่ไม่ใช่ ปกติ/ปกติ
+      const parts = [];
+      if (it.customer_roll && it.customer_roll !== 'normal') {
+        parts.push(labelCustomer(it.customer_roll));
+      }
+      if (it.quality_b && it.quality_b !== 'normal') {
+        parts.push(labelQuality(it.quality_b));
+      }
+      if (it.note && it.note.trim() !== '') {
+        parts.push(it.note);
+      }
       const remarkCombined = parts.join(',');
 
       // ✅ ไฮไลต์แถวที่ยังไม่เลือก Sup
@@ -1958,6 +1965,23 @@ function renderAlertPODetail(items) {
   </div>`;
 
   $('alertPODetailBody').innerHTML = html;
+
+  // ✅ เช็ค Sup ครบ → enable/disable ปุ่มยืนยัน
+  const hasMissingSup = items.some(it => !it.sup || String(it.sup).trim() === '');
+  const confirmBtn = document.querySelector('#modalAlertPODetail .form-actions .primary');
+  if (confirmBtn) {
+    if (hasMissingSup) {
+      confirmBtn.disabled = true;
+      confirmBtn.style.opacity = '0.4';
+      confirmBtn.style.cursor = 'not-allowed';
+      confirmBtn.title = 'กรุณาระบุ Sup. ให้ครบก่อน';
+    } else {
+      confirmBtn.disabled = false;
+      confirmBtn.style.opacity = '';
+      confirmBtn.style.cursor = '';
+      confirmBtn.title = '';
+    }
+  }
 }
 
 function confirmCreatePO() {
@@ -1968,14 +1992,10 @@ function confirmCreatePO() {
     return;
   }
 
-  // ✅ เช็ค Sup ก่อนสร้าง PO
+  // ✅ เช็ค Sup ก่อนสร้าง PO — กันพลาด
   const missingSup = _pendingPOItems.filter(it => !it.sup || String(it.sup).trim() === '');
   if (missingSup.length > 0) {
-    const list = missingSup.slice(0, 10).map(it =>
-      `• ${it.gradegram} · Size ${it.size} · ${it.quantity} ม้วน`
-    ).join('\n');
-    const more = missingSup.length > 10 ? `\n... และอีก ${missingSup.length - 10} รายการ` : '';
-    alert(`⚠️ มี ${missingSup.length} รายการที่ยังไม่ได้เลือก Sup.\n\n${list}${more}\n\nกรุณาเลือก Sup. ให้ครบก่อนสร้าง PO`);
+    alert(`⚠️ ไม่สามารถสร้าง PO ได้\n\nมี ${missingSup.length} รายการที่ยังไม่ได้ระบุผู้ขาย (Sup.)\nกรุณาตรวจสอบและเลือก Sup. ให้ครบก่อน`);
     return;
   }
 
