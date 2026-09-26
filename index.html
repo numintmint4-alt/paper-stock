@@ -364,7 +364,14 @@
 
           <label><input type="checkbox" id="alertIncludeCustomer"> รวมม้วนลูกค้า</label>
 
+          <label>📊 Usage Plan
+            <select id="alertUsageRange" onchange="onUsagePlanRangeChange(this.value)">
+              <option value="__NONE__">— ไม่ใช้ —</option>
+            </select>
+          </label>
+
           <button class="primary" onclick="renderAlert()">🔍 วิเคราะห์</button>
+          <button class="primary" onclick="openUsagePlanImport()">📥 Import Usage Plan</button>
           <button onclick="window.print()">🖨 พิมพ์</button>
         </div>
 
@@ -759,6 +766,23 @@
     <div class="form-actions" style="margin-top:16px">
       <button onclick="closeAddPOItemsModal()">ยกเลิก</button>
       <button class="primary" onclick="saveAddPOItems()">💾 บันทึกการแก้ไข</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== MODAL USAGE PLAN IMPORT ==================== -->
+<div class="modal-bg" id="modalUsagePlanImport">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-head">
+      <h3>📥 Import Usage Plan</h3>
+      <button onclick="closeModal('modalUsagePlanImport')">ปิด</button>
+    </div>
+
+    <div id="usagePlanImportBody"></div>
+
+    <div class="form-actions" style="margin-top:16px">
+      <button onclick="closeModal('modalUsagePlanImport')">ยกเลิก</button>
+      <button class="primary" id="usagePlanImportConfirmBtn" onclick="confirmUsagePlanImport()">💾 บันทึก</button>
     </div>
   </div>
 </div>
