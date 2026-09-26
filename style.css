@@ -1340,7 +1340,7 @@ th{
 /* ═══════════════════════════════════════════════════════════ */
 /* ALERT FLAT TABLE — Fix Column Widths (15 columns) */
 /* ═══════════════════════════════════════════════════════════ */
-.alert-flat-table { table-layout: fixed; width: 100%; }
+.alert-flat-table { table-layout: auto; width: 100%; }
 .alert-flat-table th:nth-child(1)  { width: 110px; }
 .alert-flat-table th:nth-child(2)  { width: 90px;  }
 .alert-flat-table th:nth-child(3)  { width: 70px;  }
