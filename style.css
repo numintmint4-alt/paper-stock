@@ -1338,24 +1338,23 @@ th{
 .alert-flat-table thead th { position: sticky; top: 0; z-index: 10; background: var(--primary); color: #fff; box-shadow: 0 2px 0 0 var(--border); }
 
 /* ═══════════════════════════════════════════════════════════ */
-/* ALERT FLAT TABLE — Fix Column Widths (15 columns) */
+/* ALERT FLAT TABLE — Fix Column Widths (13 columns) */
 /* ═══════════════════════════════════════════════════════════ */
-.alert-flat-table { table-layout: auto; width: 100%; }
-.alert-flat-table th:nth-child(1)  { width: 110px; }
-.alert-flat-table th:nth-child(2)  { width: 90px;  }
-.alert-flat-table th:nth-child(3)  { width: 70px;  }
-.alert-flat-table th:nth-child(4)  { width: 90px;  }
-.alert-flat-table th:nth-child(5)  { width: 90px;  }
-.alert-flat-table th:nth-child(6)  { width: 70px;  }
-.alert-flat-table th:nth-child(7)  { width: 90px;  }
-.alert-flat-table th:nth-child(8)  { width: 90px;  }
-.alert-flat-table th:nth-child(9)  { width: 90px;  }
-.alert-flat-table th:nth-child(10) { width: 90px;  }
-.alert-flat-table th:nth-child(11) { width: 90px;  }
-.alert-flat-table th:nth-child(12) { width: 90px;  }
-.alert-flat-table th:nth-child(13) { width: 90px;  }
-.alert-flat-table th:nth-child(14) { width: 90px;  }
-.alert-flat-table th:nth-child(15) { width: 200px; }
+.alert-flat-table { table-layout: fixed; width: 100%; }
+/* ✅ 13 columns — Gradegrams กว้าง, หมายเหตุกว้างสุด */
+.alert-flat-table th:nth-child(1)  { width: 130px; }   /* Gradegrams */
+.alert-flat-table th:nth-child(2)  { width: 80px;  }   /* Size */
+.alert-flat-table th:nth-child(3)  { width: 90px;  }   /* Snapshot */
+.alert-flat-table th:nth-child(4)  { width: 100px; }   /* Stock (มี filter) */
+.alert-flat-table th:nth-child(5)  { width: 100px; }   /* Receive (มี filter) */
+.alert-flat-table th:nth-child(6)  { width: 90px;  }   /* Alert */
+.alert-flat-table th:nth-child(7)  { width: 100px; }   /* สถานะ */
+.alert-flat-table th:nth-child(8)  { width: 90px;  }   /* สั่งซื้อ */
+.alert-flat-table th:nth-child(9)  { width: 90px;  }   /* Sup. */
+.alert-flat-table th:nth-child(10) { width: 110px; }   /* ม้วนลูกค้า */
+.alert-flat-table th:nth-child(11) { width: 110px; }   /* คุณภาพ B */
+.alert-flat-table th:nth-child(12) { width: 90px;  }   /* FSC */
+.alert-flat-table th:nth-child(13) { width: 300px; }   /* หมายเหตุ — กว้างสุด */
 
 .alert-flat-table .fsc-cell { font-size: 10px; padding: 4px 6px; }
 .alert-flat-table .fsc-cell .badge { font-size: 10px; padding: 2px 6px; }
@@ -1403,8 +1402,6 @@ th{
 #poDetailBody td { padding: 6px 10px; border: 1px solid var(--border); }
 
 .report-foot button { padding: 6px 12px; font-size: 13px; }
-
-.alert-flat-table th:nth-child(9), .alert-flat-table th:nth-child(10) { min-width: 90px; }
 
 .alert-input-customer, .alert-input-quality { font-size: 11px; padding: 4px 4px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); width: 100%; max-width: 90px; font-family: inherit; box-sizing: border-box; }
 .alert-input-customer:focus, .alert-input-quality:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(59,130,246,.15); }
