@@ -1855,10 +1855,18 @@ function renderAddPOItemsTable() {
 
 function getAvailableSizesFor(gradegram) {
   if (!gradegram) return [];
-  const { grade, gram } = parseGradegram(gradegram);
+
+  const targetNorm = normalizeGrade(gradegram);
+  const targetRaw  = String(gradegram).toUpperCase();
+
   return [...new Set(
     masterCache
-      .filter(m => normalizeGrade(m.grade) === grade && String(m.gram) === String(gram))
+      .filter(m => {
+        const mGrade = normalizeGrade(m.grade);
+        const mGram  = String(m.gram);
+        const mFull  = mGrade + mGram;
+        return mFull === targetNorm || mFull === targetRaw;
+      })
       .map(m => Number(m.size))
   )].sort((a, b) => a - b);
 }
