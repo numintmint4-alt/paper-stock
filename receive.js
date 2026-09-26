@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// STOCK V6 — receive.js (V9 - Auto-fetch from PO, ไม่มี Tab)
+// STOCK V9 — receive.js (V9.1 - Fix Date Query + Debug)
 // ═══════════════════════════════════════════════════════════════
 
 let receiveSelectedGrades = [];
@@ -23,6 +23,14 @@ function fmtDateThai(d) {
   const mm = String(dObj.getMonth() + 1).padStart(2, '0');
   const yyyy = dObj.getFullYear() + 543;
   return `${dd}/${mm}/${yyyy}`;
+}
+
+// ✅ [FIX-1] Helper: ดึงวันที่จาก input → normalize เป็น 'yyyy-mm-dd' เสมอ
+function getReceiveDateISO() {
+  const raw = $('receiveDate')?.value;
+  if (!raw) return '';
+  // <input type="date"> คืน 'yyyy-mm-dd' อยู่แล้ว — ตัดให้เหลือ 10 ตัวอักษร
+  return String(raw).slice(0, 10);
 }
 
 async function initReceiveTab() {
@@ -141,11 +149,16 @@ function renderSupplierSummary(rows, dateThai) {
 
 // ================= RENDER RECEIVE =================
 async function renderReceive() {
-  const receiveDate = $('receiveDate')?.value;
+  // ✅ [FIX-1] ใช้ helper แทน
+  const receiveDate = getReceiveDateISO();
   const supplier = $('receiveSupplier')?.value || '';
   const fsc = $('receiveFsc')?.value || 'all';
   const remark = $('receiveRemark')?.value || '';
   const mode = $('receiveMode')?.value || 'matrix';
+
+  // ✅ [DEBUG] แสดงค่าจริง
+  console.log('🔍 [renderReceive] receiveDate =', receiveDate);
+
   if (!receiveDate) { alert('กรุณาเลือกวันที่รับเข้า'); return; }
 
   const dateThai = thaiDateFull(receiveDate);
@@ -158,12 +171,16 @@ async function renderReceive() {
 
   try {
     // ✅ Step 1: เช็คว่ามีข้อมูลใน po_receive ของวันนี้ไหม
+    // [FIX-3] ใช้ range แทน .eq() เพื่อรองรับทั้ง date และ timestamp
     const { count: existCount, error: countErr } = await supabase
       .from('po_receive')
       .select('*', { count: 'exact', head: true })
-      .eq('po_date', receiveDate);
+      .gte('po_date', receiveDate)
+      .lt('po_date', receiveDate + 'T23:59:59');
 
     if (countErr) throw countErr;
+
+    console.log('🔍 [renderReceive] po_receive count =', existCount);
 
     // ✅ Step 2: ถ้าไม่มี → auto-fetch จาก PO
     if (!existCount || existCount === 0) {
@@ -192,6 +209,9 @@ async function renderReceive() {
 
     const rows = data || [];
     receiveCache = rows;
+
+    console.log('🔍 [renderReceive] get_receive_list rows =', rows.length);
+
     if (!rows.length) {
       $('receiveBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่มีข้อมูลในเงื่อนไขที่เลือก</p>';
       return;
@@ -211,14 +231,20 @@ async function fetchFromPO(receiveDate, opts = {}) {
   const { silent = false } = opts;
 
   try {
-    // ✅ Step 1: Query PO ที่ ref_receive = วันที่นี้ + status = saved ขึ้นไป
+    // ✅ [FIX-3] Step 1: ใช้ range แทน .eq() — รองรับ date + timestamp
+    console.log('🔍 [fetchFromPO] receiveDate =', receiveDate);
+
     const { data: pos, error: poErr } = await supabase
       .from('purchase_orders')
       .select('id, po_no, sup_code, ref_receive, status')
-      .eq('ref_receive', receiveDate)
+      .gte('ref_receive', receiveDate)
+      .lt('ref_receive', receiveDate + 'T23:59:59')
       .in('status', ['saved', 'sent']);
 
     if (poErr) throw poErr;
+
+    console.log('🔍 [fetchFromPO] พบ PO =', pos?.length || 0, pos?.map(p => p.po_no));
+
     if (!pos || !pos.length) {
       return { ok: false, reason: 'no_po' };
     }
@@ -227,7 +253,8 @@ async function fetchFromPO(receiveDate, opts = {}) {
     const { error: delErr } = await supabase
       .from('po_receive')
       .delete()
-      .eq('po_date', receiveDate);
+      .gte('po_date', receiveDate)
+      .lt('po_date', receiveDate + 'T23:59:59');
 
     if (delErr) throw delErr;
 
@@ -285,7 +312,8 @@ async function fetchFromPO(receiveDate, opts = {}) {
 
 // ✅ ปุ่ม "รีเฟรชจาก PO" — manual refresh
 async function refreshFromPO() {
-  const receiveDate = $('receiveDate')?.value;
+  // ✅ [FIX-1]
+  const receiveDate = getReceiveDateISO();
   if (!receiveDate) { alert('กรุณาเลือกวันที่รับเข้า'); return; }
 
   const dateThai = thaiDateFull(receiveDate);
@@ -416,7 +444,8 @@ function renderReceiveList(rows, dateThai, supHtml = '') {
 
 // ================= RECEIVE DETAIL =================
 async function openReceiveDetail(gradegram, size, dateThai) {
-  const receiveDate = $('receiveDate')?.value;
+  // ✅ [FIX-1]
+  const receiveDate = getReceiveDateISO();
   if (!receiveDate) return;
 
   const { grade } = parseGradegram(gradegram);
@@ -479,7 +508,7 @@ function exportReceive() {
     alert('ไม่มีข้อมูลให้ Export');
     return;
   }
-  const receiveDate = $('receiveDate')?.value || '';
+  const receiveDate = getReceiveDateISO();   // ✅ [FIX-1]
 
   const supMap = {};
   receiveCache.forEach(r => {
@@ -536,5 +565,5 @@ function exportReceive() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ✅ จบ receive.js — ประวัติ PO ย้ายไป purchase-order.js
+// ✅ จบ receive.js V9.1 — Fix Date Query + Debug
 // ═══════════════════════════════════════════════════════════════
