@@ -1846,8 +1846,8 @@ async function createPOFromAlert() {
       const lsKey = alertLS_Key(r.gradegram, r.size);
       const lsVal = getAlertInput(lsKey, dateIdx);
 
+      // ✅ เก็บแค่ "กรอกจำนวน" → ไม่ต้องเช็ค Sup ที่นี่
       if (!lsVal.qty || Number(lsVal.qty) <= 0) continue;
-      if (!lsVal.sup) continue;
 
       allItems.push({
         seq: allItems.length + 1,
@@ -1857,7 +1857,7 @@ async function createPOFromAlert() {
         size: r.size,
         gradegram_size: `${r.gradegram}-${Number(r.size).toFixed(2)}`,
         quantity: Number(lsVal.qty),
-        sup: lsVal.sup,
+        sup: lsVal.sup || '',   // ✅ ปล่อยว่างได้
         customer_roll: lsVal.customer_roll || 'normal',
         quality_b: lsVal.quality_b || 'normal',
         note: lsVal.note || ''
@@ -1866,7 +1866,7 @@ async function createPOFromAlert() {
   }
 
   if (!allItems.length) {
-    alert('กรุณากรอกจำนวนสั่งซื้อ + Sup. อย่างน้อย 1 รายการ');
+    alert('กรุณากรอกจำนวนสั่งซื้ออย่างน้อย 1 รายการ');
     return;
   }
 
@@ -1914,6 +1914,7 @@ function renderAlertPODetail(items) {
             <th style="width:50px">#</th>
             <th style="width:180px">Gradegram-Size</th>
             <th style="width:90px;text-align:center">Quantity</th>
+            <th style="width:90px;text-align:center">Sup.</th>
             <th>หมายเหตุ</th>
           </tr></thead>
           <tbody>`;
@@ -1927,10 +1928,17 @@ function renderAlertPODetail(items) {
       ].filter(x => x && x.trim() !== '');
       const remarkCombined = parts.join(',');
 
-      html += `<tr>
+      // ✅ ไฮไลต์แถวที่ยังไม่เลือก Sup
+      const supDisplay = it.sup
+        ? esc(it.sup)
+        : '<span style="color:#dc2626;font-weight:700">⚠️ ยังไม่ระบุ</span>';
+      const rowStyle = !it.sup ? ' style="background:#fef2f2"' : '';
+
+      html += `<tr${rowStyle}>
         <td style="text-align:center">${idx + 1}</td>
         <td><b>${esc(it.gradegram_size)}</b></td>
         <td style="text-align:center;font-weight:700;color:#1e40af">${it.quantity}</td>
+        <td style="text-align:center">${supDisplay}</td>
         <td>${esc(remarkCombined)}</td>
       </tr>`;
     });
@@ -1939,7 +1947,7 @@ function renderAlertPODetail(items) {
       <tfoot><tr style="background:#cbd5e1;font-weight:700">
         <td colspan="2" style="text-align:right">รวมวันนี้ (ม้วน)</td>
         <td style="text-align:center;color:#dc2626;font-size:15px">${dayTotal}</td>
-        <td></td>
+        <td colspan="2"></td>
       </tr></tfoot>
       </table>
       </div>`;
@@ -1957,6 +1965,17 @@ function confirmCreatePO() {
 
   if (alertReceiveDates.length === 0) {
     alert('กรุณากำหนดวันที่รับสินค้าอย่างน้อย 1 วัน');
+    return;
+  }
+
+  // ✅ เช็ค Sup ก่อนสร้าง PO
+  const missingSup = _pendingPOItems.filter(it => !it.sup || String(it.sup).trim() === '');
+  if (missingSup.length > 0) {
+    const list = missingSup.slice(0, 10).map(it =>
+      `• ${it.gradegram} · Size ${it.size} · ${it.quantity} ม้วน`
+    ).join('\n');
+    const more = missingSup.length > 10 ? `\n... และอีก ${missingSup.length - 10} รายการ` : '';
+    alert(`⚠️ มี ${missingSup.length} รายการที่ยังไม่ได้เลือก Sup.\n\n${list}${more}\n\nกรุณาเลือก Sup. ให้ครบก่อนสร้าง PO`);
     return;
   }
 
