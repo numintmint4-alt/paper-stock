@@ -224,7 +224,11 @@ async function onAlertDateChange() {
 
   if (snapshot) {
     await applyAlertSnapshot(snapshot);
-    setAlertLocked(true, analyzedDate);   // ✅ lock เฉพาะวันที่มี snapshot
+
+    // ✅ lock เฉพาะเมื่อ snapshot เป็นของ "วันเก่า" (ข้ามวันมาแล้ว)
+    const today = toISODate(new Date());
+    const isPastDay = analyzedDate < today;
+    setAlertLocked(isPastDay, analyzedDate);
   } else {
     setAlertLocked(false);
     await autoAnalyzeAlert();
@@ -241,17 +245,25 @@ function setAlertLocked(locked, analyzedDate) {
 
   if (locked) {
     if (lockBanner) {
-      lockBanner.innerHTML = `🔒 ข้อมูลวันที่ <b>${fmtDateThai(analyzedDate)}</b> — สร้าง PO แล้ว ดูได้อย่างเดียว`;
+      lockBanner.innerHTML = `🔒 ข้อมูลวันที่ <b>${fmtDateThai(analyzedDate)}</b> — ข้ามวันแล้ว ดูได้อย่างเดียว`;
       lockBanner.classList.remove('hidden');
     }
 
     if (body) body.classList.add('alert-locked');
 
-    // ✅ ล็อกทุกช่อง "ยกเว้น" alertDate → user เปลี่ยนวันได้
+    // ✅ ล็อกทุกช่อง "ยกเว้น alertDate" → user เปลี่ยนวันกลับไปดูวันอื่นได้เสมอ
     ['alertStockDate', 'alertReceiveDate', 'alertSnapshotMonth', 'alertIncludeCustomer'].forEach(id => {
       const el = $(id);
       if (el) el.disabled = true;
     });
+
+    // ✅ alertDate ต้องเปิดใช้งานเสมอ — ไม่แตะเลย
+    const dateEl = $('alertDate');
+    if (dateEl) {
+      dateEl.disabled = false;
+      dateEl.style.background = '';
+      dateEl.style.cursor = '';
+    }
 
     document.querySelectorAll('[onclick*="createPOFromAlert"], [onclick*="clearAlertInputs"]').forEach(btn => {
       btn.disabled = true;
@@ -263,6 +275,7 @@ function setAlertLocked(locked, analyzedDate) {
     if (lockBanner) lockBanner.classList.add('hidden');
     if (body) body.classList.remove('alert-locked');
 
+    // ✅ ปลดล็อกทุกช่อง
     ['alertStockDate', 'alertReceiveDate', 'alertSnapshotMonth', 'alertIncludeCustomer'].forEach(id => {
       const el = $(id);
       if (el) {
@@ -271,6 +284,14 @@ function setAlertLocked(locked, analyzedDate) {
         el.style.cursor = '';
       }
     });
+
+    // ✅ alertDate เปิดใช้งานเสมอ
+    const dateEl = $('alertDate');
+    if (dateEl) {
+      dateEl.disabled = false;
+      dateEl.style.background = '';
+      dateEl.style.cursor = '';
+    }
 
     document.querySelectorAll('[onclick*="createPOFromAlert"], [onclick*="clearAlertInputs"]').forEach(btn => {
       btn.disabled = false;
