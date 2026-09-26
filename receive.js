@@ -156,9 +156,6 @@ async function renderReceive() {
   const remark = $('receiveRemark')?.value || '';
   const mode = $('receiveMode')?.value || 'matrix';
 
-  // ✅ [DEBUG] แสดงค่าจริง
-  console.log('🔍 [renderReceive] receiveDate =', receiveDate);
-
   if (!receiveDate) { alert('กรุณาเลือกวันที่รับเข้า'); return; }
 
   const dateThai = thaiDateFull(receiveDate);
@@ -171,16 +168,13 @@ async function renderReceive() {
 
   try {
     // ✅ Step 1: เช็คว่ามีข้อมูลใน po_receive ของวันนี้ไหม
-    // [FIX-3] ใช้ range แทน .eq() เพื่อรองรับทั้ง date และ timestamp
+    // [FIX-3] ใช้ .eq() เพราะ DB เป็น date
     const { count: existCount, error: countErr } = await supabase
       .from('po_receive')
       .select('*', { count: 'exact', head: true })
-      .gte('po_date', receiveDate)
-      .lt('po_date', receiveDate + 'T23:59:59');
+      .eq('po_date', receiveDate);
 
     if (countErr) throw countErr;
-
-    console.log('🔍 [renderReceive] po_receive count =', existCount);
 
     // ✅ Step 2: ถ้าไม่มี → auto-fetch จาก PO
     if (!existCount || existCount === 0) {
@@ -210,8 +204,6 @@ async function renderReceive() {
     const rows = data || [];
     receiveCache = rows;
 
-    console.log('🔍 [renderReceive] get_receive_list rows =', rows.length);
-
     if (!rows.length) {
       $('receiveBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่มีข้อมูลในเงื่อนไขที่เลือก</p>';
       return;
@@ -231,19 +223,14 @@ async function fetchFromPO(receiveDate, opts = {}) {
   const { silent = false } = opts;
 
   try {
-    // ✅ [FIX-3] Step 1: ใช้ range แทน .eq() — รองรับ date + timestamp
-    console.log('🔍 [fetchFromPO] receiveDate =', receiveDate);
-
+    // ✅ [FIX-3] Step 1: ใช้ .eq() เพราะ DB เป็น date
     const { data: pos, error: poErr } = await supabase
       .from('purchase_orders')
       .select('id, po_no, sup_code, ref_receive, status')
-      .gte('ref_receive', receiveDate)
-      .lt('ref_receive', receiveDate + 'T23:59:59')
+      .eq('ref_receive', receiveDate)
       .in('status', ['saved', 'sent']);
 
     if (poErr) throw poErr;
-
-    console.log('🔍 [fetchFromPO] พบ PO =', pos?.length || 0, pos?.map(p => p.po_no));
 
     if (!pos || !pos.length) {
       return { ok: false, reason: 'no_po' };
@@ -253,8 +240,7 @@ async function fetchFromPO(receiveDate, opts = {}) {
     const { error: delErr } = await supabase
       .from('po_receive')
       .delete()
-      .gte('po_date', receiveDate)
-      .lt('po_date', receiveDate + 'T23:59:59');
+      .eq('po_date', receiveDate);
 
     if (delErr) throw delErr;
 
