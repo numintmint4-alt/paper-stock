@@ -32,6 +32,24 @@ const ALERT_ORDER_FILTERS = [
 let alertSelectedSupFilters = [];
 let alertAllSupsInData = [];
 
+// ✅ Filter "Stock" (รอบ 2)
+let alertSelectedStockFilters = ['all'];
+const ALERT_STOCK_FILTERS = [
+  { value: 'all', label: 'ทั้งหมด' },
+  { value: 'eq0', label: '= 0' },
+  { value: 'gt0', label: '> 0' },
+  { value: 'lt0', label: '< 0' }
+];
+
+// ✅ Filter "Receive" (รอบ 2)
+let alertSelectedReceiveFilters = ['all'];
+const ALERT_RECEIVE_FILTERS = [
+  { value: 'all', label: 'ทั้งหมด' },
+  { value: 'eq0', label: '= 0' },
+  { value: 'gt0', label: '> 0' },
+  { value: 'lt0', label: '< 0' }
+];
+
 // ✅ Customer Roll (ม้วนลูกค้า)
 const ALERT_CUSTOMER_ROLLS = [
   { value: 'normal',   label: 'ปกติ' },
@@ -372,7 +390,42 @@ function renderAlertFromCache() {
       </div>
     </div>
   </th>`;
-  html += '<th>Snapshot</th><th>Stock</th><th>Receive</th>';
+  html += '<th>Snapshot</th>';
+
+  // ✅ Stock Filter
+  html += `<th class="th-with-filter">
+    <div class="th-filter-wrap" id="alertStockFilterBox">
+      <button type="button" class="th-filter-btn" id="alertStockFilterBtn">
+        <span id="alertStockFilterLabel">Stock</span>
+        <span class="arrow">▼</span>
+      </button>
+      <div class="grade-dropdown hidden" id="alertStockFilterDropdown" style="min-width:180px">
+        <div class="grade-actions">
+          <button type="button" onclick="selectAllAlertStockFilters()">✓ เลือกทั้งหมด</button>
+          <button type="button" onclick="clearAllAlertStockFilters()">✗ ล้างทั้งหมด</button>
+        </div>
+        <div class="grade-list" id="alertStockFilterList"></div>
+      </div>
+    </div>
+  </th>`;
+
+  // ✅ Receive Filter
+  html += `<th class="th-with-filter">
+    <div class="th-filter-wrap" id="alertReceiveFilterBox">
+      <button type="button" class="th-filter-btn" id="alertReceiveFilterBtn">
+        <span id="alertReceiveFilterLabel">Receive</span>
+        <span class="arrow">▼</span>
+      </button>
+      <div class="grade-dropdown hidden" id="alertReceiveFilterDropdown" style="min-width:180px">
+        <div class="grade-actions">
+          <button type="button" onclick="selectAllAlertReceiveFilters()">✓ เลือกทั้งหมด</button>
+          <button type="button" onclick="clearAllAlertReceiveFilters()">✗ ล้างทั้งหมด</button>
+        </div>
+        <div class="grade-list" id="alertReceiveFilterList"></div>
+      </div>
+    </div>
+  </th>`;
+
   html += `<th class="th-with-filter">
     <div class="th-filter-wrap" id="alertFilterBox">
       <button type="button" class="th-filter-btn" id="alertFilterBtn">
@@ -481,7 +534,7 @@ function renderAlertFromCache() {
   html += `<tr class="total-row">
     <td colspan="7" style="text-align:right;font-weight:700">จำนวนรวม (ม้วน)</td>
     <td style="font-weight:700;color:#dc2626;font-size:15px">${grandShortage > 0 ? grandShortage : '-'}</td>
-    <td colspan="5"></td>
+    <td colspan="7"></td>
   </tr>`;
 
   html += '</tbody></table></div>';
@@ -503,16 +556,22 @@ function renderAlertFromCache() {
   renderAlertFilterList();
   renderAlertOrderFilterList();
   renderAlertSupFilterList();
+  renderAlertStockFilterList();
+  renderAlertReceiveFilterList();
   updateAlertGradeLabel();
   updateAlertSizeLabel();
   updateAlertFilterLabel();
   updateAlertOrderFilterLabel();
   updateAlertSupFilterLabel();
+  updateAlertStockFilterLabel();
+  updateAlertReceiveFilterLabel();
   _attachAlertDropdown('alertGradeFilterBtn', 'alertGradeDropdown', 'alertGradeFilterBox', 'alertGrade');
   _attachAlertDropdown('alertSizeFilterBtn', 'alertSizeDropdown', 'alertSizeFilterBox', 'alertSize');
   _attachAlertDropdown('alertFilterBtn', 'alertFilterDropdown', 'alertFilterBox', 'alertFilter');
   _attachAlertDropdown('alertOrderFilterBtn', 'alertOrderFilterDropdown', 'alertOrderFilterBox', 'alertOrderFilter');
   _attachAlertDropdown('alertSupFilterBtn', 'alertSupFilterDropdown', 'alertSupFilterBox', 'alertSupFilter');
+  _attachAlertDropdown('alertStockFilterBtn', 'alertStockFilterDropdown', 'alertStockFilterBox', 'alertStockFilter');
+  _attachAlertDropdown('alertReceiveFilterBtn', 'alertReceiveFilterDropdown', 'alertReceiveFilterBox', 'alertReceiveFilter');
   renderAlertReceiveDates();
 
   // ✅ Apply filter แล้ว render ใหม่
@@ -836,6 +895,106 @@ function clearAllAlertSupFilters() {
   applyAlertFiltersAndRender();
 }
 
+// ================= STOCK FILTER (รอบ 2) =================
+function renderAlertStockFilterList() {
+  const list = $('alertStockFilterList');
+  if (!list) return;
+  list.innerHTML = ALERT_STOCK_FILTERS.map(f => {
+    const checked = alertSelectedStockFilters.includes(f.value);
+    return `<label class="item ${checked ? 'checked' : ''}" data-stock-filter="${f.value}">
+      <input type="checkbox" ${checked ? 'checked' : ''}>
+      <span>${f.label}</span>
+    </label>`;
+  }).join('');
+  list.querySelectorAll('.item').forEach(el => {
+    const cb = el.querySelector('input[type="checkbox"]');
+    cb.addEventListener('change', () => {
+      const val = el.dataset.stockFilter;
+      if (cb.checked) {
+        if (!alertSelectedStockFilters.includes(val)) alertSelectedStockFilters.push(val);
+      } else {
+        alertSelectedStockFilters = alertSelectedStockFilters.filter(x => x !== val);
+      }
+      el.classList.toggle('checked', cb.checked);
+      updateAlertStockFilterLabel();
+      applyAlertFiltersAndRender();
+    });
+  });
+}
+
+function updateAlertStockFilterLabel() {
+  const label = $('alertStockFilterLabel');
+  if (!label) return;
+  if (alertSelectedStockFilters.length === 0 || alertSelectedStockFilters.includes('all')) {
+    label.textContent = 'Stock';
+  } else if (alertSelectedStockFilters.length === 1) {
+    const f = ALERT_STOCK_FILTERS.find(x => x.value === alertSelectedStockFilters[0]);
+    label.textContent = f ? f.label : alertSelectedStockFilters[0];
+  } else {
+    label.textContent = `Stock (${alertSelectedStockFilters.length})`;
+  }
+}
+function selectAllAlertStockFilters() {
+  alertSelectedStockFilters = ['all'];
+  renderAlertStockFilterList(); updateAlertStockFilterLabel();
+  applyAlertFiltersAndRender();
+}
+function clearAllAlertStockFilters() {
+  alertSelectedStockFilters = [];
+  renderAlertStockFilterList(); updateAlertStockFilterLabel();
+  applyAlertFiltersAndRender();
+}
+
+// ================= RECEIVE FILTER (รอบ 2) =================
+function renderAlertReceiveFilterList() {
+  const list = $('alertReceiveFilterList');
+  if (!list) return;
+  list.innerHTML = ALERT_RECEIVE_FILTERS.map(f => {
+    const checked = alertSelectedReceiveFilters.includes(f.value);
+    return `<label class="item ${checked ? 'checked' : ''}" data-receive-filter="${f.value}">
+      <input type="checkbox" ${checked ? 'checked' : ''}>
+      <span>${f.label}</span>
+    </label>`;
+  }).join('');
+  list.querySelectorAll('.item').forEach(el => {
+    const cb = el.querySelector('input[type="checkbox"]');
+    cb.addEventListener('change', () => {
+      const val = el.dataset.receiveFilter;
+      if (cb.checked) {
+        if (!alertSelectedReceiveFilters.includes(val)) alertSelectedReceiveFilters.push(val);
+      } else {
+        alertSelectedReceiveFilters = alertSelectedReceiveFilters.filter(x => x !== val);
+      }
+      el.classList.toggle('checked', cb.checked);
+      updateAlertReceiveFilterLabel();
+      applyAlertFiltersAndRender();
+    });
+  });
+}
+
+function updateAlertReceiveFilterLabel() {
+  const label = $('alertReceiveFilterLabel');
+  if (!label) return;
+  if (alertSelectedReceiveFilters.length === 0 || alertSelectedReceiveFilters.includes('all')) {
+    label.textContent = 'Receive';
+  } else if (alertSelectedReceiveFilters.length === 1) {
+    const f = ALERT_RECEIVE_FILTERS.find(x => x.value === alertSelectedReceiveFilters[0]);
+    label.textContent = f ? f.label : alertSelectedReceiveFilters[0];
+  } else {
+    label.textContent = `Receive (${alertSelectedReceiveFilters.length})`;
+  }
+}
+function selectAllAlertReceiveFilters() {
+  alertSelectedReceiveFilters = ['all'];
+  renderAlertReceiveFilterList(); updateAlertReceiveFilterLabel();
+  applyAlertFiltersAndRender();
+}
+function clearAllAlertReceiveFilters() {
+  alertSelectedReceiveFilters = [];
+  renderAlertReceiveFilterList(); updateAlertReceiveFilterLabel();
+  applyAlertFiltersAndRender();
+}
+
 // ================= APPLY FILTERS + RE-RENDER =================
 function applyAlertFiltersAndRender() {
   if (!window._alertFullCache || !window._alertFullCache.length) return;
@@ -859,6 +1018,28 @@ function applyAlertFiltersAndRender() {
       if (alertSelectedFilters.includes('lt0') && a < 0) return true;
       if (alertSelectedFilters.includes('eq0') && a === 0) return true;
       if (alertSelectedFilters.includes('gt0') && a > 0) return true;
+      return false;
+    });
+  }
+
+  // 3.5) Stock (รอบ 2)
+  if (!alertSelectedStockFilters.includes('all') && alertSelectedStockFilters.length > 0) {
+    result = result.filter(r => {
+      const v = Number(r.stock) || 0;
+      if (alertSelectedStockFilters.includes('eq0') && v === 0) return true;
+      if (alertSelectedStockFilters.includes('gt0') && v > 0) return true;
+      if (alertSelectedStockFilters.includes('lt0') && v < 0) return true;
+      return false;
+    });
+  }
+
+  // 3.6) Receive (รอบ 2)
+  if (!alertSelectedReceiveFilters.includes('all') && alertSelectedReceiveFilters.length > 0) {
+    result = result.filter(r => {
+      const v = Number(r.receive) || 0;
+      if (alertSelectedReceiveFilters.includes('eq0') && v === 0) return true;
+      if (alertSelectedReceiveFilters.includes('gt0') && v > 0) return true;
+      if (alertSelectedReceiveFilters.includes('lt0') && v < 0) return true;
       return false;
     });
   }
@@ -922,7 +1103,7 @@ function renderAlertTableBody(rows) {
   if (!tbody) return;
 
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;color:#94a3b8;padding:30px">ไม่มีรายการ 🎉</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="15" style="text-align:center;color:#94a3b8;padding:30px">ไม่มีรายการ 🎉</td></tr>';
     return;
   }
 
@@ -988,7 +1169,7 @@ function renderAlertTableBody(rows) {
   html += `<tr class="total-row">
     <td colspan="7" style="text-align:right;font-weight:700">จำนวนรวม (ม้วน)</td>
     <td style="font-weight:700;color:#dc2626;font-size:15px">${grandShortage > 0 ? grandShortage : '-'}</td>
-    <td colspan="5"></td>
+    <td colspan="7"></td>
   </tr>`;
 
   tbody.innerHTML = html;
@@ -1359,7 +1540,41 @@ async function renderAlert() {
       </div>
     </th>`;
 
-    html += '<th>Snapshot</th><th>Stock</th><th>Receive</th>';
+    html += '<th>Snapshot</th>';
+
+    // ✅ Stock Filter
+    html += `<th class="th-with-filter">
+      <div class="th-filter-wrap" id="alertStockFilterBox">
+        <button type="button" class="th-filter-btn" id="alertStockFilterBtn">
+          <span id="alertStockFilterLabel">Stock</span>
+          <span class="arrow">▼</span>
+        </button>
+        <div class="grade-dropdown hidden" id="alertStockFilterDropdown" style="min-width:180px">
+          <div class="grade-actions">
+            <button type="button" onclick="selectAllAlertStockFilters()">✓ เลือกทั้งหมด</button>
+            <button type="button" onclick="clearAllAlertStockFilters()">✗ ล้างทั้งหมด</button>
+          </div>
+          <div class="grade-list" id="alertStockFilterList"></div>
+        </div>
+      </div>
+    </th>`;
+
+    // ✅ Receive Filter
+    html += `<th class="th-with-filter">
+      <div class="th-filter-wrap" id="alertReceiveFilterBox">
+        <button type="button" class="th-filter-btn" id="alertReceiveFilterBtn">
+          <span id="alertReceiveFilterLabel">Receive</span>
+          <span class="arrow">▼</span>
+        </button>
+        <div class="grade-dropdown hidden" id="alertReceiveFilterDropdown" style="min-width:180px">
+          <div class="grade-actions">
+            <button type="button" onclick="selectAllAlertReceiveFilters()">✓ เลือกทั้งหมด</button>
+            <button type="button" onclick="clearAllAlertReceiveFilters()">✗ ล้างทั้งหมด</button>
+          </div>
+          <div class="grade-list" id="alertReceiveFilterList"></div>
+        </div>
+      </div>
+    </th>`;
 
     html += `<th class="th-with-filter">
       <div class="th-filter-wrap" id="alertFilterBox">
@@ -1470,7 +1685,7 @@ async function renderAlert() {
     html += `<tr class="total-row">
       <td colspan="7" style="text-align:right;font-weight:700">จำนวนรวม (ม้วน)</td>
       <td style="font-weight:700;color:#dc2626;font-size:15px">${grandShortage > 0 ? grandShortage : '-'}</td>
-      <td colspan="5"></td>
+      <td colspan="7"></td>
     </tr>`;
 
     html += '</tbody></table></div>';
@@ -1504,16 +1719,22 @@ async function renderAlert() {
     renderAlertSizeList();
     renderAlertOrderFilterList();
     renderAlertSupFilterList();
+    renderAlertStockFilterList();
+    renderAlertReceiveFilterList();
     updateAlertGradeLabel();
     updateAlertFilterLabel();
     updateAlertSizeLabel();
     updateAlertOrderFilterLabel();
     updateAlertSupFilterLabel();
+    updateAlertStockFilterLabel();
+    updateAlertReceiveFilterLabel();
     _attachAlertDropdown('alertGradeFilterBtn', 'alertGradeDropdown', 'alertGradeFilterBox', 'alertGrade');
     _attachAlertDropdown('alertSizeFilterBtn', 'alertSizeDropdown', 'alertSizeFilterBox', 'alertSize');
     _attachAlertDropdown('alertFilterBtn', 'alertFilterDropdown', 'alertFilterBox', 'alertFilter');
     _attachAlertDropdown('alertOrderFilterBtn', 'alertOrderFilterDropdown', 'alertOrderFilterBox', 'alertOrderFilter');
     _attachAlertDropdown('alertSupFilterBtn', 'alertSupFilterDropdown', 'alertSupFilterBox', 'alertSupFilter');
+    _attachAlertDropdown('alertStockFilterBtn', 'alertStockFilterDropdown', 'alertStockFilterBox', 'alertStockFilter');
+    _attachAlertDropdown('alertReceiveFilterBtn', 'alertReceiveFilterDropdown', 'alertReceiveFilterBox', 'alertReceiveFilter');
     renderAlertDateTabs();
 
     // ✅ Apply filter แล้ว render ใหม่ (ถ้ามี filter ค้างอยู่)
