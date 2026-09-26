@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// STOCK V8 — alert.js (Flat Table + Filter + PO + Lock Date + FSC + History + Lock)
+// STOCK V8 — alert.js (Flat Table + Filter + PO + Lock Date + FSC + History + Lock + Usage Plan)
 // ═══════════════════════════════════════════════════════════════
 
 let alertSelectedGrades = [];
@@ -72,6 +72,10 @@ const ALERT_RECEIVE_DATES_KEY = 'stockv8_alert_receive_dates';
 let alertReceiveDates = [];
 let alertActiveDateIdx = 0;
 
+// ✅ Usage Plan — ช่วงวันที่ที่ user เลือก
+let alertUsageRanges = [];      // [{ date_from, date_to }]
+let alertUsageSelected = null;  // { date_from, date_to } หรือ null
+
 function getAlertLSKey(dateIdx = alertActiveDateIdx) {
   return `${ALERT_LS_KEY_PREFIX}${dateIdx + 1}`;
 }
@@ -136,6 +140,10 @@ async function initAlertTab() {
   await loadAlertGradeFilter();
   loadAlertFilter();
   initAlertReceiveDates();
+
+  // ✅ โหลด Usage Ranges + render dropdown
+  await loadUsagePlanRanges();
+  renderUsageRangeDropdown();
 
   await onAlertDateChange();
 }
@@ -325,7 +333,7 @@ async function applyAlertSnapshot(snapshot) {
     if (snapshot.stock_date)     $('alertStockDate').value = snapshot.stock_date;
     if (snapshot.receive_date)   $('alertReceiveDate').value = snapshot.receive_date;
 
-        if (snapshot.receive_dates && Array.isArray(snapshot.receive_dates)) {
+    if (snapshot.receive_dates && Array.isArray(snapshot.receive_dates)) {
       alertReceiveDates = [...snapshot.receive_dates];
       saveAlertReceiveDates();
       renderAlertDateTabs();
@@ -1449,6 +1457,11 @@ async function renderAlert() {
     return;
   }
 
+  // ✅ โหลด Usage Ranges (ถ้ายังไม่มี)
+  if (!alertUsageRanges.length) {
+    await loadUsagePlanRanges();
+  }
+
   const gradeLabel = alertSelectedGrades.length > 0
     ? ` · เกรด: ${alertSelectedGrades.join(', ')}` : '';
 
@@ -1461,10 +1474,12 @@ async function renderAlert() {
   $('alertBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังวิเคราะห์...</p>';
 
   try {
-    const { data, error } = await supabase.rpc('get_alert_matrix', {
+    const { data, error } = await supabase.rpc('get_alert_matrix_v2', {
       p_snapshot_month: snapshotMonth,
       p_stock_date:     stockDate,
       p_receive_date:   receiveDate,
+      p_usage_from:     alertUsageSelected?.date_from || null,
+      p_usage_to:       alertUsageSelected?.date_to   || null,
     });
     if (error) throw error;
 
@@ -1903,7 +1918,7 @@ function renderAlertPODetail(items) {
       <div>📅 <b>${Object.keys(byDate).length}</b> วันรับสินค้า</div>
     </div>`;
 
-    Object.keys(byDate).sort().forEach(dateKey => {
+  Object.keys(byDate).sort().forEach(dateKey => {
     const dayItems = byDate[dateKey];
     const dayTotal = dayItems.reduce((s, i) => s + i.quantity, 0);
 
@@ -2118,6 +2133,303 @@ async function openAlertDetail(gradegram, size) {
     $('alertDetailBody').innerHTML = html;
   } catch (err) {
     $('alertDetailBody').innerHTML = `<div class="msg err">${esc(err.message)}</div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ========== USAGE PLAN RANGES (Phase 6) ========================
+// ═══════════════════════════════════════════════════════════════
+
+async function loadUsagePlanRanges() {
+  try {
+    const { data, error } = await supabase.rpc('get_all_usage_plan_ranges');
+    if (error) throw error;
+    alertUsageRanges = data || [];
+    console.log('📋 Usage ranges:', alertUsageRanges);
+  } catch (e) {
+    console.warn('loadUsagePlanRanges:', e);
+    alertUsageRanges = [];
+  }
+}
+
+// ✅ เปลี่ยนช่วง Usage
+async function onUsagePlanRangeChange(value) {
+  if (!value || value === '__NONE__') {
+    alertUsageSelected = null;
+  } else {
+    const [from, to] = value.split('|');
+    alertUsageSelected = { date_from: from, date_to: to };
+  }
+  await renderAlert();
+}
+
+// ✅ Render dropdown Usage Plan
+function renderUsageRangeDropdown() {
+  const sel = $('alertUsageRange');
+  if (!sel) return;
+
+  if (!alertUsageRanges.length) {
+    sel.innerHTML = '<option value="__NONE__">— ยังไม่มีข้อมูล —</option>';
+    return;
+  }
+
+  let html = '<option value="__NONE__">— ไม่ใช้ —</option>';
+  alertUsageRanges.forEach(r => {
+    const fromThai = fmtDateThai(r.date_from);
+    const toThai   = fmtDateThai(r.date_to);
+    const selected = alertUsageSelected &&
+                     alertUsageSelected.date_from === r.date_from &&
+                     alertUsageSelected.date_to   === r.date_to;
+    html += `<option value="${r.date_from}|${r.date_to}" ${selected ? 'selected' : ''}>
+      ${fromThai} - ${toThai}
+    </option>`;
+  });
+  sel.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ========== USAGE PLAN IMPORT (Phase 6) ========================
+// ═══════════════════════════════════════════════════════════════
+
+let _usagePlanRows = [];
+let _usagePlanDateCols = [];   // [{ key, iso, thai }]
+
+// ✅ แปลง '28/09/26' → { iso: '2026-09-28', thai: '28/09/2569' }
+function parseExcelDateKey(key) {
+  const m = String(key).match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
+  if (!m) return null;
+  const dd = m[1].padStart(2, '0');
+  const mm = m[2].padStart(2, '0');
+  const yyShort = Number(m[3]);
+  const yearBE = 2500 + yyShort;   // 26 → 2569
+  const yearCE = yearBE - 543;     // 2569 → 2026
+  return {
+    iso:  `${yearCE}-${mm}-${dd}`,
+    thai: `${dd}/${mm}/${yearBE}`
+  };
+}
+
+// ✅ เปิด dialog เลือกไฟล์
+function openUsagePlanImport() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.xlsx,.xls';
+  input.onchange = e => handleUsagePlanFile(e.target.files[0]);
+  input.click();
+}
+
+// ✅ อ่านไฟล์ + เปิด modal เลือกวันที่
+async function handleUsagePlanFile(file) {
+  if (!file) return;
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+
+    if (!rows.length) {
+      alert('ไฟล์ไม่มีข้อมูล');
+      return;
+    }
+
+    // ✅ หา date columns
+    const firstRow = rows[0];
+    const dateCols = [];
+    Object.keys(firstRow).forEach(k => {
+      const parsed = parseExcelDateKey(k);
+      if (parsed) dateCols.push({ key: k, ...parsed });
+    });
+
+    if (!dateCols.length) {
+      alert('ไม่พบคอลัมน์วันที่ในไฟล์ (รูปแบบ DD/MM/YY)');
+      return;
+    }
+
+    _usagePlanRows = rows;
+    _usagePlanDateCols = dateCols;
+
+    // ✅ เปิด modal
+    renderUsagePlanImportModal();
+    openModal('modalUsagePlanImport');
+
+  } catch (e) {
+    console.error('handleUsagePlanFile:', e);
+    alert('อ่านไฟล์ไม่สำเร็จ: ' + e.message);
+  }
+}
+
+// ✅ Render modal
+function renderUsagePlanImportModal() {
+  const body = $('usagePlanImportBody');
+  if (!body) return;
+
+  const minDate = _usagePlanDateCols[0].iso;
+  const maxDate = _usagePlanDateCols[_usagePlanDateCols.length - 1].iso;
+
+  let html = `
+    <div class="msg info" style="margin-bottom:12px">
+      📊 พบ <b>${_usagePlanRows.length}</b> แถว · <b>${_usagePlanDateCols.length}</b> คอลัมน์วันที่<br>
+      ช่วง: <b>${_usagePlanDateCols[0].thai}</b> ถึง <b>${_usagePlanDateCols[_usagePlanDateCols.length - 1].thai}</b>
+    </div>
+
+    <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:12px">
+      <label>📅 จากวันที่ (ค.ศ.)
+        <input type="date" id="usagePlanFrom" value="${minDate}" min="${minDate}" max="${maxDate}">
+      </label>
+      <label>📅 ถึงวันที่ (ค.ศ.)
+        <input type="date" id="usagePlanTo" value="${maxDate}" min="${minDate}" max="${maxDate}">
+      </label>
+    </div>
+
+    <div class="hint" style="margin-top:12px">
+      💡 ระบบจะรวมค่าทุกคอลัมน์ที่อยู่ในช่วงวันที่ที่เลือก
+    </div>
+  `;
+
+  body.innerHTML = html;
+}
+
+// ✅ คำนวณ + ส่งไป RPC
+async function confirmUsagePlanImport() {
+  const from = $('usagePlanFrom')?.value;
+  const to   = $('usagePlanTo')?.value;
+
+  if (!from || !to) {
+    alert('กรุณาเลือกช่วงวันที่');
+    return;
+  }
+  if (from > to) {
+    alert('วันที่ "จาก" ต้องไม่เกิน "ถึง"');
+    return;
+  }
+
+  // ✅ หาคอลัมน์ที่อยู่ในช่วง
+  const activeCols = _usagePlanDateCols.filter(c => c.iso >= from && c.iso <= to);
+  if (!activeCols.length) {
+    alert('ไม่มีคอลัมน์วันที่อยู่ในช่วงที่เลือก');
+    return;
+  }
+
+  // ✅ ประมวลผล
+  const result = [];
+  const skipped = [];
+
+  _usagePlanRows.forEach(row => {
+    const gradegram = String(row['GRADE'] || '').trim().toUpperCase();
+    const size = Number(row['SIZE']);
+    if (!gradegram || !size) return;
+
+    // ✅ หา master
+    const parsed = parseGradegram(gradegram);
+    const gradeNorm = normalizeGrade(parsed.grade || gradegram);
+    const gramNorm = String(parsed.gram || '').replace(/^0+/, '') || parsed.gram;
+
+    const spec = masterCache.find(m =>
+      normalizeGrade(m.grade) === gradeNorm &&
+      String(m.gram).replace(/^0+/, '') === String(gramNorm).replace(/^0+/, '') &&
+      Number(m.size) === size
+    );
+
+    if (!spec) {
+      skipped.push(`${gradegram}/${size}`);
+      return;
+    }
+
+    const stdWeight = Number(spec.std_weight_kg) || 0;
+    if (stdWeight <= 0) {
+      skipped.push(`${gradegram}/${size} (no std)`);
+      return;
+    }
+
+    // ✅ รวม kg ทุกคอลัมน์ในช่วง
+    let totalKg = 0;
+    activeCols.forEach(col => {
+      totalKg += Number(row[col.key]) || 0;
+    });
+
+    if (totalKg <= 0) return;   // ข้ามถ้าไม่มีค่า
+
+    const rolls = Number((totalKg / stdWeight).toFixed(4));
+
+    result.push({
+      gradegram,
+      size,
+      usage_rolls: rolls,
+      usage_kg: Number(totalKg.toFixed(2))
+    });
+  });
+
+  if (!result.length) {
+    alert('ไม่มีข้อมูลที่สามารถ import ได้\n(ไม่พบใน master หรือ kg = 0)');
+    return;
+  }
+
+  // ✅ ส่งไป RPC
+  const btn = $('usagePlanImportConfirmBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'กำลังบันทึก...'; }
+
+  try {
+    const { data, error } = await supabase.rpc('import_usage_plan', {
+      p_date_from: from,
+      p_date_to: to,
+      p_rows: result,
+      p_user_id: currentUser?.id
+    });
+    if (error) throw error;
+
+    if (!data?.success) {
+      throw new Error(data?.error || 'บันทึกไม่สำเร็จ');
+    }
+
+    closeModal('modalUsagePlanImport');
+
+    // ✅ Toast สรุปผล
+    showToast(
+      `✅ Import สำเร็จ ${data.inserted} รายการ` +
+      (skipped.length ? ` · ข้าม ${skipped.length}` : ''),
+      'ok', 4000
+    );
+
+    // ✅ Reload Usage Ranges + dropdown
+    await loadUsagePlanRanges();
+    renderUsageRangeDropdown();
+
+    // ✅ Refresh Alert
+    await renderAlert();
+
+  } catch (e) {
+    alert('❌ ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '💾 บันทึก'; }
+  }
+}
+
+// ✅ ล้าง Usage Plan (ถามวันที่)
+async function clearUsagePlan() {
+  const from = prompt('📅 ลบ Usage Plan จากวันที่ (YYYY-MM-DD):');
+  if (!from) return;
+  const to = prompt('📅 ถึงวันที่ (YYYY-MM-DD):', from);
+  if (!to) return;
+
+  if (!confirm(`⚠️ ลบ Usage Plan ช่วง ${from} ถึง ${to}?`)) return;
+
+  try {
+    const { data, error } = await supabase.rpc('clear_usage_plan', {
+      p_date_from: from,
+      p_date_to: to
+    });
+    if (error) throw error;
+
+    showToast(`✅ ลบ ${data?.deleted || 0} รายการ`, 'ok', 3000);
+
+    // ✅ Reset selection + reload
+    alertUsageSelected = null;
+    await loadUsagePlanRanges();
+    renderUsageRangeDropdown();
+
+    // ✅ Refresh Alert
+    await renderAlert();
+  } catch (e) {
+    alert('❌ ' + e.message);
   }
 }
 
