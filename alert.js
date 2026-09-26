@@ -1991,11 +1991,12 @@ function confirmCreatePO() {
     if (res.ok) {
       console.log('✅ Alert snapshot saved:', res.data);
 
-      clearAllAlertInputsAllDates();
+      // ✅ ไม่ล้าง inputs — เก็บไว้ให้ user ดูย้อนหลัง/แก้ไข
+      // clearAllAlertInputsAllDates();
 
       renderAlert();
 
-      console.log('✅ Alert inputs cleared (all dates)');
+      console.log('✅ Alert inputs kept (not cleared)');
     } else {
       console.warn('❌ Alert snapshot save failed:', res.error);
     }
