@@ -50,6 +50,14 @@ const ALERT_RECEIVE_FILTERS = [
   { value: 'lt0', label: '< 0' }
 ];
 
+// ✅ Filter "Usage Plan" (Phase 6)
+let alertSelectedUsageFilters = ['all'];
+const ALERT_USAGE_FILTERS = [
+  { value: 'all', label: 'ทั้งหมด' },
+  { value: 'has', label: 'มี Usage' },
+  { value: 'none', label: 'ไม่มี Usage' }
+];
+
 // ✅ Customer Roll (ม้วนลูกค้า)
 const ALERT_CUSTOMER_ROLLS = [
   { value: 'normal',   label: 'ปกติ' },
@@ -435,6 +443,23 @@ function renderAlertFromCache() {
     </div>
   </th>`;
 
+  // ✅ Usage Plan (คอลัมน์ใหม่ + Filter)
+  html += `<th class="th-with-filter">
+    <div class="th-filter-wrap" id="alertUsageFilterBox">
+      <button type="button" class="th-filter-btn" id="alertUsageFilterBtn">
+        <span id="alertUsageFilterLabel">Usage Plan</span>
+        <span class="arrow">▼</span>
+      </button>
+      <div class="grade-dropdown hidden" id="alertUsageFilterDropdown" style="min-width:180px">
+        <div class="grade-actions">
+          <button type="button" onclick="selectAllAlertUsageFilters()">✓ เลือกทั้งหมด</button>
+          <button type="button" onclick="clearAllAlertUsageFilters()">✗ ล้างทั้งหมด</button>
+        </div>
+        <div class="grade-list" id="alertUsageFilterList"></div>
+      </div>
+    </div>
+  </th>`;
+
   html += `<th class="th-with-filter">
     <div class="th-filter-wrap" id="alertFilterBox">
       <button type="button" class="th-filter-btn" id="alertFilterBtn">
@@ -528,6 +553,7 @@ function renderAlertFromCache() {
     html += `<td>${r.snapshot}</td>`;
     html += `<td>${Number(r.stock).toFixed(2)}</td>`;
     html += `<td>${r.receive}</td>`;
+    html += `<td class="usage-cell">${r.usage_plan ? Number(r.usage_plan).toFixed(2) : '-'}</td>`;
     html += `<td class="alert-cell"><b>${a > 0 ? '+' + a : a}</b></td>`;
     html += `<td class="status-cell">${statusTxt}</td>`;
     html += `<td><input type="number" class="alert-input-qty${clsQty}" placeholder="-" value="${lsVal.qty || ''}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'qty', this.value, this)"></td>`;
@@ -541,7 +567,7 @@ function renderAlertFromCache() {
   });
 
   html += `<tr class="total-row">
-    <td colspan="7" style="text-align:right;font-weight:700">จำนวนรวม (ม้วน)</td>
+    <td colspan="8" style="text-align:right;font-weight:700">จำนวนรวม (ม้วน)</td>
     <td style="font-weight:700;color:#dc2626;font-size:15px">${grandShortage > 0 ? grandShortage : '-'}</td>
     <td colspan="7"></td>
   </tr>`;
@@ -567,6 +593,7 @@ function renderAlertFromCache() {
   renderAlertSupFilterList();
   renderAlertStockFilterList();
   renderAlertReceiveFilterList();
+  renderAlertUsageFilterList();
   updateAlertGradeLabel();
   updateAlertSizeLabel();
   updateAlertFilterLabel();
@@ -574,6 +601,7 @@ function renderAlertFromCache() {
   updateAlertSupFilterLabel();
   updateAlertStockFilterLabel();
   updateAlertReceiveFilterLabel();
+  updateAlertUsageFilterLabel();
   _attachAlertDropdown('alertGradeFilterBtn', 'alertGradeDropdown', 'alertGradeFilterBox', 'alertGrade');
   _attachAlertDropdown('alertSizeFilterBtn', 'alertSizeDropdown', 'alertSizeFilterBox', 'alertSize');
   _attachAlertDropdown('alertFilterBtn', 'alertFilterDropdown', 'alertFilterBox', 'alertFilter');
@@ -581,12 +609,12 @@ function renderAlertFromCache() {
   _attachAlertDropdown('alertSupFilterBtn', 'alertSupFilterDropdown', 'alertSupFilterBox', 'alertSupFilter');
   _attachAlertDropdown('alertStockFilterBtn', 'alertStockFilterDropdown', 'alertStockFilterBox', 'alertStockFilter');
   _attachAlertDropdown('alertReceiveFilterBtn', 'alertReceiveFilterDropdown', 'alertReceiveFilterBox', 'alertReceiveFilter');
+  _attachAlertDropdown('alertUsageFilterBtn', 'alertUsageFilterDropdown', 'alertUsageFilterBox', 'alertUsageFilter');
   renderAlertReceiveDates();
 
   // ✅ Apply filter แล้ว render ใหม่
   applyAlertFiltersAndRender();
 }
-
 // ================= SUPPLIERS =================
 async function loadAlertSuppliers() {
   try {
@@ -1004,6 +1032,56 @@ function clearAllAlertReceiveFilters() {
   applyAlertFiltersAndRender();
 }
 
+// ================= USAGE PLAN FILTER =================
+function renderAlertUsageFilterList() {
+  const list = $('alertUsageFilterList');
+  if (!list) return;
+  list.innerHTML = ALERT_USAGE_FILTERS.map(f => {
+    const checked = alertSelectedUsageFilters.includes(f.value);
+    return `<label class="item ${checked ? 'checked' : ''}" data-usage-filter="${f.value}">
+      <input type="checkbox" ${checked ? 'checked' : ''}>
+      <span>${f.label}</span>
+    </label>`;
+  }).join('');
+  list.querySelectorAll('.item').forEach(el => {
+    const cb = el.querySelector('input[type="checkbox"]');
+    cb.addEventListener('change', () => {
+      const val = el.dataset.usageFilter;
+      if (cb.checked) {
+        if (!alertSelectedUsageFilters.includes(val)) alertSelectedUsageFilters.push(val);
+      } else {
+        alertSelectedUsageFilters = alertSelectedUsageFilters.filter(x => x !== val);
+      }
+      el.classList.toggle('checked', cb.checked);
+      updateAlertUsageFilterLabel();
+      applyAlertFiltersAndRender();
+    });
+  });
+}
+
+function updateAlertUsageFilterLabel() {
+  const label = $('alertUsageFilterLabel');
+  if (!label) return;
+  if (alertSelectedUsageFilters.length === 0 || alertSelectedUsageFilters.includes('all')) {
+    label.textContent = 'Usage Plan';
+  } else if (alertSelectedUsageFilters.length === 1) {
+    const f = ALERT_USAGE_FILTERS.find(x => x.value === alertSelectedUsageFilters[0]);
+    label.textContent = f ? f.label : alertSelectedUsageFilters[0];
+  } else {
+    label.textContent = `Usage (${alertSelectedUsageFilters.length})`;
+  }
+}
+function selectAllAlertUsageFilters() {
+  alertSelectedUsageFilters = ['all'];
+  renderAlertUsageFilterList(); updateAlertUsageFilterLabel();
+  applyAlertFiltersAndRender();
+}
+function clearAllAlertUsageFilters() {
+  alertSelectedUsageFilters = [];
+  renderAlertUsageFilterList(); updateAlertUsageFilterLabel();
+  applyAlertFiltersAndRender();
+}
+
 // ================= APPLY FILTERS + RE-RENDER =================
 function applyAlertFiltersAndRender() {
   if (!window._alertFullCache || !window._alertFullCache.length) return;
@@ -1049,6 +1127,16 @@ function applyAlertFiltersAndRender() {
       if (alertSelectedReceiveFilters.includes('eq0') && v === 0) return true;
       if (alertSelectedReceiveFilters.includes('gt0') && v > 0) return true;
       if (alertSelectedReceiveFilters.includes('lt0') && v < 0) return true;
+      return false;
+    });
+  }
+
+  // 3.7) Usage Plan (Phase 6)
+  if (!alertSelectedUsageFilters.includes('all') && alertSelectedUsageFilters.length > 0) {
+    result = result.filter(r => {
+      const v = Number(r.usage_plan) || 0;
+      if (alertSelectedUsageFilters.includes('has') && v > 0) return true;
+      if (alertSelectedUsageFilters.includes('none') && v === 0) return true;
       return false;
     });
   }
@@ -1112,7 +1200,7 @@ function renderAlertTableBody(rows) {
   if (!tbody) return;
 
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="15" style="text-align:center;color:#94a3b8;padding:30px">ไม่มีรายการ 🎉</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="16" style="text-align:center;color:#94a3b8;padding:30px">ไม่มีรายการ 🎉</td></tr>';
     return;
   }
 
@@ -1163,6 +1251,7 @@ function renderAlertTableBody(rows) {
     html += `<td>${r.snapshot}</td>`;
     html += `<td>${Number(r.stock).toFixed(2)}</td>`;
     html += `<td>${r.receive}</td>`;
+    html += `<td class="usage-cell">${r.usage_plan ? Number(r.usage_plan).toFixed(2) : '-'}</td>`;
     html += `<td class="alert-cell"><b>${a > 0 ? '+' + a : a}</b></td>`;
     html += `<td class="status-cell">${statusTxt}</td>`;
     html += `<td><input type="number" class="alert-input-qty${clsQty}" placeholder="-" value="${lsVal.qty || ''}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'qty', this.value, this)"></td>`;
@@ -1176,7 +1265,7 @@ function renderAlertTableBody(rows) {
   });
 
   html += `<tr class="total-row">
-    <td colspan="7" style="text-align:right;font-weight:700">จำนวนรวม (ม้วน)</td>
+    <td colspan="8" style="text-align:right;font-weight:700">จำนวนรวม (ม้วน)</td>
     <td style="font-weight:700;color:#dc2626;font-size:15px">${grandShortage > 0 ? grandShortage : '-'}</td>
     <td colspan="7"></td>
   </tr>`;
@@ -1592,6 +1681,23 @@ async function renderAlert() {
       </div>
     </th>`;
 
+    // ✅ Usage Plan (คอลัมน์ใหม่ + Filter)
+    html += `<th class="th-with-filter">
+      <div class="th-filter-wrap" id="alertUsageFilterBox">
+        <button type="button" class="th-filter-btn" id="alertUsageFilterBtn">
+          <span id="alertUsageFilterLabel">Usage Plan</span>
+          <span class="arrow">▼</span>
+        </button>
+        <div class="grade-dropdown hidden" id="alertUsageFilterDropdown" style="min-width:180px">
+          <div class="grade-actions">
+            <button type="button" onclick="selectAllAlertUsageFilters()">✓ เลือกทั้งหมด</button>
+            <button type="button" onclick="clearAllAlertUsageFilters()">✗ ล้างทั้งหมด</button>
+          </div>
+          <div class="grade-list" id="alertUsageFilterList"></div>
+        </div>
+      </div>
+    </th>`;
+
     html += `<th class="th-with-filter">
       <div class="th-filter-wrap" id="alertFilterBox">
         <button type="button" class="th-filter-btn" id="alertFilterBtn">
@@ -1686,6 +1792,7 @@ async function renderAlert() {
       html += `<td>${r.snapshot}</td>`;
       html += `<td>${Number(r.stock).toFixed(2)}</td>`;
       html += `<td>${r.receive}</td>`;
+      html += `<td class="usage-cell">${r.usage_plan ? Number(r.usage_plan).toFixed(2) : '-'}</td>`;
       html += `<td class="alert-cell"><b>${a > 0 ? '+' + a : a}</b></td>`;
       html += `<td class="status-cell">${statusTxt}</td>`;
       html += `<td><input type="number" class="alert-input-qty${clsQty}" placeholder="-" value="${lsVal.qty || ''}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'qty', this.value, this)"></td>`;
@@ -1699,7 +1806,7 @@ async function renderAlert() {
     });
 
     html += `<tr class="total-row">
-      <td colspan="7" style="text-align:right;font-weight:700">จำนวนรวม (ม้วน)</td>
+      <td colspan="8" style="text-align:right;font-weight:700">จำนวนรวม (ม้วน)</td>
       <td style="font-weight:700;color:#dc2626;font-size:15px">${grandShortage > 0 ? grandShortage : '-'}</td>
       <td colspan="7"></td>
     </tr>`;
@@ -1737,6 +1844,7 @@ async function renderAlert() {
     renderAlertSupFilterList();
     renderAlertStockFilterList();
     renderAlertReceiveFilterList();
+    renderAlertUsageFilterList();
     updateAlertGradeLabel();
     updateAlertFilterLabel();
     updateAlertSizeLabel();
@@ -1744,6 +1852,7 @@ async function renderAlert() {
     updateAlertSupFilterLabel();
     updateAlertStockFilterLabel();
     updateAlertReceiveFilterLabel();
+    updateAlertUsageFilterLabel();
     _attachAlertDropdown('alertGradeFilterBtn', 'alertGradeDropdown', 'alertGradeFilterBox', 'alertGrade');
     _attachAlertDropdown('alertSizeFilterBtn', 'alertSizeDropdown', 'alertSizeFilterBox', 'alertSize');
     _attachAlertDropdown('alertFilterBtn', 'alertFilterDropdown', 'alertFilterBox', 'alertFilter');
@@ -1751,6 +1860,7 @@ async function renderAlert() {
     _attachAlertDropdown('alertSupFilterBtn', 'alertSupFilterDropdown', 'alertSupFilterBox', 'alertSupFilter');
     _attachAlertDropdown('alertStockFilterBtn', 'alertStockFilterDropdown', 'alertStockFilterBox', 'alertStockFilter');
     _attachAlertDropdown('alertReceiveFilterBtn', 'alertReceiveFilterDropdown', 'alertReceiveFilterBox', 'alertReceiveFilter');
+    _attachAlertDropdown('alertUsageFilterBtn', 'alertUsageFilterDropdown', 'alertUsageFilterBox', 'alertUsageFilter');
     renderAlertDateTabs();
 
     // ✅ Apply filter แล้ว render ใหม่ (ถ้ามี filter ค้างอยู่)
@@ -2445,6 +2555,7 @@ function exportAlert() {
       Snapshot: r.snapshot,
       Stock: r.stock,
       Receive: r.receive,
+      'Usage Plan': r.usage_plan || 0,
       Alert: r.alert,
       สถานะ: r.alert < 0 ? `ขาด ${Math.ceil(Math.abs(r.alert))}` : (r.alert === 0 ? 'พอดี' : `เกิน ${Math.floor(r.alert)}`),
       สั่งซื้อ: lsVal.qty || '',
