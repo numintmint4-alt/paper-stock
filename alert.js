@@ -1902,13 +1902,23 @@ function renderAlertPODetail(items) {
       <div>📅 <b>${Object.keys(byDate).length}</b> วันรับสินค้า</div>
     </div>`;
 
-  Object.keys(byDate).sort().forEach(dateKey => {
+    Object.keys(byDate).sort().forEach(dateKey => {
     const dayItems = byDate[dateKey];
     const dayTotal = dayItems.reduce((s, i) => s + i.quantity, 0);
 
+    // ✅ สรุปตาม Sup
+    const supSummary = {};
+    dayItems.forEach(it => {
+      const sup = it.sup || '(ไม่ระบุ)';
+      supSummary[sup] = (supSummary[sup] || 0) + Number(it.quantity || 0);
+    });
+    const supList = Object.keys(supSummary).sort()
+      .map(sup => `${esc(sup)} ${supSummary[sup]} ม้วน`)
+      .join(' · ');
+
     html += `
       <div class="po-detail-date-section">
-        <div class="po-detail-date-head">📅 วันที่รับ: <b>${fmtDate(dateKey)}</b> · ${dayItems.length} รายการ · ${dayTotal} ม้วน</div>
+        <div class="po-detail-date-head">📅 วันที่รับ: <b>${fmtDate(dateKey)}</b> · ${dayItems.length} รายการ · รวม ${dayTotal} ม้วน · ${supList}</div>
         <table>
           <thead><tr>
             <th style="width:50px">#</th>
