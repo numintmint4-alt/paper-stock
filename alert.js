@@ -2355,8 +2355,9 @@ async function handleUsagePlanFile(file) {
     }
 
     _usagePlanRows = rows;
-    _usagePlanDateCols = dateCols;
-
+    // ✅ เรียงตามวันที่ (น้อย → มาก)
+    _usagePlanDateCols = dateCols.sort((a, b) => a.iso.localeCompare(b.iso));
+    
     // ✅ เปิด modal
     renderUsagePlanImportModal();
     openModal('modalUsagePlanImport');
