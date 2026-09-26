@@ -1316,6 +1316,7 @@ th{
 
 .alert-flat-table td.alert-cell { font-size: 15px; font-weight: 700; color: var(--text); }
 .alert-flat-table td.status-cell { font-size: 12px; }
+.alert-flat-table td.usage-cell { font-size: 14px; font-weight: 600; color: var(--indigo); }
 
 .alert-flat-table tr.total-row td { background: #cbd5e1; font-weight: 700; font-size: 14px; padding: 10px 8px; }
 
