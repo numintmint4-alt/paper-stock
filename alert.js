@@ -224,12 +224,7 @@ async function onAlertDateChange() {
 
   if (snapshot) {
     await applyAlertSnapshot(snapshot);
-
-    const createdDate = snapshot.created_at ? toISODate(new Date(snapshot.created_at)) : null;
-    const today = toISODate(new Date());
-    const shouldLock = createdDate && createdDate < today;
-
-    setAlertLocked(shouldLock, analyzedDate);
+    setAlertLocked(true, analyzedDate);   // ✅ lock เฉพาะวันที่มี snapshot
   } else {
     setAlertLocked(false);
     await autoAnalyzeAlert();
@@ -252,7 +247,8 @@ function setAlertLocked(locked, analyzedDate) {
 
     if (body) body.classList.add('alert-locked');
 
-    ['alertDate', 'alertStockDate', 'alertReceiveDate', 'alertSnapshotMonth', 'alertIncludeCustomer'].forEach(id => {
+    // ✅ ล็อกทุกช่อง "ยกเว้น" alertDate → user เปลี่ยนวันได้
+    ['alertStockDate', 'alertReceiveDate', 'alertSnapshotMonth', 'alertIncludeCustomer'].forEach(id => {
       const el = $(id);
       if (el) el.disabled = true;
     });
@@ -267,7 +263,7 @@ function setAlertLocked(locked, analyzedDate) {
     if (lockBanner) lockBanner.classList.add('hidden');
     if (body) body.classList.remove('alert-locked');
 
-    ['alertDate', 'alertStockDate', 'alertReceiveDate', 'alertSnapshotMonth', 'alertIncludeCustomer'].forEach(id => {
+    ['alertStockDate', 'alertReceiveDate', 'alertSnapshotMonth', 'alertIncludeCustomer'].forEach(id => {
       const el = $(id);
       if (el) {
         el.disabled = false;
