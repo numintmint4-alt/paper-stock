@@ -2311,8 +2311,8 @@ function parseExcelDateKey(key) {
   const dd = m[1].padStart(2, '0');
   const mm = m[2].padStart(2, '0');
   const yyShort = Number(m[3]);
-  const yearBE = 2500 + yyShort;   // 26 → 2569
-  const yearCE = yearBE - 543;     // 2569 → 2026
+  const yearCE = 2000 + yyShort;
+  const yearBE = yearCE + 543;
   return {
     iso:  `${yearCE}-${mm}-${dd}`,
     thai: `${dd}/${mm}/${yearBE}`
