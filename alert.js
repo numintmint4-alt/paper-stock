@@ -1914,7 +1914,6 @@ function renderAlertPODetail(items) {
             <th style="width:50px">#</th>
             <th style="width:180px">Gradegram-Size</th>
             <th style="width:90px;text-align:center">Quantity</th>
-            <th style="width:90px;text-align:center">Sup.</th>
             <th>หมายเหตุ</th>
           </tr></thead>
           <tbody>`;
@@ -1935,17 +1934,10 @@ function renderAlertPODetail(items) {
       }
       const remarkCombined = parts.join(',');
 
-      // ✅ ไฮไลต์แถวที่ยังไม่เลือก Sup
-      const supDisplay = it.sup
-        ? esc(it.sup)
-        : '<span style="color:#dc2626;font-weight:700">⚠️ ยังไม่ระบุ</span>';
-      const rowStyle = !it.sup ? ' style="background:#fef2f2"' : '';
-
-      html += `<tr${rowStyle}>
+      html += `<tr>
         <td style="text-align:center">${idx + 1}</td>
         <td><b>${esc(it.gradegram_size)}</b></td>
         <td style="text-align:center;font-weight:700;color:#1e40af">${it.quantity}</td>
-        <td style="text-align:center">${supDisplay}</td>
         <td>${esc(remarkCombined)}</td>
       </tr>`;
     });
@@ -1954,7 +1946,7 @@ function renderAlertPODetail(items) {
       <tfoot><tr style="background:#cbd5e1;font-weight:700">
         <td colspan="2" style="text-align:right">รวมวันนี้ (ม้วน)</td>
         <td style="text-align:center;color:#dc2626;font-size:15px">${dayTotal}</td>
-        <td colspan="2"></td>
+        <td></td>
       </tr></tfoot>
       </table>
       </div>`;
@@ -1965,23 +1957,6 @@ function renderAlertPODetail(items) {
   </div>`;
 
   $('alertPODetailBody').innerHTML = html;
-
-  // ✅ เช็ค Sup ครบ → enable/disable ปุ่มยืนยัน
-  const hasMissingSup = items.some(it => !it.sup || String(it.sup).trim() === '');
-  const confirmBtn = document.querySelector('#modalAlertPODetail .form-actions .primary');
-  if (confirmBtn) {
-    if (hasMissingSup) {
-      confirmBtn.disabled = true;
-      confirmBtn.style.opacity = '0.4';
-      confirmBtn.style.cursor = 'not-allowed';
-      confirmBtn.title = 'กรุณาระบุ Sup. ให้ครบก่อน';
-    } else {
-      confirmBtn.disabled = false;
-      confirmBtn.style.opacity = '';
-      confirmBtn.style.cursor = '';
-      confirmBtn.title = '';
-    }
-  }
 }
 
 function confirmCreatePO() {
