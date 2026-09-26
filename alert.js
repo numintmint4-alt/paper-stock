@@ -325,13 +325,14 @@ async function applyAlertSnapshot(snapshot) {
     if (snapshot.stock_date)     $('alertStockDate').value = snapshot.stock_date;
     if (snapshot.receive_date)   $('alertReceiveDate').value = snapshot.receive_date;
 
-    if (snapshot.receive_dates && Array.isArray(snapshot.receive_dates)) {
+        if (snapshot.receive_dates && Array.isArray(snapshot.receive_dates)) {
       alertReceiveDates = [...snapshot.receive_dates];
       saveAlertReceiveDates();
       renderAlertDateTabs();
     }
 
-    clearAllAlertInputsAllDates();
+    // ✅ ไม่ลบ inputs — เก็บถาวรจนกว่าจะกด "ล้างค่า"
+    // clearAllAlertInputsAllDates();
 
     alertCache = snapshot.result_json || [];
     renderAlertFromCache();
