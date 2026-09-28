@@ -2332,10 +2332,14 @@ function openUsagePlanImport() {
 async function handleUsagePlanFile(file) {
   if (!file) return;
   try {
-    const buf = await file.arrayBuffer();
+        const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, { type: 'array' });
-    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
 
+    // ✅ เก็บไว้ debug
+    window._debugWB = wb;
+
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
     if (!rows.length) {
       alert('ไฟล์ไม่มีข้อมูล');
       return;
