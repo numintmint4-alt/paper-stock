@@ -351,6 +351,7 @@ function getSelectedCustomers() {
 }
 
 // ================= TITLE BUILDER =================
+// ✅ จุดที่ 1: เปลี่ยนชื่อหัวข้อ + แสดงเป็นบรรทัดเดียว
 function updateReportTitle() {
   const mEl = $('titleMonth');
   const yEl = $('titleYear');
@@ -358,16 +359,16 @@ function updateReportTitle() {
   const m = Number(mEl.value);
   const y = Number(yEl.value);
   const titleEl = $('reportTitle');
-  if (titleEl) titleEl.innerHTML = `ตารางควบคุมระดับ Stock<br>ประจำเดือน ${THAI_MONTHS[m-1]} ${y}`;
+  if (titleEl) titleEl.innerHTML = `ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ<br>ประจำเดือน ${THAI_MONTHS[m-1]} ${y}`;
 }
 
 function getCurrentTitle() {
   const mEl = $('titleMonth');
   const yEl = $('titleYear');
-  if (!mEl || !yEl) return 'ตารางควบคุมระดับ Stock';
+  if (!mEl || !yEl) return 'ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ';
   const m = Number(mEl.value);
   const y = Number(yEl.value);
-  return `ตารางควบคุมระดับ Stock ประจำเดือน ${THAI_MONTHS[m-1]} ${y}`;
+  return `ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ ประจำเดือน ${THAI_MONTHS[m-1]} ${y}`;
 }
 
 // ================= MATRIX =================
@@ -391,7 +392,7 @@ async function renderMatrix() {
   matrixRange = { from: fromISO, to: toISO };
 
   const mode = document.querySelector('input[name="mode"]:checked').value;
-  const customers = getSelectedCustomers();  // ✅ เปลี่ยนจาก const customer = $('qCustomer').value;
+  const customers = getSelectedCustomers();
   const selectedGradesInMatrix = getSelectedGrades();
 
   updateReportTitle();
@@ -501,7 +502,7 @@ async function renderMatrix() {
     colKeys2.forEach(s => {
       const v = cells[rk + '|' + s];
       if (!v) html += '<td class="empty">-</td>';
-      // ✅ จุดที่ 3.1: เปลี่ยนจาก title → data-tip (custom tooltip)
+      // ✅ เปลี่ยนจาก title → data-tip (custom tooltip)
       else html += `<td class="clickable" data-tip="Gradegrams ${esc(rk)} · Size ${s}" onclick="openDrill('${esc(rk)}',${s})">${Number(v).toFixed(2)}</td>`;
     });
     html += `<td class="total-col">${Number(rowTotals2[rk] || 0).toFixed(2)}</td></tr>`;
@@ -566,7 +567,7 @@ async function saveStockLevelSnapshot() {
 
   const payload = {
     title: finalTitle,
-    months: [titleMonthYM],                          // ← ✅ เก็บแค่เดือนของ title
+    months: [titleMonthYM],
     mode: document.querySelector('input[name="mode"]:checked').value,
     customer: getSelectedCustomers().join(','),
     grades: getSelectedGrades(),
