@@ -516,7 +516,7 @@ th{
   gap: 16px;
 }
 
-/* ✅ report-title +10% = 21px, justify-self: center */
+/* ✅ report-title +10% = 21px */
 .report-title{
   text-align: center;
   font-weight: 700;
@@ -1171,10 +1171,10 @@ th{
 /* ========== PRINT ========== */
 /* ═══════════════════════════════════════════════════════════ */
 @media print {
-  @page { 
-    size: A4 landscape; 
+  @page {
+    size: A4 landscape;
     margin: 8mm;
-    margin-top: 50mm;        /* ✅ เว้นด้านบน 5 ซม. ก่อนหัวข้อ */
+    margin-top: 10mm;        /* ✅ เว้นด้านบน 1 ซม. */
   }
 
   html, body {
@@ -1191,6 +1191,7 @@ th{
   .card { box-shadow: none; padding: 0; margin: 0; border: none; }
   .container { padding: 0; max-width: 100%; }
 
+  /* ✅ report-head ใช้ grid 3 คอลัมน์ */
   .report-head {
     display: grid !important;
     grid-template-columns: 1fr auto 1fr !important;
@@ -1199,6 +1200,7 @@ th{
     width: 100%;
   }
 
+  /* ✅ title เป็นบรรทัดเดียว */
   .report-title {
     text-align: center;
     font-size: 15px;
@@ -1208,7 +1210,7 @@ th{
   }
 
   .report-title br {
-    display: none !important;
+    display: none !important;   /* ✅ ซ่อน <br> เพื่อรวมเป็นบรรทัดเดียว */
   }
 
   .report-title .title-select {
@@ -1270,6 +1272,7 @@ th{
     text-overflow: ellipsis;
   }
 
+  /* ✅ Gradegrams ขยาย 65px ให้พอดี ไม่ล้น */
   .report-table .grade-col {
     width: 65px;
     min-width: 65px;
@@ -1286,6 +1289,7 @@ th{
     white-space: nowrap;
   }
 
+  /* ✅ Size กระจายเต็มพื้นที่ */
   .report-table thead th:not(.grade-col):not(.total-col),
   .report-table tbody td:not(.grade-col):not(.total-col):not(.empty) {
     width: auto;
@@ -1295,6 +1299,7 @@ th{
     padding: 2px 2px;
   }
 
+  /* ✅ Total 50px */
   .report-table .total-col {
     width: 50px;
     min-width: 50px;
@@ -1324,16 +1329,13 @@ th{
     page-break-inside: avoid;
   }
 
+  /* ✅ ซ่อน report-foot ตอนพิมพ์ */
   .report-foot {
     display: none !important;
   }
 
   .alert-table th,
   .alert-table td.grade-col { position: static; }
-
-  /* ✅ Fallback: กรณี browser ไม่รองรับ @page margin-top */
-  /* ถ้าไม่ต้องการให้เปิดใช้ ให้ comment บรรทัดล่างนี้ */
-  /* body { padding-top: 50mm; } */
 }
 
 /* ═══════════════════════════════════════════════════════════ */
