@@ -2,6 +2,7 @@
 //  STOCK ม้วนกระดาษ V7 — stock.js
 //  เพิ่ม: multi-select Customer/Location/Status + waiting status
 //  ✅ แก้: tooltip, total ล่าง, คลิก cell, ส่ง gradegram เต็ม
+//  ✅ แก้: default date = เมื่อวาน (ถ้าเป็นอาทิตย์ → เสาร์)
 // ═══════════════════════════════════════════════════════════════
 
 let stockSelectedGrades = [];
@@ -45,9 +46,11 @@ function showSuccessModal(message) {
 async function initStockTab() {
   const dateInput = $('stockDate');
   if (dateInput && !dateInput.value) {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    dateInput.value = toISODate(yesterday);
+    const target = new Date();
+    target.setDate(target.getDate() - 1);
+    // ✅ ถ้าเป็นวันอาทิตย์ (0) → ย้อนไปวันเสาร์
+    if (target.getDay() === 0) target.setDate(target.getDate() - 1);
+    dateInput.value = toISODate(target);
   }
   await loadStockGradeFilter();
   await loadStockCustomers();
@@ -627,9 +630,11 @@ async function openStockDetail(gradegram, size) {
 // IMPORT STOCK
 // ═══════════════════════════════════════════════════════════════
 function openStockImportModal() {
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  $('stockImportDate').value = toISODate(yesterday);
+  const target = new Date();
+  target.setDate(target.getDate() - 1);
+  // ✅ ถ้าเป็นวันอาทิตย์ (0) → ย้อนไปวันเสาร์
+  if (target.getDay() === 0) target.setDate(target.getDate() - 1);
+  $('stockImportDate').value = toISODate(target);
   $('stockImportError').innerHTML = '';
   openModal('modalStockImport');
 }
