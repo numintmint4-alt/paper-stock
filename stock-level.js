@@ -351,7 +351,7 @@ function getSelectedCustomers() {
 }
 
 // ================= TITLE BUILDER =================
-// ✅ จุดที่ 1: เปลี่ยนชื่อหัวข้อ + แสดงเป็นบรรทัดเดียว
+// ✅ จุดที่ 1: เปลี่ยนชื่อหัวข้อ
 function updateReportTitle() {
   const mEl = $('titleMonth');
   const yEl = $('titleYear');
@@ -502,7 +502,7 @@ async function renderMatrix() {
     colKeys2.forEach(s => {
       const v = cells[rk + '|' + s];
       if (!v) html += '<td class="empty">-</td>';
-      // ✅ เปลี่ยนจาก title → data-tip (custom tooltip)
+      // ✅ จุดที่ 3.1: ใช้ data-tip สำหรับ custom tooltip
       else html += `<td class="clickable" data-tip="Gradegrams ${esc(rk)} · Size ${s}" onclick="openDrill('${esc(rk)}',${s})">${Number(v).toFixed(2)}</td>`;
     });
     html += `<td class="total-col">${Number(rowTotals2[rk] || 0).toFixed(2)}</td></tr>`;
@@ -701,7 +701,7 @@ async function deleteSnapshot(id, title) {
 function printSnapshot() { window.print(); }
 
 // ═══════════════════════════════════════════════════════════════
-// INIT — โหลด Month Filter
+// INIT — โหลด Month Filter + Snapshot + Title
 // ═══════════════════════════════════════════════════════════════
 (function initStockLevel() {
   const run = () => {
@@ -712,6 +712,12 @@ function printSnapshot() { window.print(); }
       }
       if (typeof loadStockLevelSnapshots === 'function') {
         loadStockLevelSnapshots();
+      }
+      // ✅ จุดที่ 5: เรียก updateReportTitle() ตอน init
+      //    เพื่อให้หัวข้อตรงกับค่าที่ตั้งไว้ใน .report-title (index.html)
+      if (typeof updateReportTitle === 'function') {
+        updateReportTitle();
+        console.log('[StockLevel] ✅ updateReportTitle() called');
       }
     }, 150);
   };
