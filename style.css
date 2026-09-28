@@ -484,7 +484,7 @@ th{
   text-align: center;
   flex: 1;
   font-weight: 700;
-  font-size: 17px;
+  font-size: 17.5px;
   line-height: 1.5;
   color: var(--text);
 }
@@ -523,15 +523,18 @@ th{
 }
 .report-table thead th:not(.grade-col):not(.total-col),
 .report-table tbody td:not(.grade-col):not(.total-col):not(.empty){
-  min-width: 56px;
-  max-width: 56px;
-  width: 56px;
+  min-width: 44px;
+  max-width: 44px;
+  width: 44px;
+  font-size: 12px;
+  padding: 5px 4px;
 }
 .report-table thead th{
   background: var(--primary-dark);
   color: #fff;
-  font-weight: 700;
-  font-size: 11px;
+  font-weight: 800;
+  font-size: 11.5px;
+  padding: 6px 4px;
   position: sticky;
   top: 0;
   z-index: 5;
@@ -543,16 +546,14 @@ th{
   font-weight: 700;
   text-align: left;
   padding-left: 8px;
-  min-width: 64px;
-  max-width: 64px;
-  width: 64px;
+  min-width: 80px;
+  max-width: 80px;
+  width: 80px;
   position: sticky;
   left: 0;
   z-index: 4;
-  font-size: 11px;
+  font-size: 12px;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   color: var(--text);
 }
 .report-table thead .grade-col{
@@ -1151,16 +1152,31 @@ th{
   .report-table .grade-col {
     width: 50px;
     min-width: 50px;
+    max-width: 50px;
+    font-size: 10px;
     position: static;
     background: var(--primary) !important;
     color: #fff !important;
     text-align: left;
     font-weight: 700;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: nowrap;
+  }
+
+  .report-table thead th:not(.grade-col):not(.total-col),
+  .report-table tbody td:not(.grade-col):not(.total-col):not(.empty) {
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    font-size: 9px;
+    padding: 2px 1px;
   }
 
   .report-table .total-col {
     width: 45px;
     min-width: 45px;
+    font-size: 9px;
     background: var(--primary) !important;
     color: #fff !important;
     font-weight: 700;
@@ -1366,7 +1382,7 @@ th{
 /* ═══════════════════════════════════════════════════════════ */
 .alert-flat-table .th-with-filter { padding: 4px 6px !important; text-align: center; }
 .alert-flat-table .th-filter-wrap { position: relative; display: inline-block; width: 100%; }
-.alert-flat-table .th-filter-btn { width: 100%; background: transparent; border: 1px solid rgba(255,255,255,.3); color: #fff; border-radius: var(--radius-sm); padding: 3px 6px; font-size: 12px; font-weight: 700; font-family: inherit; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 4px; transition: var(--transition); }
+.alert-flat-table .th-filter-btn { width: 100%; background: transparent; border: 1px solid rgba(255,255,255,.3); color: #fff; border-radius: var(--radius-sm); padding: 5px 8px; font-size: 12.5px; font-weight: 800; font-family: inherit; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 4px; transition: var(--transition); }
 .alert-flat-table .th-filter-btn:hover { background: rgba(255,255,255,.15); border-color: rgba(255,255,255,.6); }
 .alert-flat-table .th-filter-btn .arrow { font-size: 9px; transition: transform .2s; }
 .alert-flat-table .th-filter-btn.open .arrow { transform: rotate(180deg); }
