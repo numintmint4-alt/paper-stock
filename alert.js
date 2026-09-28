@@ -2332,7 +2332,7 @@ function openUsagePlanImport() {
 async function handleUsagePlanFile(file) {
   if (!file) return;
   try {
-        const buf = await file.arrayBuffer();
+    const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, { type: 'array' });
 
     // ✅ เก็บไว้ debug
@@ -2377,7 +2377,7 @@ function renderUsagePlanImportModal() {
   const body = $('usagePlanImportBody');
   if (!body) return;
 
-    // ✅ ใช้คอลัมน์แรก-สุดท้าย (หลังจาก sort แล้ว)
+  // ✅ ใช้คอลัมน์แรก-สุดท้าย (หลังจาก sort แล้ว)
   const minDate = _usagePlanDateCols[0].iso;
   const maxDate = _usagePlanDateCols[_usagePlanDateCols.length - 1].iso;
 
@@ -2436,16 +2436,17 @@ async function confirmUsagePlanImport() {
     const size = Number(row['SIZE']);
     if (!gradegram || !size) return;
 
-    // ✅ หา master
-    const parsed = parseGradegram(gradegram);
-    const gradeNorm = normalizeGrade(parsed.grade || gradegram);
-    const gramNorm = String(parsed.gram || '').replace(/^0+/, '') || parsed.gram;
+    // ✅ หา master — ใช้วิธี match แบบเดียวกับ getAvailableSizesFor()
+    const targetNorm = normalizeGrade(gradegram);   // 'CA097' → 'CA097'
+    const targetRaw  = String(gradegram).toUpperCase();
 
-    const spec = masterCache.find(m =>
-      normalizeGrade(m.grade) === gradeNorm &&
-      String(m.gram).replace(/^0+/, '') === String(gramNorm).replace(/^0+/, '') &&
-      Number(m.size) === size
-    );
+    const spec = masterCache.find(m => {
+      const mGrade = normalizeGrade(m.grade);       // 'CA' → 'CA'
+      const mGram  = String(m.gram);                // '097'
+      const mFull  = mGrade + mGram;                // 'CA097'
+      return (mFull === targetNorm || mFull === targetRaw)
+          && Number(m.size) === size;
+    });
 
     if (!spec) {
       skipped.push(`${gradegram}/${size}`);
