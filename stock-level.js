@@ -501,7 +501,8 @@ async function renderMatrix() {
     colKeys2.forEach(s => {
       const v = cells[rk + '|' + s];
       if (!v) html += '<td class="empty">-</td>';
-      else html += `<td class="clickable" onclick="openDrill('${esc(rk)}',${s})">${Number(v).toFixed(2)}</td>`;
+      // ✅ เพิ่ม title (tooltip) แสดง Gradegrams + Size เมื่อ hover
+      else html += `<td class="clickable" title="Gradegrams ${esc(rk)} · Size ${s}" onclick="openDrill('${esc(rk)}',${s})">${Number(v).toFixed(2)}</td>`;
     });
     html += `<td class="total-col">${Number(rowTotals2[rk] || 0).toFixed(2)}</td></tr>`;
   });
