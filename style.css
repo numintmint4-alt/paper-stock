@@ -310,6 +310,20 @@ input:focus,select:focus {
   font-weight: 800;
 }
 
+/* ✅ จุดที่ 5: ปี 2569 — ตัวหนา */
+.filters select,
+.filters input{
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text);
+}
+
+/* ✅ เจาะจง select ปี */
+#filterYear{
+  font-weight: 700;
+  color: var(--text);
+}
+
 /* ═══════════════════════════════════════════════════════════ */
 /* ========== GRADE FILTER (checkbox) ========== */
 /* ═══════════════════════════════════════════════════════════ */
@@ -490,23 +504,28 @@ th{
 /* ═══════════════════════════════════════════════════════════ */
 /* ========== REPORT / MATRIX (ทุกหน้า) ========== */
 /* ═══════════════════════════════════════════════════════════ */
+
+/* ✅ จุดที่ 1: report-head ใช้ grid 3 คอลัมน์ → title อยู่กลางเป๊ะ */
 .report-head{
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: start;
   border-bottom: 2px solid var(--primary);
   padding-bottom: 14px;
   margin-bottom: 14px;
   gap: 16px;
 }
+
+/* ✅ จุดที่ 1 + 2: report-title +10% = 21px, justify-self: center */
 .report-title{
   text-align: center;
-  flex: 1;
   font-weight: 700;
-  font-size: 19px;
+  font-size: 21px;
   line-height: 1.5;
   color: var(--text);
+  justify-self: center;
 }
+
 .report-subtitle{
   text-align: center;
   font-size: 13px;
@@ -514,18 +533,22 @@ th{
   font-weight: 400;
   margin-top: 6px;
 }
+
+/* ✅ จุดที่ 1: report-doc ชิดขวา */
 .report-doc{
   font-size: 12px;
   color: var(--text-muted);
   white-space: nowrap;
   font-weight: 600;
+  justify-self: end;
 }
 
 .report-wrap{
   overflow-x: auto;
   overflow-y: visible;
   width: 100%;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-md);   /* ✅ จุดที่ 3.2: มุมโค้งให้ตาราง */
+  overflow: hidden;                  /* ✅ จุดที่ 3.2: clip tooltip/มุม */
 }
 .report-table{
   font-size: 12px;
@@ -586,6 +609,7 @@ th{
 .report-table td.clickable{
   cursor: pointer;
   background: var(--orange-soft);
+  position: relative;   /* ✅ จุดที่ 3.2: ให้ custom tooltip วางได้ */
 }
 .report-table td.clickable:hover{
   background: var(--orange-bg);
@@ -619,6 +643,46 @@ th{
 
 .report-table td .cell-content{display:flex;flex-direction:column;align-items:center;gap:2px}
 .report-table td .cell-main{font-weight:700;color:var(--text);font-size:12px}
+
+/* ═══════════════════════════════════════════════════════════ */
+/* ========== CUSTOM TOOLTIP (Matrix cell) ========== */
+/* ═══════════════════════════════════════════════════════════ */
+.report-table td.clickable[data-tip]:hover::after{
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--primary-dark);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(37,99,235,.35);
+  pointer-events: none;
+  animation: tipFadeIn .15s ease;
+}
+
+/* ลูกศรชี้ลง */
+.report-table td.clickable[data-tip]:hover::before{
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--primary-dark);
+  z-index: 1000;
+  pointer-events: none;
+}
+
+@keyframes tipFadeIn{
+  from { opacity: 0; transform: translateX(-50%) translateY(4px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
 
 /* ═══════════════════════════════════════════════════════════ */
 /* ========== DRILL MODAL — ลดความสูงแถว ========== */
@@ -1123,6 +1187,7 @@ th{
   .card { box-shadow: none; padding: 0; margin: 0; border: none; }
   .container { padding: 0; max-width: 100%; }
 
+  /* ✅ จุดที่ 1: report-head ใช้ grid 3 คอลัมน์ (เหมือนจอ) */
   .report-head {
     display: grid !important;
     grid-template-columns: 1fr auto 1fr !important;
@@ -1131,9 +1196,10 @@ th{
     width: 100%;
   }
 
+  /* ✅ จุดที่ 4: report-title ลดลงสำหรับพิมพ์ */
   .report-title {
     text-align: center;
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 700;
     line-height: 1.4;
   }
@@ -1143,7 +1209,7 @@ th{
     border: none;
     background: transparent;
     font-weight: 700;
-    font-size: 16px;
+    font-size: 15px;
     padding: 0;
     margin: 0 4px;
     width: auto;
@@ -1161,7 +1227,7 @@ th{
     margin: 0 4px;
     padding: 0;
     font-weight: 700;
-    font-size: 16px;
+    font-size: 15px;
     color: #000;
     text-align: center;
   }
@@ -1197,11 +1263,13 @@ th{
     text-overflow: ellipsis;
   }
 
+  /* ✅ จุดที่ 4: Gradegrams ขยาย 65px ให้พอดี ไม่ล้น */
   .report-table .grade-col {
-    width: 50px;
-    min-width: 50px;
-    max-width: 50px;
+    width: 65px;
+    min-width: 65px;
+    max-width: 65px;
     font-size: 10px;
+    padding: 2px 4px;
     position: static;
     background: var(--primary) !important;
     color: #fff !important;
@@ -1212,18 +1280,21 @@ th{
     white-space: nowrap;
   }
 
+  /* ✅ จุดที่ 4: Size กระจายเต็มพื้นที่ */
   .report-table thead th:not(.grade-col):not(.total-col),
   .report-table tbody td:not(.grade-col):not(.total-col):not(.empty) {
     width: auto;
-    min-width: 0;
+    min-width: 32px;
     max-width: none;
     font-size: 9px;
-    padding: 2px 1px;
+    padding: 2px 2px;
   }
 
+  /* ✅ จุดที่ 4: Total 50px */
   .report-table .total-col {
-    width: 45px;
-    min-width: 45px;
+    width: 50px;
+    min-width: 50px;
+    max-width: 50px;
     font-size: 9px;
     background: var(--primary) !important;
     color: #fff !important;
