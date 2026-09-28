@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 //  STOCK ม้วนกระดาษ V7 — stock.js
 //  เพิ่ม: multi-select Customer/Location/Status + waiting status
-//  ✅ แก้ 3 ปัญหา: tooltip, total ล่าง, คลิก cell ไม่แสดงรายละเอียด
+//  ✅ แก้: tooltip, total ล่าง, คลิก cell, ส่ง gradegram เต็ม
 // ═══════════════════════════════════════════════════════════════
 
 let stockSelectedGrades = [];
@@ -385,9 +385,6 @@ async function renderStockMatrix() {
   try {
     const normalizedGrades = stockSelectedGrades.map(g => normalizeGrade(g));
 
-    // ✅ ส่ง p_roll_status เป็น jsonb
-    // ถ้าไม่ได้เลือกอะไร → ส่ง null (ให้ RPC ใช้ default full+scrap+waiting)
-    // ถ้าเลือก → ส่ง array jsonb
     const rollStatusParam = stockSelectedStatuses.length > 0
       ? stockSelectedStatuses
       : null;
@@ -450,7 +447,6 @@ async function renderStockMatrix() {
       if (v.scrap > 0)   parts.push(`+${v.scrap}`);
       if (v.waiting > 0) parts.push(`·${v.waiting}`);
       if (!parts.length) return '';
-      // ถ้ามี full ตัวแรก ไม่ต้องมี + นำหน้า
       return parts.join('').replace(/^\+/, '');
     }
 
@@ -533,7 +529,7 @@ async function openStockDetail(gradegram, size) {
   const stockDate = $('stockDate')?.value;
   if (!stockDate) return;
 
-  const { grade } = parseGradegram(gradegram);
+  // ✅ ลบ parseGradegram ออก — ส่ง gradegram เต็ม (เช่น "CA112") ไปที่ RPC
 
   // ✅ Title ฟอนต์ใหญ่ + subtitle
   $('stockDetailTitle').innerHTML = `
@@ -551,13 +547,13 @@ async function openStockDetail(gradegram, size) {
 
     const { data, error } = await supabase.rpc('get_stock_detail', {
       p_stock_date: stockDate,
-      p_grade: grade,
+      p_grade: gradegram,        // ✅ ส่ง "CA112" เต็ม (ไม่ตัดเหลือ "CA")
       p_width: size,
       p_roll_status: rollStatusParam
     });
     if (error) throw error;
 
-    // ✅ ปัญหาที่ 3: Debug log เพื่อดูค่า RPC ที่ return จริง
+    // ✅ Debug log เพื่อดูค่า RPC ที่ return จริง
     console.log('🔍 RPC raw data:', data);
     console.log('🔍 type:', typeof data, '| isArray:', Array.isArray(data), '| length:', data?.length);
 
@@ -568,7 +564,6 @@ async function openStockDetail(gradegram, size) {
     } else if (data && Array.isArray(data.data)) {
       rows = data.data;
     } else if (data && typeof data === 'object') {
-      // กรณี RPC return object เดี่ยว หรือ JSON object
       rows = [data];
     }
 
@@ -577,7 +572,6 @@ async function openStockDetail(gradegram, size) {
       return;
     }
 
-    // ✅ Debug: ดู property ของ row แรก
     console.log('🔍 first row:', rows[0]);
 
     const fullCount    = rows.filter(r => r.roll_status === 'full').length;
