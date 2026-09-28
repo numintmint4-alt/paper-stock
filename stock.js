@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 //  STOCK ม้วนกระดาษ V7 — stock.js
 //  เพิ่ม: multi-select Customer/Location/Status + waiting status
+//  ✅ แก้ 3 ปัญหา: tooltip, total ล่าง, คลิก cell ไม่แสดงรายละเอียด
 // ═══════════════════════════════════════════════════════════════
 
 let stockSelectedGrades = [];
@@ -474,7 +475,8 @@ async function renderStockMatrix() {
           html += '<td class="empty">-</td>';
         } else {
           const cellTxt = buildCellText(v);
-          html += `<td class="clickable" onclick="openStockDetail('${esc(rk)}', ${s})">
+          // ✅ ปัญหาที่ 1: เพิ่ม data-tip สำหรับ custom tooltip
+          html += `<td class="clickable" data-tip="Gradegrams ${esc(rk)} · Size ${s}" onclick="openStockDetail('${esc(rk)}', ${s})">
             <div class="cell-content">
               <div class="cell-main">${cellTxt}</div>
             </div>
@@ -489,7 +491,8 @@ async function renderStockMatrix() {
     html += '<tr class="total-row"><td class="grade-col">Total</td>';
     colKeys.forEach(s => {
       const ct = colTotals[s];
-      html += `<td>${buildCellText(ct)}</td>`;
+      // ✅ ปัญหาที่ 2: เปลี่ยน buildCellText → buildTotalText
+      html += `<td>${buildTotalText(ct)}</td>`;
     });
     const grand = { full: 0, scrap: 0, waiting: 0 };
     Object.values(colTotals).forEach(ct => {
@@ -554,11 +557,28 @@ async function openStockDetail(gradegram, size) {
     });
     if (error) throw error;
 
-    const rows = data || [];
+    // ✅ ปัญหาที่ 3: Debug log เพื่อดูค่า RPC ที่ return จริง
+    console.log('🔍 RPC raw data:', data);
+    console.log('🔍 type:', typeof data, '| isArray:', Array.isArray(data), '| length:', data?.length);
+
+    // ✅ รองรับทั้ง array ตรงๆ และ object ที่มี .data ซ้อน
+    let rows = [];
+    if (Array.isArray(data)) {
+      rows = data;
+    } else if (data && Array.isArray(data.data)) {
+      rows = data.data;
+    } else if (data && typeof data === 'object') {
+      // กรณี RPC return object เดี่ยว หรือ JSON object
+      rows = [data];
+    }
+
     if (!rows.length) {
       $('stockDetailBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">ไม่พบรายละเอียด</p>';
       return;
     }
+
+    // ✅ Debug: ดู property ของ row แรก
+    console.log('🔍 first row:', rows[0]);
 
     const fullCount    = rows.filter(r => r.roll_status === 'full').length;
     const scrapCount   = rows.filter(r => r.roll_status === 'scrap').length;
@@ -584,7 +604,7 @@ async function openStockDetail(gradegram, size) {
         scrap:   { cls: 'scrap-row',   txt: '♻️ เศษ' },
         waiting: { cls: 'waiting-row', txt: '⏳ รอกรอ' }
       };
-      const st = statusMap[r.roll_status] || { cls: '', txt: r.roll_status };
+      const st = statusMap[r.roll_status] || { cls: '', txt: r.roll_status || '-' };
       const custTxt = r.is_customer_roll ? `👤 ${esc(r.customer)}` : esc(r.customer) || '-';
 
       html += `<tr class="${st.cls}">
@@ -604,6 +624,7 @@ async function openStockDetail(gradegram, size) {
     html += '</tbody></table></div>';
     $('stockDetailBody').innerHTML = html;
   } catch (err) {
+    console.error('openStockDetail error:', err);
     $('stockDetailBody').innerHTML = `<div class="msg err">${esc(err.message)}</div>`;
   }
 }
