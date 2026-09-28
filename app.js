@@ -42,17 +42,30 @@ function normalizeGrade(g) {
 }
 
 // ================= V6: Parse Gradegram =================
+// ✅ แยก grade + gram จาก gradegram เช่น:
+//    'CA097'  → { grade: 'CA',  gram: '097' }
+//    'CAF097' → { grade: 'CAF', gram: '097' }
+//    'CA'     → { grade: 'CA',  gram: null }
+//    'CAF'    → { grade: 'CAF', gram: null }
 function parseGradegram(gradegram) {
   if (!gradegram) return { grade: '', gram: null };
   const s = String(gradegram).trim().toUpperCase();
 
-  let m = s.match(/^([A-Z]+)F(\d+)$/);
-  if (m) return { grade: m[1] + 'F' + m[2].padStart(3, '0'), gram: m[2] };
+  // กรณีมี F คั่น: CAF097
+  let m = s.match(/^([A-Z]+F)(\d+)$/);
+  if (m) return { grade: m[1], gram: m[2].padStart(3, '0') };
 
-  m = s.match(/^([A-Z]+)(\d+)$/);
-  if (m) return { grade: m[1] + m[2].padStart(3, '0'), gram: null };
+  // กรณีลงท้าย F: CA097F
+  m = s.match(/^([A-Z]+)(\d+)F$/);
+  if (m) return { grade: m[1] + 'F', gram: m[2].padStart(3, '0') };
 
+  // กรณีมีแต่ F: CAF
   if (/^[A-Z]+F$/.test(s)) return { grade: s, gram: null };
+
+  // กรณีปกติ: CA097
+  m = s.match(/^([A-Z]+)(\d+)$/);
+  if (m) return { grade: m[1], gram: m[2].padStart(3, '0') };
+
   return { grade: s, gram: null };
 }
 
