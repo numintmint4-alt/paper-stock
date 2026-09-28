@@ -543,13 +543,33 @@ th{
   justify-self: end;
 }
 
+/* ═══════════════════════════════════════════════════════════ */
+/* ========== REPORT WRAP — Scroll แนวนอน ========== */
+/* ═══════════════════════════════════════════════════════════ */
 .report-wrap{
   overflow-x: auto;
   overflow-y: visible;
   width: 100%;
   border-radius: var(--radius-md);
-  overflow: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
 }
+
+.report-wrap::-webkit-scrollbar{
+  height: 10px;
+}
+.report-wrap::-webkit-scrollbar-track{
+  background: var(--surface-soft);
+  border-radius: var(--radius-sm);
+}
+.report-wrap::-webkit-scrollbar-thumb{
+  background: var(--border-strong);
+  border-radius: var(--radius-sm);
+}
+.report-wrap::-webkit-scrollbar-thumb:hover{
+  background: var(--text-light);
+}
+
 .report-table{
   font-size: 12px;
   table-layout: auto;
