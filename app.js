@@ -42,27 +42,18 @@ function normalizeGrade(g) {
 }
 
 // ================= V6: Parse Gradegram =================
-// ✅ แยก grade + gram จาก gradegram เช่น:
-//    'CA097'  → { grade: 'CA',  gram: '097' }
-//    'CAF097' → { grade: 'CAF', gram: '097' }
-//    'CA'     → { grade: 'CA',  gram: null }
-//    'CAF'    → { grade: 'CAF', gram: null }
 function parseGradegram(gradegram) {
   if (!gradegram) return { grade: '', gram: null };
   const s = String(gradegram).trim().toUpperCase();
 
-  // กรณีมี F คั่น: CAF097
   let m = s.match(/^([A-Z]+F)(\d+)$/);
   if (m) return { grade: m[1], gram: m[2].padStart(3, '0') };
 
-  // กรณีลงท้าย F: CA097F
   m = s.match(/^([A-Z]+)(\d+)F$/);
   if (m) return { grade: m[1] + 'F', gram: m[2].padStart(3, '0') };
 
-  // กรณีมีแต่ F: CAF
   if (/^[A-Z]+F$/.test(s)) return { grade: s, gram: null };
 
-  // กรณีปกติ: CA097
   m = s.match(/^([A-Z]+)(\d+)$/);
   if (m) return { grade: m[1], gram: m[2].padStart(3, '0') };
 
@@ -293,7 +284,7 @@ function toggleAcc(head, bodyId) {
     if (bodyId === 'accRolluse') renderLatestBatch();
     if (bodyId === 'accUsers' && HAS_EDGE_FUNCTION) loadUsers();
     if (bodyId === 'accArchive') loadArchiveStats();
-if (bodyId === 'accPriceMaster' && typeof initPriceMaster === 'function') initPriceMaster();
+    if (bodyId === 'accPriceMaster' && typeof initPriceMaster === 'function') initPriceMaster();
   }
 }
 
@@ -369,10 +360,12 @@ async function loadMaster(onProgress = null) {
   );
   return masterCache;
 }
+
+// ✅ แก้จุดที่ 2: refreshAll() — await loadSizeFilter()
 async function refreshAll() {
   await loadMaster();
   if (typeof loadGradeFilter === 'function') await loadGradeFilter();
-  if (typeof loadSizeFilter === 'function') loadSizeFilter();
+  if (typeof loadSizeFilter === 'function') await loadSizeFilter();      // ✅ await
   if (typeof loadMonthFilter === 'function') loadMonthFilter();
   if (typeof loadStockGradeFilter === 'function') await loadStockGradeFilter();
   if (typeof loadReceiveGradeFilter === 'function') await loadReceiveGradeFilter();
@@ -565,6 +558,7 @@ function openMasterForm(row) {
 }
 function editMaster(id) { openMasterForm(masterCache.find(r => r.id === id)); }
 
+// ✅ แก้จุดที่ 3: saveMaster() — rebuild filter ทุกตัวหลัง loadMaster()
 async function saveMaster() {
   const grade = $('fGrade').value.trim();
   const gram = Number($('fGram').value);
@@ -584,6 +578,10 @@ async function saveMaster() {
   closeModal('modalMaster');
   await loadMaster();
   await loadGradeFilter();
+  if (typeof loadSizeFilter === 'function') await loadSizeFilter();          // ✅ เพิ่ม
+  if (typeof loadStockGradeFilter === 'function') await loadStockGradeFilter();  // ✅ เพิ่ม
+  if (typeof loadReceiveGradeFilter === 'function') await loadReceiveGradeFilter(); // ✅ เพิ่ม
+  if (typeof loadAlertGradeFilter === 'function') await loadAlertGradeFilter();     // ✅ เพิ่ม
   renderMaster();
 }
 async function delMaster(id) {
@@ -665,6 +663,10 @@ function importMaster(ev) {
 
       await loadMaster();
       await loadGradeFilter();
+      if (typeof loadSizeFilter === 'function') await loadSizeFilter();          // ✅ เพิ่ม
+      if (typeof loadStockGradeFilter === 'function') await loadStockGradeFilter();  // ✅ เพิ่ม
+      if (typeof loadReceiveGradeFilter === 'function') await loadReceiveGradeFilter(); // ✅ เพิ่ม
+      if (typeof loadAlertGradeFilter === 'function') await loadAlertGradeFilter();     // ✅ เพิ่ม
       renderMaster();
     } catch (ex) {
       hideProgress('masterProgress');
@@ -1092,7 +1094,6 @@ async function loadArchiveStats() {
 async function callAdmin(action, payload = {}) {
   let { data: { session } } = await supabase.auth.getSession();
 
-  // ✅ Auto-refresh ถ้าหมดอายุ หรือใกล้หมดใน 60 วินาที
   if (session && session.expires_at * 1000 < Date.now() + 60000) {
     const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
     if (refreshErr) {
@@ -1104,7 +1105,6 @@ async function callAdmin(action, payload = {}) {
 
   if (!session) return handleSessionExpired();
 
-  // ✅ เช็ค session กับ Server จริง — กันเคส session ถูกลบที่ server
   try {
     const { data: { user }, error: userErr } = await supabase.auth.getUser();
     if (userErr || !user) {
@@ -1113,7 +1113,6 @@ async function callAdmin(action, payload = {}) {
     }
   } catch (e) {
     console.warn('getUser error:', e);
-    // ไม่ throw ต่อ — ปล่อยให้ fetch ด้านล่าง handle
   }
 
   const res = await fetch(EDGE_FUNCTION_URL, {
@@ -1126,7 +1125,6 @@ async function callAdmin(action, payload = {}) {
   return json;
 }
 
-// ✅ Handle session หมดอายุ: clear + toast + reload
 async function handleSessionExpired() {
   showToast('Session หมดอายุ กำลังกลับหน้า login...', 'warn', 2000);
   try {
