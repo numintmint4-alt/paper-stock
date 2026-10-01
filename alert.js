@@ -156,18 +156,21 @@ async function initAlertTab() {
   await onAlertDateChange();
 }
 
+// ✅ แก้ #4: ลบการ set alertSnapshotMonth ออก — ปล่อยให้ loadSnapshotMonths() จัดการ
 function applyCalculatedDates(analyzedDate) {
   if (!analyzedDate) return;
 
   const stockDate = calcStockDate(analyzedDate);
   const receiveDate = calcReceiveDate(analyzedDate);
-  const snapshotMonth = calcSnapshotMonth(analyzedDate);
+  // ❌ ไม่ set snapshotMonth ที่นี่ — ปล่อยให้ loadSnapshotMonths() จัดการ
+  // const snapshotMonth = calcSnapshotMonth(analyzedDate);
 
   if ($('alertStockDate')) $('alertStockDate').value = stockDate;
   if ($('alertReceiveDate')) $('alertReceiveDate').value = receiveDate;
-  if ($('alertSnapshotMonth') && !$('alertSnapshotMonth').value) {
-    $('alertSnapshotMonth').value = snapshotMonth;
-  }
+  // ❌ ลบ 3 บรรทัดนี้:
+  // if ($('alertSnapshotMonth') && !$('alertSnapshotMonth').value) {
+  //   $('alertSnapshotMonth').value = snapshotMonth;
+  // }
 }
 
 function attachAlertDateListener() {
@@ -615,6 +618,7 @@ function renderAlertFromCache() {
   // ✅ Apply filter แล้ว render ใหม่
   applyAlertFiltersAndRender();
 }
+
 // ================= SUPPLIERS =================
 async function loadAlertSuppliers() {
   try {
@@ -632,6 +636,7 @@ async function loadAlertSuppliers() {
 }
 
 // ================= SNAPSHOT MONTHS =================
+// ✅ แก้ #5: set snapshotMonth = เดือนล่าสุดเสมอ (override ค่าที่อาจค้าง)
 async function loadSnapshotMonths() {
   try {
     const { data, error } = await supabase
@@ -646,8 +651,17 @@ async function loadSnapshotMonths() {
     });
     const months = [...set].sort().reverse();
 
-    if ($('alertSnapshotMonth') && !$('alertSnapshotMonth').value) {
-      $('alertSnapshotMonth').value = months[0] || '';
+    // ✅ set snapshotMonth = เดือนล่าสุดเสมอ (override ค่าที่อาจค้าง)
+    if ($('alertSnapshotMonth') && months.length > 0) {
+      let defaultMonth = months[0];  // เดือนล่าสุดที่มี snapshot
+
+      // ✅ ถ้ามี selectedMonths (จาก stock-level.js) → ใช้เดือนล่าสุดของ Stock Level
+      if (typeof selectedMonths !== 'undefined' && selectedMonths.length > 0) {
+        const latest = selectedMonths[selectedMonths.length - 1];
+        if (months.includes(latest)) defaultMonth = latest;
+      }
+
+      $('alertSnapshotMonth').value = defaultMonth;
     }
   } catch (e) {
     console.warn('loadSnapshotMonths:', e);
