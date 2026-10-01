@@ -7,6 +7,7 @@
 // + Add PO Items (Phase 3)
 // + Inline Edit Items (Phase 3E)
 // + closePOForm() — แก้ไข → กลับ PO List
+// + Price Fallback — เดือนก่อนหน้า (1 เดือน)
 // ═══════════════════════════════════════════════════════════════
 
 let poCache = [];
@@ -55,6 +56,16 @@ function fmtDateTH(d) {
   return `${dd}/${mm}/${yyyy}`;
 }
 
+// ✅ Helper: หาเดือนก่อนหน้า (YYYY-MM)
+function _getPrevMonth(ym) {
+  if (!ym) return ym;
+  const [y, m] = ym.split('-').map(Number);
+  let prevM = m - 1;
+  let prevY = y;
+  if (prevM <= 0) { prevM = 12; prevY = y - 1; }
+  return `${prevY}-${pad(prevM)}`;
+}
+
 // ================= INIT =================
 async function initPurchaseOrderTab() {
   const today = new Date();
@@ -97,15 +108,41 @@ async function loadPOSuppliers() {
 }
 
 // ================= PRICE MASTER =================
+// ✅ แก้: fallback ไปเดือนก่อนหน้า (1 เดือน) ถ้าเดือนปัจจุบันไม่มีราคา
 async function loadPriceMaster() {
   try {
-    const { data, error } = await supabase
+    // 1) ลองดึงราคาของเดือนที่เลือกก่อน
+    const { data: current, error: err1 } = await supabase
       .from('price_master')
       .select('*')
       .eq('month', poSelectedMonth)
       .eq('is_active', true);
-    if (error) throw error;
-    poPriceMaster = data || [];
+    if (err1) throw err1;
+
+    if (current && current.length > 0) {
+      poPriceMaster = current;
+      console.log('[PriceMaster] ✅ ใช้ราคาเดือน ' + poSelectedMonth + ' (' + current.length + ' รายการ)');
+      return;
+    }
+
+    // 2) ถ้าเดือนปัจจุบันไม่มี → fallback ไปเดือนก่อนหน้า (1 เดือน)
+    const prevMonth = _getPrevMonth(poSelectedMonth);
+    console.log('[PriceMaster] เดือน ' + poSelectedMonth + ' ไม่มีราคา → fallback ' + prevMonth);
+
+    const { data: prev, error: err2 } = await supabase
+      .from('price_master')
+      .select('*')
+      .eq('month', prevMonth)
+      .eq('is_active', true);
+    if (err2) throw err2;
+
+    if (prev && prev.length > 0) {
+      poPriceMaster = prev;
+      console.log('[PriceMaster] ✅ fallback ใช้ราคาเดือน ' + prevMonth + ' (' + prev.length + ' รายการ)');
+    } else {
+      poPriceMaster = [];
+      console.warn('[PriceMaster] ⚠ ไม่มีราคาทั้ง ' + poSelectedMonth + ' และ ' + prevMonth);
+    }
   } catch (e) {
     console.warn('loadPriceMaster:', e);
     poPriceMaster = [];
@@ -1056,7 +1093,6 @@ function renderPOFormTable() {
     </div>
   </div>`;
 
-  // ✅ แก้ปุ่ม "ยกเลิก" → ใช้ closePOForm()
   html += `<div class="form-actions" style="margin-top:16px;border-top:1px solid #e2e8f0;padding-top:14px">
     <button onclick="closePOForm()">ยกเลิก</button>
     <button class="primary" onclick="saveEditPOItems(this)">💾 บันทึกการแก้ไข</button>
