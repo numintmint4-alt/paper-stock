@@ -50,6 +50,17 @@ function loadMonthFilter() {
   renderMonthList();
   updateMonthLabel();
   attachMonthFilterListeners();
+
+  // ✅ เพิ่ม: sync titleMonth/titleYear ตามเดือนล่าสุดใน selectedMonths
+  if (selectedMonths.length > 0) {
+    const latest = selectedMonths[selectedMonths.length - 1];
+    const [ly, lm] = latest.split('-').map(Number);
+    const titleMEl = $('titleMonth');
+    const titleYEl = $('titleYear');
+    if (titleMEl) titleMEl.value = lm;
+    if (titleYEl) titleYEl.value = ly + 543;
+    if (typeof updateReportTitle === 'function') updateReportTitle();
+  }
 }
 
 function attachMonthFilterListeners() {
@@ -692,10 +703,24 @@ async function viewSnapshot(id) {
   $('snapshotViewBody').innerHTML = html;
 }
 
+// ✅ แก้: deleteSnapshot() — เพิ่ม .select() + เช็ค data.length
 async function deleteSnapshot(id, title) {
   if (!confirm(`ลบ "${title}" ?`)) return;
-  const { error } = await supabase.from('stock_level_snapshots').delete().eq('id', id);
-  if (error) { alert('ลบไม่สำเร็จ: ' + error.message); return; }
+  const { data, error } = await supabase
+    .from('stock_level_snapshots')
+    .delete()
+    .eq('id', id)
+    .select();   // ✅ เพิ่ม .select() เพื่อดูว่าลบจริงกี่ row
+
+  if (error) {
+    alert('ลบไม่สำเร็จ: ' + error.message);
+    return;
+  }
+  if (!data || data.length === 0) {
+    alert('⚠️ ลบไม่สำเร็จ — อาจติด RLS Policy\nกรุณาเช็คสิทธิ์ตาราง stock_level_snapshots ใน Supabase');
+    return;
+  }
+  console.log('✅ ลบ snapshot สำเร็จ:', data);
   await loadStockLevelSnapshots();
 }
 
