@@ -7,8 +7,8 @@
 // + Add PO Items (Phase 3)
 // + Inline Edit Items (Phase 3E)
 // + closePOForm() — แก้ไข → กลับ PO List
-// + Price Fallback — ✅ ใช้ราคาเดือนก่อนหน้า priority สูงสุด
 // + 🔄 Re-price — ดึงราคาใหม่จาก Price Master (ใน PO Form)
+// ✅ NEW: โหลดราคาตามเดือนของ PO (ref_receive) — ไม่ merge ไม่ fallback
 // ═══════════════════════════════════════════════════════════════
 
 let poCache = [];
@@ -57,14 +57,11 @@ function fmtDateTH(d) {
   return `${dd}/${mm}/${yyyy}`;
 }
 
-// ✅ Helper: หาเดือนก่อนหน้า (YYYY-MM)
-function _getPrevMonth(ym) {
-  if (!ym) return ym;
-  const [y, m] = ym.split('-').map(Number);
-  let prevM = m - 1;
-  let prevY = y;
-  if (prevM <= 0) { prevM = 12; prevY = y - 1; }
-  return `${prevY}-${pad(prevM)}`;
+// ✅ แปลงวันที่ (YYYY-MM-DD) → เดือน (YYYY-MM)
+function getMonthFromDate(dateStr) {
+  if (!dateStr) return poSelectedMonth;   // fallback ไปเดือนที่เลือก
+  const s = String(dateStr).slice(0, 7);  // 'YYYY-MM-DD' → 'YYYY-MM'
+  return s || poSelectedMonth;
 }
 
 // ================= INIT =================
@@ -109,52 +106,32 @@ async function loadPOSuppliers() {
 }
 
 // ================= PRICE MASTER =================
-// ✅ โหลดราคา 2 เดือน — ใช้เดือนก่อนหน้า priority สูงสุด
-async function loadPriceMaster() {
+// ✅ โหลดราคา "เฉพาะเดือนที่ระบุ" — ไม่ merge ไม่ fallback
+async function loadPriceMasterForMonth(month) {
   try {
-    const prevMonth = _getPrevMonth(poSelectedMonth);
+    console.log('[PriceMaster] → ดึงราคาเดือน: ' + month);
 
-    const [currentRes, prevRes] = await Promise.all([
-      supabase.from('price_master').select('*')
-        .eq('month', poSelectedMonth).eq('is_active', true),
-      supabase.from('price_master').select('*')
-        .eq('month', prevMonth).eq('is_active', true)
-    ]);
+    const { data, error } = await supabase
+      .from('price_master')
+      .select('*')
+      .eq('month', month)
+      .eq('is_active', true);
+    if (error) throw error;
 
-    if (currentRes.error) throw currentRes.error;
-    if (prevRes.error) throw prevRes.error;
+    poPriceMaster = (data || []).filter(p => Number(p.price_normal) > 0);
 
-    const current = currentRes.data || [];
-    const prev = prevRes.data || [];
-
-    // ✅ Map เริ่มจากเดือนปัจจุบัน (ราคา > 0)
-    const mergedMap = {};
-    current.forEach(c => {
-      if (Number(c.price_normal) > 0) {
-        mergedMap[c.gradegram] = c;
-      }
-    });
-
-    // ✅ เดือนก่อนหน้า → ทับเสมอ (priority สูงสุด เพราะเดือนปัจจุบันอาจผิด)
-    prev.forEach(p => {
-      if (Number(p.price_normal) > 0) {
-        mergedMap[p.gradegram] = p;
-      }
-    });
-
-    poPriceMaster = Object.values(mergedMap);
-
-    const fromPrev = poPriceMaster.filter(p => p.month === prevMonth).length;
-    const fromCurrent = poPriceMaster.filter(p => p.month === poSelectedMonth).length;
-
-    console.log(
-      `[PriceMaster] ✅ โหลด ${poPriceMaster.length} ราคา` +
-      ` (จาก ${prevMonth}: ${fromPrev} · จาก ${poSelectedMonth}: ${fromCurrent})`
-    );
+    console.log('[PriceMaster] ✅ ใช้ราคาเดือน ' + month + ' (' + poPriceMaster.length + ' รายการ)');
+    return poPriceMaster;
   } catch (e) {
-    console.warn('loadPriceMaster:', e);
+    console.warn('loadPriceMasterForMonth:', e);
     poPriceMaster = [];
+    return [];
   }
+}
+
+// ✅ โหลดราคาตามเดือนที่เลือกใน dropdown (ใช้ตอน initPO / เปลี่ยนเดือน)
+async function loadPriceMaster() {
+  return await loadPriceMasterForMonth(poSelectedMonth);
 }
 
 function getPriceFromMaster(gradegram, customerRoll, qualityB) {
@@ -507,6 +484,12 @@ async function openPOForm(poId) {
     try {
       const { data, error } = await supabase.rpc('get_purchase_order_detail', { p_po_id: poId });
       if (error) throw error;
+
+      // ✅ โหลดราคาตามเดือนของ PO (จาก ref_receive)
+      const poMonth = getMonthFromDate(data.header.ref_receive || data.header.po_date);
+      console.log('[POForm] โหลดราคาเดือน ' + poMonth + ' (จาก ref_receive: ' + data.header.ref_receive + ')');
+      await loadPriceMasterForMonth(poMonth);
+
       renderPOFormContent(data.header, data.items);
     } catch (e) {
       $('poFormBody').innerHTML = `<div class="msg err">${esc(e.message)}</div>`;
@@ -655,6 +638,12 @@ async function openPOFormFromAlert(alertData) {
     if (!byDate[d]) byDate[d] = [];
     byDate[d].push(it);
   });
+
+  // ✅ โหลดราคาตามเดือนของวันรับ (เอาวันแรก)
+  const firstDate = Object.keys(byDate).sort()[0];
+  const poMonth = getMonthFromDate(firstDate);
+  console.log('[POForm] สร้าง PO จาก Alert → โหลดราคาเดือน ' + poMonth);
+  await loadPriceMasterForMonth(poMonth);
 
   const sortedDates = Object.keys(byDate).sort();
 
@@ -997,10 +986,14 @@ function renderPOFormTable() {
   const totalCount = activeRows.length;
   const remaining = 15 - totalCount;
 
+  // ✅ ระบุเดือนของราคาที่ใช้อยู่
+  const priceMonth = getMonthFromDate(header.ref_receive || header.po_date);
+
   let html = `<div class="msg info" style="margin-bottom:12px">
     <b>✏️ แก้ไข PO — ${esc(header.po_no)}</b><br>
     📦 มีอยู่ <b>${totalCount}</b> รายการ · เพิ่มได้อีก <b style="color:#dc2626">${remaining > 0 ? remaining : 0}</b> รายการ<br>
-    Sup: <b>${esc(header.sup_code)}</b> · วันที่รับ: <b>${fmtDateTH(header.ref_receive)}</b> · สถานะ: <b>${header.status}</b>
+    Sup: <b>${esc(header.sup_code)}</b> · วันที่รับ: <b>${fmtDateTH(header.ref_receive)}</b> · สถานะ: <b>${header.status}</b><br>
+    💰 ราคาที่ใช้: <b style="color:#b45309">เดือน ${priceMonth}</b> · โหลด <b>${poPriceMaster.length}</b> รายการ
   </div>`;
 
   html += `<div class="report-wrap" style="max-height:55vh;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px">
@@ -1101,9 +1094,6 @@ function renderPOFormTable() {
     </div>
   </div>`;
 
-  // ═══════════════════════════════════════════════════════════════
-  // ✅ ปุ่ม action (ยกเลิก / 🔄 Re-price / บันทึก)
-  // ═══════════════════════════════════════════════════════════════
   html += `<div class="form-actions" style="margin-top:16px;border-top:1px solid #e2e8f0;padding-top:14px">
     <button onclick="closePOForm()">ยกเลิก</button>
     <button onclick="repricePO()" 
@@ -1125,15 +1115,18 @@ async function repricePO() {
     return;
   }
 
+  // ✅ โหลดราคาตามเดือนของ PO (จาก _editPOHeader.ref_receive)
+  const poMonth = getMonthFromDate(_editPOHeader?.ref_receive || _editPOHeader?.po_date);
+
   if (!confirm(
     `🔄 Re-price ทุกรายการใน PO นี้?\n\n` +
-    `ระบบจะดึงราคาจาก Price Master เดือน ${poSelectedMonth}\n` +
+    `ระบบจะดึงราคาจาก Price Master เดือน ${poMonth}\n` +
     `และอัปเดตราคาในตาราง (ยังไม่บันทึก)\n\n` +
     `ยืนยัน?`
   )) return;
 
-  // โหลดราคาล่าสุดจาก Price Master
-  await loadPriceMaster();
+  console.log('[Re-price] ดึงราคาเดือน ' + poMonth);
+  await loadPriceMasterForMonth(poMonth);
 
   let updatedCount = 0;
   let notFoundCount = 0;
@@ -1174,7 +1167,7 @@ async function repricePO() {
     });
   }
   if (notFoundCount > 0) {
-    msg += `\n⚠️ ${notFoundCount} รายการไม่พบราคาใน Price Master`;
+    msg += `\n⚠️ ${notFoundCount} รายการไม่พบราคาใน Price Master เดือน ${poMonth}`;
   }
   msg += `\n\n⚠️ ยังไม่บันทึก — กด "💾 บันทึกการแก้ไข" เพื่อยืนยัน`;
 
@@ -1395,7 +1388,12 @@ async function saveEditPOItems(btnEl) {
 
   try {
     const { data: detail } = await supabase.rpc('get_purchase_order_detail', { p_po_id: poEditingId });
-    if (detail) renderPOFormContent(detail.header, detail.items);
+    if (detail) {
+      // ✅ โหลดราคาเดือนของ PO นี้ใหม่หลัง save (เผื่อราคาเปลี่ยน)
+      const poMonth = getMonthFromDate(detail.header.ref_receive || detail.header.po_date);
+      await loadPriceMasterForMonth(poMonth);
+      renderPOFormContent(detail.header, detail.items);
+    }
   } catch (e) {
     console.warn('refresh after save:', e);
   }
