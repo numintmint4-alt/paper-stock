@@ -8,6 +8,7 @@
 // + Inline Edit Items (Phase 3E)
 // + closePOForm() — แก้ไข → กลับ PO List
 // + Price Fallback — ✅ ใช้ราคาเดือนก่อนหน้า priority สูงสุด
+// + 🔄 Re-price — ดึงราคาใหม่จาก Price Master (ใน PO Form)
 // ═══════════════════════════════════════════════════════════════
 
 let poCache = [];
@@ -109,7 +110,6 @@ async function loadPOSuppliers() {
 
 // ================= PRICE MASTER =================
 // ✅ โหลดราคา 2 เดือน — ใช้เดือนก่อนหน้า priority สูงสุด
-//    (เพราะราคาเดือนปัจจุบันอาจผิด / auto-copy มาแล้วอาจไม่ตรง)
 async function loadPriceMaster() {
   try {
     const prevMonth = _getPrevMonth(poSelectedMonth);
@@ -1101,12 +1101,84 @@ function renderPOFormTable() {
     </div>
   </div>`;
 
+  // ═══════════════════════════════════════════════════════════════
+  // ✅ ปุ่ม action (ยกเลิก / 🔄 Re-price / บันทึก)
+  // ═══════════════════════════════════════════════════════════════
   html += `<div class="form-actions" style="margin-top:16px;border-top:1px solid #e2e8f0;padding-top:14px">
     <button onclick="closePOForm()">ยกเลิก</button>
+    <button onclick="repricePO()" 
+            style="background:#fef3c7;color:#b45309;border:1px solid #fcd34d;padding:8px 14px;border-radius:6px;cursor:pointer;font-weight:600">
+      🔄 Re-price (ดึงราคาใหม่)
+    </button>
     <button class="primary" onclick="saveEditPOItems(this)">💾 บันทึกการแก้ไข</button>
   </div>`;
 
   container.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 🔄 RE-PRICE — ดึงราคาจาก Price Master มาใส่ PO ใหม่
+// ═══════════════════════════════════════════════════════════════
+async function repricePO() {
+  if (!_editItemsRows || !_editItemsRows.length) {
+    alert('ไม่มีรายการใน PO');
+    return;
+  }
+
+  if (!confirm(
+    `🔄 Re-price ทุกรายการใน PO นี้?\n\n` +
+    `ระบบจะดึงราคาจาก Price Master เดือน ${poSelectedMonth}\n` +
+    `และอัปเดตราคาในตาราง (ยังไม่บันทึก)\n\n` +
+    `ยืนยัน?`
+  )) return;
+
+  // โหลดราคาล่าสุดจาก Price Master
+  await loadPriceMaster();
+
+  let updatedCount = 0;
+  let notFoundCount = 0;
+  const changes = [];
+
+  _editItemsRows.forEach(row => {
+    if (row.removed || row.isNew) return;   // ข้ามแถวที่ลบ / แถวใหม่
+
+    const newPrice = getPriceFromMaster(
+      row.gradegram,
+      row.customer_roll || 'normal',
+      row.quality_b || 'normal'
+    );
+
+    if (newPrice > 0) {
+      if (Number(row.price) !== Number(newPrice)) {
+        changes.push({
+          gradegram: row.gradegram,
+          size: row.size,
+          old: row.price,
+          new: newPrice
+        });
+        row.price = newPrice;
+        updatedCount++;
+      }
+    } else {
+      notFoundCount++;
+    }
+  });
+
+  renderPOFormTable();
+
+  let msg = `✅ พบการเปลี่ยนแปลง ${updatedCount} รายการ`;
+  if (changes.length > 0 && changes.length <= 10) {
+    msg += '\n\n';
+    changes.forEach(c => {
+      msg += `${c.gradegram}-${c.size}: ${Number(c.old).toFixed(2)} → ${Number(c.new).toFixed(2)}\n`;
+    });
+  }
+  if (notFoundCount > 0) {
+    msg += `\n⚠️ ${notFoundCount} รายการไม่พบราคาใน Price Master`;
+  }
+  msg += `\n\n⚠️ ยังไม่บันทึก — กด "💾 บันทึกการแก้ไข" เพื่อยืนยัน`;
+
+  alert(msg);
 }
 
 // ✅ Add row ใหม่
