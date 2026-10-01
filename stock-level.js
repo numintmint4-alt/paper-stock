@@ -2,6 +2,7 @@
 // STOCK V6.3 — stock-level.js (FULL)
 // Month Filter + Customer Filter + Gradegrams Filter + Size Filter
 // + Matrix + Snapshot
+// ✅ Matrix: format ตาม mode (full → floor, actual → toFixed(2))
 // ═══════════════════════════════════════════════════════════════
 
 // ================= STATE =================
@@ -498,6 +499,14 @@ async function renderMatrix() {
     return;
   }
 
+  // ✅ Helper: format ตาม mode
+  //    - "ม้วนเต็ม" → Math.floor (ตัดทศนิยม)
+  //    - "ใช้จริง"   → toFixed(2) (ทศนิยม 2 ตำแหน่ง)
+  const fmtVal = (v) => {
+    const num = Number(v) || 0;
+    return mode === 'full' ? Math.floor(num) : num.toFixed(2);
+  };
+
   let html = '<div class="report-wrap"><table class="report-table"><thead><tr><th class="grade-col">Gradegrams</th>';
   colKeys2.forEach(s => html += `<th>${s}</th>`);
   html += '<th class="total-col">Total</th></tr></thead><tbody>';
@@ -508,13 +517,13 @@ async function renderMatrix() {
     colKeys2.forEach(s => {
       const v = cells[rk + '|' + s];
       if (!v) html += '<td class="empty">-</td>';
-      else html += `<td class="clickable" data-tip="Gradegrams ${esc(rk)} · Size ${s}" onclick="openDrill('${esc(rk)}',${s})">${Number(v).toFixed(2)}</td>`;
+      else html += `<td class="clickable" data-tip="Gradegrams ${esc(rk)} · Size ${s}" onclick="openDrill('${esc(rk)}',${s})">${fmtVal(v)}</td>`;
     });
-    html += `<td class="total-col">${Number(rowTotals2[rk] || 0).toFixed(2)}</td></tr>`;
+    html += `<td class="total-col">${fmtVal(rowTotals2[rk] || 0)}</td></tr>`;
   });
   html += '<tr class="total-row"><td class="grade-col">Total</td>';
-  colKeys2.forEach(s => html += `<td>${Number(colTotals2[s] || 0).toFixed(2)}</td>`);
-  html += `<td class="total-col">${Number(grand2).toFixed(2)}</td></tr></tbody></table></div>`;
+  colKeys2.forEach(s => html += `<td>${fmtVal(colTotals2[s] || 0)}</td>`);
+  html += `<td class="total-col">${fmtVal(grand2)}</td></tr></tbody></table></div>`;
   html += `<div class="report-foot">แสดงเป็นจำนวนม้วน · โหมด: ${mode === 'full' ? 'ม้วนเต็ม' : 'ใช้จริง'} · ยอดสูงสุดต่อวัน</div>`;
   $('matrixBody').innerHTML = html;
 
