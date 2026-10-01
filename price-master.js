@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 // STOCK V8 — price-master.js
 // Master ราคา (Price Master) — ราคาต่อ Gradegram รายเดือน
+// + Auto-copy จากเดือนก่อนหน้า (ลบปุ่ม Sync ออก)
 // ═══════════════════════════════════════════════════════════════
 
 let pmCache = [];
@@ -13,6 +14,16 @@ function showMsg(elId, text, type = 'ok') {
   if (!el) return;
   el.innerHTML = `<div class="msg ${type}">${esc(text)}</div>`;
   setTimeout(() => { el.innerHTML = ''; }, 3000);
+}
+
+// ================= HELPER: getPrevMonth =================
+function getPrevMonth(ym) {
+  if (!ym) return ym;
+  const [y, m] = ym.split('-').map(Number);
+  let prevM = m - 1;
+  let prevY = y;
+  if (prevM <= 0) { prevM = 12; prevY = y - 1; }
+  return `${prevY}-${pad(prevM)}`;
 }
 
 // ================= INIT =================
@@ -30,7 +41,62 @@ async function initPriceMaster() {
   if (savedNc && $('pmNcDiscount')) $('pmNcDiscount').value = savedNc;
 
   await loadPriceMasterList();
+
+  // ✅ ถ้าเดือนนี้ยังไม่มีราคา → auto-copy จากเดือนก่อนหน้า
+  if (!pmCache.length) {
+    await autoCopyFromPrevMonth();
+  }
+
   renderPMList();
+}
+
+// ================= AUTO COPY FROM PREV MONTH =================
+// ✅ ถ้าเดือนนี้ไม่มีราคาเลย → copy จากเดือนก่อนหน้าอัตโนมัติ
+async function autoCopyFromPrevMonth() {
+  try {
+    const prevMonth = getPrevMonth(pmSelectedMonth);
+    console.log('[PriceMaster] เดือน ' + pmSelectedMonth + ' ว่าง → auto-copy จาก ' + prevMonth);
+
+    // 1) ดึงราคาเดือนก่อนหน้า
+    const { data: prev, error: err1 } = await supabase
+      .from('price_master')
+      .select('*')
+      .eq('month', prevMonth)
+      .eq('is_active', true);
+    if (err1) throw err1;
+
+    if (!prev || !prev.length) {
+      console.warn('[PriceMaster] เดือนก่อนหน้า (' + prevMonth + ') ไม่มีราคา → ไม่ copy');
+      return;
+    }
+
+    // 2) สร้าง payload สำหรับเดือนนี้ (copy ราคามาทั้งหมด)
+    const newRows = prev.map(p => ({
+      gradegram: p.gradegram,
+      month: pmSelectedMonth,
+      price_normal: p.price_normal,
+      price_f: p.price_f,
+      price_bt: p.price_bt,
+      price_ktp: p.price_ktp,
+      nc_discount: p.nc_discount,
+      is_active: true
+    }));
+
+    // 3) Insert
+    const { error: err2 } = await supabase
+      .from('price_master')
+      .insert(newRows);
+    if (err2) throw err2;
+
+    console.log('[PriceMaster] ✅ copy ' + newRows.length + ' ราคาจาก ' + prevMonth + ' สำเร็จ');
+
+    // 4) Reload
+    await loadPriceMasterList();
+    showMsg('pmMsg', `✅ Copy ราคาจากเดือน ${prevMonth} อัตโนมัติ (${newRows.length} รายการ)`, 'ok');
+  } catch (e) {
+    console.warn('autoCopyFromPrevMonth:', e);
+    showMsg('pmMsg', 'Auto-copy ล้มเหลว: ' + e.message, 'err');
+  }
 }
 
 // ================= LOAD =================
@@ -55,7 +121,14 @@ async function onPMonthChange() {
   const monthEl = $('pmMonth');
   if (!monthEl) return;
   pmSelectedMonth = monthEl.value;
+
   await loadPriceMasterList();
+
+  // ✅ ถ้าเดือนใหม่ไม่มีราคา → auto-copy จากเดือนก่อนหน้า
+  if (!pmCache.length) {
+    await autoCopyFromPrevMonth();
+  }
+
   renderPMList();
 }
 
@@ -71,7 +144,7 @@ function renderPMList() {
   if (!body) return;
 
   if (!pmCache.length) {
-    body.innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">ยังไม่มีราคาในเดือนนี้ — กด "🔄 สร้างราคาทั้งหมด" เพื่อเริ่ม</p>';
+    body.innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">ยังไม่มีราคาในเดือนนี้<br><small>ระบบจะ copy จากเดือนก่อนหน้าอัตโนมัติ</small></p>';
     return;
   }
 
@@ -102,9 +175,8 @@ function renderPMList() {
 
 // ================= OPEN FORM (EDIT ONLY) =================
 async function openPMForm(id) {
-  // ✅ ต้องมี id (Edit mode เท่านั้น)
   if (!id) {
-    alert('ใช้ปุ่ม "🔄 สร้างราคาทั้งหมด" เพื่อเพิ่มเกรดใหม่\nหรือกด "✏️ Edit" ที่แถวเพื่อแก้ราคา');
+    alert('ใช้ปุ่ม "auto-copy" ที่โหลดอัตโนมัติ\nหรือกด "✏️ Edit" ที่แถวเพื่อแก้ราคา');
     return;
   }
 
@@ -112,7 +184,6 @@ async function openPMForm(id) {
   $('pmFormError').innerHTML = '';
   $('pmfMonth').value = pmSelectedMonth;
 
-  // ✅ สร้าง dropdown gradegram (แสดงแค่ค่าที่มี)
   const gradeSelect = $('pmfGradegram');
   if (!gradeSelect) return;
 
@@ -139,7 +210,6 @@ async function openPMForm(id) {
   openModal('modalPM');
 }
 
-// ✅ อัปเดต NC อัตโนมัติ
 function updatePM_NC_Auto() {
   const normal = Number($('pmfNormal').value) || 0;
   const disc = Number($('pmfNcDiscount').value) || 0;
@@ -200,7 +270,6 @@ async function deletePM(id) {
 
     await loadPriceMasterList();
     renderPMList();
-
     showMsg('pmMsg', '✅ ลบสำเร็จ', 'ok');
   } catch (e) {
     $('pmMsg').innerHTML = `<div class="msg err">ลบไม่สำเร็จ: ${esc(e.message)}</div>`;
@@ -277,35 +346,7 @@ async function importPriceMaster(event) {
   }
 }
 
-// ================= SYNC FROM SPECS =================
-async function syncPriceMaster() {
-  if (!pmSelectedMonth) {
-    alert('เลือกเดือนก่อน');
-    return;
-  }
-
-  if (!confirm(
-    `สร้างราคาสำหรับทุก gradegram ในเดือน ${pmSelectedMonth}?\n\n` +
-    `• รายการที่มีอยู่แล้ว → ไม่เขียนทับ\n` +
-    `• รายการใหม่ → copy จากเดือนก่อน (ถ้ามี)\n` +
-    `• ถ้าเดือนก่อนไม่มี → ราคาเริ่มต้น = 0`
-  )) return;
-
-  try {
-    const { data, error } = await supabase.rpc('sync_price_master_from_specs', {
-      p_month: pmSelectedMonth
-    });
-    if (error) throw error;
-
-    let msg = `✅ สร้างเสร็จ: `;
-    msg += `เพิ่มใหม่ ${data.inserted} แถว`;
-    if (data.copied > 0) msg += ` (copy จาก ${data.prev_month} ${data.copied} แถว)`;
-    msg += ` · มีอยู่แล้ว ${data.existing} แถว`;
-
-    showMsg('pmMsg', msg, 'ok');
-    await loadPriceMasterList();
-    renderPMList();
-  } catch (e) {
-    showMsg('pmMsg', '❌ ' + e.message, 'err');
-  }
-}
+// ═══════════════════════════════════════════════════════════════
+// ❌ ลบ syncPriceMaster() ออก — ไม่ใช้แล้ว
+//    เพราะมี autoCopyFromPrevMonth() ทำงานอัตโนมัติตอนเปิดหน้า
+// ═══════════════════════════════════════════════════════════════
