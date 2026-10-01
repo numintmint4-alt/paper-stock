@@ -2,6 +2,9 @@
 // STOCK V8 — price-master.js
 // Master ราคา (Price Master) — ราคาต่อ Gradegram รายเดือน
 // + Auto-copy จากเดือนก่อนหน้า (ลบปุ่ม Sync ออก)
+// + ➕ ปุ่ม "เพิ่มราคาใหม่" (Add Mode)
+// + Pre-fill ราคาจากเดือนก่อนหน้า
+// + 🔄 ปุ่ม "Copy จากเดือนก่อน" (forceRecopy)
 // ═══════════════════════════════════════════════════════════════
 
 let pmCache = [];
@@ -99,6 +102,44 @@ async function autoCopyFromPrevMonth() {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════
+// 🔄 FORCE RE-COPY — ปุ่ม "Copy จากเดือนก่อน" (Manual)
+// ═══════════════════════════════════════════════════════════════
+// ✅ Force re-copy ราคาจากเดือนก่อนหน้า (สำหรับปุ่มใน UI)
+//    - ลบราคาเดือนปัจจุบันทั้งหมดก่อน
+//    - แล้ว copy ใหม่จากเดือนก่อน
+//    - ใช้เมื่อ auto-copy ทำงานผิดพลาด หรือต้องการ refresh
+async function forceRecopy() {
+  const prevMonth = getPrevMonth(pmSelectedMonth);
+
+  if (!confirm(
+    `🔄 Re-copy ราคาเดือน ${pmSelectedMonth}\n\n` +
+    `จากเดือน ${prevMonth}\n\n` +
+    `⚠️ ราคาเดือนปัจจุบันทั้งหมดจะถูกลบ และ copy ใหม่จากเดือนก่อน\n\n` +
+    `ยืนยัน?`
+  )) return;
+
+  try {
+    // 1) ลบราคาเดือนปัจจุบันทั้งหมด
+    const { error: err1 } = await supabase
+      .from('price_master')
+      .delete()
+      .eq('month', pmSelectedMonth);
+    if (err1) throw err1;
+
+    console.log('[PriceMaster] ✅ ลบราคาเดือน ' + pmSelectedMonth + ' แล้ว');
+
+    // 2) เคลียร์ cache → auto-copy ทำงาน
+    pmCache = [];
+    await autoCopyFromPrevMonth();
+    renderPMList();
+
+    showMsg('pmMsg', `✅ Re-copy จาก ${prevMonth} สำเร็จ`, 'ok');
+  } catch (e) {
+    showMsg('pmMsg', 'Re-copy ล้มเหลว: ' + e.message, 'err');
+  }
+}
+
 // ================= LOAD =================
 async function loadPriceMasterList() {
   try {
@@ -143,12 +184,19 @@ function renderPMList() {
   const body = $('pmBody');
   if (!body) return;
 
+  // ✅ ปุ่ม "เพิ่มราคาใหม่" ด้านบน
+  const topBar = `<div style="margin-bottom:12px;display:flex;justify-content:flex-end;gap:8px">
+    <button class="primary" onclick="openPMAddForm()" style="padding:8px 16px">
+      ➕ เพิ่มราคาใหม่
+    </button>
+  </div>`;
+
   if (!pmCache.length) {
-    body.innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">ยังไม่มีราคาในเดือนนี้<br><small>ระบบจะ copy จากเดือนก่อนหน้าอัตโนมัติ</small></p>';
+    body.innerHTML = topBar + '<p style="text-align:center;color:#94a3b8;padding:20px">ยังไม่มีราคาในเดือนนี้<br><small>ระบบจะ copy จากเดือนก่อนหน้าอัตโนมัติ</small></p>';
     return;
   }
 
-  let html = '<div class="data-scroll"><table class="data-table"><thead><tr>';
+  let html = topBar + '<div class="data-scroll"><table class="data-table"><thead><tr>';
   html += '<th>Gradegram</th><th>ราคาปกติ</th><th>ปั้ม F</th><th>ปั้ม BT</th><th>ปั้ม KTP</th><th>NC ลด</th><th>NC (auto)</th><th></th>';
   html += '</tr></thead><tbody>';
 
@@ -173,7 +221,89 @@ function renderPMList() {
   body.innerHTML = html;
 }
 
-// ================= OPEN FORM (EDIT ONLY) =================
+// ═══════════════════════════════════════════════════════════════
+// ➕ ADD MODE — เพิ่มราคาใหม่
+// ═══════════════════════════════════════════════════════════════
+
+// ✅ เปิดฟอร์มเพิ่มราคาใหม่
+async function openPMAddForm() {
+  pmEditingId = null;
+  $('pmFormError').innerHTML = '';
+  $('pmfMonth').value = pmSelectedMonth;
+
+  const gradeSelect = $('pmfGradegram');
+  if (!gradeSelect) return;
+
+  // ✅ ดึง gradegram ทั้งหมดจาก masterCache
+  const allGradegrams = [...new Set(
+    masterCache.map(m => normalizeGrade(m.grade) + m.gram)
+  )].sort();
+
+  // ✅ กรอง gradegram ที่มีอยู่แล้วในเดือนนี้
+  const existingGradegrams = new Set(pmCache.map(r => r.gradegram));
+  const availableGradegrams = allGradegrams.filter(g => !existingGradegrams.has(g));
+
+  if (!availableGradegrams.length) {
+    alert('✅ มีราคาครบทุก gradegram ในเดือนนี้แล้ว');
+    return;
+  }
+
+  gradeSelect.disabled = false;
+  gradeSelect.style.background = '';
+  gradeSelect.innerHTML = '<option value="">-- เลือก gradegram --</option>' +
+    availableGradegrams.map(g => `<option value="${esc(g)}">${esc(g)}</option>`).join('');
+
+  $('pmFormTitle').textContent = '➕ เพิ่มราคาใหม่ — ' + pmSelectedMonth;
+
+  // เคลียร์ค่า
+  $('pmfNormal').value = '';
+  $('pmfF').value = '';
+  $('pmfBT').value = '';
+  $('pmfKTP').value = '';
+  $('pmfNcDiscount').value = localStorage.getItem('stockv8_pm_nc_discount') || 1;
+
+  // ✅ เมื่อเลือก gradegram → ดึงราคาจากเดือนก่อนมา pre-fill
+  gradeSelect.onchange = () => {
+    const g = gradeSelect.value;
+    if (!g) return;
+    prefillFromPrevMonth(g);
+  };
+
+  updatePM_NC_Auto();
+  $('pmfNormal').oninput = updatePM_NC_Auto;
+  $('pmfNcDiscount').oninput = updatePM_NC_Auto;
+
+  openModal('modalPM');
+}
+
+// ✅ Pre-fill ราคาจากเดือนก่อนหน้า
+async function prefillFromPrevMonth(gradegram) {
+  try {
+    const prevMonth = getPrevMonth(pmSelectedMonth);
+    const { data, error } = await supabase
+      .from('price_master')
+      .select('*')
+      .eq('month', prevMonth)
+      .eq('gradegram', gradegram)
+      .eq('is_active', true)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return;
+
+    $('pmfNormal').value = data.price_normal || '';
+    $('pmfF').value = data.price_f || '';
+    $('pmfBT').value = data.price_bt || '';
+    $('pmfKTP').value = data.price_ktp || '';
+    $('pmfNcDiscount').value = data.nc_discount || 1;
+
+    updatePM_NC_Auto();
+    console.log('[PriceMaster] Pre-fill จากเดือน ' + prevMonth + ' สำเร็จ');
+  } catch (e) {
+    console.warn('prefillFromPrevMonth:', e);
+  }
+}
+
+// ================= OPEN FORM (EDIT) =================
 async function openPMForm(id) {
   if (!id) {
     alert('ใช้ปุ่ม "auto-copy" ที่โหลดอัตโนมัติ\nหรือกด "✏️ Edit" ที่แถวเพื่อแก้ราคา');
@@ -216,14 +346,18 @@ function updatePM_NC_Auto() {
   $('pmfNC').value = (normal - disc).toFixed(2);
 }
 
-// ================= SAVE (UPDATE ONLY) =================
+// ═══════════════════════════════════════════════════════════════
+// SAVE — รองรับทั้ง ADD และ EDIT
+// ═══════════════════════════════════════════════════════════════
 async function savePMForm() {
-  if (!pmEditingId) {
-    $('pmFormError').innerHTML = '<div class="msg err">ไม่พบรายการที่จะแก้ไข</div>';
+  const gradegram = $('pmfGradegram').value;
+
+  // ✅ Validation
+  if (!gradegram) {
+    $('pmFormError').innerHTML = '<div class="msg err">กรุณาเลือก gradegram</div>';
     return;
   }
 
-  const gradegram = $('pmfGradegram').value;
   const payload = {
     price_normal: Number($('pmfNormal').value),
     price_f:      Number($('pmfF').value) || null,
@@ -239,16 +373,34 @@ async function savePMForm() {
   }
 
   try {
-    const { error } = await supabase
-      .from('price_master')
-      .update(payload)
-      .eq('id', pmEditingId);
-    if (error) throw error;
+    if (pmEditingId) {
+      // ✅ EDIT MODE
+      const { error } = await supabase
+        .from('price_master')
+        .update(payload)
+        .eq('id', pmEditingId);
+      if (error) throw error;
 
-    closeModal('modalPM');
-    await loadPriceMasterList();
-    renderPMList();
-    showMsg('pmMsg', `✅ แก้ไขราคา ${gradegram} สำเร็จ`, 'ok');
+      closeModal('modalPM');
+      await loadPriceMasterList();
+      renderPMList();
+      showMsg('pmMsg', `✅ แก้ไขราคา ${gradegram} สำเร็จ`, 'ok');
+    } else {
+      // ✅ ADD MODE
+      payload.gradegram = gradegram;
+      payload.month = pmSelectedMonth;
+      payload.is_active = true;
+
+      const { error } = await supabase
+        .from('price_master')
+        .insert(payload);
+      if (error) throw error;
+
+      closeModal('modalPM');
+      await loadPriceMasterList();
+      renderPMList();
+      showMsg('pmMsg', `✅ เพิ่มราคา ${gradegram} สำเร็จ`, 'ok');
+    }
   } catch (e) {
     $('pmFormError').innerHTML = `<div class="msg err">${esc(e.message)}</div>`;
   }
@@ -349,4 +501,5 @@ async function importPriceMaster(event) {
 // ═══════════════════════════════════════════════════════════════
 // ❌ ลบ syncPriceMaster() ออก — ไม่ใช้แล้ว
 //    เพราะมี autoCopyFromPrevMonth() ทำงานอัตโนมัติตอนเปิดหน้า
+//    และมี forceRecopy() สำหรับปุ่ม Manual
 // ═══════════════════════════════════════════════════════════════
