@@ -504,18 +504,19 @@
             <p class="hint">ราคาต่อ <b>Gradegram</b> (ไม่รวม Size) · ตั้งได้ทุกเดือน · NC = ราคาปกติ − ส่วนลด</p>
 
             <div class="filters">
-              <label>📅 เดือน
-                <input type="month" id="pmMonth" onchange="onPMonthChange()">
-              </label>
-              <label>NC ลด
-                <input type="number" id="pmNcDiscount" value="1" step="0.01" style="width:80px" onchange="onPMNcDiscountChange()">
-                บาท
-              </label>
-              <button class="primary" onclick="syncPriceMaster()">🔄 สร้างราคาทั้งหมด</button>
-              <button onclick="exportPriceMaster()">📤 Export Excel</button>
-              <input type="file" id="filePriceMaster" accept=".xlsx,.xls" class="hidden" onchange="importPriceMaster(event)">
-              <button class="admin-only" onclick="document.getElementById('filePriceMaster').click()">📥 Import Excel</button>
-            </div>
+  <label>📅 เดือน
+    <input type="month" id="pmMonth" onchange="onPMonthChange()">
+  </label>
+  <label>NC ลด
+    <input type="number" id="pmNcDiscount" value="1" step="0.01" style="width:80px" onchange="onPMNcDiscountChange()">
+    บาท
+  </label>
+  <!-- ❌ ลบปุ่ม Sync — ใช้ auto-copy แทน -->
+  <!-- <button class="primary" onclick="syncPriceMaster()">🔄 สร้างราคาทั้งหมด</button> -->
+  <button onclick="exportPriceMaster()">📤 Export Excel</button>
+  <input type="file" id="filePriceMaster" accept=".xlsx,.xls" class="hidden" onchange="importPriceMaster(event)">
+  <button class="admin-only" onclick="document.getElementById('filePriceMaster').click()">📥 Import Excel</button>
+</div>
 
             <div id="pmMsg"></div>
             <div id="pmBody"></div>
