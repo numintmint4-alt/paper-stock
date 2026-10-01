@@ -18,6 +18,7 @@ let selectedCustomers = [];
 let allCustomersList = [];
 
 // ================= MONTH FILTER =================
+// ✅ แก้จุดที่ 1: ใช้เดือน Report Title เป็น default (ไม่ใช่ today)
 function loadMonthFilter() {
   const yearEl = $('filterYear');
   const yearCE = yearEl ? Number(yearEl.value) - 543 : new Date().getFullYear();
@@ -27,13 +28,16 @@ function loadMonthFilter() {
     allMonthsList.push(`${yearCE}-${pad(m)}`);
   }
 
-  // default: 3 เดือนก่อนเดือนปัจจุบัน
+  // ✅ default = 3 เดือนก่อน "เดือนของ Report Title" (titleMonth/titleYear)
+  //    ไม่ใช่ today — กันบั๊กวันที่ 1 ของเดือนใหม่
   if (selectedMonths.length === 0) {
-    const now = new Date();
-    const curY = now.getFullYear();
-    const curM = now.getMonth() + 1;
-    if (curY === yearCE) {
-      let m = curM;
+    const titleMEl = $('titleMonth');
+    const titleYEl = $('titleYear');
+    const baseY = titleYEl ? Number(titleYEl.value) - 543 : new Date().getFullYear();
+    const baseM = titleMEl ? Number(titleMEl.value) : (new Date().getMonth() + 1);
+
+    if (baseY === yearCE) {
+      let m = baseM;
       for (let i = 0; i < 3; i++) {
         m -= 1;
         if (m <= 0) m += 12;
@@ -129,11 +133,16 @@ function clearAllMonths() { selectedMonths = []; renderMonthList(); updateMonthL
 function onYearChange() { selectedMonths = []; loadMonthFilter(); }
 
 // ================= SIZE FILTER =================
-function loadSizeFilter() {
+// ✅ แก้จุดที่ 2: loadSizeFilter() เป็น async + retry มี limit
+async function loadSizeFilter() {
+  // ✅ retry แบบมี limit (กัน infinite loop)
   if (!masterCache || masterCache.length === 0) {
     console.log('[SizeFilter] masterCache ว่าง — รอ 300ms แล้วลองใหม่');
-    setTimeout(loadSizeFilter, 300);
-    return;
+    await new Promise(r => setTimeout(r, 300));
+    if (!masterCache || masterCache.length === 0) {
+      console.warn('[SizeFilter] masterCache ยังว่างหลัง retry — ข้าม');
+      return;
+    }
   }
 
   allSizesList = [...new Set(
@@ -226,13 +235,10 @@ function getSelectedSizes() { return selectedSizes; }
 
 // ================= CUSTOMER FILTER (ใหม่) =================
 function loadCustomerFilter(custList) {
-  // อัปเดต allCustomersList — เก็บค่าที่เคยเลือกไว้ (selectedCustomers) ไม่ให้หาย
   if (Array.isArray(custList) && custList.length > 0) {
-    // รวมรายชื่อใหม่ + ค่าที่เคยเลือกไว้ (ถ้าหลุดจาก list ใหม่ ให้คงไว้)
     const merged = new Set([...custList, ...selectedCustomers]);
     allCustomersList = [...merged].sort();
   } else {
-    // ถ้าไม่มีข้อมูลเลย ก็ยังคงค่าที่เคยเลือกไว้
     if (allCustomersList.length === 0) allCustomersList = [...selectedCustomers];
   }
 
@@ -273,7 +279,6 @@ function renderCustomerList() {
   const list = $('customerList');
   if (!list) return;
 
-  // เพิ่ม __GENERAL__ เป็นตัวเลือกแรกเสมอ (ถ้ายังไม่มี)
   const displayList = ['__GENERAL__', ...allCustomersList.filter(c => c !== '__GENERAL__')];
 
   if (displayList.length === 0) {
@@ -351,7 +356,6 @@ function getSelectedCustomers() {
 }
 
 // ================= TITLE BUILDER =================
-// ✅ จุดที่ 1: เปลี่ยนชื่อหัวข้อ
 function updateReportTitle() {
   const mEl = $('titleMonth');
   const yEl = $('titleYear');
@@ -406,7 +410,6 @@ async function renderMatrix() {
     return q;
   });
 
-  // ✅ สร้างรายชื่อลูกค้าจาก allUsage แล้วส่งให้ loadCustomerFilter
   const custSet = new Set();
   allUsage.forEach(u => {
     const c = (u.roll_for_customer || '').trim();
@@ -415,7 +418,6 @@ async function renderMatrix() {
   const custList = [...custSet].sort();
   loadCustomerFilter(custList);
 
-  // ✅ กรองลูกค้าตาม selectedCustomers
   let usage = allUsage;
   if (customers.length > 0) {
     usage = allUsage.filter(u => {
@@ -428,14 +430,12 @@ async function renderMatrix() {
   const mByCode = {};
   masterCache.forEach(m => mByCode[m.item_code] = m);
 
-  // group by item_code + usage_date
   const daily = {};
   usage.forEach(u => {
     const key = u.item_code + '|' + u.usage_date;
     daily[key] = (daily[key] || 0) + Number(u.used_kgs);
   });
 
-  // max ต่อ item_code
   const perItem = {};
   Object.entries(daily).forEach(([k, kg]) => {
     const code = k.split('|')[0];
@@ -446,7 +446,6 @@ async function renderMatrix() {
     if (!perItem[code] || rolls > perItem[code]) perItem[code] = rolls;
   });
 
-  // matrix
   const rowSet = new Map(), colSet = new Set(), cells = {};
   Object.entries(perItem).forEach(([code, maxVal]) => {
     const m = mByCode[code];
@@ -457,20 +456,17 @@ async function renderMatrix() {
     cells[k] = (cells[k] || 0) + maxVal;
   });
 
-  // rowKeys + filter Gradegrams
   let rowKeys = [...rowSet.keys()].sort((a, b) => a.localeCompare(b));
   if (selectedGradesInMatrix.length > 0) {
     rowKeys = rowKeys.filter(rk => selectedGradesInMatrix.includes(rk));
   }
 
-  // colKeys2 จาก colSet + filter Size
   let colKeys2 = [...colSet].sort((a, b) => a - b);
   const selectedSizesInMatrix = getSelectedSizes();
   if (selectedSizesInMatrix.length > 0) {
     colKeys2 = colKeys2.filter(s => selectedSizesInMatrix.includes(s));
   }
 
-  // คำนวณ totals จาก colKeys2
   const rowTotals2 = {}, colTotals2 = {};
   let grand2 = 0;
 
@@ -491,7 +487,6 @@ async function renderMatrix() {
     return;
   }
 
-  // render
   let html = '<div class="report-wrap"><table class="report-table"><thead><tr><th class="grade-col">Gradegrams</th>';
   colKeys2.forEach(s => html += `<th>${s}</th>`);
   html += '<th class="total-col">Total</th></tr></thead><tbody>';
@@ -502,7 +497,6 @@ async function renderMatrix() {
     colKeys2.forEach(s => {
       const v = cells[rk + '|' + s];
       if (!v) html += '<td class="empty">-</td>';
-      // ✅ จุดที่ 3.1: ใช้ data-tip สำหรับ custom tooltip
       else html += `<td class="clickable" data-tip="Gradegrams ${esc(rk)} · Size ${s}" onclick="openDrill('${esc(rk)}',${s})">${Number(v).toFixed(2)}</td>`;
     });
     html += `<td class="total-col">${Number(rowTotals2[rk] || 0).toFixed(2)}</td></tr>`;
@@ -513,7 +507,6 @@ async function renderMatrix() {
   html += `<div class="report-foot">แสดงเป็นจำนวนม้วน · โหมด: ${mode === 'full' ? 'ม้วนเต็ม' : 'ใช้จริง'} · ยอดสูงสุดต่อวัน</div>`;
   $('matrixBody').innerHTML = html;
 
-  // snapshot data
   currentSnapshotData = [];
   rowKeys.forEach(rk => {
     colKeys2.forEach(s => {
@@ -524,6 +517,7 @@ async function renderMatrix() {
 }
 
 // ================= SNAPSHOT =================
+// ✅ แก้จุดที่ 4: saveStockLevelSnapshot() — ใช้ titleMonth/titleYear + fallback
 async function saveStockLevelSnapshot() {
   const title = getCurrentTitle();
   const msgEl = $('snapshotMsg');
@@ -560,10 +554,18 @@ async function saveStockLevelSnapshot() {
     finalTitle = `${title}/${n}`;
   }
 
-  // ✅ ใช้เดือนของ Title เป็น months (ไม่ใช่ selectedMonths ที่เป็นเดือนที่คำนวณ)
+  // ✅ เพิ่ม: ถ้า titleMonth/titleYear ว่าง → fallback ไป selectedMonths
   const mEl = $('titleMonth');
   const yEl = $('titleYear');
-  const titleMonthYM = `${Number(yEl.value) - 543}-${pad(Number(mEl.value))}`;
+  let titleMonthYM;
+  if (mEl?.value && yEl?.value) {
+    titleMonthYM = `${Number(yEl.value) - 543}-${pad(Number(mEl.value))}`;
+  } else if (selectedMonths.length > 0) {
+    titleMonthYM = selectedMonths[selectedMonths.length - 1];  // เดือนล่าสุด
+  } else {
+    if (msgEl) msgEl.innerHTML = '<div class="msg err">⚠ ยังไม่ได้เลือกเดือน</div>';
+    return;
+  }
 
   const payload = {
     title: finalTitle,
@@ -672,7 +674,6 @@ async function viewSnapshot(id) {
   html += `<td class="total-col">${Number(grand).toFixed(2)}</td></tr>`;
   html += '</tbody></table></div>';
 
-  // ✅ เพิ่มแสดงลูกค้าที่เคยกรองไว้
   const dt = new Date(data.created_at).toLocaleString('th-TH');
   let customerDisplay = 'ทั้งหมด';
   if (data.customer) {
@@ -713,8 +714,6 @@ function printSnapshot() { window.print(); }
       if (typeof loadStockLevelSnapshots === 'function') {
         loadStockLevelSnapshots();
       }
-      // ✅ จุดที่ 5: เรียก updateReportTitle() ตอน init
-      //    เพื่อให้หัวข้อตรงกับค่าที่ตั้งไว้ใน .report-title (index.html)
       if (typeof updateReportTitle === 'function') {
         updateReportTitle();
         console.log('[StockLevel] ✅ updateReportTitle() called');
@@ -727,20 +726,17 @@ function printSnapshot() { window.print(); }
 
 // ═══════════════════════════════════════════════════════════════
 // PRINT HANDLER — เปลี่ยน <select> เป็น <span> ตอนพิมพ์
-// เพื่อควบคุมช่องว่างระหว่าง "ประจำเดือน [เดือน] [ปี]"
 // ═══════════════════════════════════════════════════════════════
 window.addEventListener('beforeprint', () => {
   const mSel = document.getElementById('titleMonth');
   const ySel = document.getElementById('titleYear');
   if (!mSel || !ySel) return;
 
-  // เก็บ reference ไว้ restore
   window._printBackup = {
     monthSel: mSel,
     yearSel: ySel
   };
 
-  // สร้าง span แทน <select>
   const mSpan = document.createElement('span');
   mSpan.textContent = mSel.options[mSel.selectedIndex].text;
   mSpan.className = 'title-select-print';
@@ -751,7 +747,6 @@ window.addEventListener('beforeprint', () => {
   ySpan.className = 'title-select-print';
   ySpan.id = 'titleYearPrint';
 
-  // แทนที่ใน DOM
   mSel.parentNode.replaceChild(mSpan, mSel);
   ySel.parentNode.replaceChild(ySpan, ySel);
 });
