@@ -7,7 +7,7 @@
 // + Add PO Items (Phase 3)
 // + Inline Edit Items (Phase 3E)
 // + closePOForm() — แก้ไข → กลับ PO List
-// + Price Fallback — เดือนก่อนหน้า (1 เดือน)
+// + Price Fallback — ✅ ใช้ราคาเดือนก่อนหน้า priority สูงสุด
 // ═══════════════════════════════════════════════════════════════
 
 let poCache = [];
@@ -108,41 +108,49 @@ async function loadPOSuppliers() {
 }
 
 // ================= PRICE MASTER =================
-// ✅ แก้: fallback ไปเดือนก่อนหน้า (1 เดือน) ถ้าเดือนปัจจุบันไม่มีราคา
+// ✅ โหลดราคา 2 เดือน — ใช้เดือนก่อนหน้า priority สูงสุด
+//    (เพราะราคาเดือนปัจจุบันอาจผิด / auto-copy มาแล้วอาจไม่ตรง)
 async function loadPriceMaster() {
   try {
-    // 1) ลองดึงราคาของเดือนที่เลือกก่อน
-    const { data: current, error: err1 } = await supabase
-      .from('price_master')
-      .select('*')
-      .eq('month', poSelectedMonth)
-      .eq('is_active', true);
-    if (err1) throw err1;
-
-    if (current && current.length > 0) {
-      poPriceMaster = current;
-      console.log('[PriceMaster] ✅ ใช้ราคาเดือน ' + poSelectedMonth + ' (' + current.length + ' รายการ)');
-      return;
-    }
-
-    // 2) ถ้าเดือนปัจจุบันไม่มี → fallback ไปเดือนก่อนหน้า (1 เดือน)
     const prevMonth = _getPrevMonth(poSelectedMonth);
-    console.log('[PriceMaster] เดือน ' + poSelectedMonth + ' ไม่มีราคา → fallback ' + prevMonth);
 
-    const { data: prev, error: err2 } = await supabase
-      .from('price_master')
-      .select('*')
-      .eq('month', prevMonth)
-      .eq('is_active', true);
-    if (err2) throw err2;
+    const [currentRes, prevRes] = await Promise.all([
+      supabase.from('price_master').select('*')
+        .eq('month', poSelectedMonth).eq('is_active', true),
+      supabase.from('price_master').select('*')
+        .eq('month', prevMonth).eq('is_active', true)
+    ]);
 
-    if (prev && prev.length > 0) {
-      poPriceMaster = prev;
-      console.log('[PriceMaster] ✅ fallback ใช้ราคาเดือน ' + prevMonth + ' (' + prev.length + ' รายการ)');
-    } else {
-      poPriceMaster = [];
-      console.warn('[PriceMaster] ⚠ ไม่มีราคาทั้ง ' + poSelectedMonth + ' และ ' + prevMonth);
-    }
+    if (currentRes.error) throw currentRes.error;
+    if (prevRes.error) throw prevRes.error;
+
+    const current = currentRes.data || [];
+    const prev = prevRes.data || [];
+
+    // ✅ Map เริ่มจากเดือนปัจจุบัน (ราคา > 0)
+    const mergedMap = {};
+    current.forEach(c => {
+      if (Number(c.price_normal) > 0) {
+        mergedMap[c.gradegram] = c;
+      }
+    });
+
+    // ✅ เดือนก่อนหน้า → ทับเสมอ (priority สูงสุด เพราะเดือนปัจจุบันอาจผิด)
+    prev.forEach(p => {
+      if (Number(p.price_normal) > 0) {
+        mergedMap[p.gradegram] = p;
+      }
+    });
+
+    poPriceMaster = Object.values(mergedMap);
+
+    const fromPrev = poPriceMaster.filter(p => p.month === prevMonth).length;
+    const fromCurrent = poPriceMaster.filter(p => p.month === poSelectedMonth).length;
+
+    console.log(
+      `[PriceMaster] ✅ โหลด ${poPriceMaster.length} ราคา` +
+      ` (จาก ${prevMonth}: ${fromPrev} · จาก ${poSelectedMonth}: ${fromCurrent})`
+    );
   } catch (e) {
     console.warn('loadPriceMaster:', e);
     poPriceMaster = [];
