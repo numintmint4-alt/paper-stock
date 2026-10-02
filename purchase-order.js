@@ -10,7 +10,7 @@
 // + 🔄 Re-price — ดึงราคาใหม่จาก Price Master (ใน PO Form)
 // ✅ NEW: โหลดราคาตามเดือนของ PO (ref_receive) — ไม่ merge ไม่ fallback
 // ✅ NEW: เก็บ scroll position + focus กลับหลัง render (Inline Edit)
-// ✅ NEW: Drag & Drop เรียงลำดับ PO Items (Sortable.js)
+// ✅ NEW: Drag & Drop เรียงลำดับ PO Items (Sortable.js) — ใช้ uid แทน index
 // ═══════════════════════════════════════════════════════════════
 
 let poCache = [];
@@ -61,8 +61,8 @@ function fmtDateTH(d) {
 
 // ✅ แปลงวันที่ (YYYY-MM-DD) → เดือน (YYYY-MM)
 function getMonthFromDate(dateStr) {
-  if (!dateStr) return poSelectedMonth;   // fallback ไปเดือนที่เลือก
-  const s = String(dateStr).slice(0, 7);  // 'YYYY-MM-DD' → 'YYYY-MM'
+  if (!dateStr) return poSelectedMonth;
+  const s = String(dateStr).slice(0, 7);
   return s || poSelectedMonth;
 }
 
@@ -108,7 +108,6 @@ async function loadPOSuppliers() {
 }
 
 // ================= PRICE MASTER =================
-// ✅ โหลดราคา "เฉพาะเดือนที่ระบุ" — ไม่ merge ไม่ fallback
 async function loadPriceMasterForMonth(month) {
   try {
     console.log('[PriceMaster] → ดึงราคาเดือน: ' + month);
@@ -131,7 +130,6 @@ async function loadPriceMasterForMonth(month) {
   }
 }
 
-// ✅ โหลดราคาตามเดือนที่เลือกใน dropdown (ใช้ตอน initPO / เปลี่ยนเดือน)
 async function loadPriceMaster() {
   return await loadPriceMasterForMonth(poSelectedMonth);
 }
@@ -252,7 +250,6 @@ async function renderPOList() {
   }
 }
 
-// ✅ Render rows
 function renderPOListRows(rows) {
   const tbody = $('poListTbody');
   if (!tbody) return;
@@ -293,7 +290,6 @@ function renderPOListRows(rows) {
   tbody.innerHTML = html;
 }
 
-// ✅ Filter Change Handler
 function onPOFilterChange() {
   const ponoEl = $('poFilterPONoInput');
   const fromEl = $('poFilterDateFrom');
@@ -306,26 +302,21 @@ function onPOFilterChange() {
   applyPOFiltersAndRender();
 }
 
-// ✅ Apply filters
 function applyPOFiltersAndRender() {
   let result = [...poCache];
 
   if (poFilterPONo) {
     result = result.filter(p => String(p.po_no).toLowerCase().includes(poFilterPONo.toLowerCase()));
   }
-
   if (poFilterDateFrom) {
     result = result.filter(p => p.po_date && p.po_date.slice(0, 10) === poFilterDateFrom);
   }
-
   if (poFilterDateTo) {
     result = result.filter(p => p.ref_receive && p.ref_receive.slice(0, 10) === poFilterDateTo);
   }
-
   if (poFilterSup.length > 0) {
     result = result.filter(p => poFilterSup.includes(p.sup_code));
   }
-
   if (poFilterStatus.length > 0) {
     result = result.filter(p => poFilterStatus.includes(p.status));
   }
@@ -333,7 +324,6 @@ function applyPOFiltersAndRender() {
   renderPOListRows(result);
 }
 
-// ✅ Sup. filter list
 function renderPOSupFilterList(supList) {
   const list = $('poFilterSupList');
   if (!list) return;
@@ -393,7 +383,6 @@ function clearAllPOSups() {
   applyPOFiltersAndRender();
 }
 
-// ✅ Status filter list
 function renderPOStatusFilterList() {
   const list = $('poFilterStatusList');
   if (!list) return;
@@ -450,7 +439,6 @@ function clearAllPOStatuses() {
   applyPOFiltersAndRender();
 }
 
-// ✅ Dropdown helper
 function _attachPOFilterDropdown(btnId, dropdownId, boxId, docKey) {
   const btn = $(btnId);
   const dropdown = $(dropdownId);
@@ -487,7 +475,6 @@ async function openPOForm(poId) {
       const { data, error } = await supabase.rpc('get_purchase_order_detail', { p_po_id: poId });
       if (error) throw error;
 
-      // ✅ โหลดราคาตามเดือนของ PO (จาก ref_receive)
       const poMonth = getMonthFromDate(data.header.ref_receive || data.header.po_date);
       console.log('[POForm] โหลดราคาเดือน ' + poMonth + ' (จาก ref_receive: ' + data.header.ref_receive + ')');
       await loadPriceMasterForMonth(poMonth);
@@ -641,7 +628,6 @@ async function openPOFormFromAlert(alertData) {
     byDate[d].push(it);
   });
 
-  // ✅ โหลดราคาตามเดือนของวันรับ (เอาวันแรก)
   const firstDate = Object.keys(byDate).sort()[0];
   const poMonth = getMonthFromDate(firstDate);
   console.log('[POForm] สร้าง PO จาก Alert → โหลดราคาเดือน ' + poMonth);
@@ -951,7 +937,7 @@ let _editItemsRows = [];
 let _editPOHeader = null;
 
 // ═══════════════════════════════════════════════════════════════
-// ✅ Drag & Drop เรียงลำดับ PO Items
+// ✅ Drag & Drop เรียงลำดับ PO Items (ใช้ uid แทน index)
 // ═══════════════════════════════════════════════════════════════
 let _poItemsSortable = null;
 
@@ -979,19 +965,49 @@ function initPOItemsSortable() {
     chosenClass: 'sortable-chosen',
     dragClass: 'sortable-drag',
     onEnd: function (evt) {
-      const oldIndex = evt.oldIndex;
-      const newIndex = evt.newIndex;
+      // ✅ ดึง uid จาก element ที่ลาก (ใช้ uid แทน index)
+      const draggedEl = evt.item;
+      const draggedUid = draggedEl?.dataset?.rowUid;
 
-      if (oldIndex === newIndex) return;
+      if (!draggedUid) {
+        console.warn('[PO Sort] ไม่พบ data-row-uid ใน element ที่ลาก');
+        return;
+      }
 
-      // ✅ สลับตำแหน่งใน array
-      const movedRow = _editItemsRows.splice(oldIndex, 1)[0];
-      _editItemsRows.splice(newIndex, 0, movedRow);
+      // ✅ หา index ปัจจุบันใน array
+      const fromIdx = _editItemsRows.findIndex(r => r.uid === draggedUid);
+      if (fromIdx === -1) {
+        console.warn('[PO Sort] ไม่พบ uid ใน _editItemsRows:', draggedUid);
+        return;
+      }
 
-      // ✅ Render ใหม่ → อัปเดตเลข # ให้ตรง
+      // ✅ เอา row ออกจาก array ก่อน
+      const [movedRow] = _editItemsRows.splice(fromIdx, 1);
+
+      // ✅ หา index ใหม่จาก DOM
+      const prevEl = draggedEl.previousElementSibling;
+      const nextEl = draggedEl.nextElementSibling;
+
+      let toIdx;
+
+      if (prevEl && prevEl.dataset.rowUid) {
+        const prevIdx = _editItemsRows.findIndex(r => r.uid === prevEl.dataset.rowUid);
+        toIdx = prevIdx === -1 ? _editItemsRows.length : prevIdx + 1;
+      } else if (nextEl && nextEl.dataset.rowUid) {
+        const nextIdx = _editItemsRows.findIndex(r => r.uid === nextEl.dataset.rowUid);
+        toIdx = nextIdx === -1 ? 0 : nextIdx;
+      } else {
+        toIdx = _editItemsRows.length;
+      }
+
+      // ✅ แทรกกลับเข้า array ที่ตำแหน่งใหม่
+      _editItemsRows.splice(toIdx, 0, movedRow);
+
+      console.log('[PO Sort] ✅ ย้าย uid=' + draggedUid + ' จาก index ' + fromIdx + ' → ' + toIdx);
+      console.log('[PO Sort] ✅ ลำดับใหม่:', _editItemsRows.map(r => r.uid));
+
+      // ✅ Render ใหม่
       renderPOFormTable();
-
-      console.log('[PO Sort] ย้ายจากตำแหน่ง ' + oldIndex + ' → ' + newIndex);
     }
   });
 }
@@ -1026,8 +1042,6 @@ function renderPOFormContent(header, items) {
 
 // ═══════════════════════════════════════════════════════════════
 // ✅ Render ตาราง items + ปุ่ม
-// ✅ NEW: เก็บ/คืน scroll position + จำ input ที่ focus
-// ✅ NEW: เพิ่ม drag handle + id="poItemsTbody"
 // ═══════════════════════════════════════════════════════════════
 function renderPOFormTable() {
   const container = $('poFormBody');
@@ -1042,7 +1056,6 @@ function renderPOFormTable() {
   const totalCount = activeRows.length;
   const remaining = 15 - totalCount;
 
-  // ✅ ระบุเดือนของราคาที่ใช้อยู่
   const priceMonth = getMonthFromDate(header.ref_receive || header.po_date);
 
   let html = `<div class="msg info" style="margin-bottom:12px">
@@ -1182,7 +1195,7 @@ function renderPOFormTable() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 🔄 RE-PRICE — ดึงราคาจาก Price Master มาใส่ PO ใหม่
+// 🔄 RE-PRICE
 // ═══════════════════════════════════════════════════════════════
 async function repricePO() {
   if (!_editItemsRows || !_editItemsRows.length) {
@@ -1190,7 +1203,6 @@ async function repricePO() {
     return;
   }
 
-  // ✅ โหลดราคาตามเดือนของ PO (จาก _editPOHeader.ref_receive)
   const poMonth = getMonthFromDate(_editPOHeader?.ref_receive || _editPOHeader?.po_date);
 
   if (!confirm(
@@ -1208,7 +1220,7 @@ async function repricePO() {
   const changes = [];
 
   _editItemsRows.forEach(row => {
-    if (row.removed || row.isNew) return;   // ข้ามแถวที่ลบ / แถวใหม่
+    if (row.removed || row.isNew) return;
 
     const newPrice = getPriceFromMaster(
       row.gradegram,
@@ -1283,21 +1295,18 @@ function onEditRowChange(uid, field, value) {
     row.size = '';
   }
 
-  // ✅ จำ input ที่ active อยู่ก่อน render
   const activeEl = document.activeElement;
   const activeField = activeEl?.dataset?.field;
   const activeUid = activeEl?.dataset?.uid;
 
   renderPOFormTable();
 
-  // ✅ focus กลับไปที่ input เดิม (ถ้ามี)
   if (activeField && activeUid) {
     const newEl = document.querySelector(
       `[data-uid="${activeUid}"][data-field="${activeField}"]`
     );
     if (newEl) {
       newEl.focus();
-      // ถ้าเป็น input → เก็บ cursor ตำแหน่งเดิม
       if (newEl.setSelectionRange) {
         const len = newEl.value?.length || 0;
         newEl.setSelectionRange(len, len);
@@ -1484,7 +1493,6 @@ async function saveEditPOItems(btnEl) {
   try {
     const { data: detail } = await supabase.rpc('get_purchase_order_detail', { p_po_id: poEditingId });
     if (detail) {
-      // ✅ โหลดราคาเดือนของ PO นี้ใหม่หลัง save (เผื่อราคาเปลี่ยน)
       const poMonth = getMonthFromDate(detail.header.ref_receive || detail.header.po_date);
       await loadPriceMasterForMonth(poMonth);
       renderPOFormContent(detail.header, detail.items);
@@ -1626,7 +1634,6 @@ async function openPODetail(poId) {
 // ═══════════════════════════════════════════════════════════════
 // ================= ประวัติ PO ที่ถูกลบ =================
 // ═══════════════════════════════════════════════════════════════
-
 async function openDeletedPOList() {
   $('poDetailTitle').textContent = '📜 ประวัติ PO ที่ถูกลบ';
   $('poDetailBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
@@ -1793,7 +1800,7 @@ async function onPOMonthChange() {
   await renderPOList();
 }
 
-// ================= CANCEL PO FORM (จาก Alert → เด้งกลับ Alert) =================
+// ================= CANCEL PO FORM =================
 function cancelPOForm() {
   closeModal('modalPOForm');
 
@@ -1807,7 +1814,6 @@ function cancelPOForm() {
   if (alertBtn) alertBtn.click();
 }
 
-// ✅ ปิดฟอร์ม PO (แก้ไข → อยู่หน้า PO List)
 function closePOForm() {
   closeModal('modalPOForm');
   poEditingId = null;
@@ -1920,7 +1926,6 @@ async function exportPOToExcel_Async() {
 // ═══════════════════════════════════════════════════════════════
 // ================= ADD PO ITEMS (Phase 3) =====================
 // ═══════════════════════════════════════════════════════════════
-
 let _addItemsRows = [];
 
 async function openAddPOItemsModal() {
