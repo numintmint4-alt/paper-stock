@@ -9,6 +9,8 @@
 // + closePOForm() — แก้ไข → กลับ PO List
 // + 🔄 Re-price — ดึงราคาใหม่จาก Price Master (ใน PO Form)
 // ✅ NEW: โหลดราคาตามเดือนของ PO (ref_receive) — ไม่ merge ไม่ fallback
+// ✅ NEW: เก็บ scroll position + focus กลับหลัง render (Inline Edit)
+// ✅ NEW: Drag & Drop เรียงลำดับ PO Items (Sortable.js)
 // ═══════════════════════════════════════════════════════════════
 
 let poCache = [];
@@ -948,6 +950,52 @@ async function _doSaveAllPOs(posList, alertData, btnEl) {
 let _editItemsRows = [];
 let _editPOHeader = null;
 
+// ═══════════════════════════════════════════════════════════════
+// ✅ Drag & Drop เรียงลำดับ PO Items
+// ═══════════════════════════════════════════════════════════════
+let _poItemsSortable = null;
+
+function initPOItemsSortable() {
+  const tbody = document.getElementById('poItemsTbody');
+  if (!tbody) return;
+
+  // ✅ destroy instance เก่า (ถ้ามี)
+  if (_poItemsSortable) {
+    try { _poItemsSortable.destroy(); } catch (e) { /* ignore */ }
+    _poItemsSortable = null;
+  }
+
+  // ✅ ตรวจว่ามี Sortable library หรือยัง
+  if (typeof Sortable === 'undefined') {
+    console.warn('[PO Sort] ยังไม่ได้โหลด Sortable.js — ข้ามการ drag & drop');
+    return;
+  }
+
+  // ✅ สร้าง Sortable ใหม่
+  _poItemsSortable = new Sortable(tbody, {
+    animation: 150,
+    handle: '.drag-handle',
+    ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    dragClass: 'sortable-drag',
+    onEnd: function (evt) {
+      const oldIndex = evt.oldIndex;
+      const newIndex = evt.newIndex;
+
+      if (oldIndex === newIndex) return;
+
+      // ✅ สลับตำแหน่งใน array
+      const movedRow = _editItemsRows.splice(oldIndex, 1)[0];
+      _editItemsRows.splice(newIndex, 0, movedRow);
+
+      // ✅ Render ใหม่ → อัปเดตเลข # ให้ตรง
+      renderPOFormTable();
+
+      console.log('[PO Sort] ย้ายจากตำแหน่ง ' + oldIndex + ' → ' + newIndex);
+    }
+  });
+}
+
 // ================= RENDER PO FORM (EDIT) =================
 function renderPOFormContent(header, items) {
   if (!header) {
@@ -976,10 +1024,18 @@ function renderPOFormContent(header, items) {
   renderPOFormTable();
 }
 
+// ═══════════════════════════════════════════════════════════════
 // ✅ Render ตาราง items + ปุ่ม
+// ✅ NEW: เก็บ/คืน scroll position + จำ input ที่ focus
+// ✅ NEW: เพิ่ม drag handle + id="poItemsTbody"
+// ═══════════════════════════════════════════════════════════════
 function renderPOFormTable() {
   const container = $('poFormBody');
   if (!container) return;
+
+  // ✅ เก็บ scroll position ก่อน render
+  const scrollWrap = container.querySelector('.report-wrap');
+  const savedScrollTop = scrollWrap ? scrollWrap.scrollTop : 0;
 
   const header = _editPOHeader;
   const activeRows = _editItemsRows.filter(r => !r.removed);
@@ -1000,6 +1056,7 @@ function renderPOFormTable() {
     <table class="add-items-table">
       <thead>
         <tr>
+          <th style="width:32px" title="ลากเพื่อจัดลำดับ">⋮⋮</th>
           <th style="width:40px">#</th>
           <th style="width:130px">Gradegram</th>
           <th style="width:80px">Size</th>
@@ -1011,7 +1068,7 @@ function renderPOFormTable() {
           <th style="width:50px"></th>
         </tr>
       </thead>
-      <tbody>`;
+      <tbody id="poItemsTbody">`;
 
   const uniqueGradegrams = [...new Set(masterCache.map(m => normalizeGrade(m.grade) + m.gram))].sort();
 
@@ -1031,33 +1088,40 @@ function renderPOFormTable() {
     ).join('');
 
     const gradegramCell = row.isNew
-      ? `<select onchange="onEditRowChange('${row.uid}', 'gradegram', this.value)">
+      ? `<select data-uid="${row.uid}" data-field="gradegram"
+                 onchange="onEditRowChange('${row.uid}', 'gradegram', this.value)">
            <option value="">-- เลือก --</option>${gradegramOpts}
          </select>`
       : `<b style="color:#1e293b">${esc(row.gradegram)}</b>`;
 
     const sizeCell = row.isNew
-      ? `<select onchange="onEditRowChange('${row.uid}', 'size', this.value)" style="width:80px" ${!row.gradegram ? 'disabled' : ''}>
+      ? `<select data-uid="${row.uid}" data-field="size"
+                 onchange="onEditRowChange('${row.uid}', 'size', this.value)"
+                 style="width:80px" ${!row.gradegram ? 'disabled' : ''}>
            <option value="">--</option>${sizeOpts}
          </select>`
       : `<b>${row.size}</b>`;
 
     html += `<tr data-row-uid="${row.uid}" ${row.isNew ? 'style="background:#eff6ff"' : ''}>
+      <td class="drag-handle" style="text-align:center;cursor:grab;user-select:none;color:#94a3b8;font-size:16px" title="ลากเพื่อจัดลำดับ">⋮⋮</td>
       <td style="text-align:center">${idx + 1}</td>
       <td>${gradegramCell}</td>
       <td>${sizeCell}</td>
       <td>
         <input type="number" value="${row.quantity || ''}" min="1" step="1"
+               data-uid="${row.uid}" data-field="quantity"
                onchange="onEditRowChange('${row.uid}', 'quantity', this.value)"
                style="width:70px;text-align:center">
       </td>
       <td style="text-align:right;color:#dc2626;font-weight:700">
         <input type="number" value="${Number(displayPrice).toFixed(2)}" step="0.01"
+               data-uid="${row.uid}" data-field="price"
                onchange="onEditRowChange('${row.uid}', 'price', this.value)"
                style="width:80px;text-align:right;color:#dc2626;font-weight:700">
       </td>
       <td>
-        <select onchange="onEditRowChange('${row.uid}', 'customer_roll', this.value)">
+        <select data-uid="${row.uid}" data-field="customer_roll"
+                onchange="onEditRowChange('${row.uid}', 'customer_roll', this.value)">
           <option value="normal" ${row.customer_roll === 'normal' ? 'selected' : ''}>ปกติ</option>
           <option value="pump_f" ${row.customer_roll === 'pump_f' ? 'selected' : ''}>ปั้ม F</option>
           <option value="pump_bt" ${row.customer_roll === 'pump_bt' ? 'selected' : ''}>ปั้ม BT</option>
@@ -1065,13 +1129,15 @@ function renderPOFormTable() {
         </select>
       </td>
       <td>
-        <select onchange="onEditRowChange('${row.uid}', 'quality_b', this.value)">
+        <select data-uid="${row.uid}" data-field="quality_b"
+                onchange="onEditRowChange('${row.uid}', 'quality_b', this.value)">
           <option value="normal" ${row.quality_b === 'normal' ? 'selected' : ''}>ปกติ</option>
           <option value="nc" ${row.quality_b === 'nc' ? 'selected' : ''}>NC</option>
         </select>
       </td>
       <td>
         <input type="text" value="${esc(row.note || '')}"
+               data-uid="${row.uid}" data-field="note"
                onchange="onEditRowChange('${row.uid}', 'note', this.value)"
                style="width:100%;min-width:100px">
       </td>
@@ -1104,6 +1170,15 @@ function renderPOFormTable() {
   </div>`;
 
   container.innerHTML = html;
+
+  // ✅ เรียก Sortable ใหม่ทุกครั้งหลัง render
+  initPOItemsSortable();
+
+  // ✅ คืน scroll position หลัง render
+  const newScrollWrap = container.querySelector('.report-wrap');
+  if (newScrollWrap) {
+    newScrollWrap.scrollTop = savedScrollTop;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1197,7 +1272,7 @@ function addEditRow() {
   renderPOFormTable();
 }
 
-// ✅ Change handler
+// ✅ Change handler (พร้อม حفظ focus + cursor)
 function onEditRowChange(uid, field, value) {
   const row = _editItemsRows.find(r => r.uid === uid);
   if (!row) return;
@@ -1208,7 +1283,27 @@ function onEditRowChange(uid, field, value) {
     row.size = '';
   }
 
+  // ✅ จำ input ที่ active อยู่ก่อน render
+  const activeEl = document.activeElement;
+  const activeField = activeEl?.dataset?.field;
+  const activeUid = activeEl?.dataset?.uid;
+
   renderPOFormTable();
+
+  // ✅ focus กลับไปที่ input เดิม (ถ้ามี)
+  if (activeField && activeUid) {
+    const newEl = document.querySelector(
+      `[data-uid="${activeUid}"][data-field="${activeField}"]`
+    );
+    if (newEl) {
+      newEl.focus();
+      // ถ้าเป็น input → เก็บ cursor ตำแหน่งเดิม
+      if (newEl.setSelectionRange) {
+        const len = newEl.value?.length || 0;
+        newEl.setSelectionRange(len, len);
+      }
+    }
+  }
 }
 
 // ✅ Remove row
