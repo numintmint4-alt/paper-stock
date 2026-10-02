@@ -410,8 +410,8 @@ function renderAlertFromCache() {
       </div>
     </div>
   </th>`;
-  html += '<th>Snapshot</th>';
-
+  html += '<th>Stock Level</th>';
+  
   // ✅ Stock Filter
   html += `<th class="th-with-filter">
     <div class="th-filter-wrap" id="alertStockFilterBox">
