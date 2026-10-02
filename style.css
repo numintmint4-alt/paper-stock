@@ -1695,3 +1695,39 @@ th{
   .add-items-table { font-size: 11px; }
   .add-items-table thead th, .add-items-table tbody td { padding: 4px 5px; }
 }
+/* ═══════════════════════════════════════════════════════════ */
+/* ========== DRAG & DROP — PO Items ========== */
+/* ═══════════════════════════════════════════════════════════ */
+
+.add-items-table .drag-handle {
+  cursor: grab;
+  user-select: none;
+  background: var(--surface-soft);
+  color: var(--text-light);
+  font-size: 14px;
+  text-align: center;
+  padding: 0 !important;
+  width: 32px;
+}
+.add-items-table .drag-handle:hover {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.add-items-table .drag-handle:active {
+  cursor: grabbing;
+}
+
+/* ✅ ตอนลาก */
+.sortable-ghost {
+  opacity: 0.4;
+  background: var(--primary-soft) !important;
+}
+.sortable-chosen {
+  background: var(--primary-soft) !important;
+  box-shadow: 0 4px 12px rgba(59,130,246,.3);
+}
+.sortable-drag {
+  opacity: 1 !important;
+  background: #fff !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,.15);
+}
