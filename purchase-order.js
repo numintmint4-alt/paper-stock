@@ -11,10 +11,12 @@
 // ✅ NEW: โหลดราคาตามเดือนของ PO (ref_receive) — ไม่ merge ไม่ fallback
 // ✅ NEW: เก็บ scroll position + focus กลับหลัง render (Inline Edit)
 // ✅ NEW: Drag & Drop เรียงลำดับ PO Items (Sortable.js) — ใช้ uid แทน index
+// ✅ NEW (V10): แก้ไข Header (Sup / วันที่รับ / วันที่ออก) ใน PO Form
 // ═══════════════════════════════════════════════════════════════
 
 let poCache = [];
 let poSuppliers = [];
+let poSuppliersFull = [];   // ✅ NEW: เก็บ {code, name} สำหรับ dropdown
 let poPriceMaster = [];
 let poSelectedMonth = '';
 let poEditingId = null;
@@ -96,14 +98,24 @@ async function loadPOSuppliers() {
   try {
     const { data, error } = await supabase
       .from('paper_suppliers')
-      .select('code')
+      .select('code, name')
       .eq('is_active', true)
       .order('code');
     if (error) throw error;
-    poSuppliers = (data || []).map(s => s.code);
+
+    poSuppliersFull = (data || []).map(s => ({
+      code: s.code,
+      name: s.name || s.code
+    }));
+    poSuppliers = poSuppliersFull.map(s => s.code);
   } catch (e) {
     console.warn('loadPOSuppliers:', e);
-    poSuppliers = ['EKP', 'MKP', 'SCK'];
+    poSuppliersFull = [
+      { code: 'EKP', name: 'EKP' },
+      { code: 'MKP', name: 'MKP' },
+      { code: 'SCK', name: 'SCK' }
+    ];
+    poSuppliers = poSuppliersFull.map(s => s.code);
   }
 }
 
@@ -935,6 +947,7 @@ async function _doSaveAllPOs(posList, alertData, btnEl) {
 // ================= STATE: Edit Items =================
 let _editItemsRows = [];
 let _editPOHeader = null;
+let _editHeaderDirty = false;   // ✅ NEW: flag ว่ามีการแก้ header
 
 // ═══════════════════════════════════════════════════════════════
 // ✅ Drag & Drop เรียงลำดับ PO Items (ใช้ uid แทน index)
@@ -945,19 +958,16 @@ function initPOItemsSortable() {
   const tbody = document.getElementById('poItemsTbody');
   if (!tbody) return;
 
-  // ✅ destroy instance เก่า (ถ้ามี)
   if (_poItemsSortable) {
     try { _poItemsSortable.destroy(); } catch (e) { /* ignore */ }
     _poItemsSortable = null;
   }
 
-  // ✅ ตรวจว่ามี Sortable library หรือยัง
   if (typeof Sortable === 'undefined') {
     console.warn('[PO Sort] ยังไม่ได้โหลด Sortable.js — ข้ามการ drag & drop');
     return;
   }
 
-  // ✅ สร้าง Sortable ใหม่
   _poItemsSortable = new Sortable(tbody, {
     animation: 150,
     handle: '.drag-handle',
@@ -965,7 +975,6 @@ function initPOItemsSortable() {
     chosenClass: 'sortable-chosen',
     dragClass: 'sortable-drag',
     onEnd: function (evt) {
-      // ✅ ดึง uid จาก element ที่ลาก (ใช้ uid แทน index)
       const draggedEl = evt.item;
       const draggedUid = draggedEl?.dataset?.rowUid;
 
@@ -974,17 +983,14 @@ function initPOItemsSortable() {
         return;
       }
 
-      // ✅ หา index ปัจจุบันใน array
       const fromIdx = _editItemsRows.findIndex(r => r.uid === draggedUid);
       if (fromIdx === -1) {
         console.warn('[PO Sort] ไม่พบ uid ใน _editItemsRows:', draggedUid);
         return;
       }
 
-      // ✅ เอา row ออกจาก array ก่อน
       const [movedRow] = _editItemsRows.splice(fromIdx, 1);
 
-      // ✅ หา index ใหม่จาก DOM
       const prevEl = draggedEl.previousElementSibling;
       const nextEl = draggedEl.nextElementSibling;
 
@@ -1000,13 +1006,11 @@ function initPOItemsSortable() {
         toIdx = _editItemsRows.length;
       }
 
-      // ✅ แทรกกลับเข้า array ที่ตำแหน่งใหม่
       _editItemsRows.splice(toIdx, 0, movedRow);
 
       console.log('[PO Sort] ✅ ย้าย uid=' + draggedUid + ' จาก index ' + fromIdx + ' → ' + toIdx);
       console.log('[PO Sort] ✅ ลำดับใหม่:', _editItemsRows.map(r => r.uid));
 
-      // ✅ Render ใหม่
       renderPOFormTable();
     }
   });
@@ -1020,6 +1024,7 @@ function renderPOFormContent(header, items) {
   }
 
   _editPOHeader = header;
+  _editHeaderDirty = false;
 
   const activeItems = items.filter(it => it.status !== 'cancelled');
   _editItemsRows = activeItems.map((it, idx) => ({
@@ -1041,7 +1046,7 @@ function renderPOFormContent(header, items) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ✅ Render ตาราง items + ปุ่ม
+// ✅ Render ตาราง items + ปุ่ม + Info Bar (Editable)
 // ═══════════════════════════════════════════════════════════════
 function renderPOFormTable() {
   const container = $('poFormBody');
@@ -1058,11 +1063,45 @@ function renderPOFormTable() {
 
   const priceMonth = getMonthFromDate(header.ref_receive || header.po_date);
 
-  let html = `<div class="msg info" style="margin-bottom:12px">
-    <b>✏️ แก้ไข PO — ${esc(header.po_no)}</b><br>
-    📦 มีอยู่ <b>${totalCount}</b> รายการ · เพิ่มได้อีก <b style="color:#dc2626">${remaining > 0 ? remaining : 0}</b> รายการ<br>
-    Sup: <b>${esc(header.sup_code)}</b> · วันที่รับ: <b>${fmtDateTH(header.ref_receive)}</b> · สถานะ: <b>${header.status}</b><br>
-    💰 ราคาที่ใช้: <b style="color:#b45309">เดือน ${priceMonth}</b> · โหลด <b>${poPriceMaster.length}</b> รายการ
+  // ✅ สร้าง options สำหรับ Supplier dropdown
+  const supOptions = poSuppliersFull.map(s =>
+    `<option value="${esc(s.code)}" ${s.code === header.sup_code ? 'selected' : ''}>${esc(s.code)} — ${esc(s.name)}</option>`
+  ).join('');
+
+  let html = `<div class="po-info-bar">
+    <div class="po-info-row">
+      <b>✏️ แก้ไข PO — ${esc(header.po_no)}</b>
+      <span class="po-info-badge">สถานะ: <b>${header.status}</b></span>
+    </div>
+
+    <div class="po-info-grid">
+      <div class="po-info-field">
+        <label>ผู้ขาย (Supplier):</label>
+        <select id="editPOSup" class="po-info-input" onchange="onEditHeaderChange('sup_code', this.value)">
+          ${supOptions}
+        </select>
+      </div>
+
+      <div class="po-info-field">
+        <label>วันที่รับ (Receive Date):</label>
+        <input type="date" id="editPORefReceive" class="po-info-input"
+               value="${header.ref_receive ? String(header.ref_receive).slice(0,10) : ''}"
+               onchange="onEditHeaderChange('ref_receive', this.value)">
+      </div>
+
+      <div class="po-info-field">
+        <label>วันที่ออก (PO Date):</label>
+        <input type="date" id="editPOPoDate" class="po-info-input"
+               value="${header.po_date ? String(header.po_date).slice(0,10) : ''}"
+               onchange="onEditHeaderChange('po_date', this.value)">
+      </div>
+    </div>
+
+    <div class="po-info-meta">
+      📦 มีอยู่ <b>${totalCount}</b> รายการ · เพิ่มได้อีก <b style="color:#dc2626">${remaining > 0 ? remaining : 0}</b> รายการ
+      · 💰 ราคาเดือน <b style="color:#b45309">${priceMonth}</b> · โหลด <b>${poPriceMaster.length}</b> รายการ
+      ${_editHeaderDirty ? '<span class="po-info-dirty">● มีการแก้ไข header</span>' : ''}
+    </div>
   </div>`;
 
   html += `<div class="report-wrap" style="max-height:55vh;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px">
@@ -1184,13 +1223,86 @@ function renderPOFormTable() {
 
   container.innerHTML = html;
 
-  // ✅ เรียก Sortable ใหม่ทุกครั้งหลัง render
   initPOItemsSortable();
 
-  // ✅ คืน scroll position หลัง render
   const newScrollWrap = container.querySelector('.report-wrap');
   if (newScrollWrap) {
     newScrollWrap.scrollTop = savedScrollTop;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ✅ NEW: ตรวจจับการแก้ไข Header (Sup / วันที่)
+// ═══════════════════════════════════════════════════════════════
+function onEditHeaderChange(field, value) {
+  if (!_editPOHeader) return;
+
+  _editPOHeader[field] = value;
+
+  // ✅ ถ้าแก้ ref_receive → โหลดราคาเดือนใหม่
+  if (field === 'ref_receive') {
+    const newMonth = getMonthFromDate(value);
+    console.log('[PO Edit] เปลี่ยน ref_receive → โหลดราคาเดือน ' + newMonth);
+    loadPriceMasterForMonth(newMonth).then(() => {
+      _editHeaderDirty = true;
+      renderPOFormTable();
+    });
+    return;
+  }
+
+  if (field === 'sup_code' || field === 'po_date') {
+    _editHeaderDirty = true;
+    renderPOFormTable();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ✅ NEW: บันทึก Header (Sup / วันที่) ที่แก้ไข
+// ═══════════════════════════════════════════════════════════════
+async function saveEditPOHeader() {
+  if (!poEditingId || !_editPOHeader) return { ok: true, changed: false };
+  if (!_editHeaderDirty) return { ok: true, changed: false };
+
+  const header = _editPOHeader;
+
+  try {
+    const { data: detail } = await supabase.rpc('get_purchase_order_detail', { p_po_id: poEditingId });
+    const orig = detail?.header || {};
+
+    const newSup = header.sup_code;
+    const newReceive = header.ref_receive ? String(header.ref_receive).slice(0,10) : null;
+    const newPoDate = header.po_date ? String(header.po_date).slice(0,10) : null;
+
+    const origReceive = orig.ref_receive ? String(orig.ref_receive).slice(0,10) : null;
+    const origPoDate = orig.po_date ? String(orig.po_date).slice(0,10) : null;
+
+    const supChanged = newSup !== orig.sup_code;
+    const receiveChanged = newReceive !== origReceive;
+    const poDateChanged = newPoDate !== origPoDate;
+
+    if (!supChanged && !receiveChanged && !poDateChanged) {
+      _editHeaderDirty = false;
+      return { ok: true, changed: false };
+    }
+
+    const { data, error } = await supabase.rpc('update_po_header', {
+      p_po_id: poEditingId,
+      p_sup_code: newSup,
+      p_ref_receive: newReceive,
+      p_po_date: newPoDate,
+      p_user_id: currentUser?.id
+    });
+
+    if (error) throw error;
+    if (data && data.success === false) {
+      throw new Error(data.error || 'บันทึก header ไม่สำเร็จ');
+    }
+
+    _editHeaderDirty = false;
+    return { ok: true, changed: true };
+  } catch (e) {
+    console.error('saveEditPOHeader:', e);
+    return { ok: false, error: e.message };
   }
 }
 
@@ -1351,7 +1463,7 @@ async function removeEditRow(uid) {
   }
 }
 
-// ✅ บันทึกการแก้ไข
+// ✅ บันทึกการแก้ไข (รวม Header)
 async function saveEditPOItems(btnEl) {
   if (!poEditingId) {
     alert('ไม่พบ PO ที่กำลังแก้ไข');
@@ -1394,12 +1506,15 @@ async function saveEditPOItems(btnEl) {
     }
   });
 
-  if (!updatedOld.length && !newRows.length) {
+  const headerChanged = _editHeaderDirty;
+
+  if (!updatedOld.length && !newRows.length && !headerChanged) {
     alert('ไม่มีการเปลี่ยนแปลง');
     return;
   }
 
   const totalMsg = [];
+  if (headerChanged) totalMsg.push('แก้ไขข้อมูล Header (ผู้ขาย/วันที่)');
   if (updatedOld.length) totalMsg.push(`แก้ไข ${updatedOld.length} รายการ`);
   if (newRows.length) totalMsg.push(`เพิ่ม ${newRows.length} รายการ`);
 
@@ -1476,6 +1591,14 @@ async function saveEditPOItems(btnEl) {
     }
   }
 
+  // ✅ NEW: บันทึก Header
+  if (headerChanged) {
+    const headerResult = await saveEditPOHeader();
+    if (!headerResult.ok) {
+      errorMsg += `Header: ${headerResult.error}; `;
+    }
+  }
+
   if (btn) {
     btn.disabled = false;
     btn.textContent = '💾 บันทึกการแก้ไข';
@@ -1485,6 +1608,7 @@ async function saveEditPOItems(btnEl) {
     alert(`⚠️ มีข้อผิดพลาด:\n${errorMsg}`);
   } else {
     const summary = [];
+    if (headerChanged) summary.push('Header');
     if (updatedOld.length) summary.push(`แก้ไข ${updatedOld.length}`);
     if (newRows.length) summary.push(`เพิ่ม ${newRows.length}`);
     alert(`✅ บันทึกสำเร็จ (${summary.join(' · ')})`);
@@ -1809,6 +1933,7 @@ function cancelPOForm() {
 
   _editItemsRows = [];
   _editPOHeader = null;
+  _editHeaderDirty = false;
 
   const alertBtn = document.querySelector('.nav button[data-tab="alert"]');
   if (alertBtn) alertBtn.click();
@@ -1819,6 +1944,7 @@ function closePOForm() {
   poEditingId = null;
   _editItemsRows = [];
   _editPOHeader = null;
+  _editHeaderDirty = false;
   renderPOList();
 }
 
