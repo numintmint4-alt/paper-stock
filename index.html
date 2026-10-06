@@ -395,6 +395,9 @@
             <input type="month" id="poMonth" onchange="onPOMonthChange()">
           </label>
 
+          <!-- ✅ NEW: ปุ่มสร้าง PO ใหม่ -->
+          <button class="primary" onclick="openCreatePOModal()">➕ สร้าง PO ใหม่</button>
+
           <button onclick="exportPOToExcel()">📤 Export Excel</button>
           <button onclick="window.print()">🖨 พิมพ์</button>
         </div>
