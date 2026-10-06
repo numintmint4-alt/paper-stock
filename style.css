@@ -310,7 +310,6 @@ input:focus,select:focus {
   font-weight: 800;
 }
 
-/* ✅ ปี 2569 — ตัวหนา */
 .filters select,
 .filters input{
   font-weight: 700;
@@ -318,7 +317,6 @@ input:focus,select:focus {
   color: var(--text);
 }
 
-/* ✅ เจาะจง select ปี */
 #filterYear{
   font-weight: 700;
   color: var(--text);
@@ -505,7 +503,6 @@ th{
 /* ========== REPORT / MATRIX (ทุกหน้า) ========== */
 /* ═══════════════════════════════════════════════════════════ */
 
-/* ✅ report-head ใช้ grid 3 คอลัมน์ → title อยู่กลางเป๊ะ */
 .report-head{
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -516,7 +513,6 @@ th{
   gap: 16px;
 }
 
-/* ✅ report-title +10% = 21px */
 .report-title{
   text-align: center;
   font-weight: 700;
@@ -534,7 +530,6 @@ th{
   margin-top: 6px;
 }
 
-/* ✅ report-doc ชิดขวา */
 .report-doc{
   font-size: 12px;
   color: var(--text-muted);
@@ -686,7 +681,6 @@ th{
   animation: tipFadeIn .15s ease;
 }
 
-/* ลูกศรชี้ลง */
 .report-table td.clickable[data-tip]:hover::before{
   content: '';
   position: absolute;
@@ -727,7 +721,6 @@ th{
   line-height: 1.3;
 }
 
-/* ปุ่ม "ดู" ในตาราง drill */
 #drillBody button{
   padding: 3px 10px;
   font-size: 12px;
@@ -1114,13 +1107,11 @@ th{
   box-shadow: var(--shadow-lg);
 }
 
-/* ✅ สี 4 แบบ */
 .stat-card.green::before  { background: var(--green); }
 .stat-card.orange::before { background: var(--orange); }
 .stat-card.pink::before   { background: var(--pink); }
 .stat-card.violet::before { background: var(--violet); }
 
-/* ✅ Icon กล่อง */
 .stat-icon {
   width: 52px;
   height: 52px;
@@ -1138,7 +1129,6 @@ th{
 .stat-card.pink   .stat-icon { background: var(--pink-soft);   color: var(--pink-dark); }
 .stat-card.violet .stat-icon { background: var(--violet-soft); color: var(--violet); }
 
-/* ✅ เนื้อหา */
 .stat-body {
   flex: 1;
   min-width: 0;
@@ -1164,7 +1154,6 @@ th{
   font-weight: 500;
 }
 
-/* ✅ Trend */
 .stat-trend {
   font-size: 12px;
   font-weight: 700;
@@ -1194,7 +1183,7 @@ th{
   @page {
     size: A4 landscape;
     margin: 8mm;
-    margin-top: 10mm;        /* ✅ เว้นด้านบน 1 ซม. */
+    margin-top: 10mm;
   }
 
   html, body {
@@ -1211,7 +1200,6 @@ th{
   .card { box-shadow: none; padding: 0; margin: 0; border: none; }
   .container { padding: 0; max-width: 100%; }
 
-  /* ✅ report-head ใช้ grid 3 คอลัมน์ */
   .report-head {
     display: grid !important;
     grid-template-columns: 1fr auto 1fr !important;
@@ -1220,7 +1208,6 @@ th{
     width: 100%;
   }
 
-  /* ✅ title เป็นบรรทัดเดียว */
   .report-title {
     text-align: center;
     font-size: 15px;
@@ -1230,7 +1217,7 @@ th{
   }
 
   .report-title br {
-    display: none !important;   /* ✅ ซ่อน <br> เพื่อรวมเป็นบรรทัดเดียว */
+    display: none !important;
   }
 
   .report-title .title-select {
@@ -1292,7 +1279,6 @@ th{
     text-overflow: ellipsis;
   }
 
-  /* ✅ Gradegrams ขยาย 65px ให้พอดี ไม่ล้น */
   .report-table .grade-col {
     width: 65px;
     min-width: 65px;
@@ -1309,7 +1295,6 @@ th{
     white-space: nowrap;
   }
 
-  /* ✅ Size กระจายเต็มพื้นที่ */
   .report-table thead th:not(.grade-col):not(.total-col),
   .report-table tbody td:not(.grade-col):not(.total-col):not(.empty) {
     width: auto;
@@ -1319,7 +1304,6 @@ th{
     padding: 2px 2px;
   }
 
-  /* ✅ Total 50px */
   .report-table .total-col {
     width: 50px;
     min-width: 50px;
@@ -1349,7 +1333,6 @@ th{
     page-break-inside: avoid;
   }
 
-  /* ✅ ซ่อน report-foot ตอนพิมพ์ */
   .report-foot {
     display: none !important;
   }
@@ -1502,24 +1485,24 @@ th{
 .alert-flat-table thead th { position: sticky; top: 0; z-index: 10; background: var(--primary); color: #fff; box-shadow: 0 2px 0 0 var(--border); }
 
 /* ═══════════════════════════════════════════════════════════ */
-/* ALERT FLAT TABLE — Fix Column Widths (13 columns) */
+/* ALERT FLAT TABLE — Fix Column Widths (14 columns) */
 /* ═══════════════════════════════════════════════════════════ */
 .alert-flat-table { table-layout: fixed; width: 100%; }
-/* ✅ 14 columns (เพิ่ม Usage Plan) — ใช้ % → เต็มหน้าจอเสมอ */
-.alert-flat-table th:nth-child(1)  { width: 8%;  }   /* Gradegrams */
-.alert-flat-table th:nth-child(2)  { width: 5%;  }   /* Size */
-.alert-flat-table th:nth-child(3)  { width: 6%;  }   /* Snapshot */
-.alert-flat-table th:nth-child(4)  { width: 7%;  }   /* Stock */
-.alert-flat-table th:nth-child(5)  { width: 7%;  }   /* Receive */
-.alert-flat-table th:nth-child(6)  { width: 7%;  }   /* Usage Plan ← ใหม่ */
-.alert-flat-table th:nth-child(7)  { width: 7%;  }   /* Alert */
-.alert-flat-table th:nth-child(8)  { width: 8%;  }   /* สถานะ */
-.alert-flat-table th:nth-child(9)  { width: 8%;  }   /* สั่งซื้อ */
-.alert-flat-table th:nth-child(10) { width: 7%;  }   /* Sup. */
-.alert-flat-table th:nth-child(11) { width: 8%;  }   /* ม้วนลูกค้า */
-.alert-flat-table th:nth-child(12) { width: 8%;  }   /* คุณภาพ B */
-.alert-flat-table th:nth-child(13) { width: 7%;  }   /* FSC */
-.alert-flat-table th:nth-child(14) { width: 9%;  }   /* หมายเหตุ */
+
+.alert-flat-table th:nth-child(1)  { width: 8%;  }
+.alert-flat-table th:nth-child(2)  { width: 5%;  }
+.alert-flat-table th:nth-child(3)  { width: 6%;  }
+.alert-flat-table th:nth-child(4)  { width: 7%;  }
+.alert-flat-table th:nth-child(5)  { width: 7%;  }
+.alert-flat-table th:nth-child(6)  { width: 7%;  }
+.alert-flat-table th:nth-child(7)  { width: 7%;  }
+.alert-flat-table th:nth-child(8)  { width: 8%;  }
+.alert-flat-table th:nth-child(9)  { width: 8%;  }
+.alert-flat-table th:nth-child(10) { width: 7%;  }
+.alert-flat-table th:nth-child(11) { width: 8%;  }
+.alert-flat-table th:nth-child(12) { width: 8%;  }
+.alert-flat-table th:nth-child(13) { width: 7%;  }
+.alert-flat-table th:nth-child(14) { width: 9%;  }
 
 .alert-flat-table .fsc-cell { font-size: 10px; padding: 4px 6px; }
 .alert-flat-table .fsc-cell .badge { font-size: 10px; padding: 2px 6px; }
@@ -1695,6 +1678,7 @@ th{
   .add-items-table { font-size: 11px; }
   .add-items-table thead th, .add-items-table tbody td { padding: 4px 5px; }
 }
+
 /* ═══════════════════════════════════════════════════════════ */
 /* ========== DRAG & DROP — PO Items ========== */
 /* ═══════════════════════════════════════════════════════════ */
@@ -1717,7 +1701,6 @@ th{
   cursor: grabbing;
 }
 
-/* ✅ ตอนลาก */
 .sortable-ghost {
   opacity: 0.4;
   background: var(--primary-soft) !important;
@@ -1731,136 +1714,7 @@ th{
   background: #fff !important;
   box-shadow: 0 8px 24px rgba(0,0,0,.15);
 }
-/* ═══════════════════════════════════════════════════════════ */
-/* ========== PO INFO BAR — แก้ไข Header (Sup/วันที่) ========== */
-/* ═══════════════════════════════════════════════════════════ */
 
-.po-info-bar {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px 16px;
-  background: #e3f2fd;
-  border: 1px solid #93c5fd;
-  border-radius: 8px;
-  margin-bottom: 12px;
-  line-height: 1.5;
-}
-
-/* ✅ แถวบน: ชื่อ PO + สถานะ */
-.po-info-bar .po-info-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px;
-  padding-bottom: 8px;
-  border-bottom: 1px dashed #93c5fd;
-}
-
-.po-info-bar .po-info-row b {
-  font-size: 15px;
-  color: #1e3a8a;
-}
-
-.po-info-bar .po-info-badge {
-  font-size: 12px;
-  padding: 3px 10px;
-  background: #fff;
-  border-radius: 999px;
-  border: 1px solid #93c5fd;
-  color: #1e40af;
-  white-space: nowrap;
-}
-
-/* ✅ Grid 3 คอลัมน์: Sup / วันที่รับ / วันที่ออก */
-.po-info-bar .po-info-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px;
-  align-items: end;
-}
-
-.po-info-bar .po-info-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.po-info-bar .po-info-field label {
-  font-size: 12px;
-  font-weight: 700;
-  color: #1e40af;
-  white-space: nowrap;
-}
-
-.po-info-bar .po-info-input {
-  width: 100%;
-  padding: 7px 10px;
-  font-size: 13px;
-  font-weight: 600;
-  font-family: inherit;
-  border: 1.5px solid #60a5fa;
-  border-radius: 6px;
-  background: #fff;
-  color: #1e293b;
-  transition: var(--transition);
-  box-sizing: border-box;
-}
-
-.po-info-bar .po-info-input:focus {
-  outline: none;
-  border-color: var(--primary-dark);
-  box-shadow: 0 0 0 3px rgba(59,130,246,.2);
-}
-
-.po-info-bar .po-info-input:hover {
-  border-color: var(--primary-dark);
-}
-
-/* ✅ แถวล่าง: meta info */
-.po-info-bar .po-info-meta {
-  font-size: 13px;
-  color: #1e40af;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  padding-top: 6px;
-  border-top: 1px dashed #93c5fd;
-}
-
-.po-info-bar .po-info-meta b {
-  color: #1e3a8a;
-}
-
-/* ✅ สถานะ "มีการแก้ไข" */
-.po-info-bar .po-info-dirty {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 10px;
-  background: #fef3c7;
-  color: #b45309;
-  border: 1px solid #fcd34d;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-  animation: pulseDirty 1.5s ease-in-out infinite;
-}
-
-@keyframes pulseDirty {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.6; }
-}
-
-/* ✅ Responsive */
-@media (max-width: 640px) {
-  .po-info-bar {
-    padding: 10px 12px;
-  }
-  .po
 /* ═══════════════════════════════════════════════════════════ */
 /* ========== PO INFO BAR — แก้ไข Header (Sup/วันที่) ========== */
 /* ═══════════════════════════════════════════════════════════ */
@@ -2000,27 +1854,24 @@ th{
 .msg.info > br {
   line-height: 2;
 }
+
 /* ═══════════════════════════════════════════════════════════════
-   ✅ Hover Effect — หน้า Alert (ใช้กับ td.alert-cell)
+   ✅ Hover Effect — หน้า Alert (เด่นทั้งแถว)
    ═══════════════════════════════════════════════════════════════ */
 
-/* เมื่อเอาเมาส์วางบนแถว → ทุก td ในแถวนั้นเปลี่ยนสี */
-table tbody tr:hover td.alert-cell,
-.alert-flat-table tbody tr:hover td,
-#alertBody table tbody tr:hover td {
+/* บังคับทุก td ในทุกตาราง ให้เปลี่ยนสีเมื่อ hover ที่ tr */
+table tbody tr:hover > td,
+table tbody tr:hover > th {
     background-color: #dbeafe !important;   /* สีฟ้าอ่อน */
-    cursor: pointer;
     transition: background-color 0.15s ease;
 }
 
-/* ✅ เพิ่ม Effect เงาด้านซ้าย + ตัวหนาเล็กน้อย */
-table tbody tr:hover td.alert-cell {
-    box-shadow: inset 3px 0 0 #2563eb;      /* แถบน้ำเงินด้านซ้าย */
-    font-weight: 500;
+/* ✅ เพิ่มเอฟเฟกต์ให้ดูมีมิติ */
+table tbody tr:hover > td {
+    box-shadow: inset 0 -1px 0 #93c5fd;
 }
 
-/* ✅ ถ้าอยากให้ hover ใช้กับทั้งแถว (รวม td ที่ไม่มี alert-cell) */
-table tbody tr:hover td {
-    background-color: #dbeafe !important;
-    transition: background-color 0.15s ease;
+/* ✅ เอฟเฟกต์แถบสีน้ำเงินด้านซ้าย (เส้นบอก) */
+table tbody tr:hover > td:first-child {
+    box-shadow: inset 3px 0 0 #2563eb;
 }
