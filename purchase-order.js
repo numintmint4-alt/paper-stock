@@ -13,6 +13,7 @@
 // ✅ NEW: Drag & Drop เรียงลำดับ PO Items (Sortable.js) — ใช้ uid แทน index
 // ✅ NEW (V10): แก้ไข Header (Sup / วันที่รับ / วันที่ออก) ใน PO Form
 // ✅ NEW (V11): ปุ่ม "สร้าง PO ใหม่" — สร้าง PO เปล่าจากหน้า List
+// ✅ NEW (V12): เก็บลำดับเดิม (_editOriginalOrder) + ตรวจ isOrderChanged() + reorder_po_items
 // ═══════════════════════════════════════════════════════════════
 
 let poCache = [];
@@ -523,6 +524,7 @@ async function openCreatePOModal() {
     _editItemsRows = [];
     _editPOHeader = emptyHeader;
     _editHeaderDirty = false;
+    _editOriginalOrder = [];   // ✅ NEW
     window._isCreateMode = true;   // ✅ flag ว่าเป็นโหมดสร้างใหม่
 
     // 5. Render ฟอร์ม
@@ -1012,7 +1014,7 @@ async function _doSaveAllPOs(posList, alertData, btnEl) {
 let _editItemsRows = [];
 let _editPOHeader = null;
 let _editHeaderDirty = false;
-let _editOriginalOrder = [];   // ✅ NEW: เก็บลำดับ id เดิม เพื่อเทียบว่า seq เปลี่ยนไหม
+let _editOriginalOrder = [];   // ✅ เก็บลำดับ id เดิม เพื่อเทียบว่า seq เปลี่ยนไหม
 
 // ═══════════════════════════════════════════════════════════════
 // ✅ Drag & Drop เรียงลำดับ PO Items
@@ -1074,9 +1076,29 @@ function initPOItemsSortable() {
       _editItemsRows.splice(toIdx, 0, movedRow);
 
       console.log('[PO Sort] ✅ ย้าย uid=' + draggedUid + ' จาก index ' + fromIdx + ' → ' + toIdx);
+
+      // ✅ เพิ่ม log ดูว่าลำดับเปลี่ยนจริงไหม
+      console.log('[PO Sort] ลำดับใหม่:', _editItemsRows
+        .filter(r => !r.isNew && !r.removed)
+        .map(r => r.id)
+      );
+      console.log('[PO Sort] ลำดับเดิม:', _editOriginalOrder);
+      console.log('[PO Sort] isOrderChanged:', isOrderChanged());
+
       renderPOFormTable();
     }
   });
+}
+
+// ✅ ตรวจสอบว่าลำดับ items เปลี่ยนไปหรือไม่
+function isOrderChanged() {
+  const currentOrder = _editItemsRows
+    .filter(r => !r.isNew && !r.removed)
+    .map(r => r.id);
+
+  if (currentOrder.length !== _editOriginalOrder.length) return false;
+
+  return currentOrder.some((id, idx) => id !== _editOriginalOrder[idx]);
 }
 
 // ================= RENDER PO FORM (EDIT) =================
@@ -1104,6 +1126,11 @@ function renderPOFormContent(header, items) {
     note: it.note || '',
     removed: false
   }));
+
+  // ✅ เก็บลำดับเดิม
+  _editOriginalOrder = _editItemsRows
+    .filter(r => !r.isNew && !r.removed)
+    .map(r => r.id);
 
   renderPOFormTable();
 }
@@ -1417,6 +1444,7 @@ async function saveCreatePO(btnEl) {
     _editItemsRows = [];
     _editPOHeader = null;
     _editHeaderDirty = false;
+    _editOriginalOrder = [];
 
     await renderPOList();
 
@@ -1671,6 +1699,7 @@ async function saveEditPOItems(btnEl) {
 
   const activeRows = _editItemsRows.filter(r => !r.removed);
 
+  // Validation
   for (const row of activeRows) {
     if (row.isNew) {
       if (!row.gradegram || !row.size || !row.quantity) {
@@ -1707,7 +1736,11 @@ async function saveEditPOItems(btnEl) {
 
   const headerChanged = _editHeaderDirty;
 
-  if (!updatedOld.length && !newRows.length && !headerChanged) {
+  // ✅ เช็คว่าลำดับเปลี่ยนไหม
+  const orderChanged = isOrderChanged();
+
+  // ✅ ถ้าลำดับเปลี่ยน ก็ให้ถือว่ามีการเปลี่ยนแปลง
+  if (!updatedOld.length && !newRows.length && !headerChanged && !orderChanged) {
     alert('ไม่มีการเปลี่ยนแปลง');
     return;
   }
@@ -1716,6 +1749,7 @@ async function saveEditPOItems(btnEl) {
   if (headerChanged) totalMsg.push('แก้ไขข้อมูล Header');
   if (updatedOld.length) totalMsg.push(`แก้ไข ${updatedOld.length} รายการ`);
   if (newRows.length) totalMsg.push(`เพิ่ม ${newRows.length} รายการ`);
+  if (orderChanged) totalMsg.push(`จัดลำดับใหม่ ${activeRows.filter(r => !r.isNew).length} รายการ`);
 
   if (!confirm(`ยืนยันบันทึก?\n\n${totalMsg.join(' · ')}`)) return;
 
@@ -1727,6 +1761,7 @@ async function saveEditPOItems(btnEl) {
 
   let errorMsg = '';
 
+  // 1. อัปเดต items ที่แก้ไข
   for (const row of updatedOld) {
     try {
       const payload = {
@@ -1749,6 +1784,7 @@ async function saveEditPOItems(btnEl) {
     }
   }
 
+  // 2. เพิ่ม items ใหม่
   if (newRows.length) {
     try {
       const itemsPayload = newRows.map(r => {
@@ -1790,6 +1826,29 @@ async function saveEditPOItems(btnEl) {
     }
   }
 
+  // ✅ 3. บันทึกลำดับใหม่ (Reorder)
+  if (orderChanged) {
+    try {
+      const orderedIds = _editItemsRows
+        .filter(r => !r.isNew && !r.removed)
+        .map(r => r.id);
+
+      const { data, error } = await supabase.rpc('reorder_po_items', {
+        p_po_id: poEditingId,
+        p_item_ids: orderedIds,
+        p_user_id: currentUser?.id
+      });
+      if (error) throw error;
+
+      if (data && data.success === false) {
+        throw new Error(data.error || 'จัดลำดับไม่สำเร็จ');
+      }
+    } catch (e) {
+      errorMsg += `จัดลำดับ: ${e.message}; `;
+    }
+  }
+
+  // 4. อัปเดต Header
   if (headerChanged) {
     const headerResult = await saveEditPOHeader();
     if (!headerResult.ok) {
@@ -1809,9 +1868,11 @@ async function saveEditPOItems(btnEl) {
     if (headerChanged) summary.push('Header');
     if (updatedOld.length) summary.push(`แก้ไข ${updatedOld.length}`);
     if (newRows.length) summary.push(`เพิ่ม ${newRows.length}`);
+    if (orderChanged) summary.push(`จัดลำดับใหม่`);
     alert(`✅ บันทึกสำเร็จ (${summary.join(' · ')})`);
   }
 
+  // รีเฟรช
   try {
     const { data: detail } = await supabase.rpc('get_purchase_order_detail', { p_po_id: poEditingId });
     if (detail) {
@@ -2134,6 +2195,7 @@ function cancelPOForm() {
   _editItemsRows = [];
   _editPOHeader = null;
   _editHeaderDirty = false;
+  _editOriginalOrder = [];
 
   // ✅ ให้อยู่ที่ Tab Purchase Order เหมือนเดิม
   // ไม่ต้อง switchTab ใดๆ — เพราะเราอยู่ที่หน้านี้อยู่แล้ว
@@ -2150,6 +2212,7 @@ function closePOForm() {
   _editItemsRows = [];
   _editPOHeader = null;
   _editHeaderDirty = false;
+  _editOriginalOrder = [];
   window._isCreateMode = false;
   renderPOList();
 }
