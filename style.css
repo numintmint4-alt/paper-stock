@@ -2000,3 +2000,27 @@ th{
 .msg.info > br {
   line-height: 2;
 }
+/* ═══════════════════════════════════════════════════════════════
+   ✅ Hover Effect — หน้า Alert (ใช้กับ td.alert-cell)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* เมื่อเอาเมาส์วางบนแถว → ทุก td ในแถวนั้นเปลี่ยนสี */
+table tbody tr:hover td.alert-cell,
+.alert-flat-table tbody tr:hover td,
+#alertBody table tbody tr:hover td {
+    background-color: #dbeafe !important;   /* สีฟ้าอ่อน */
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+/* ✅ เพิ่ม Effect เงาด้านซ้าย + ตัวหนาเล็กน้อย */
+table tbody tr:hover td.alert-cell {
+    box-shadow: inset 3px 0 0 #2563eb;      /* แถบน้ำเงินด้านซ้าย */
+    font-weight: 500;
+}
+
+/* ✅ ถ้าอยากให้ hover ใช้กับทั้งแถว (รวม td ที่ไม่มี alert-cell) */
+table tbody tr:hover td {
+    background-color: #dbeafe !important;
+    transition: background-color 0.15s ease;
+}
