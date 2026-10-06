@@ -1,5 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
 // STOCK V8 — alert.js (Flat Table + Filter + PO + Lock Date + FSC + History + Lock + Usage Plan)
+// + ✅ Hover Effect (เด่นทั้งแถว — ทับสี row-red/yellow/green)
 // ═══════════════════════════════════════════════════════════════
 
 let alertSelectedGrades = [];
@@ -615,8 +616,50 @@ function renderAlertFromCache() {
   _attachAlertDropdown('alertUsageFilterBtn', 'alertUsageFilterDropdown', 'alertUsageFilterBox', 'alertUsageFilter');
   renderAlertReceiveDates();
 
+  // ✅ เพิ่ม Hover Effect
+  initAlertRowHover();
+
   // ✅ Apply filter แล้ว render ใหม่
   applyAlertFiltersAndRender();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ✅ Hover Effect — บังคับทุก td (ใช้ทั้ง initial render + filter)
+// ═══════════════════════════════════════════════════════════════
+function initAlertRowHover() {
+  setTimeout(() => {
+    const alertRows = document.querySelectorAll('.alert-flat-table tbody tr');
+    alertRows.forEach(row => {
+      if (row.classList.contains('total-row')) return;  // ข้ามแถวรวม
+
+      row.style.cursor = 'pointer';
+      row.style.transition = 'background-color 0.15s ease';
+
+      const cells = row.querySelectorAll('td');
+      const originalColors = [];
+      cells.forEach((cell, idx) => {
+        originalColors[idx] = cell.style.backgroundColor || '';
+      });
+
+      // ✅ ใช้ flag กัน duplicate listener
+      if (row._hoverAttached) return;
+      row._hoverAttached = true;
+
+      row.addEventListener('mouseenter', () => {
+        cells.forEach(cell => {
+          cell.style.backgroundColor = '#dbeafe';
+          cell.style.transition = 'background-color 0.15s ease';
+        });
+      });
+
+      row.addEventListener('mouseleave', () => {
+        cells.forEach((cell, idx) => {
+          cell.style.backgroundColor = originalColors[idx];
+        });
+      });
+    });
+    console.log('[Alert Hover] ✅ เพิ่ม Hover ให้ ' + alertRows.length + ' แถว');
+  }, 50);
 }
 
 // ================= SUPPLIERS =================
@@ -1285,6 +1328,9 @@ function renderAlertTableBody(rows) {
   </tr>`;
 
   tbody.innerHTML = html;
+
+  // ✅ เพิ่ม Hover Effect หลัง render tbody ใหม่
+  initAlertRowHover();
 }
 
 // ================= DROPDOWN HELPER =================
@@ -1876,6 +1922,9 @@ async function renderAlert() {
     _attachAlertDropdown('alertReceiveFilterBtn', 'alertReceiveFilterDropdown', 'alertReceiveFilterBox', 'alertReceiveFilter');
     _attachAlertDropdown('alertUsageFilterBtn', 'alertUsageFilterDropdown', 'alertUsageFilterBox', 'alertUsageFilter');
     renderAlertDateTabs();
+
+    // ✅ เพิ่ม Hover Effect หลัง render ครั้งแรก
+    initAlertRowHover();
 
     // ✅ Apply filter แล้ว render ใหม่ (ถ้ามี filter ค้างอยู่)
     applyAlertFiltersAndRender();
