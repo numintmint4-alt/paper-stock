@@ -1012,6 +1012,7 @@ async function _doSaveAllPOs(posList, alertData, btnEl) {
 let _editItemsRows = [];
 let _editPOHeader = null;
 let _editHeaderDirty = false;
+let _editOriginalOrder = [];   // ✅ NEW: เก็บลำดับ id เดิม เพื่อเทียบว่า seq เปลี่ยนไหม
 
 // ═══════════════════════════════════════════════════════════════
 // ✅ Drag & Drop เรียงลำดับ PO Items
