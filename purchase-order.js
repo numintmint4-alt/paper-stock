@@ -2125,6 +2125,7 @@ async function onPOMonthChange() {
 function cancelPOForm() {
   closeModal('modalPOForm');
 
+  // ล้าง State ทั้งหมด
   window._pendingPOs = null;
   window._pendingAlertData = null;
   window._isCreateMode = false;
@@ -2133,8 +2134,13 @@ function cancelPOForm() {
   _editPOHeader = null;
   _editHeaderDirty = false;
 
-  const alertBtn = document.querySelector('.nav button[data-tab="alert"]');
-  if (alertBtn) alertBtn.click();
+  // ✅ ให้อยู่ที่ Tab Purchase Order เหมือนเดิม
+  // ไม่ต้อง switchTab ใดๆ — เพราะเราอยู่ที่หน้านี้อยู่แล้ว
+  
+  // ถ้าต้องการรีเฟรชตาราง PO หลังปิด Modal
+  if (typeof loadPurchaseOrders === 'function') {
+    loadPurchaseOrders();
+  }
 }
 
 function closePOForm() {
