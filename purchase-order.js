@@ -1470,8 +1470,8 @@ async function saveCreatePO(btnEl) {
       } catch (e) {
         throw new Error('ขอเลข PO ไม่สำเร็จ: ' + e.message);
       }
-    } else {
-      // ✅ (V17) เช็คว่าซ้ำกับ PO ที่มีอยู่ไหม
+           } else {
+      // ✅ เช็คว่าซ้ำกับ PO ที่มีอยู่ไหม
       const { data: existing } = await supabase
         .from('purchase_orders')
         .select('id')
@@ -1482,10 +1482,12 @@ async function saveCreatePO(btnEl) {
         throw new Error(`⚠️ เลข PO "${poNo}" มีอยู่แล้วในระบบ กรุณาใช้เลขอื่น`);
       }
 
-            // ✅ (V18) ตรวจสอบ format PO No. — ยอมรับ PO + ตัวเลข 6-15 หลัก
-      if (!/^PO\d{6,15}$/.test(poNo)) {
-        throw new Error(`⚠️ รูปแบบเลข PO ไม่ถูกต้อง\n\nต้องเป็น PO ตามด้วยตัวเลข 6-15 หลัก\nเช่น PO22610003\n(กรอก: ${poNo})`);
+      // ✅ ตรวจสอบ format: PO + ตัวเลข 9 หลัก (เช่น PO226100055)
+      if (!/^PO\d{9}$/.test(poNo)) {
+        throw new Error(`⚠️ รูปแบบเลข PO ไม่ถูกต้อง\n\nต้องเป็น PO + ตัวเลข 9 หลัก เช่น PO226100055\n(กรอก: ${poNo})`);
       }
+
+    }  // ✅ ปิด else ตรงนี้ ← จุดสำคัญที่ทำให้หน้า PO กลับมา!
 
     // ✅ เตรียม items
     const items = activeRows.map((row, idx) => {
