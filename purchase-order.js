@@ -14,7 +14,7 @@
 // ✅ NEW (V10): แก้ไข Header (Sup / วันที่รับ / วันที่ออก) ใน PO Form
 // ✅ NEW (V11): ปุ่ม "สร้าง PO ใหม่" — สร้าง PO เปล่าจากหน้า List
 // ✅ NEW (V12): เก็บลำดับเดิม (_editOriginalOrder) + ตรวจ isOrderChanged() + reorder_po_items
-// ✅ NEW (V15): Verify Password — ใช้ tempClient.auth.signInWithPassword() (Supabase Auth)
+// ✅ NEW (V16): Verify Password — ใช้ window.supabase.createClient() (Supabase Auth)
 // ═══════════════════════════════════════════════════════════════
 
 let poCache = [];
@@ -584,7 +584,7 @@ async function openPOFormWithVerify(poId) {
   openPOForm(poId);
 }
 
-// ✅ [V15] Verify Password — ใช้ tempClient.auth.signInWithPassword()
+// ✅ [V16] Verify Password — ใช้ window.supabase.createClient()
 async function verifyAndOpen(po, password, note) {
   try {
     // ✅ ใช้ email ของ user ปัจจุบัน
@@ -595,7 +595,7 @@ async function verifyAndOpen(po, password, note) {
     }
 
     // ✅ สร้าง Supabase Client ชั่วคราว (ไม่ทับ session หลัก)
-    const tempClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    const tempClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: {
         persistSession: false,
         autoRefreshToken: false,
@@ -682,7 +682,7 @@ function openVerifyModal({ username, title, message, onConfirm }) {
   setTimeout(() => $('verifyPasswordInput')?.focus(), 100);
 }
 
-// ✅ [V15] Verify Password — ไม่มี logout/หน่วงเวลาแล้ว (tempClient จัดการเอง)
+// ✅ [V16] Verify Password — ไม่มี logout/หน่วงเวลาแล้ว (tempClient จัดการเอง)
 async function confirmVerifyPassword() {
   const password = $('verifyPasswordInput').value;
   const note = $('verifyPasswordNote').value.trim();
@@ -916,10 +916,10 @@ async function saveAllPOs(btnEl) {
         title: `🔒 ยืนยันการบันทึก PO ${po.po_no}`,
         message: 'PO นี้ Saved แล้ว — ต้องยืนยันรหัสผ่าน + หมายเหตุ',
         onConfirm: async (password, note) => {
-          // ✅ [V15] ใช้ tempClient.auth.signInWithPassword()
+          // ✅ [V16] ใช้ window.supabase.createClient()
           const email = currentUser?.email || '';
 
-          const tempClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          const tempClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
             auth: {
               persistSession: false,
               autoRefreshToken: false,
