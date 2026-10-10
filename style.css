@@ -1659,6 +1659,31 @@ th{
 .po-filter-label { font-size: 11px; font-weight: 700; color: #fff; text-align: center; white-space: nowrap; line-height: 1.2; }
 
 /* ═══════════════════════════════════════════════════════════ */
+/* ✅ PO LIST TABLE — ลดความสูงแถว (NEW) */
+/* ═══════════════════════════════════════════════════════════ */
+
+/* ✅ ลดความสูงแถว PO */
+.po-list-table th,
+.po-list-table td {
+    padding: 4px 8px !important;      /* ลดจาก 12px → 4px */
+    line-height: 1.2 !important;      /* ลดช่องว่างระหว่างบรรทัด */
+    font-size: 13px;                   /* ปรับขนาดฟอนต์ให้พอดี */
+}
+
+/* ✅ ลดปุ่มในแถว PO ให้เล็กลง */
+.po-list-table button {
+    padding: 3px 8px !important;
+    font-size: 11px !important;
+    line-height: 1.2 !important;
+}
+
+/* ✅ ลด Badge สถานะให้เล็กลง */
+.po-list-table .badge {
+    padding: 2px 6px !important;
+    font-size: 11px !important;
+}
+
+/* ═══════════════════════════════════════════════════════════ */
 /* ========== MODAL ADD PO ITEMS ========== */
 /* ═══════════════════════════════════════════════════════════ */
 .add-items-table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--surface); }
