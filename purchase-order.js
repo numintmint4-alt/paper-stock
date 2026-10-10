@@ -14,6 +14,7 @@
 // ✅ NEW (V10): แก้ไข Header (Sup / วันที่รับ / วันที่ออก) ใน PO Form
 // ✅ NEW (V11): ปุ่ม "สร้าง PO ใหม่" — สร้าง PO เปล่าจากหน้า List
 // ✅ NEW (V12): เก็บลำดับเดิม (_editOriginalOrder) + ตรวจ isOrderChanged() + reorder_po_items
+// ✅ NEW (V13): Verify Password — logout session เก่าก่อน + post-logout หลังใช้เสร็จ
 // ═══════════════════════════════════════════════════════════════
 
 let poCache = [];
@@ -583,15 +584,29 @@ async function openPOFormWithVerify(poId) {
   openPOForm(poId);
 }
 
+// ✅ [V13] Verify Password — logout session เก่าก่อน + post-logout หลังใช้เสร็จ
 async function verifyAndOpen(po, password, note) {
   try {
     const username = (currentUser?.email || '').split('@')[0] || '';
 
+    // ✅ [จุดที่ 1] Reset session เก่าก่อน verify ใหม่
+    try {
+      await callAdmin('logout', {});
+      console.log('[Verify] ✅ Logout session เก่าสำเร็จ');
+    } catch (e) {
+      console.warn('[Verify] logout error (ignore):', e);
+    }
+
+    // ✅ [จุดที่ 2] หน่วงเวลาเล็กน้อยให้ Edge Function reset session เสร็จ
+    await new Promise(r => setTimeout(r, 300));
+
+    // Verify password
     const res = await callAdmin('verifyPassword', { username, password });
     if (!res || !res.ok) {
       return { ok: false, error: res?.error || 'รหัสผ่านไม่ถูกต้อง' };
     }
 
+    // Log การแก้ไข
     try {
       await supabase.from('po_change_log').insert({
         po_id: po.id,
@@ -651,6 +666,7 @@ function openVerifyModal({ username, title, message, onConfirm }) {
   setTimeout(() => $('verifyPasswordInput')?.focus(), 100);
 }
 
+// ✅ [V13] Verify Password — post-logout หลังใช้เสร็จ
 async function confirmVerifyPassword() {
   const password = $('verifyPasswordInput').value;
   const note = $('verifyPasswordNote').value.trim();
@@ -680,6 +696,14 @@ async function confirmVerifyPassword() {
       btn.disabled = false;
       btn.textContent = '✅ ยืนยัน';
       return;
+    }
+
+    // ✅ [จุดที่ 3] Reset session หลังใช้เสร็จ ป้องกันครั้งต่อไปค้าง
+    try {
+      await callAdmin('logout', {});
+      console.log('[Verify] ✅ Logout session หลังใช้เสร็จ');
+    } catch (e) {
+      console.warn('[Verify] post-logout error (ignore):', e);
     }
 
     closeModal('modalVerifyPassword');
