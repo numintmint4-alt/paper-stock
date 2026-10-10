@@ -14,7 +14,7 @@
 // ✅ NEW (V10): แก้ไข Header (Sup / วันที่รับ / วันที่ออก) ใน PO Form
 // ✅ NEW (V11): ปุ่ม "สร้าง PO ใหม่" — สร้าง PO เปล่าจากหน้า List
 // ✅ NEW (V12): เก็บลำดับเดิม (_editOriginalOrder) + ตรวจ isOrderChanged() + reorder_po_items
-// ✅ NEW (V13): Verify Password — logout session เก่าก่อน + post-logout หลังใช้เสร็จ
+// ✅ NEW (V15): Verify Password — ใช้ tempClient.auth.signInWithPassword() (Supabase Auth)
 // ═══════════════════════════════════════════════════════════════
 
 let poCache = [];
@@ -584,26 +584,41 @@ async function openPOFormWithVerify(poId) {
   openPOForm(poId);
 }
 
-// ✅ [V13] Verify Password — logout session เก่าก่อน + post-logout หลังใช้เสร็จ
+// ✅ [V15] Verify Password — ใช้ tempClient.auth.signInWithPassword()
 async function verifyAndOpen(po, password, note) {
   try {
-    const username = (currentUser?.email || '').split('@')[0] || '';
+    // ✅ ใช้ email ของ user ปัจจุบัน
+    const email = currentUser?.email || '';
 
-    // ✅ [จุดที่ 1] Reset session เก่าก่อน verify ใหม่
-    try {
-      await callAdmin('logout', {});
-      console.log('[Verify] ✅ Logout session เก่าสำเร็จ');
-    } catch (e) {
-      console.warn('[Verify] logout error (ignore):', e);
+    if (!email) {
+      return { ok: false, error: 'ไม่พบ email ผู้ใช้' };
     }
 
-    // ✅ [จุดที่ 2] หน่วงเวลาเล็กน้อยให้ Edge Function reset session เสร็จ
-    await new Promise(r => setTimeout(r, 300));
+    // ✅ สร้าง Supabase Client ชั่วคราว (ไม่ทับ session หลัก)
+    const tempClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false
+      }
+    });
 
-    // Verify password
-    const res = await callAdmin('verifyPassword', { username, password });
-    if (!res || !res.ok) {
-      return { ok: false, error: res?.error || 'รหัสผ่านไม่ถูกต้อง' };
+    // ✅ ใช้ Supabase Auth verify password
+    const { data, error } = await tempClient.auth.signInWithPassword({
+      email: email,
+      password: password
+    });
+
+    if (error || !data.user) {
+      console.warn('[Verify] Auth error:', error?.message);
+      return { ok: false, error: 'รหัสผ่านไม่ถูกต้อง' };
+    }
+
+    // ✅ Sign out client ชั่วคราว (session หลักไม่กระทบ)
+    try {
+      await tempClient.auth.signOut();
+    } catch (e) {
+      console.warn('[Verify] tempClient signOut error:', e);
     }
 
     // Log การแก้ไข
@@ -621,6 +636,7 @@ async function verifyAndOpen(po, password, note) {
     openPOForm(po.id);
     return { ok: true };
   } catch (e) {
+    console.error('[Verify] Unexpected error:', e);
     return { ok: false, error: e.message };
   }
 }
@@ -666,7 +682,7 @@ function openVerifyModal({ username, title, message, onConfirm }) {
   setTimeout(() => $('verifyPasswordInput')?.focus(), 100);
 }
 
-// ✅ [V13] Verify Password — post-logout หลังใช้เสร็จ
+// ✅ [V15] Verify Password — ไม่มี logout/หน่วงเวลาแล้ว (tempClient จัดการเอง)
 async function confirmVerifyPassword() {
   const password = $('verifyPasswordInput').value;
   const note = $('verifyPasswordNote').value.trim();
@@ -696,14 +712,6 @@ async function confirmVerifyPassword() {
       btn.disabled = false;
       btn.textContent = '✅ ยืนยัน';
       return;
-    }
-
-    // ✅ [จุดที่ 3] Reset session หลังใช้เสร็จ ป้องกันครั้งต่อไปค้าง
-    try {
-      await callAdmin('logout', {});
-      console.log('[Verify] ✅ Logout session หลังใช้เสร็จ');
-    } catch (e) {
-      console.warn('[Verify] post-logout error (ignore):', e);
     }
 
     closeModal('modalVerifyPassword');
@@ -908,10 +916,33 @@ async function saveAllPOs(btnEl) {
         title: `🔒 ยืนยันการบันทึก PO ${po.po_no}`,
         message: 'PO นี้ Saved แล้ว — ต้องยืนยันรหัสผ่าน + หมายเหตุ',
         onConfirm: async (password, note) => {
-          const res = await callAdmin('verifyPassword', { username, password });
-          if (!res || !res.ok) {
-            return { ok: false, error: res?.error || 'รหัสผ่านไม่ถูกต้อง' };
+          // ✅ [V15] ใช้ tempClient.auth.signInWithPassword()
+          const email = currentUser?.email || '';
+
+          const tempClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            auth: {
+              persistSession: false,
+              autoRefreshToken: false,
+              detectSessionInUrl: false
+            }
+          });
+
+          const { data, error } = await tempClient.auth.signInWithPassword({
+            email: email,
+            password: password
+          });
+
+          if (error || !data.user) {
+            return { ok: false, error: 'รหัสผ่านไม่ถูกต้อง' };
           }
+
+          try {
+            await tempClient.auth.signOut();
+          } catch (e) {
+            console.warn('[Verify] tempClient signOut error:', e);
+          }
+
+          // Log การแก้ไข
           try {
             await supabase.from('po_change_log').insert({
               po_id: po.id,
@@ -922,6 +953,7 @@ async function saveAllPOs(btnEl) {
           } catch (logErr) {
             console.warn('po_change_log insert failed:', logErr);
           }
+
           await _doSaveAllPOs(posList, alertData, btnEl);
           return { ok: true };
         }
