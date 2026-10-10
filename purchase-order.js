@@ -15,6 +15,7 @@
 // ✅ NEW (V11): ปุ่ม "สร้าง PO ใหม่" — สร้าง PO เปล่าจากหน้า List
 // ✅ NEW (V12): เก็บลำดับเดิม (_editOriginalOrder) + ตรวจ isOrderChanged() + reorder_po_items
 // ✅ NEW (V16): Verify Password — ใช้ window.supabase.createClient() (Supabase Auth)
+// ✅ NEW (V17): เพิ่มช่องกรอกเลข PO เองในหน้า "สร้าง PO ใหม่" (default = Auto)
 // ═══════════════════════════════════════════════════════════════
 
 let poCache = [];
@@ -480,6 +481,7 @@ function _attachPOFilterDropdown(btnId, dropdownId, boxId, docKey) {
 
 // ═══════════════════════════════════════════════════════════════
 // ✅ NEW: สร้าง PO ใหม่ (ปุ่มจากหน้า List)
+// ✅ NEW (V17): เพิ่มช่องกรอกเลข PO เอง (default = Auto)
 // ═══════════════════════════════════════════════════════════════
 async function openCreatePOModal() {
   try {
@@ -504,10 +506,12 @@ async function openCreatePOModal() {
     await loadPriceMasterForMonth(poSelectedMonth);
 
     // 3. สร้าง header เปล่า
+    // ✅ (V17) เก็บค่าเดิม + เพิ่ม flag บอกว่าเป็น auto หรือ manual
     const todayISO = toISODate(today);
     const emptyHeader = {
       id: null,
-      po_no: nextPoNo || '(auto)',
+      po_no: nextPoNo || '',           // ← ปล่อยว่างไว้ ให้ User กรอกเองได้
+      po_no_auto: nextPoNo || '',      // ✅ เก็บค่าที่ระบบแนะนำ
       po_date: todayISO,
       sup_code: poSuppliers[0] || 'EKP',
       status: 'draft',
@@ -1193,6 +1197,7 @@ function renderPOFormContent(header, items) {
 
 // ═══════════════════════════════════════════════════════════════
 // ✅ Render ตาราง items + ปุ่ม + Info Bar (Editable)
+// ✅ (V17) เพิ่มช่องกรอก PO No. สำหรับโหมดสร้างใหม่
 // ═══════════════════════════════════════════════════════════════
 function renderPOFormTable() {
   const container = $('poFormBody');
@@ -1215,11 +1220,25 @@ function renderPOFormTable() {
 
   const isCreate = window._isCreateMode === true;
 
+  // ✅ (V17) สำหรับโหมดสร้างใหม่ — ให้กรอก PO No. ได้
+  const poNoField = isCreate
+    ? `<div class="po-info-field" style="flex:1;min-width:200px">
+         <label>เลขที่ PO (เว้นว่าง = Auto):</label>
+         <input type="text" id="editPoNo" class="po-info-input"
+                value="${esc(header.po_no || '')}"
+                placeholder="${esc(header.po_no_auto || 'PO...')}"
+                onchange="onEditHeaderChange('po_no', this.value.trim())"
+                style="font-weight:700;color:#1e40af">
+       </div>`
+    : '';
+
   let html = `<div class="po-info-bar">
     <div class="po-info-row">
-      <b>${isCreate ? '🧾 สร้าง PO ใหม่' : '✏️ แก้ไข PO'} — ${esc(header.po_no)}</b>
+      <b>${isCreate ? '🧾 สร้าง PO ใหม่' : '✏️ แก้ไข PO'} — ${esc(header.po_no || '(auto)')}</b>
       <span class="po-info-badge">สถานะ: <b>${header.status || 'draft'}</b></span>
     </div>
+
+    ${isCreate ? `<div class="po-info-grid">${poNoField}</div>` : ''}
 
     <div class="po-info-grid">
       <div class="po-info-field">
@@ -1380,7 +1399,7 @@ function renderPOFormTable() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ✅ NEW: ปุ่มบันทึก統一 (แยกโหมดสร้าง/แก้ไข)
+// ✅ NEW: ปุ่มบันทึก统一 (แยกโหมดสร้าง/แก้ไข)
 // ═══════════════════════════════════════════════════════════════
 async function savePOFormInline(btnEl) {
   const isCreate = window._isCreateMode === true;
@@ -1393,6 +1412,7 @@ async function savePOFormInline(btnEl) {
 
 // ═══════════════════════════════════════════════════════════════
 // ✅ NEW: สร้าง PO ใหม่ (INSERT)
+// ✅ (V17) ใช้เลข PO ที่ User กรอก (ถ้ามี) + ตรวจซ้ำ + validate format
 // ═══════════════════════════════════════════════════════════════
 async function saveCreatePO(btnEl) {
   const header = _editPOHeader;
@@ -1432,20 +1452,43 @@ async function saveCreatePO(btnEl) {
   }
 
   try {
-    // ✅ ขอเลข PO ใหม่
-    const today = new Date();
-    const yy = String(today.getFullYear()).slice(-2);
-    const mm = pad(today.getMonth() + 1);
+    // ✅ (V17) ใช้เลขที่ User กรอกก่อน ถ้าเว้นว่างค่อยขอจากระบบ
+    let poNo = (header.po_no || '').trim();
 
-    let poNo;
-    try {
-      const { data: nextNo, error: errNext } = await supabase.rpc('get_next_po_no', {
-        p_yy: yy, p_mm: mm
-      });
-      if (errNext) throw errNext;
-      poNo = nextNo;
-    } catch (e) {
-      throw new Error('ขอเลข PO ไม่สำเร็จ: ' + e.message);
+    if (!poNo) {
+      // ถ้าเว้นว่าง → ขอจากระบบ
+      const today = new Date();
+      const yy = String(today.getFullYear()).slice(-2);
+      const mm = pad(today.getMonth() + 1);
+
+      try {
+        const { data: nextNo, error: errNext } = await supabase.rpc('get_next_po_no', {
+          p_yy: yy, p_mm: mm
+        });
+        if (errNext) throw errNext;
+        poNo = nextNo;
+      } catch (e) {
+        throw new Error('ขอเลข PO ไม่สำเร็จ: ' + e.message);
+      }
+    } else {
+      // ✅ (V17) เช็คว่าซ้ำกับ PO ที่มีอยู่ไหม
+      const { data: existing } = await supabase
+        .from('purchase_orders')
+        .select('id')
+        .eq('po_no', poNo)
+        .maybeSingle();
+
+      if (existing) {
+        throw new Error(`⚠️ เลข PO "${poNo}" มีอยู่แล้วในระบบ กรุณาใช้เลขอื่น`);
+      }
+
+      // ✅ (V17) ตรวจสอบ format PO No.
+      // ✅ (V17) ตรวจสอบ format PO No.
+      if (!/^PO\d{10}$/.test(poNo) && !/^PO\d{2}\d{2}\d{4}$/.test(poNo)) {
+        // ยอมรับ format เช่น PO22610003 (PO + ปี 2 หลัก + เดือน 2 หลัก + เลข 4 หลัก)
+        // หรือปรับให้ตรงกับ format ที่ใช้จริง
+        throw new Error(`⚠️ รูปแบบเลข PO ไม่ถูกต้อง\n\nต้องเป็น PO + ตัวเลข 10 หลัก เช่น PO22610003\n(กรอก: ${poNo})`);
+      }
     }
 
     // ✅ เตรียม items
@@ -1476,7 +1519,7 @@ async function saveCreatePO(btnEl) {
     // ✅ Header
     const newHeader = {
       po_no: poNo,
-      po_date: header.po_date || toISODate(today),
+      po_date: header.po_date || toISODate(new Date()),
       sup_code: header.sup_code,
       status: 'draft',
       ref_snapshot: header.ref_snapshot || null,
@@ -1517,6 +1560,7 @@ async function saveCreatePO(btnEl) {
 
 // ═══════════════════════════════════════════════════════════════
 // ✅ ตรวจจับการแก้ไข Header
+// ✅ (V17) รองรับ po_no
 // ═══════════════════════════════════════════════════════════════
 function onEditHeaderChange(field, value) {
   if (!_editPOHeader) return;
@@ -1530,6 +1574,13 @@ function onEditHeaderChange(field, value) {
       _editHeaderDirty = true;
       renderPOFormTable();
     });
+    return;
+  }
+
+  // ✅ (V17) เพิ่ม: กรณีเปลี่ยน po_no
+  if (field === 'po_no') {
+    _editHeaderDirty = true;
+    // ไม่ต้อง render ใหม่ เพราะ input ยัง focus อยู่
     return;
   }
 
