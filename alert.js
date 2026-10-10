@@ -1,12 +1,16 @@
 // ═══════════════════════════════════════════════════════════════
 // STOCK V8 — alert.js (Flat Table + Filter + PO + Lock Date + FSC + History + Lock + Usage Plan)
 // + ✅ Hover Effect (เด่นทั้งแถว — ทับสี row-red/yellow/green)
+// + ✅ View Toggle: Flat / Matrix
 // ═══════════════════════════════════════════════════════════════
 
 let alertSelectedGrades = [];
 let alertAllGrades = [];
 let alertCache = [];
 let alertSupplierCache = [];
+
+// ✅ View mode: 'flat' (รายการ) | 'matrix' (Matrix)
+let alertViewMode = 'flat';
 
 // ✅ Size Filter
 let alertSelectedSizes = [];
@@ -374,6 +378,7 @@ function renderAlertFromCache() {
 
   // ✅ Render (summary ย้ายไปอยู่ใน date tabs แล้ว)
   let html = `<div id="alertDateTabsBox" class="alert-date-tabs"></div>`;
+  html += `<div id="alertViewToggleWrap"></div>`;   // ✅ เพิ่ม view toggle
 
   const sorted = [...alertCache].sort((a, b) => {
     if (a.gradegram !== b.gradegram) return a.gradegram.localeCompare(b.gradegram);
@@ -514,72 +519,10 @@ function renderAlertFromCache() {
   </th>`;
 
   html += '<th>ม้วนลูกค้า</th><th>คุณภาพ B</th><th>FSC</th><th>หมายเหตุ</th>';
-  html += '</tr></thead><tbody>';
-
-  let grandShortage = 0;
-
-  sorted.forEach(r => {
-    const a = Number(r.alert) || 0;
-    let rowCls, statusTxt;
-    if (a < 0)      { rowCls = 'row-red';    statusTxt = `🔴 ขาด ${Math.ceil(Math.abs(a))}`; grandShortage += Math.abs(a); }
-    else if (a === 0) { rowCls = 'row-yellow'; statusTxt = '🟡 พอดี'; }
-    else             { rowCls = 'row-green';  statusTxt = `🟢 เกิน ${Math.floor(a)}`; }
-
-    const lsKey = alertLS_Key(r.gradegram, r.size);
-    const lsVal = getAlertInput(lsKey);
-
-    const supOptions = alertSupplierCache.map(code =>
-      `<option value="${esc(code)}" ${lsVal.sup === code ? 'selected' : ''}>${esc(code)}</option>`
-    ).join('');
-
-    const custOptions = ALERT_CUSTOMER_ROLLS.map(c =>
-      `<option value="${c.value}" ${lsVal.customer_roll === c.value ? 'selected' : ''}>${c.label}</option>`
-    ).join('');
-
-    const qualOptions = ALERT_QUALITY_B.map(q =>
-      `<option value="${q.value}" ${lsVal.quality_b === q.value ? 'selected' : ''}>${q.label}</option>`
-    ).join('');
-
-    const isFSC = isFSCGrade(r.gradegram);
-    const fscBadge = isFSC
-      ? '<span class="badge ok" style="font-size:10px">🟢 FSC</span>'
-      : '<span class="badge" style="background:#f1f5f9;color:#64748b;font-size:10px">⚪ Non-FSC</span>';
-
-    const clsQty   = (lsVal.qty && Number(lsVal.qty) > 0) ? ' filled' : '';
-    const clsSup   = lsVal.sup ? ' filled' : '';
-    const clsCust  = (lsVal.customer_roll && lsVal.customer_roll !== 'normal') ? ' filled' : '';
-    const clsQual  = (lsVal.quality_b && lsVal.quality_b !== 'normal') ? ' filled' : '';
-    const clsNote  = lsVal.note ? ' filled' : '';
-
-    html += `<tr class="${rowCls}">`;
-    html += `<td class="grade-col clickable" onclick="openAlertDetail('${esc(r.gradegram)}', ${r.size})">${esc(r.gradegram)}</td>`;
-    html += `<td class="clickable" onclick="openAlertDetail('${esc(r.gradegram)}', ${r.size})">${r.size}</td>`;
-    html += `<td>${r.snapshot}</td>`;
-    html += `<td>${Number(r.stock).toFixed(2)}</td>`;
-    html += `<td>${r.receive}</td>`;
-    html += `<td class="usage-cell">${r.usage_plan ? Number(r.usage_plan).toFixed(2) : '-'}</td>`;
-    html += `<td class="alert-cell"><b>${a > 0 ? '+' + a : a}</b></td>`;
-    html += `<td class="status-cell">${statusTxt}</td>`;
-    html += `<td><input type="number" class="alert-input-qty${clsQty}" placeholder="-" value="${lsVal.qty || ''}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'qty', this.value, this)"></td>`;
-    html += `<td><select class="alert-input-sup${clsSup}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'sup', this.value, this)">
-      <option value="">-- Sup --</option>${supOptions}</select></td>`;
-    html += `<td><select class="alert-input-customer${clsCust}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'customer_roll', this.value, this)">${custOptions}</select></td>`;
-    html += `<td><select class="alert-input-quality${clsQual}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'quality_b', this.value, this)">${qualOptions}</select></td>`;
-    html += `<td class="fsc-cell">${fscBadge}</td>`;
-    html += `<td><input type="text" class="alert-input-note${clsNote}" placeholder="-" value="${esc(lsVal.note || '')}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'note', this.value, this)"></td>`;
-    html += '</tr>';
-  });
-
-  html += `<tr class="total-row">
-    <td colspan="8" style="text-align:right;font-weight:700">จำนวนรวม (ม้วน)</td>
-    <td style="font-weight:700;color:#dc2626;font-size:15px">${grandShortage > 0 ? grandShortage : '-'}</td>
-    <td colspan="7"></td>
-  </tr>`;
-
-  html += '</tbody></table></div>';
+  html += '</tr></thead><tbody></tbody></table></div>';
 
   html += `<div class="report-foot" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-    <div>Stock Level − (Stock + Receive) = Alert · รวมต้องสั่ง ${grandShortage} ม้วน</div>
+    <div>Stock Level − (Stock + Receive) = Alert</div>
     <div style="display:flex;gap:6px">
       <button class="primary" onclick="createPOFromAlert()">📄 สร้าง PO</button>
       <button class="danger" onclick="clearAlertInputs()">🗑 ล้างค่า</button>
@@ -616,11 +559,40 @@ function renderAlertFromCache() {
   _attachAlertDropdown('alertUsageFilterBtn', 'alertUsageFilterDropdown', 'alertUsageFilterBox', 'alertUsageFilter');
   renderAlertReceiveDates();
 
-  // ✅ เพิ่ม Hover Effect
-  initAlertRowHover();
-
-  // ✅ Apply filter แล้ว render ใหม่
+  // ✅ Apply filter แล้ว render ใหม่ (จะ auto-detect โหมด)
   applyAlertFiltersAndRender();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ✅ Alert View Toggle (Matrix / รายการ)
+// ═══════════════════════════════════════════════════════════════
+
+function setAlertViewMode(mode) {
+  if (mode !== 'flat' && mode !== 'matrix') return;
+  if (alertViewMode === mode) return;
+
+  alertViewMode = mode;
+  console.log('[Alert] เปลี่ยนโหมดเป็น:', mode);
+
+  // Re-render (ใช้ filter ปัจจุบัน)
+  renderAlertTableBody(alertCache);
+}
+
+function renderAlertViewToggle() {
+  return `
+    <div class="alert-view-toggle" id="alertViewToggle">
+      <button type="button"
+              class="${alertViewMode === 'flat' ? 'active' : ''}"
+              onclick="setAlertViewMode('flat')">
+        📋 รายการ
+      </button>
+      <button type="button"
+              class="${alertViewMode === 'matrix' ? 'active' : ''}"
+              onclick="setAlertViewMode('matrix')">
+        📊 Matrix
+      </button>
+    </div>
+  `;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1252,7 +1224,37 @@ function renderAlertTableBody(rows) {
     }
   }
 
-  // ✅ อัปเดต tbody
+  // ✅ หา container
+  const container = document.getElementById('alertBody');
+  if (!container) return;
+
+  // ✅ อัปเดตปุ่ม toggle (ถ้ายังไม่มี หรือมีอยู่ → re-render)
+  let toggleEl = document.getElementById('alertViewToggleWrap');
+  if (!toggleEl) {
+    toggleEl = document.createElement('div');
+    toggleEl.id = 'alertViewToggleWrap';
+    // แทรกก่อนตาราง
+    const dateTabsBox = document.getElementById('alertDateTabsBox');
+    if (dateTabsBox && dateTabsBox.parentNode) {
+      dateTabsBox.parentNode.insertBefore(toggleEl, dateTabsBox.nextSibling);
+    } else {
+      container.insertBefore(toggleEl, container.firstChild);
+    }
+  }
+  toggleEl.innerHTML = renderAlertViewToggle();
+
+  // ✅ เลือกโหมด render
+  if (alertViewMode === 'matrix') {
+    renderAlertMatrixView(rows);
+  } else {
+    renderAlertFlatView(rows);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ✅ Render: โหมดตารางรายการ (Flat)
+// ═══════════════════════════════════════════════════════════════
+function renderAlertFlatView(rows) {
   const tbody = document.querySelector('.alert-flat-table tbody');
   if (!tbody) return;
 
@@ -1328,9 +1330,185 @@ function renderAlertTableBody(rows) {
   </tr>`;
 
   tbody.innerHTML = html;
-
-  // ✅ เพิ่ม Hover Effect หลัง render tbody ใหม่
   initAlertRowHover();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ✅ Render: โหมด Matrix (ตารางไขว้)
+// ═══════════════════════════════════════════════════════════════
+
+function renderAlertMatrixView(rows) {
+  const container = document.getElementById('alertBody');
+  if (!container) return;
+
+  // ✅ หา wrapper ของตารางเดิม หรือสร้างใหม่
+  let matrixWrap = document.getElementById('alertMatrixWrap');
+  const flatTable = container.querySelector('.alert-flat-table');
+
+  if (!matrixWrap) {
+    matrixWrap = document.createElement('div');
+    matrixWrap.id = 'alertMatrixWrap';
+    matrixWrap.className = 'alert-matrix-wrap';
+
+    // ✅ ถ้ามี flat table อยู่ → ซ่อนไว้ (ไม่ลบ เพื่อสลับกลับได้เร็ว)
+    if (flatTable) {
+      flatTable.parentNode.style.display = 'none';
+    }
+
+    // แทรกก่อน report-foot
+    const reportFoot = container.querySelector('.report-foot');
+    if (reportFoot) {
+      container.insertBefore(matrixWrap, reportFoot);
+    } else {
+      container.appendChild(matrixWrap);
+    }
+  } else {
+    // ✅ ถ้ามี matrixWrap อยู่แล้ว → แสดง + ซ่อน flat
+    matrixWrap.style.display = '';
+    if (flatTable) flatTable.parentNode.style.display = 'none';
+  }
+
+  // ✅ สร้างข้อมูล Matrix
+  if (!rows.length) {
+    matrixWrap.innerHTML = '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่มีรายการ 🎉</p>';
+    return;
+  }
+
+  // ✅ หา unique grades + sizes
+  const grades = [...new Set(rows.map(r => r.gradegram))].sort();
+  const sizes  = [...new Set(rows.map(r => Number(r.size)))].sort((a, b) => a - b);
+
+  // ✅ สร้าง map: key = `${grade}|${size}` → row data
+  const dataMap = {};
+  rows.forEach(r => {
+    dataMap[`${r.gradegram}|${r.size}`] = r;
+  });
+
+  // ✅ คำนวณ total ต่อ grade และต่อ size
+  const gradeTotals = {};   // grade → { snapshot, stock, receive, usage, alert, qty }
+  const sizeTotals  = {};   // size  → { snapshot, stock, receive, usage, alert, qty }
+  let grandTotal = { snapshot: 0, stock: 0, receive: 0, usage: 0, alert: 0, qty: 0 };
+
+  grades.forEach(g => {
+    gradeTotals[g] = { snapshot: 0, stock: 0, receive: 0, usage: 0, alert: 0, qty: 0 };
+  });
+  sizes.forEach(s => {
+    sizeTotals[s] = { snapshot: 0, stock: 0, receive: 0, usage: 0, alert: 0, qty: 0 };
+  });
+
+  // ✅ Header row
+  let html = '<table class="alert-matrix-new-table"><thead><tr>';
+  html += '<th class="grade-col">Gradegram</th>';
+  html += '<th class="size-col">Size</th>';
+
+  // คอลัมน์ตัวเลข (ตามโหมดเดิม)
+  html += '<th>Snapshot</th>';
+  html += '<th>Stock</th>';
+  html += '<th>Receive</th>';
+  html += '<th>Usage Plan</th>';
+  html += '<th>Alert</th>';
+  html += '<th>สถานะ</th>';
+  html += '<th style="background:#dc2626">🛒 สั่งซื้อ</th>';
+  html += '</tr></thead><tbody>';
+
+  // ✅ วนแต่ละ grade → วนแต่ละ size
+  grades.forEach(grade => {
+    // เช็คว่า grade นี้มี size อะไรบ้าง
+    const sizesOfGrade = sizes.filter(s => dataMap[`${grade}|${s}`]);
+
+    sizesOfGrade.forEach((size, idx) => {
+      const r = dataMap[`${grade}|${size}`];
+      if (!r) return;
+
+      const a = Number(r.alert) || 0;
+      let rowCls, statusTxt;
+      if (a < 0)      { rowCls = 'row-red';    statusTxt = `🔴 ขาด ${Math.ceil(Math.abs(a))}`; }
+      else if (a === 0) { rowCls = 'row-yellow'; statusTxt = '🟡 พอดี'; }
+      else             { rowCls = 'row-green';  statusTxt = `🟢 เกิน ${Math.floor(a)}`; }
+
+      const lsKey = alertLS_Key(r.gradegram, r.size);
+      const lsVal = getAlertInput(lsKey);
+      const qty = Number(lsVal.qty) || 0;
+
+      // ✅ สะสมค่า
+      gradeTotals[grade].snapshot += Number(r.snapshot) || 0;
+      gradeTotals[grade].stock    += Number(r.stock) || 0;
+      gradeTotals[grade].receive  += Number(r.receive) || 0;
+      gradeTotals[grade].usage    += Number(r.usage_plan) || 0;
+      gradeTotals[grade].alert    += a;
+      gradeTotals[grade].qty      += qty;
+
+      sizeTotals[size].snapshot += Number(r.snapshot) || 0;
+      sizeTotals[size].stock    += Number(r.stock) || 0;
+      sizeTotals[size].receive  += Number(r.receive) || 0;
+      sizeTotals[size].usage    += Number(r.usage_plan) || 0;
+      sizeTotals[size].alert    += a;
+      sizeTotals[size].qty      += qty;
+
+      grandTotal.snapshot += Number(r.snapshot) || 0;
+      grandTotal.stock    += Number(r.stock) || 0;
+      grandTotal.receive  += Number(r.receive) || 0;
+      grandTotal.usage    += Number(r.usage_plan) || 0;
+      grandTotal.alert    += a;
+      grandTotal.qty      += qty;
+
+      // ✅ แสดง grade + size เฉพาะแถวแรกของ grade (rowspan)
+      const showGrade = idx === 0;
+      const rowspanAttr = showGrade ? ` rowspan="${sizesOfGrade.length}"` : '';
+
+      html += `<tr class="${rowCls}">`;
+      if (showGrade) {
+        html += `<td class="grade-col"${rowspanAttr}><b>${esc(grade)}</b></td>`;
+      }
+      html += `<td class="size-col">${size}</td>`;
+      html += `<td>${r.snapshot}</td>`;
+      html += `<td>${Number(r.stock).toFixed(2)}</td>`;
+      html += `<td>${r.receive}</td>`;
+      html += `<td>${r.usage_plan ? Number(r.usage_plan).toFixed(2) : '-'}</td>`;
+      html += `<td class="alert-cell"><b>${a > 0 ? '+' + a : a}</b></td>`;
+      html += `<td style="font-size:11px">${statusTxt}</td>`;
+
+      // ✅ คอลัมน์กรอกจำนวนสั่งซื้อ
+      const clsQty = qty > 0 ? ' filled' : '';
+      html += `<td><input type="number"
+        class="alert-matrix-input${clsQty}"
+        placeholder="-"
+        value="${lsVal.qty || ''}"
+        onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'qty', this.value, this)"></td>`;
+
+      html += '</tr>';
+    });
+  });
+
+  // ✅ แถว Total (ท้ายตาราง)
+  html += `<tr class="total-row">`;
+  html += `<td class="grade-col" colspan="2" style="text-align:right">รวม</td>`;
+  html += `<td>${grandTotal.snapshot}</td>`;
+  html += `<td>${grandTotal.stock.toFixed(2)}</td>`;
+  html += `<td>${grandTotal.receive}</td>`;
+  html += `<td>${grandTotal.usage.toFixed(2)}</td>`;
+  html += `<td style="color:#dc2626">${grandTotal.alert > 0 ? '+' + grandTotal.alert : grandTotal.alert}</td>`;
+  html += `<td></td>`;
+  html += `<td style="color:#dc2626;font-weight:700">${grandTotal.qty > 0 ? grandTotal.qty : '-'}</td>`;
+  html += `</tr>`;
+
+  html += '</tbody></table>';
+
+  matrixWrap.innerHTML = html;
+
+  // ✅ ปรับความสูงของ grade-col / size-col ให้ไม่ทับกัน
+  setTimeout(() => {
+    const gradeCols = matrixWrap.querySelectorAll('.grade-col');
+    const sizeCols  = matrixWrap.querySelectorAll('.size-col');
+
+    // หาความกว้างจริงของ grade-col แรก แล้ว set left ให้ size-col
+    if (gradeCols.length > 0) {
+      const gradeWidth = gradeCols[0].offsetWidth;
+      sizeCols.forEach(sc => {
+        sc.style.left = gradeWidth + 'px';
+      });
+    }
+  }, 50);
 }
 
 // ================= DROPDOWN HELPER =================
@@ -1657,6 +1835,7 @@ async function renderAlert() {
 
     // ✅ Summary block ถูกลบออก (ย้ายไปอยู่ใน renderAlertDateTabs)
     let html = `<div id="alertDateTabsBox" class="alert-date-tabs"></div>`;
+    html += `<div id="alertViewToggleWrap"></div>`;   // ✅ เพิ่ม view toggle
 
     if (!display.length) {
       html += '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่มีรายการ 🎉</p>';
@@ -1809,72 +1988,10 @@ async function renderAlert() {
     </th>`;
 
     html += '<th>ม้วนลูกค้า</th><th>คุณภาพ B</th><th>FSC</th><th>หมายเหตุ</th>';
-    html += '</tr></thead><tbody>';
-
-    let grandShortage = 0;
-
-    sorted.forEach(r => {
-      const a = Number(r.alert) || 0;
-      let rowCls, statusTxt;
-      if (a < 0)      { rowCls = 'row-red';    statusTxt = `🔴 ขาด ${Math.ceil(Math.abs(a))}`;  grandShortage += Math.abs(a); }
-      else if (a === 0) { rowCls = 'row-yellow'; statusTxt = '🟡 พอดี'; }
-      else             { rowCls = 'row-green';  statusTxt = `🟢 เกิน ${Math.floor(a)}`; }
-
-      const lsKey = alertLS_Key(r.gradegram, r.size);
-      const lsVal = getAlertInput(lsKey);
-
-      const supOptions = alertSupplierCache.map(code =>
-        `<option value="${esc(code)}" ${lsVal.sup === code ? 'selected' : ''}>${esc(code)}</option>`
-      ).join('');
-
-      const custOptions = ALERT_CUSTOMER_ROLLS.map(c =>
-        `<option value="${c.value}" ${lsVal.customer_roll === c.value ? 'selected' : ''}>${c.label}</option>`
-      ).join('');
-
-      const qualOptions = ALERT_QUALITY_B.map(q =>
-        `<option value="${q.value}" ${lsVal.quality_b === q.value ? 'selected' : ''}>${q.label}</option>`
-      ).join('');
-
-      const isFSC = isFSCGrade(r.gradegram);
-      const fscBadge = isFSC
-        ? '<span class="badge ok" style="font-size:10px">🟢 FSC</span>'
-        : '<span class="badge" style="background:#f1f5f9;color:#64748b;font-size:10px">⚪ Non-FSC</span>';
-
-      const clsQty   = (lsVal.qty && Number(lsVal.qty) > 0) ? ' filled' : '';
-      const clsSup   = lsVal.sup ? ' filled' : '';
-      const clsCust  = (lsVal.customer_roll && lsVal.customer_roll !== 'normal') ? ' filled' : '';
-      const clsQual  = (lsVal.quality_b && lsVal.quality_b !== 'normal') ? ' filled' : '';
-      const clsNote  = lsVal.note ? ' filled' : '';
-
-      html += `<tr class="${rowCls}">`;
-      html += `<td class="grade-col clickable" onclick="openAlertDetail('${esc(r.gradegram)}', ${r.size})">${esc(r.gradegram)}</td>`;
-      html += `<td class="clickable" onclick="openAlertDetail('${esc(r.gradegram)}', ${r.size})">${r.size}</td>`;
-      html += `<td>${r.snapshot}</td>`;
-      html += `<td>${Number(r.stock).toFixed(2)}</td>`;
-      html += `<td>${r.receive}</td>`;
-      html += `<td class="usage-cell">${r.usage_plan ? Number(r.usage_plan).toFixed(2) : '-'}</td>`;
-      html += `<td class="alert-cell"><b>${a > 0 ? '+' + a : a}</b></td>`;
-      html += `<td class="status-cell">${statusTxt}</td>`;
-      html += `<td><input type="number" class="alert-input-qty${clsQty}" placeholder="-" value="${lsVal.qty || ''}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'qty', this.value, this)"></td>`;
-      html += `<td><select class="alert-input-sup${clsSup}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'sup', this.value, this)">
-        <option value="">-- Sup --</option>${supOptions}</select></td>`;
-      html += `<td><select class="alert-input-customer${clsCust}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'customer_roll', this.value, this)">${custOptions}</select></td>`;
-      html += `<td><select class="alert-input-quality${clsQual}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'quality_b', this.value, this)">${qualOptions}</select></td>`;
-      html += `<td class="fsc-cell">${fscBadge}</td>`;
-      html += `<td><input type="text" class="alert-input-note${clsNote}" placeholder="-" value="${esc(lsVal.note || '')}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'note', this.value, this)"></td>`;
-      html += '</tr>';
-    });
-
-    html += `<tr class="total-row">
-      <td colspan="8" style="text-align:right;font-weight:700">จำนวนรวม (ม้วน)</td>
-      <td style="font-weight:700;color:#dc2626;font-size:15px">${grandShortage > 0 ? grandShortage : '-'}</td>
-      <td colspan="7"></td>
-    </tr>`;
-
-    html += '</tbody></table></div>';
+    html += '</tr></thead><tbody></tbody></table></div>';
 
     html += `<div class="report-foot" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-      <div>Stock Level − (Stock + Receive) = Alert · รวมต้องสั่ง ${grandShortage} ม้วน</div>
+      <div>Stock Level − (Stock + Receive) = Alert</div>
       <div style="display:flex;gap:6px">
         <button class="primary" onclick="createPOFromAlert()">📄 สร้าง PO</button>
         <button class="danger" onclick="clearAlertInputs()">🗑 ล้างค่า</button>
@@ -1923,10 +2040,7 @@ async function renderAlert() {
     _attachAlertDropdown('alertUsageFilterBtn', 'alertUsageFilterDropdown', 'alertUsageFilterBox', 'alertUsageFilter');
     renderAlertDateTabs();
 
-    // ✅ เพิ่ม Hover Effect หลัง render ครั้งแรก
-    initAlertRowHover();
-
-    // ✅ Apply filter แล้ว render ใหม่ (ถ้ามี filter ค้างอยู่)
+    // ✅ Apply filter แล้ว render ใหม่ (จะ auto-detect โหมด)
     applyAlertFiltersAndRender();
 
     if (hasPOEdited()) {
