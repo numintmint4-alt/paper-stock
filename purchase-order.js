@@ -1482,14 +1482,10 @@ async function saveCreatePO(btnEl) {
         throw new Error(`⚠️ เลข PO "${poNo}" มีอยู่แล้วในระบบ กรุณาใช้เลขอื่น`);
       }
 
-      // ✅ (V17) ตรวจสอบ format PO No.
-      // ✅ (V17) ตรวจสอบ format PO No.
-      if (!/^PO\d{10}$/.test(poNo) && !/^PO\d{2}\d{2}\d{4}$/.test(poNo)) {
-        // ยอมรับ format เช่น PO22610003 (PO + ปี 2 หลัก + เดือน 2 หลัก + เลข 4 หลัก)
-        // หรือปรับให้ตรงกับ format ที่ใช้จริง
-        throw new Error(`⚠️ รูปแบบเลข PO ไม่ถูกต้อง\n\nต้องเป็น PO + ตัวเลข 10 หลัก เช่น PO22610003\n(กรอก: ${poNo})`);
+            // ✅ (V18) ตรวจสอบ format PO No. — ยอมรับ PO + ตัวเลข 6-15 หลัก
+      if (!/^PO\d{6,15}$/.test(poNo)) {
+        throw new Error(`⚠️ รูปแบบเลข PO ไม่ถูกต้อง\n\nต้องเป็น PO ตามด้วยตัวเลข 6-15 หลัก\nเช่น PO22610003\n(กรอก: ${poNo})`);
       }
-    }
 
     // ✅ เตรียม items
     const items = activeRows.map((row, idx) => {
