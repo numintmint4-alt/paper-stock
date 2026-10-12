@@ -4,6 +4,9 @@
 // + ✅ View Toggle: Flat / Matrix (ตารางไขว้ Gradegram × Size)
 // + ✅ Matrix Cell Modal + ฟอร์มสั่งซื้อ
 // + ✅ Multi-item per cell (สูงสุด 5 รายการ/ช่อง)
+// + ✅ ล็อกวันที่วิเคราะห์ = วันนี้
+// + ✅ วันที่รับสินค้า จ-ส (ไม่รวม อา)
+// + ✅ Alert History (ตรวจสอบย้อนหลัง)
 // ═══════════════════════════════════════════════════════════════
 
 let alertSelectedGrades = [];
@@ -91,6 +94,10 @@ let alertActiveDateIdx = 0;
 let alertUsageRanges = [];      // [{ date_from, date_to }]
 let alertUsageSelected = null;  // { date_from, date_to } หรือ null
 
+// ✅ History view state
+let alertHistoryMode = 'matrix';   // 'matrix' | 'flat'
+let alertHistoryData = null;       // snapshot ที่โหลดมา
+
 function getAlertLSKey(dateIdx = alertActiveDateIdx) {
   return `${ALERT_LS_KEY_PREFIX}${dateIdx + 1}`;
 }
@@ -105,7 +112,7 @@ function _parseLocalDate(iso) {
 function _nextWorkingDay(fromDate) {
   const d = new Date(fromDate);
   d.setDate(d.getDate() + 1);
-  if (d.getDay() === 0) d.setDate(d.getDate() + 1);
+  while (d.getDay() === 0) d.setDate(d.getDate() + 1);  // ✅ ข้ามอาทิตย์
   return d;
 }
 
@@ -144,10 +151,23 @@ let _pendingPOItems = [];
 async function initAlertTab() {
   const today = toISODate(new Date());
 
+  // ✅ ล็อก alertDate = วันนี้เสมอ
   const alertDateEl = $('alertDate');
-  if (alertDateEl && !alertDateEl.value) alertDateEl.value = today;
+  if (alertDateEl) {
+    alertDateEl.value = today;
+    alertDateEl.readOnly = true;
+    alertDateEl.style.pointerEvents = 'none';
+    alertDateEl.style.background = '#f1f5f9';
+    alertDateEl.style.cursor = 'not-allowed';
+  }
 
-  applyCalculatedDates($('alertDate')?.value || today);
+  // ✅ ถ้าใช้ span แสดงผล (เผื่อไว้)
+  const displayEl = $('alertDateDisplay');
+  if (displayEl) {
+    displayEl.textContent = fmtDateThai(today);
+  }
+
+  applyCalculatedDates(today);
   attachAlertDateListener();
 
   await loadAlertSuppliers();
@@ -161,6 +181,9 @@ async function initAlertTab() {
   renderUsageRangeDropdown();
 
   await onAlertDateChange();
+
+  // ✅ แสดงการ์ดประวัติ
+  showAlertHistoryCard();
 }
 
 // ✅ แก้ #4: ลบการ set alertSnapshotMonth ออก — ปล่อยให้ loadSnapshotMonths() จัดการ
@@ -179,6 +202,7 @@ function attachAlertDateListener() {
   if (el && el.dataset.listenerAttached !== '1') {
     el.dataset.listenerAttached = '1';
     el.addEventListener('change', () => {
+      // ✅ วันที่ถูกล็อกไว้ = วันนี้ ไม่ต้องให้ user เปลี่ยน
       applyCalculatedDates(el.value);
       onAlertDateChange();
     });
@@ -364,7 +388,6 @@ function renderAlertFromCache() {
   window._alertFullCache = [...alertCache];
 
   let html = `<div id="alertDateTabsBox" class="alert-date-tabs"></div>`;
-  html += `<div id="alertViewToggleWrap"></div>`;
 
   const sorted = [...alertCache].sort((a, b) => {
     if (a.gradegram !== b.gradegram) return a.gradegram.localeCompare(b.gradegram);
@@ -504,12 +527,12 @@ function renderAlertFromCache() {
   html += '<th>ม้วนลูกค้า</th><th>คุณภาพ B</th><th>FSC</th><th>หมายเหตุ</th>';
   html += '</tr></thead><tbody></tbody></table></div>';
 
+  // ✅ ลบปุ่มพิมพ์ออก (ขั้นตอนที่ 2)
   html += `<div class="report-foot" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
     <div>Stock Level − (Stock + Receive) = Alert</div>
     <div style="display:flex;gap:6px">
       <button class="primary" onclick="createPOFromAlert()">📄 สร้าง PO</button>
       <button class="danger" onclick="clearAlertInputs()">🗑 ล้างค่า</button>
-      <button onclick="window.print()">🖨 พิมพ์</button>
     </div>
   </div>`;
 
@@ -557,23 +580,6 @@ function setAlertViewMode(mode) {
   console.log('[Alert] เปลี่ยนโหมดเป็น:', mode);
 
   renderAlertTableBody(alertCache);
-}
-
-function renderAlertViewToggle() {
-  return `
-    <div class="alert-view-toggle" id="alertViewToggle">
-      <button type="button"
-              class="${alertViewMode === 'flat' ? 'active' : ''}"
-              onclick="setAlertViewMode('flat')">
-        📋 รายการ
-      </button>
-      <button type="button"
-              class="${alertViewMode === 'matrix' ? 'active' : ''}"
-              onclick="setAlertViewMode('matrix')">
-        📊 Matrix
-      </button>
-    </div>
-  `;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1212,20 +1218,6 @@ function renderAlertTableBody(rows) {
   if (flatWrap) flatWrap.style.display = 'none';
   if (matrixWrapOld) matrixWrapOld.style.display = 'none';
 
-  // ✅ จัดการปุ่ม toggle
-  let toggleEl = document.getElementById('alertViewToggleWrap');
-  if (!toggleEl) {
-    toggleEl = document.createElement('div');
-    toggleEl.id = 'alertViewToggleWrap';
-    const dateTabsBox = document.getElementById('alertDateTabsBox');
-    if (dateTabsBox && dateTabsBox.parentNode) {
-      dateTabsBox.parentNode.insertBefore(toggleEl, dateTabsBox.nextSibling);
-    } else {
-      container.insertBefore(toggleEl, container.firstChild);
-    }
-  }
-  toggleEl.innerHTML = renderAlertViewToggle();
-
   // ✅ เลือกโหมด render
   if (alertViewMode === 'matrix') {
     if (flatWrap) flatWrap.style.display = 'none';
@@ -1462,14 +1454,14 @@ function renderAlertMatrixView(rows) {
       const totalQty = getAlertQtyTotal(r.gradegram, r.size);
       const hasOrder = totalQty > 0;
 
-      const orderBadge = hasOrder
-        ? `<div class="matrix-order-badge">📦 ${totalQty}</div>`
-        : '';
+      // ✅ รถเข็นต่อท้ายตัวเลข (ขั้นตอนที่ 3)
+      const cartIcon = hasOrder ? `<span class="matrix-cart-icon">🛒</span>` : '';
 
       html += `<td class="matrix-cell ${cellCls} ${hasOrder ? 'has-order' : ''}"
                     onclick="openAlertMatrixCell('${esc(grade)}', ${size})">
-                 <div class="matrix-value">${a > 0 ? '+' + a : a}</div>
-                 ${orderBadge}
+                 <div class="matrix-value">
+                   ${a > 0 ? '+' + a : a}${cartIcon}
+                 </div>
                </td>`;
     });
 
@@ -1983,7 +1975,7 @@ function clearPOFlags() {
 function getNextWorkingDay(baseDate = new Date()) {
   const d = new Date(baseDate);
   d.setDate(d.getDate() + 1);
-  if (d.getDay() === 0) d.setDate(d.getDate() + 1);
+  while (d.getDay() === 0) d.setDate(d.getDate() + 1);  // ✅ ข้ามอาทิตย์
   return toISODate(d);
 }
 
@@ -2012,6 +2004,11 @@ function addAlertReceiveDate() {
     .sort((a, b) => a - b);
 
   if (sorted.length === 0) {
+    // ✅ เช็ควันอาทิตย์
+    if (_parseLocalDate(analyzedDate).getDay() === 0) {
+      alert('⚠️ ไม่สามารถเลือกวันอาทิตย์ได้');
+      return;
+    }
     alertReceiveDates.push(analyzedDate);
     saveAlertReceiveDates();
     renderAlertDateTabs();
@@ -2024,7 +2021,7 @@ function addAlertReceiveDate() {
 
   let cursor = new Date(analyzedD);
   while (cursor <= lastD) {
-    if (cursor.getDay() !== 0) {
+    if (cursor.getDay() !== 0) {   // ✅ ข้ามอาทิตย์
       const iso = toISODate(cursor);
       if (!existing.has(iso)) {
         alertReceiveDates.push(iso);
@@ -2038,6 +2035,9 @@ function addAlertReceiveDate() {
   }
 
   const nextD = _nextWorkingDay(lastD);
+  // ✅ ป้องกันหากรอบสุดท้ายเป็นอาทิตย์
+  while (nextD.getDay() === 0) nextD.setDate(nextD.getDate() + 1);
+
   alertReceiveDates.push(toISODate(nextD));
   alertReceiveDates.sort((a, b) => _parseLocalDate(a) - _parseLocalDate(b));
   saveAlertReceiveDates();
@@ -2082,6 +2082,7 @@ function switchAlertDate(idx) {
   renderAlert();
 }
 
+// ✅ Date Tabs แคบลง + View Toggle inline ตรงกลาง + Summary ขวา
 function renderAlertDateTabs() {
   const box = $('alertDateTabsBox');
   if (!box) return;
@@ -2091,8 +2092,9 @@ function renderAlertDateTabs() {
   const totalOK       = cache.filter(r => Number(r.alert) === 0).length;
   const totalOver     = cache.filter(r => Number(r.alert) > 0).length;
 
+  // ✅ ซ้าย: date tabs (แคบ)
   let html = '<div class="alert-date-tabs-left">';
-  html += '<span class="alert-date-label">📅 วันที่รับสินค้า:</span>';
+  html += '<span class="alert-date-label">📅:</span>';
 
   alertReceiveDates.forEach((d, i) => {
     const dObj = new Date(d);
@@ -2104,15 +2106,22 @@ function renderAlertDateTabs() {
 
     html += `<span class="alert-date-tab-wrap ${active ? 'is-active' : ''}">
       <button type="button" class="alert-date-tab ${active}" onclick="switchAlertDate(${i})">
-        📅 วันที่ : ${display}
+        📅 ${display}
       </button>
       <button type="button" class="alert-date-tab-close" onclick="removeAlertReceiveDate(${i})" title="ลบวันนี้">✕</button>
     </span>`;
   });
 
-  html += `<button type="button" class="alert-date-add-btn" onclick="addAlertReceiveDate()">+ เพิ่มวันที่รับสินค้า</button>`;
+  html += `<button type="button" class="alert-date-add-btn" onclick="addAlertReceiveDate()">+ เพิ่มวัน</button>`;
   html += '</div>';
 
+  // ✅ กลาง: View Toggle (ย้ายมาไว้ตรงนี้)
+  html += '<div class="alert-view-toggle-inline">';
+  html += `<button type="button" class="${alertViewMode === 'flat' ? 'active' : ''}" onclick="setAlertViewMode('flat')">📋 รายการ</button>`;
+  html += `<button type="button" class="${alertViewMode === 'matrix' ? 'active' : ''}" onclick="setAlertViewMode('matrix')">📊 Matrix</button>`;
+  html += '</div>';
+
+  // ✅ ขวา: Summary
   html += '<div class="alert-date-tabs-right">';
   html += `<span class="item red">🔴 ${totalShortage}</span>`;
   html += `<span class="item yellow">🟡 ${totalOK}</span>`;
@@ -2124,6 +2133,13 @@ function renderAlertDateTabs() {
 
 function initAlertReceiveDates() {
   alertReceiveDates = loadAlertReceiveDates();
+
+  // ✅ กรองวันอาทิตย์ออก
+  alertReceiveDates = alertReceiveDates.filter(d => {
+    const dt = _parseLocalDate(d);
+    return dt && dt.getDay() !== 0;
+  });
+
   if (alertReceiveDates.length === 0) {
     alertReceiveDates.push(getNextWorkingDay());
     saveAlertReceiveDates();
@@ -2198,7 +2214,6 @@ async function renderAlert() {
     const display = result;
 
     let html = `<div id="alertDateTabsBox" class="alert-date-tabs"></div>`;
-    html += `<div id="alertViewToggleWrap"></div>`;
 
     if (!display.length) {
       html += '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่มีรายการ 🎉</p>';
@@ -2346,12 +2361,12 @@ async function renderAlert() {
     html += '<th>ม้วนลูกค้า</th><th>คุณภาพ B</th><th>FSC</th><th>หมายเหตุ</th>';
     html += '</tr></thead><tbody></tbody></table></div>';
 
+    // ✅ ลบปุ่มพิมพ์ออก
     html += `<div class="report-foot" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
       <div>Stock Level − (Stock + Receive) = Alert</div>
       <div style="display:flex;gap:6px">
         <button class="primary" onclick="createPOFromAlert()">📄 สร้าง PO</button>
         <button class="danger" onclick="clearAlertInputs()">🗑 ล้างค่า</button>
-        <button onclick="window.print()">🖨 พิมพ์</button>
       </div>
     </div>`;
 
@@ -3047,6 +3062,179 @@ async function clearUsagePlan() {
   } catch (e) {
     alert('❌ ' + e.message);
   }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ✅ Alert History (ตรวจสอบย้อนหลัง)
+// ═══════════════════════════════════════════════════════════
+
+function showAlertHistoryCard() {
+  const card = $('alertHistoryCard');
+  if (card) card.style.display = '';
+
+  // ✅ ตั้ง default date = today
+  const dateEl = $('alertHistoryDate');
+  if (dateEl && !dateEl.value) {
+    dateEl.value = toISODate(new Date());
+  }
+}
+
+function setAlertHistoryMode(mode) {
+  if (mode !== 'matrix' && mode !== 'flat') return;
+  alertHistoryMode = mode;
+
+  // ✅ อัปเดตปุ่ม toggle
+  document.querySelectorAll('#alertHistoryToggle button').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.mode === mode);
+  });
+
+  // ✅ Re-render ถ้ามีข้อมูล
+  if (alertHistoryData) {
+    renderAlertHistory();
+  }
+}
+
+async function loadAlertHistory() {
+  const dateEl = $('alertHistoryDate');
+  const date = dateEl?.value;
+  if (!date) {
+    alert('กรุณาเลือกวันที่');
+    return;
+  }
+
+  const body = $('alertHistoryBody');
+  if (body) body.innerHTML = '<p style="text-align:center;color:#94a3b8;padding:30px">กำลังโหลด...</p>';
+
+  try {
+    const snapshot = await loadAlertSnapshot(date);
+
+    if (!snapshot) {
+      body.innerHTML = '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่พบข้อมูลของวันนี้ 🎉</p>';
+      alertHistoryData = null;
+      return;
+    }
+
+    alertHistoryData = snapshot.result_json || [];
+    if (!alertHistoryData.length) {
+      body.innerHTML = '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่มีรายการ</p>';
+      return;
+    }
+
+    renderAlertHistory();
+  } catch (e) {
+    console.error('loadAlertHistory:', e);
+    body.innerHTML = `<div class="msg err">โหลดไม่สำเร็จ: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderAlertHistory() {
+  const body = $('alertHistoryBody');
+  if (!body || !alertHistoryData) return;
+
+  if (alertHistoryMode === 'matrix') {
+    body.innerHTML = buildHistoryMatrixHtml(alertHistoryData);
+  } else {
+    body.innerHTML = buildHistoryFlatHtml(alertHistoryData);
+  }
+}
+
+// ✅ สร้างตาราง Matrix (read-only)
+function buildHistoryMatrixHtml(rows) {
+  const grades = [...new Set(rows.map(r => r.gradegram))].sort();
+  const sizes  = [...new Set(rows.map(r => Number(r.size)))].sort((a, b) => a - b);
+
+  const dataMap = {};
+  rows.forEach(r => { dataMap[`${r.gradegram}|${r.size}`] = r; });
+
+  let html = '<table class="alert-matrix-new-table"><thead><tr>';
+  html += '<th class="grade-col-matrix">GRADEGRAMS</th>';
+  sizes.forEach(s => { html += `<th>${s}</th>`; });
+  html += '<th class="total-col-matrix">TOTAL</th></tr></thead><tbody>';
+
+  grades.forEach(grade => {
+    html += '<tr>';
+    html += `<td class="grade-col-matrix">${esc(grade)}</td>`;
+
+    let rowTotal = 0;
+    sizes.forEach(size => {
+      const r = dataMap[`${grade}|${size}`];
+      if (!r) { html += '<td class="empty-cell">-</td>'; return; }
+
+      const a = Number(r.alert) || 0;
+      rowTotal += a;
+
+      let cellCls = '';
+      if (a < 0)        cellCls = 'matrix-red';
+      else if (a === 0) cellCls = 'matrix-yellow';
+      else              cellCls = 'matrix-green';
+
+      html += `<td class="matrix-cell ${cellCls}">
+                 <div class="matrix-value">${a > 0 ? '+' + a : a}</div>
+               </td>`;
+    });
+
+    html += `<td class="total-col-matrix">${rowTotal > 0 ? '+' + rowTotal.toFixed(2) : rowTotal.toFixed(2)}</td>`;
+    html += '</tr>';
+  });
+
+  // Total row
+  html += '<tr class="total-row-matrix">';
+  html += '<td class="grade-col-matrix" style="text-align:right">TOTAL</td>';
+  sizes.forEach(size => {
+    let colTotal = 0;
+    grades.forEach(grade => {
+      const r = dataMap[`${grade}|${size}`];
+      if (r) colTotal += Number(r.alert) || 0;
+    });
+    html += `<td>${colTotal > 0 ? '+' + colTotal.toFixed(2) : colTotal.toFixed(2)}</td>`;
+  });
+  const grandTotal = rows.reduce((s, r) => s + (Number(r.alert) || 0), 0);
+  html += `<td class="total-col-matrix">${grandTotal > 0 ? '+' + grandTotal.toFixed(2) : grandTotal.toFixed(2)}</td>`;
+  html += '</tr></tbody></table>';
+
+  return html;
+}
+
+// ✅ สร้างตาราง Flat (read-only)
+function buildHistoryFlatHtml(rows) {
+  const sorted = [...rows].sort((a, b) => {
+    if (a.gradegram !== b.gradegram) return a.gradegram.localeCompare(b.gradegram);
+    return a.size - b.size;
+  });
+
+  let html = '<table class="alert-flat-table" style="width:100%"><thead><tr>';
+  html += '<th>Gradegrams</th><th>Size</th><th>Stock Level</th><th>Stock</th><th>Receive</th>';
+  html += '<th>Usage Plan</th><th>Alert</th><th>สถานะ</th><th>ม้วนลูกค้า</th><th>คุณภาพ B</th><th>FSC</th><th>หมายเหตุ</th>';
+  html += '</tr></thead><tbody>';
+
+  sorted.forEach(r => {
+    const a = Number(r.alert) || 0;
+    let rowCls, statusTxt;
+    if (a < 0)        { rowCls = 'row-red';    statusTxt = `🔴 ขาด ${Math.ceil(Math.abs(a))}`; }
+    else if (a === 0) { rowCls = 'row-yellow'; statusTxt = '🟡 พอดี'; }
+    else              { rowCls = 'row-green';  statusTxt = `🟢 เกิน ${Math.floor(a)}`; }
+
+    const isFSC = isFSCGrade(r.gradegram);
+    const fscBadge = isFSC ? '🟢 FSC' : '⚪ Non-FSC';
+
+    html += `<tr class="${rowCls}">`;
+    html += `<td class="grade-col">${esc(r.gradegram)}</td>`;
+    html += `<td>${r.size}</td>`;
+    html += `<td>${r.snapshot}</td>`;
+    html += `<td>${Number(r.stock).toFixed(2)}</td>`;
+    html += `<td>${r.receive}</td>`;
+    html += `<td>${r.usage_plan ? Number(r.usage_plan).toFixed(2) : '-'}</td>`;
+    html += `<td class="alert-cell"><b>${a > 0 ? '+' + a : a}</b></td>`;
+    html += `<td class="status-cell">${statusTxt}</td>`;
+    html += `<td>-</td>`;
+    html += `<td>-</td>`;
+    html += `<td>${fscBadge}</td>`;
+    html += `<td>-</td>`;
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  return html;
 }
 
 // ================= EXPORT =================
