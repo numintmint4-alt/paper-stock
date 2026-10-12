@@ -1824,3 +1824,49 @@ table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
   filter: brightness(0.92);
   box-shadow: inset 0 0 0 2px var(--primary-dark);
 }
+/* ═══════════════════════════════════════════════════════════ */
+/* ✅ Fix 1: ปุ่ม วิเคราะห์ / Import — สูง 30px เท่าฟิลเตอร์ */
+/* ═══════════════════════════════════════════════════════════ */
+.filters > button,
+.filters .btn-analyze,
+.filters .btn-import,
+.filters button.primary,
+.filters button.danger {
+  height: 30px !important;
+  min-height: 30px !important;
+  max-height: 30px !important;
+  padding: 0 12px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 12.5px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  box-sizing: border-box !important;
+  vertical-align: middle !important;
+}
+
+/* ═══════════════════════════════════════════════════════════ */
+/* ✅ Fix 2: Stock Level เดือน — กว้าง 150px */
+/* ═══════════════════════════════════════════════════════════ */
+.filters input[type="month"] {
+  width: 150px !important;
+  max-width: 150px !important;
+  min-width: 150px !important;
+}
+
+/* ═══════════════════════════════════════════════════════════ */
+/* ✅ Fix 3: ปุ่ม [Matrix / รายการ] — ลดความสูงนิดเดียว */
+/* ═══════════════════════════════════════════════════════════ */
+.alert-view-toggle-inline {
+  height: 22px !important;
+  padding: 1px !important;
+  gap: 2px !important;
+}
+
+.alert-view-toggle-inline button {
+  height: 18px !important;
+  padding: 0 10px !important;
+  font-size: 11px !important;
+  line-height: 1 !important;
+}
