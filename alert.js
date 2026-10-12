@@ -1,5 +1,10 @@
 // ═══════════════════════════════════════════════════════════════
-// STOCK V8 — alert.js (ฉบับสมบูรณ์ — ครบ 10 ขั้นตอน)
+// STOCK V8 — alert.js
+// + ✅ Multi-item per cell
+// + ✅ LocalStorage Key = ISO Date (ไม่ใช่ index)
+// + ✅ วันที่รับเริ่มจาก analyzedDate + 1 (ข้ามอาทิตย์)
+// + ✅ Alert History (snapshot)
+// + ✅ ล็อกวันที่วิเคราะห์ = วันนี้
 // ═══════════════════════════════════════════════════════════════
 
 let alertSelectedGrades = [];
@@ -7,14 +12,11 @@ let alertAllGrades = [];
 let alertCache = [];
 let alertSupplierCache = [];
 
-// ✅ View mode
 let alertViewMode = 'matrix';
 
-// ✅ Size Filter
 let alertSelectedSizes = [];
 let alertAllSizes = [];
 
-// ✅ Alert Filter
 let alertSelectedFilters = ['all'];
 const ALERT_ALL_FILTERS = [
   { value: 'all', label: 'ทั้งหมด' },
@@ -23,7 +25,6 @@ const ALERT_ALL_FILTERS = [
   { value: 'gt0', label: '🟢 เกิน (> 0)' }
 ];
 
-// ✅ Filter สั่งซื้อ
 let alertSelectedOrderFilters = ['all'];
 const ALERT_ORDER_FILTERS = [
   { value: 'all',        label: 'ทั้งหมด' },
@@ -31,11 +32,9 @@ const ALERT_ORDER_FILTERS = [
   { value: 'not_filled', label: '⬜ ยังไม่กรอก' }
 ];
 
-// ✅ Filter Sup.
 let alertSelectedSupFilters = [];
 let alertAllSupsInData = [];
 
-// ✅ Filter Stock
 let alertSelectedStockFilters = ['all'];
 const ALERT_STOCK_FILTERS = [
   { value: 'all', label: 'ทั้งหมด' },
@@ -44,7 +43,6 @@ const ALERT_STOCK_FILTERS = [
   { value: 'lt0', label: '< 0' }
 ];
 
-// ✅ Filter Receive
 let alertSelectedReceiveFilters = ['all'];
 const ALERT_RECEIVE_FILTERS = [
   { value: 'all', label: 'ทั้งหมด' },
@@ -53,7 +51,6 @@ const ALERT_RECEIVE_FILTERS = [
   { value: 'lt0', label: '< 0' }
 ];
 
-// ✅ Filter Usage Plan
 let alertSelectedUsageFilters = ['all'];
 const ALERT_USAGE_FILTERS = [
   { value: 'all', label: 'ทั้งหมด' },
@@ -61,7 +58,6 @@ const ALERT_USAGE_FILTERS = [
   { value: 'none', label: 'ไม่มี Usage' }
 ];
 
-// ✅ Constants
 const ALERT_CUSTOMER_ROLLS = [
   { value: 'normal',   label: 'ปกติ' },
   { value: 'pump_f',   label: 'ปั้ม F' },
@@ -74,7 +70,6 @@ const ALERT_QUALITY_B = [
   { value: 'nc',     label: 'NC' }
 ];
 
-// ✅ Storage keys
 const ALERT_LS_KEY_PREFIX = 'stockv8_alert_inputs_v';
 const ALERT_PO_FLAG_KEY = 'stockv8_alert_po_created';
 const ALERT_RECEIVE_DATES_KEY = 'stockv8_alert_receive_dates';
@@ -85,13 +80,30 @@ let alertActiveDateIdx = 0;
 let alertUsageRanges = [];
 let alertUsageSelected = null;
 
-// ✅ History state
 let alertHistoryMode = 'matrix';
 let alertHistoryData = null;
 let alertHistoryMeta = null;
 
+let _pendingPOItems = [];
+
+// ═══════════════════════════════════════════════════════════════
+// ✅ ขั้นตอนที่ 4.1: LS Key — ใช้ ISO Date แทน Index
+// ═══════════════════════════════════════════════════════════════
+
+function getAlertLSKeyByDate(isoDate) {
+  if (!isoDate) {
+    const activeDate = alertReceiveDates[alertActiveDateIdx];
+    if (!activeDate) return `${ALERT_LS_KEY_PREFIX}default`;
+    return `${ALERT_LS_KEY_PREFIX}${activeDate}`;
+  }
+  return `${ALERT_LS_KEY_PREFIX}${isoDate}`;
+}
+
+// ✅ Backward-compat: รับ idx → คืน key ตามวันที่ของ idx นั้น
 function getAlertLSKey(dateIdx = alertActiveDateIdx) {
-  return `${ALERT_LS_KEY_PREFIX}${dateIdx + 1}`;
+  const activeDate = alertReceiveDates[dateIdx];
+  if (!activeDate) return `${ALERT_LS_KEY_PREFIX}default`;
+  return `${ALERT_LS_KEY_PREFIX}${activeDate}`;
 }
 
 // ================= DATE HELPERS =================
@@ -101,7 +113,7 @@ function _parseLocalDate(iso) {
   return new Date(y, m - 1, d);
 }
 
-// ✅ ขั้นตอนที่ 10 — ข้ามอาทิตย์ (while loop)
+// ✅ ขั้นตอนที่ 6: +1 แล้วข้ามอาทิตย์
 function _nextWorkingDay(fromDate) {
   const d = new Date(fromDate);
   d.setDate(d.getDate() + 1);
@@ -113,9 +125,7 @@ function calcStockDate(analyzedDate) {
   if (!analyzedDate) return '';
   const d = new Date(analyzedDate);
   d.setDate(d.getDate() - 1);
-  if (d.getDay() === 0) {
-    d.setDate(d.getDate() - 1);
-  }
+  if (d.getDay() === 0) d.setDate(d.getDate() - 1);
   return toISODate(d);
 }
 
@@ -138,12 +148,34 @@ function fmtDateThai(d) {
   return `${dd}/${mm}/${yyyy}`;
 }
 
-let _pendingPOItems = [];
+// ═══════════════════════════════════════════════════════════════
+// ✅ ขั้นตอนที่ 5: ล้าง key เก่า (v1, v2, ...)
+// ═══════════════════════════════════════════════════════════════
+function cleanOldAlertKeys() {
+  try {
+    const toRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && /^stockv8_alert_inputs_v\d+$/.test(key)) {
+        toRemove.push(key);
+      }
+    }
+    toRemove.forEach(k => localStorage.removeItem(k));
+    if (toRemove.length) {
+      console.log(`🧹 ล้าง key เก่า ${toRemove.length} รายการ:`, toRemove);
+    }
+  } catch (e) {
+    console.warn('cleanOldAlertKeys:', e);
+  }
+}
 
 // ================= INIT =================
 async function initAlertTab() {
+  cleanOldAlertKeys();   // ✅ ขั้นตอนที่ 5
+
   const today = toISODate(new Date());
 
+  // ✅ ขั้นตอนที่ 8: ล็อกวันที่วิเคราะห์ = วันนี้
   const alertDateEl = $('alertDate');
   if (alertDateEl) {
     alertDateEl.value = today;
@@ -170,7 +202,6 @@ async function initAlertTab() {
 
   await onAlertDateChange();
 
-  // ✅ ขั้นตอนที่ 9 — แสดงการ์ดประวัติ
   showAlertHistoryCard();
 }
 
@@ -184,15 +215,19 @@ function applyCalculatedDates(analyzedDate) {
   if ($('alertReceiveDate')) $('alertReceiveDate').value = receiveDate;
 }
 
+// ✅ ขั้นตอนที่ 8: ล็อกไม่ให้แก้
 function attachAlertDateListener() {
   const el = $('alertDate');
-  if (el && el.dataset.listenerAttached !== '1') {
-    el.dataset.listenerAttached = '1';
-    el.addEventListener('change', () => {
-      applyCalculatedDates(el.value);
-      onAlertDateChange();
-    });
-  }
+  if (!el) return;
+
+  el.readOnly = true;
+  el.style.pointerEvents = 'none';
+  el.style.background = '#f1f5f9';
+  el.style.cursor = 'not-allowed';
+
+  if (el.dataset.listenerAttached === '1') return;
+  el.dataset.listenerAttached = '1';
+  // ไม่ผูก change listener (ล็อกแล้ว)
 }
 
 // ================= ALERT HISTORY =================
@@ -303,13 +338,6 @@ function setAlertLocked(locked, analyzedDate) {
       if (el) el.disabled = true;
     });
 
-    const dateEl = $('alertDate');
-    if (dateEl) {
-      dateEl.disabled = false;
-      dateEl.style.background = '';
-      dateEl.style.cursor = '';
-    }
-
     document.querySelectorAll('[onclick*="createPOFromAlert"], [onclick*="clearAlertInputs"]').forEach(btn => {
       btn.disabled = true;
       btn.style.opacity = '0.4';
@@ -328,13 +356,6 @@ function setAlertLocked(locked, analyzedDate) {
         el.style.cursor = '';
       }
     });
-
-    const dateEl = $('alertDate');
-    if (dateEl) {
-      dateEl.disabled = false;
-      dateEl.style.background = '';
-      dateEl.style.cursor = '';
-    }
 
     document.querySelectorAll('[onclick*="createPOFromAlert"], [onclick*="clearAlertInputs"]').forEach(btn => {
       btn.disabled = false;
@@ -376,7 +397,7 @@ function renderAlertFromCache() {
   let html = `<div id="alertDateTabsBox" class="alert-date-tabs"></div>`;
 
   html += '<div class="report-wrap alert-scroll"><table class="alert-flat-table"><thead><tr>';
-  // ... (thead filter headers เหมือนเดิม)
+  // ... (thead filter headers — เหมือนเดิม)
   html += `<th class="th-with-filter">
     <div class="th-filter-wrap" id="alertGradeFilterBox">
       <button type="button" class="th-filter-btn" id="alertGradeFilterBtn">
@@ -408,7 +429,6 @@ function renderAlertFromCache() {
     </div>
   </th>`;
   html += '<th>Stock Level</th>';
-
   html += `<th class="th-with-filter">
     <div class="th-filter-wrap" id="alertStockFilterBox">
       <button type="button" class="th-filter-btn" id="alertStockFilterBtn">
@@ -424,7 +444,6 @@ function renderAlertFromCache() {
       </div>
     </div>
   </th>`;
-
   html += `<th class="th-with-filter">
     <div class="th-filter-wrap" id="alertReceiveFilterBox">
       <button type="button" class="th-filter-btn" id="alertReceiveFilterBtn">
@@ -440,7 +459,6 @@ function renderAlertFromCache() {
       </div>
     </div>
   </th>`;
-
   html += `<th class="th-with-filter">
     <div class="th-filter-wrap" id="alertUsageFilterBox">
       <button type="button" class="th-filter-btn" id="alertUsageFilterBtn">
@@ -456,7 +474,6 @@ function renderAlertFromCache() {
       </div>
     </div>
   </th>`;
-
   html += `<th class="th-with-filter">
     <div class="th-filter-wrap" id="alertFilterBox">
       <button type="button" class="th-filter-btn" id="alertFilterBtn">
@@ -473,7 +490,6 @@ function renderAlertFromCache() {
     </div>
   </th>`;
   html += '<th>สถานะ</th>';
-
   html += `<th class="th-with-filter">
     <div class="th-filter-wrap" id="alertOrderFilterBox">
       <button type="button" class="th-filter-btn" id="alertOrderFilterBtn">
@@ -489,7 +505,6 @@ function renderAlertFromCache() {
       </div>
     </div>
   </th>`;
-
   html += `<th class="th-with-filter">
     <div class="th-filter-wrap" id="alertSupFilterBox">
       <button type="button" class="th-filter-btn" id="alertSupFilterBtn">
@@ -505,11 +520,10 @@ function renderAlertFromCache() {
       </div>
     </div>
   </th>`;
-
   html += '<th>ม้วนลูกค้า</th><th>คุณภาพ B</th><th>FSC</th><th>หมายเหตุ</th>';
   html += '</tr></thead><tbody></tbody></table></div>';
 
-  // ✅ ขั้นตอนที่ 1 + 2 — 🔴🟡🟢 ย้ายไป report-foot
+  // ✅ report-foot
   const footCache = window._alertFullCache || alertCache || [];
   const footShortage = footCache.filter(r => Number(r.alert) < 0).length;
   const footOK       = footCache.filter(r => Number(r.alert) === 0).length;
@@ -529,7 +543,6 @@ function renderAlertFromCache() {
 
   $('alertBody').innerHTML = html;
 
-  // ... (init filter lists + attach dropdowns เหมือนเดิม)
   renderAlertDateTabs();
   renderAlertGradeList();
   renderAlertSizeList();
@@ -561,7 +574,7 @@ function renderAlertFromCache() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ✅ Alert View Toggle
+// ✅ View Toggle
 // ═══════════════════════════════════════════════════════════════
 function setAlertViewMode(mode) {
   if (mode !== 'flat' && mode !== 'matrix') return;
@@ -575,30 +588,21 @@ function initAlertRowHover() {
     const alertRows = document.querySelectorAll('.alert-flat-table tbody tr');
     alertRows.forEach(row => {
       if (row.classList.contains('total-row')) return;
-
       row.style.cursor = 'pointer';
       row.style.transition = 'background-color 0.15s ease';
-
       const cells = row.querySelectorAll('td');
       const originalColors = [];
-      cells.forEach((cell, idx) => {
-        originalColors[idx] = cell.style.backgroundColor || '';
-      });
-
+      cells.forEach((cell, idx) => { originalColors[idx] = cell.style.backgroundColor || ''; });
       if (row._hoverAttached) return;
       row._hoverAttached = true;
-
       row.addEventListener('mouseenter', () => {
         cells.forEach(cell => {
           cell.style.backgroundColor = '#dbeafe';
           cell.style.transition = 'background-color 0.15s ease';
         });
       });
-
       row.addEventListener('mouseleave', () => {
-        cells.forEach((cell, idx) => {
-          cell.style.backgroundColor = originalColors[idx];
-        });
+        cells.forEach((cell, idx) => { cell.style.backgroundColor = originalColors[idx]; });
       });
     });
   }, 50);
@@ -637,12 +641,10 @@ async function loadSnapshotMonths() {
 
     if ($('alertSnapshotMonth') && months.length > 0) {
       let defaultMonth = months[0];
-
       if (typeof selectedMonths !== 'undefined' && selectedMonths.length > 0) {
         const latest = selectedMonths[selectedMonths.length - 1];
         if (months.includes(latest)) defaultMonth = latest;
       }
-
       $('alertSnapshotMonth').value = defaultMonth;
     }
   } catch (e) {
@@ -1352,7 +1354,7 @@ function addFlatRow(gradegram, size) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ✅ ขั้นตอนที่ 6 — Matrix view + เซลล์ไม่ครบ Sup → เหลือง
+// ✅ Matrix view
 // ═══════════════════════════════════════════════════════════════
 function renderAlertMatrixView(rows) {
   const container = document.getElementById('alertBody');
@@ -1415,12 +1417,10 @@ function renderAlertMatrixView(rows) {
       const totalQty = getAlertQtyTotal(grade, size);
       const hasOrder = totalQty > 0;
 
-      // ✅ ขั้นตอนที่ 6 — เช็คสมบูรณ์
       const items = getAlertItems(grade, size);
       const allHaveSup = items.length > 0 && items.every(it => it.sup && String(it.sup).trim());
       const hasQtyNoSup = hasOrder && !allHaveSup;
 
-      // ✅ ขั้นตอนที่ 5 — รถเข็น SVG (จะเล็กลงใน CSS)
       const cartIcon = hasOrder
         ? `<svg class="matrix-cart-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
              <circle cx="9" cy="21" r="1"/>
@@ -1764,19 +1764,32 @@ function _attachAlertDropdown(btnId, dropdownId, boxId, docKey) {
   }
 }
 
-// ================= LOCAL STORAGE =================
+// ═══════════════════════════════════════════════════════════════
+// ✅ LOCAL STORAGE — ใช้ isoDate
+// ═══════════════════════════════════════════════════════════════
 function alertLS_Key(gradegram, size) {
   return `${gradegram}|${size}`;
 }
 
-function loadAlertInputs(dateIdx = alertActiveDateIdx) {
+// ✅ ขั้นตอนที่ 4.1.1
+function loadAlertInputs(dateOrIdx) {
   try {
-    const raw = localStorage.getItem(getAlertLSKey(dateIdx));
+    let isoDate;
+    if (typeof dateOrIdx === 'string') {
+      isoDate = dateOrIdx;
+    } else {
+      const idx = (typeof dateOrIdx === 'number') ? dateOrIdx : alertActiveDateIdx;
+      isoDate = alertReceiveDates[idx];
+    }
+
+    if (!isoDate) return {};
+
+    const raw = localStorage.getItem(`${ALERT_LS_KEY_PREFIX}${isoDate}`);
     const data = raw ? JSON.parse(raw) : {};
 
+    // ✅ Auto-migrate: structure เก่า → ใหม่
     Object.keys(data).forEach(key => {
       const v = data[key];
-
       if (v && !v.items && (v.qty !== undefined || v.sup || v.customer_roll || v.quality_b || v.note)) {
         data[key] = {
           items: [{
@@ -1788,7 +1801,6 @@ function loadAlertInputs(dateIdx = alertActiveDateIdx) {
           }]
         };
       }
-
       if (data[key] && !data[key].items) {
         data[key] = { items: [] };
       }
@@ -1798,8 +1810,9 @@ function loadAlertInputs(dateIdx = alertActiveDateIdx) {
   } catch { return {}; }
 }
 
-function getAlertItems(gradegram, size, dateIdx = alertActiveDateIdx) {
-  const data = loadAlertInputs(dateIdx);
+// ✅ ขั้นตอนที่ 4.1.4
+function getAlertItems(gradegram, size, dateOrIdx) {
+  const data = loadAlertInputs(dateOrIdx);
   const key = alertLS_Key(gradegram, size);
   const cell = data[key];
   if (!cell || !cell.items) return [];
@@ -1807,8 +1820,9 @@ function getAlertItems(gradegram, size, dateIdx = alertActiveDateIdx) {
   return cell.items.filter(it => it.qty && Number(it.qty) > 0);
 }
 
-function saveAlertItems(gradegram, size, items, dateIdx = alertActiveDateIdx) {
-  const data = loadAlertInputs(dateIdx);
+// ✅ ขั้นตอนที่ 4.1.5
+function saveAlertItems(gradegram, size, items, dateOrIdx) {
+  const data = loadAlertInputs(dateOrIdx);
   const key = alertLS_Key(gradegram, size);
 
   if (!items || !items.length) {
@@ -1817,19 +1831,28 @@ function saveAlertItems(gradegram, size, items, dateIdx = alertActiveDateIdx) {
     data[key] = { items: items };
   }
 
-  localStorage.setItem(getAlertLSKey(dateIdx), JSON.stringify(data));
+  let isoDate;
+  if (typeof dateOrIdx === 'string') isoDate = dateOrIdx;
+  else if (typeof dateOrIdx === 'number') isoDate = alertReceiveDates[dateOrIdx];
+  else isoDate = alertReceiveDates[alertActiveDateIdx];
+
+  if (isoDate) {
+    localStorage.setItem(`${ALERT_LS_KEY_PREFIX}${isoDate}`, JSON.stringify(data));
+  }
 
   if (items && items.length && hasPOCreated()) {
     markAlertPOEdited();
   }
 }
 
-function getAlertQtyTotal(gradegram, size, dateIdx = alertActiveDateIdx) {
-  const items = getAlertItems(gradegram, size, dateIdx);
+// ✅ ขั้นตอนที่ 4.1.6
+function getAlertQtyTotal(gradegram, size, dateOrIdx) {
+  const items = getAlertItems(gradegram, size, dateOrIdx);
   return items.reduce((sum, it) => sum + (Number(it.qty) || 0), 0);
 }
 
-function getAlertInput(keyOrGradegram, dateIdx = alertActiveDateIdx) {
+// ✅ ขั้นตอนที่ 4.1.3
+function getAlertInput(keyOrGradegram, dateOrIdx) {
   let gradegram, size;
 
   if (typeof keyOrGradegram === 'string' && keyOrGradegram.includes('|')) {
@@ -1837,27 +1860,34 @@ function getAlertInput(keyOrGradegram, dateIdx = alertActiveDateIdx) {
     size = Number(size);
   } else {
     gradegram = keyOrGradegram;
-    size = dateIdx;
-    dateIdx = alertActiveDateIdx;
+    size = dateOrIdx;
+    dateOrIdx = undefined;
   }
 
-  const items = getAlertItems(gradegram, size, dateIdx);
+  const items = getAlertItems(gradegram, size, dateOrIdx);
   return items.length > 0 ? items[0] : {};
 }
 
+// ✅ ขั้นตอนที่ 4.1.2
 function saveAlertInput(key, field, value) {
-  const [gradegram, size] = key.split('|');
-  const items = getAlertItems(gradegram, Number(size));
+  const data = loadAlertInputs();
+  if (!data[key]) data[key] = { items: [] };
+  if (!data[key].items) data[key].items = [];
 
-  if (!items.length) {
-    items.push({
-      qty: '', sup: '', customer_roll: 'normal', quality_b: 'normal', note: ''
-    });
+  if (data[key].items.length === 0) {
+    data[key].items.push({ qty: '', sup: '', customer_roll: 'normal', quality_b: 'normal', note: '' });
+  }
+  data[key].items[0][field] = value;
+
+  const isoDate = alertReceiveDates[alertActiveDateIdx];
+  if (isoDate) {
+    localStorage.setItem(`${ALERT_LS_KEY_PREFIX}${isoDate}`, JSON.stringify(data));
   }
 
-  items[0][field] = value;
-
-  saveAlertItems(gradegram, Number(size), items);
+  const MARK_FIELDS = ['qty', 'sup', 'customer_roll', 'quality_b', 'note'];
+  if (MARK_FIELDS.includes(field) && hasPOCreated()) {
+    markAlertPOEdited();
+  }
 }
 
 // ================= PO FLAG =================
@@ -1924,7 +1954,7 @@ function saveAlertReceiveDates() {
   localStorage.setItem(ALERT_RECEIVE_DATES_KEY, JSON.stringify(alertReceiveDates));
 }
 
-// ✅ ขั้นตอนที่ 10 — addAlertReceiveDate (จ-ส)
+// ✅ ขั้นตอนที่ 7
 function addAlertReceiveDate() {
   const analyzedDate = $('alertDate')?.value;
   if (!analyzedDate) {
@@ -1932,9 +1962,21 @@ function addAlertReceiveDate() {
     return;
   }
 
-  // ✅ เช็ควันอาทิตย์
-  if (_parseLocalDate(analyzedDate).getDay() === 0) {
-    alert('⚠️ ไม่สามารถเลือกวันอาทิตย์ได้');
+  const analyzedD = _parseLocalDate(analyzedDate);
+  if (!analyzedD) {
+    alert('วันที่วิเคราะห์ไม่ถูกต้อง');
+    return;
+  }
+
+  // ✅ วันถัดไปจากวันที่วิเคราะห์ (ข้ามอาทิตย์)
+  const firstReceiveD = new Date(analyzedD);
+  firstReceiveD.setDate(firstReceiveD.getDate() + 1);
+  while (firstReceiveD.getDay() === 0) firstReceiveD.setDate(firstReceiveD.getDate() + 1);
+
+  if (alertReceiveDates.length === 0) {
+    alertReceiveDates.push(toISODate(firstReceiveD));
+    saveAlertReceiveDates();
+    renderAlertDateTabs();
     return;
   }
 
@@ -1943,18 +1985,11 @@ function addAlertReceiveDate() {
     .filter(Boolean)
     .sort((a, b) => a - b);
 
-  if (sorted.length === 0) {
-    alertReceiveDates.push(analyzedDate);
-    saveAlertReceiveDates();
-    renderAlertDateTabs();
-    return;
-  }
+  const existing = new Set(alertReceiveDates);
 
-  const analyzedD = _parseLocalDate(analyzedDate);
+  let cursor = new Date(firstReceiveD);
   const lastD = sorted[sorted.length - 1];
-  const existing = new Set(sorted.map(d => toISODate(d)));
 
-  let cursor = new Date(analyzedD);
   while (cursor <= lastD) {
     if (cursor.getDay() !== 0) {
       const iso = toISODate(cursor);
@@ -1971,12 +2006,20 @@ function addAlertReceiveDate() {
 
   const nextD = _nextWorkingDay(lastD);
   while (nextD.getDay() === 0) nextD.setDate(nextD.getDate() + 1);
-  alertReceiveDates.push(toISODate(nextD));
+
+  const nextISO = toISODate(nextD);
+  if (existing.has(nextISO)) {
+    alert('⚠️ ไม่มีวันว่างให้เพิ่ม');
+    return;
+  }
+
+  alertReceiveDates.push(nextISO);
   alertReceiveDates.sort((a, b) => _parseLocalDate(a) - _parseLocalDate(b));
   saveAlertReceiveDates();
   renderAlertDateTabs();
 }
 
+// ✅ ขั้นตอนที่ 4.3
 function removeAlertReceiveDate(idx) {
   if (alertReceiveDates.length <= 1) {
     alert('ต้องมีวันที่รับสินค้าอย่างน้อย 1 วัน');
@@ -1984,7 +2027,10 @@ function removeAlertReceiveDate(idx) {
   }
   if (!confirm('ลบวันที่นี้? ข้อมูลที่กรอกในวันนี้จะหายไปด้วย')) return;
 
-  localStorage.removeItem(getAlertLSKey(idx));
+  const dateToRemove = alertReceiveDates[idx];
+  if (dateToRemove) {
+    localStorage.removeItem(`${ALERT_LS_KEY_PREFIX}${dateToRemove}`);
+  }
 
   if (alertActiveDateIdx >= idx) {
     alertActiveDateIdx = Math.max(0, alertActiveDateIdx - 1);
@@ -2015,12 +2061,10 @@ function switchAlertDate(idx) {
   renderAlert();
 }
 
-// ✅ ขั้นตอนที่ 7 + 8 — Date Tabs + View Toggle อยู่ท้าย
 function renderAlertDateTabs() {
   const box = $('alertDateTabsBox');
   if (!box) return;
 
-  // ✅ ซ้าย: date tabs
   let html = '<div class="alert-date-tabs-left">';
   html += '<span class="alert-date-label">📅 วันที่รับสินค้า:</span>';
 
@@ -2043,7 +2087,6 @@ function renderAlertDateTabs() {
   html += `<button type="button" class="alert-date-add-btn" onclick="addAlertReceiveDate()">+ เพิ่มวัน</button>`;
   html += '</div>';
 
-  // ✅ ขวา: view toggle
   html += '<div class="alert-view-toggle-inline">';
   html += `<button type="button" class="${alertViewMode === 'flat' ? 'active' : ''}" onclick="setAlertViewMode('flat')">📋 รายการ</button>`;
   html += `<button type="button" class="${alertViewMode === 'matrix' ? 'active' : ''}" onclick="setAlertViewMode('matrix')">📊 Matrix</button>`;
@@ -2052,7 +2095,7 @@ function renderAlertDateTabs() {
   box.innerHTML = html;
 }
 
-// ✅ ขั้นตอนที่ 10 — initAlertReceiveDates (กรองอาทิตย์)
+// ✅ ขั้นตอนที่ 6
 function initAlertReceiveDates() {
   alertReceiveDates = loadAlertReceiveDates();
 
@@ -2062,9 +2105,17 @@ function initAlertReceiveDates() {
   });
 
   if (alertReceiveDates.length === 0) {
-    alertReceiveDates.push(getNextWorkingDay());
+    const analyzedDate = $('alertDate')?.value || toISODate(new Date());
+    const analyzedD = _parseLocalDate(analyzedDate);
+
+    const nextD = new Date(analyzedD);
+    nextD.setDate(nextD.getDate() + 1);
+    while (nextD.getDay() === 0) nextD.setDate(nextD.getDate() + 1);
+
+    alertReceiveDates.push(toISODate(nextD));
     saveAlertReceiveDates();
   }
+
   alertActiveDateIdx = 0;
   renderAlertDateTabs();
 }
@@ -2092,7 +2143,6 @@ async function renderAlert() {
     await loadUsagePlanRanges();
   }
 
-  // ✅ ขั้นตอนที่ 1 — หัวเรื่องแสดงแค่ (Stock Level: ...)
   const stockDateTH = stockDate ? thaiDateFull(stockDate) : '-';
   const receiveDateTH = receiveDate ? thaiDateFull(receiveDate) : '-';
 
@@ -2147,12 +2197,10 @@ async function renderAlert() {
     }
 
     html += '<div class="report-wrap alert-scroll"><table class="alert-flat-table"><thead><tr>';
-
-    // ... (thead filter headers — เหมือน renderAlertFromCache)
+    // ... (thead filter headers เหมือน renderAlertFromCache)
 
     html += '</tr></thead><tbody></tbody></table></div>';
 
-    // ✅ ขั้นตอนที่ 2 — 🔴🟡🟢 ย้ายไป report-foot
     const footCache = window._alertFullCache || alertCache || [];
     const footShortage = footCache.filter(r => Number(r.alert) < 0).length;
     const footOK       = footCache.filter(r => Number(r.alert) === 0).length;
@@ -2180,8 +2228,6 @@ async function renderAlert() {
         return items.map(it => it.sup || '');
       }).flat().filter(Boolean)
     )].sort();
-
-    // ... (init filter lists + attach dropdowns)
 
     renderAlertGradeList();
     renderAlertFilterList();
@@ -2279,10 +2325,14 @@ function onAlertInput(gradegram, size, field, value, el) {
 }
 
 // ================= CLEAR =================
+// ✅ ขั้นตอนที่ 4.4
 function clearAlertInputs() {
   if (!confirm('⚠️ ล้างค่าที่กรอกของวันนี้ (สั่งซื้อ / Sup. / ม้วนลูกค้า / คุณภาพ B / หมายเหตุ)?')) return;
 
-  localStorage.removeItem(getAlertLSKey());
+  const activeDate = alertReceiveDates[alertActiveDateIdx];
+  if (activeDate) {
+    localStorage.removeItem(`${ALERT_LS_KEY_PREFIX}${activeDate}`);
+  }
 
   renderAlert();
 
@@ -2294,13 +2344,15 @@ function clearAlertInputs() {
   setTimeout(() => msg.remove(), 2000);
 }
 
+// ✅ ขั้นตอนที่ 4.5
 function clearAllAlertInputsAllDates() {
-  for (let i = 0; i < alertReceiveDates.length; i++) {
-    localStorage.removeItem(getAlertLSKey(i));
-  }
+  alertReceiveDates.forEach(date => {
+    localStorage.removeItem(`${ALERT_LS_KEY_PREFIX}${date}`);
+  });
 }
 
 // ================= CREATE PO =================
+// ✅ ขั้นตอนที่ 4.2
 async function createPOFromAlert() {
   if (!alertCache || !alertCache.length) {
     alert('ไม่มีข้อมูล Alert');
@@ -2311,8 +2363,10 @@ async function createPOFromAlert() {
 
   for (let dateIdx = 0; dateIdx < alertReceiveDates.length; dateIdx++) {
     const dateKey = alertReceiveDates[dateIdx];
+
     for (const r of alertCache) {
-      const items = getAlertItems(r.gradegram, r.size, dateIdx);
+      // ✅ ใช้ isoDate แทน idx
+      const items = getAlertItems(r.gradegram, r.size, dateKey);
 
       for (const it of items) {
         if (!it.qty || Number(it.qty) <= 0) continue;
@@ -2824,7 +2878,7 @@ async function clearUsagePlan() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// ✅ ขั้นตอนที่ 9 — Alert History
+// ✅ Alert History
 // ═══════════════════════════════════════════════════════════
 
 function showAlertHistoryCard() {
