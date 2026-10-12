@@ -1477,3 +1477,350 @@ table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
   filter: brightness(0.92);
   box-shadow: inset 0 0 0 2px var(--primary-dark);
 }
+/* ═══════════════════════════════════════════════════════════ */
+/* ✅ ขั้นตอนที่ 3 + 4: Filter Bar — กระชับ */
+/* ═══════════════════════════════════════════════════════════ */
+
+.filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 10px;
+  row-gap: 6px;
+}
+
+.filters input[type="date"],
+.filters input[type="month"],
+.filters input[type="text"],
+.filters input[type="number"],
+.filters select {
+  height: 30px !important;
+  padding: 4px 8px !important;
+  font-size: 12.5px !important;
+  font-weight: 700 !important;
+  line-height: 1.1 !important;
+  box-sizing: border-box !important;
+  vertical-align: middle;
+}
+
+.filters input[type="date"],
+.filters input[type="month"] {
+  width: 120px !important;
+  max-width: 120px !important;
+}
+
+.filters label {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  height: 30px !important;
+  font-size: 12.5px !important;
+  font-weight: 700 !important;
+}
+
+.filters span {
+  font-size: 12.5px !important;
+  font-weight: 700 !important;
+}
+
+.filters button {
+  height: 30px !important;
+  padding: 0 12px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 12.5px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  box-sizing: border-box !important;
+}
+
+.filters input[type="checkbox"] {
+  height: auto !important;
+  width: 16px !important;
+  margin: 0 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════ */
+/* ✅ ขั้นตอนที่ 5: Matrix Cell — สถานะ + รถเข็น SVG เล็กลง */
+/* ═══════════════════════════════════════════════════════════ */
+
+.alert-matrix-new-table .matrix-cell.has-order {
+  background: rgba(59,130,246,.10);
+  box-shadow: inset 0 0 0 1.5px var(--primary);
+}
+
+.alert-matrix-new-table .matrix-cell.order-incomplete {
+  background: rgba(245,158,11,.10);
+  box-shadow: inset 0 0 0 1.5px var(--orange);
+}
+.alert-matrix-new-table .matrix-cell.order-incomplete .matrix-cart-svg {
+  color: var(--orange-dark);
+}
+
+.alert-matrix-new-table .matrix-cart-svg {
+  display: inline-block;
+  width: 11px !important;
+  height: 11px !important;
+  margin-left: 3px;
+  vertical-align: middle;
+  color: var(--primary);
+  opacity: 0.9;
+  stroke-width: 2.5;
+}
+
+.alert-matrix-new-table .matrix-cell.has-order .matrix-cart-svg {
+  color: var(--primary-dark);
+}
+
+/* ✅ Alert foot summary */
+.alert-foot-summary {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.alert-foot-summary .item {
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.alert-foot-summary .item.red    { background: var(--red-soft);    color: var(--red); }
+.alert-foot-summary .item.yellow { background: var(--yellow-soft); color: var(--yellow-dark); }
+.alert-foot-summary .item.green  { background: var(--green-soft);  color: var(--green-dark); }
+
+/* ═══════════════════════════════════════════════════════════ */
+/* ✅ ขั้นตอนที่ 7 + 8: Date Tabs — กระชับ */
+/* ═══════════════════════════════════════════════════════════ */
+
+.alert-date-tabs {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 10px;
+  padding: 4px 8px;
+  background: var(--surface-soft);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  flex-wrap: wrap;
+  min-height: 32px;
+}
+
+.alert-date-tabs-left {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex: 1 1 auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+  min-width: 0;
+}
+
+.alert-date-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 700;
+  margin-right: 4px;
+  white-space: nowrap;
+}
+
+.alert-date-tab {
+  padding: 3px 8px !important;
+  font-size: 12px !important;
+  font-weight: 600;
+  font-family: inherit;
+  border: none;
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.alert-date-tab-close {
+  padding: 0 5px !important;
+  font-size: 10px !important;
+  line-height: 1.2;
+}
+
+.alert-date-add-btn {
+  padding: 3px 8px !important;
+  font-size: 11px !important;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.alert-view-toggle-inline {
+  display: flex;
+  gap: 3px;
+  padding: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  height: 26px;
+  align-items: center;
+}
+
+.alert-view-toggle-inline button {
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: var(--transition);
+  line-height: 1.2;
+  height: 20px;
+}
+
+.alert-view-toggle-inline button:hover {
+  background: var(--surface-soft);
+  color: var(--text);
+}
+
+.alert-view-toggle-inline button.active {
+  background: var(--primary);
+  color: #fff;
+  font-weight: 700;
+}
+
+/* ═══════════════════════════════════════════════════════════ */
+/* ✅ ขั้นตอนที่ 9: Alert History Card */
+/* ═══════════════════════════════════════════════════════════ */
+
+.alert-history-card {
+  margin-top: 24px;
+  background: var(--surface);
+  border: 2px solid var(--primary-soft);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+}
+
+.alert-history-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.alert-history-head h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.alert-history-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.alert-history-controls label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.alert-history-controls input[type="date"] {
+  width: 150px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.alert-history-toggle {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.alert-history-toggle button {
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.alert-history-toggle button.active {
+  background: var(--primary);
+  color: #fff;
+  font-weight: 700;
+}
+
+.alert-history-body {
+  min-height: 200px;
+  max-height: 70vh;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-soft);
+  padding: 12px;
+}
+
+.alert-history-note {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: var(--yellow-soft);
+  color: var(--yellow-dark);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.alert-history-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+
+.alert-history-meta .item {
+  padding: 3px 10px;
+  background: var(--surface-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+}
+
+.alert-history-meta .item b {
+  color: var(--primary-dark);
+}
+
+.alert-history-body .matrix-cell.clickable {
+  cursor: pointer;
+  transition: filter .15s ease;
+}
+.alert-history-body .matrix-cell.clickable:hover {
+  filter: brightness(0.92);
+  box-shadow: inset 0 0 0 2px var(--primary-dark);
+}
