@@ -1253,3 +1253,227 @@ table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
   .report-foot { display: none !important; }
   .alert-table th, .alert-table td.grade-col { position: static; }
 }
+/* ═══════════════════════════════════════════════════════════ */
+/* ✅ Filter Bar — บังคับ input ทุกตัวสูงเท่ากัน */
+/* ═══════════════════════════════════════════════════════════ */
+
+.filters input[type="date"],
+.filters input[type="month"],
+.filters input[type="text"] {
+  height: 38px !important;
+  padding: 8px 12px !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+  box-sizing: border-box !important;
+  border: 1px solid var(--border-strong) !important;
+  border-radius: var(--radius-md) !important;
+  vertical-align: middle;
+}
+
+.filters select {
+  height: 38px !important;
+  padding: 8px 12px !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+  box-sizing: border-box !important;
+}
+
+.filters label {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  height: 38px !important;
+}
+
+.filters button,
+.filters .primary {
+  height: 38px !important;
+  padding: 0 16px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  box-sizing: border-box !important;
+}
+
+/* ═══════════════════════════════════════════════════════════ */
+/* ✅ Matrix Cell — สถานะการกรอก + รถเข็น SVG */
+/* ═══════════════════════════════════════════════════════════ */
+
+/* ✅ กรอกครบ → น้ำเงิน */
+.alert-matrix-new-table .matrix-cell.has-order {
+  background: rgba(59,130,246,.10);
+  box-shadow: inset 0 0 0 1.5px var(--primary);
+}
+
+/* ⚠️ กรอกไม่ครบ (เช่น ไม่มี Sup) → เหลือง */
+.alert-matrix-new-table .matrix-cell.order-incomplete {
+  background: rgba(245,158,11,.10);
+  box-shadow: inset 0 0 0 1.5px var(--orange);
+}
+.alert-matrix-new-table .matrix-cell.order-incomplete .matrix-cart-svg {
+  color: var(--orange-dark);
+}
+
+/* 🛒 รถเข็น SVG */
+.alert-matrix-new-table .matrix-cart-svg {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  margin-left: 3px;
+  vertical-align: middle;
+  color: var(--primary);
+  opacity: 0.9;
+}
+
+.alert-matrix-new-table .matrix-cell.has-order .matrix-cart-svg {
+  color: var(--primary-dark);
+}
+
+/* ═══════════════════════════════════════════════════════════ */
+/* ✅ ALERT DATE TABS — แคบ + View Toggle ขวาสุด */
+/* ═══════════════════════════════════════════════════════════ */
+.alert-date-tabs {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 10px;
+  padding: 4px 8px;
+  background: var(--surface-soft);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  flex-wrap: wrap;
+  min-height: 32px;
+}
+
+.alert-date-tabs-left {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex: 0 1 auto;
+  max-width: 55%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+  min-width: 0;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color .2s;
+}
+.alert-date-tabs-left:hover { scrollbar-color: #cbd5e1 transparent; }
+.alert-date-tabs-left::-webkit-scrollbar { height: 6px; }
+.alert-date-tabs-left::-webkit-scrollbar-track { background: transparent; }
+.alert-date-tabs-left::-webkit-scrollbar-thumb { background: transparent; border-radius: 3px; }
+.alert-date-tabs-left:hover::-webkit-scrollbar-thumb { background: #cbd5e1; }
+
+.alert-date-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 700;
+  margin-right: 4px;
+  white-space: nowrap;
+}
+
+.alert-date-tab {
+  padding: 3px 8px !important;
+  font-size: 12px !important;
+  font-weight: 600;
+  font-family: inherit;
+  border: none;
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.alert-date-tab-close {
+  padding: 0 5px !important;
+  font-size: 10px !important;
+  line-height: 1.2;
+}
+
+.alert-date-add-btn {
+  padding: 3px 8px !important;
+  font-size: 11px !important;
+  line-height: 1.2;
+}
+
+.alert-date-tabs-right {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-shrink: 0;
+}
+.alert-date-tabs-right .item {
+  padding: 2px 7px !important;
+  font-size: 11px !important;
+  line-height: 1.2;
+}
+
+.alert-view-toggle-inline {
+  display: flex;
+  gap: 3px;
+  padding: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  height: 26px;
+  align-items: center;
+}
+.alert-view-toggle-inline button {
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: var(--transition);
+  line-height: 1.2;
+  height: 20px;
+}
+
+/* ═══════════════════════════════════════════════════════════ */
+/* ✅ History meta + คลิกเซลล์ได้ */
+/* ═══════════════════════════════════════════════════════════ */
+.alert-history-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+
+.alert-history-meta .item {
+  padding: 3px 10px;
+  background: var(--surface-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+}
+
+.alert-history-meta .item b {
+  color: var(--primary-dark);
+}
+
+.alert-history-body .matrix-cell.clickable {
+  cursor: pointer;
+  transition: filter .15s ease;
+}
+.alert-history-body .matrix-cell.clickable:hover {
+  filter: brightness(0.92);
+  box-shadow: inset 0 0 0 2px var(--primary-dark);
+}
