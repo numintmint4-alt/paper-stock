@@ -147,6 +147,16 @@ input:focus, select:focus {
 .filters button { font-size: 14px; font-weight: 800; }
 .filters select, .filters input, #filterYear { font-weight: 700; font-size: 14px; color: var(--text); }
 
+/* ✅ ลดความกว้าง input วันที่ใน Alert (ขั้นตอนที่ 2) */
+#alertStockDate,
+#alertReceiveDate,
+#alertDate {
+  width: 130px !important;
+  max-width: 130px !important;
+  font-size: 13px !important;
+  padding: 6px 8px !important;
+}
+
 /* ═══════════════════════════════════════════════════════════ */
 /* GRADE FILTER */
 /* ═══════════════════════════════════════════════════════════ */
@@ -786,34 +796,153 @@ th {
 #modalAlertPODetail .form-actions button { padding: 8px 18px; font-size: 14px; }
 
 /* ═══════════════════════════════════════════════════════════ */
-/* ALERT DATE TABS */
+/* ✅ ALERT DATE TABS — แคบลง + View Toggle กลาง + Summary ขวา */
 /* ═══════════════════════════════════════════════════════════ */
-.alert-date-tabs { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 10px 0 14px; padding: 8px 12px; background: var(--surface-soft); border-radius: var(--radius-md); border: 1px solid var(--border); }
-.alert-date-tabs-left { display: flex; gap: 8px; align-items: center; flex: 1; overflow-x: auto; overflow-y: hidden; padding-bottom: 2px; scrollbar-width: thin; min-width: 0; scrollbar-color: transparent transparent; transition: scrollbar-color .2s; }
+.alert-date-tabs {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 14px;
+  padding: 6px 10px;
+  background: var(--surface-soft);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.alert-date-tabs-left {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex: 0 1 auto;
+  max-width: 55%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+  min-width: 0;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color .2s;
+}
 .alert-date-tabs-left:hover { scrollbar-color: #cbd5e1 transparent; }
 .alert-date-tabs-left::-webkit-scrollbar { height: 6px; }
 .alert-date-tabs-left::-webkit-scrollbar-track { background: transparent; }
 .alert-date-tabs-left::-webkit-scrollbar-thumb { background: transparent; border-radius: 3px; }
 .alert-date-tabs-left:hover::-webkit-scrollbar-thumb { background: #cbd5e1; }
 .alert-date-tabs-left::-webkit-scrollbar-thumb:hover { background: var(--text-light); }
-.alert-date-tabs-right { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
-.alert-date-tabs-right .item { padding: 4px 10px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 600; white-space: nowrap; }
+
+.alert-date-tabs-right {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-shrink: 0;
+}
+.alert-date-tabs-right .item {
+  padding: 3px 8px !important;
+  font-size: 11px !important;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
 .alert-date-tabs-right .item.red    { background: var(--red-soft);    color: var(--red); }
 .alert-date-tabs-right .item.yellow { background: var(--yellow-soft); color: var(--yellow-dark); }
 .alert-date-tabs-right .item.green  { background: var(--green-soft);  color: var(--green-dark); }
-.alert-date-label { font-size: 13px; color: var(--text-muted); font-weight: 700; margin-right: 4px; white-space: nowrap; }
-.alert-date-tab-wrap { display: inline-flex; align-items: stretch; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--border-strong); background: var(--surface); flex-shrink: 0; }
+
+.alert-date-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 700;
+  margin-right: 2px;
+  white-space: nowrap;
+}
+
+.alert-date-tab-wrap {
+  display: inline-flex;
+  align-items: stretch;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  flex-shrink: 0;
+}
 .alert-date-tab-wrap:hover { border-color: var(--primary); }
-.alert-date-tab { padding: 7px 14px; font-size: 13px; font-weight: 600; font-family: inherit; border: none; background: var(--surface); color: var(--text-muted); cursor: pointer; transition: var(--transition); white-space: nowrap; }
+.alert-date-tab {
+  padding: 5px 10px !important;
+  font-size: 12px !important;
+  font-weight: 600;
+  font-family: inherit;
+  border: none;
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+}
 .alert-date-tab:hover { background: var(--primary-soft); color: var(--primary); }
 .alert-date-tab.active { background: var(--primary); color: #fff; }
-.alert-date-tab-close { padding: 0 8px; border: none; border-left: 1px solid var(--border-strong); background: var(--surface); color: var(--red); font-size: 13px; font-weight: 700; cursor: pointer; transition: var(--transition); }
+.alert-date-tab-close {
+  padding: 0 6px !important;
+  border: none;
+  border-left: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--red);
+  font-size: 11px !important;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+}
 .alert-date-tab-close:hover { background: var(--red-soft); color: #991b1b; }
 .alert-date-tab-wrap.is-active { border-color: var(--primary-dark); }
 .alert-date-tab-wrap.is-active .alert-date-tab-close { background: var(--primary); color: #fff; border-left-color: var(--primary-dark); }
 .alert-date-tab-wrap.is-active .alert-date-tab-close:hover { background: var(--red); color: #fff; }
-.alert-date-add-btn { padding: 7px 14px; font-size: 13px; font-weight: 600; font-family: inherit; border: 1px dashed var(--primary); background: var(--primary-soft); color: var(--primary); border-radius: var(--radius-sm); cursor: pointer; transition: var(--transition); white-space: nowrap; flex-shrink: 0; }
+.alert-date-add-btn {
+  padding: 5px 10px !important;
+  font-size: 12px !important;
+  font-weight: 600;
+  font-family: inherit;
+  border: 1px dashed var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 .alert-date-add-btn:hover { background: var(--primary); color: #fff; border-style: solid; }
+
+/* ✅ View Toggle — inline ตรงกลาง */
+.alert-view-toggle-inline {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+.alert-view-toggle-inline button {
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: var(--transition);
+}
+.alert-view-toggle-inline button:hover {
+  background: var(--surface-soft);
+  color: var(--text);
+}
+.alert-view-toggle-inline button.active {
+  background: var(--primary);
+  color: #fff;
+  font-weight: 700;
+}
 
 /* Modal แยกตามวันที่รับ */
 .po-detail-date-section { margin-bottom: 16px; border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
@@ -832,7 +961,7 @@ th {
 .alert-locked .grade-dropdown { pointer-events: none; opacity: .5; }
 
 /* ═══════════════════════════════════════════════════════════ */
-/* ALERT VIEW TOGGLE */
+/* ALERT VIEW TOGGLE (เดิม — เก็บไว้เผื่อ) */
 /* ═══════════════════════════════════════════════════════════ */
 .alert-view-toggle { display: flex; gap: 6px; padding: 4px; background: var(--surface-soft); border: 1px solid var(--border); border-radius: var(--radius-md); margin: 10px 0; width: fit-content; }
 .alert-view-toggle button { padding: 7px 16px; font: 600 13px inherit; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--text-muted); cursor: pointer; transition: var(--transition); }
@@ -863,7 +992,21 @@ th {
 .alert-matrix-new-table .matrix-green  .matrix-value { color: var(--green-dark); }
 .alert-matrix-new-table .empty-cell { color: var(--text-light); background: var(--surface-soft); }
 .alert-matrix-new-table .matrix-order-badge { font-size: 9.5px; font-weight: 700; color: #fff; background: var(--primary); padding: 1px 5px; border-radius: 999px; margin-top: 2px; display: inline-block; }
-.alert-matrix-new-table .matrix-cell.has-order { box-shadow: inset 0 0 0 2px var(--primary); }
+
+/* ✅ รถเข็นต่อท้ายตัวเลข (แทน badge 📦) — ขั้นตอนที่ 3 */
+.alert-matrix-new-table .matrix-cart-icon {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 11px;
+  opacity: 0.9;
+  vertical-align: middle;
+}
+
+/* ✅ แถวที่กรอกแล้ว — เข้มขึ้นเล็กน้อย + ขอบน้ำเงิน */
+.alert-matrix-new-table .matrix-cell.has-order {
+  background: rgba(59,130,246,.10);
+  box-shadow: inset 0 0 0 1.5px var(--primary);
+}
 
 /* ═══════════════════════════════════════════════════════════ */
 /* MATRIX CELL MODAL */
@@ -923,6 +1066,118 @@ th {
 .add-flat-row-btn:hover { background: var(--primary); color: #fff; border-style: solid; }
 
 /* ═══════════════════════════════════════════════════════════ */
+/* ✅ ALERT HISTORY (ตรวจสอบย้อนหลัง) */
+/* ═══════════════════════════════════════════════════════════ */
+.alert-history-card {
+  margin-top: 24px;
+  background: var(--surface);
+  border: 2px solid var(--primary-soft);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+}
+
+.alert-history-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.alert-history-head h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.alert-history-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.alert-history-controls label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.alert-history-controls input[type="date"] {
+  width: 150px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.alert-history-toggle {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.alert-history-toggle button {
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.alert-history-toggle button.active {
+  background: var(--primary);
+  color: #fff;
+  font-weight: 700;
+}
+
+.alert-history-body {
+  min-height: 200px;
+  max-height: 70vh;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-soft);
+  padding: 12px;
+}
+
+.alert-history-note {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: var(--yellow-soft);
+  color: var(--yellow-dark);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* ✅ History Matrix — ห้ามแก้ (read-only) */
+.alert-history-body .matrix-cell {
+  cursor: default !important;
+}
+.alert-history-body .matrix-cell:hover {
+  filter: none !important;
+  box-shadow: none !important;
+}
+.alert-history-body input,
+.alert-history-body select {
+  pointer-events: none;
+  background: var(--surface-soft) !important;
+  color: var(--text-muted) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════ */
 /* HOVER EFFECT (Global) */
 /* ═══════════════════════════════════════════════════════════ */
 table tbody tr:hover > td,
@@ -941,6 +1196,7 @@ table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
   #modalAddPOItems .modal { padding: 12px; }
   .add-items-table { font-size: 11px; }
   .add-items-table thead th, .add-items-table tbody td { padding: 4px 5px; }
+  .alert-date-tabs-left { max-width: 100%; }
 }
 @media (max-width: 640px) {
   .form-grid { grid-template-columns: 1fr; }
@@ -964,6 +1220,9 @@ table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
   .po-info-bar { padding: 10px 12px; }
   .po-info-bar .po-info-grid { grid-template-columns: 1fr; }
   .po-info-bar .po-info-row b { font-size: 14px; }
+  .alert-date-tabs { padding: 6px 8px; }
+  .alert-date-tabs-left { max-width: 100%; }
+  .alert-view-toggle-inline button { padding: 4px 10px; font-size: 11px; }
 }
 
 /* ═══════════════════════════════════════════════════════════ */
