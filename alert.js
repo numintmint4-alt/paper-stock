@@ -3,6 +3,7 @@
 // + ✅ Hover Effect (เด่นทั้งแถว — ทับสี row-red/yellow/green)
 // + ✅ View Toggle: Flat / Matrix (ตารางไขว้ Gradegram × Size)
 // + ✅ Matrix Cell Modal + ฟอร์มสั่งซื้อ
+// + ✅ Multi-item per cell (สูงสุด 5 รายการ/ช่อง)
 // ═══════════════════════════════════════════════════════════════
 
 let alertSelectedGrades = [];
@@ -11,7 +12,7 @@ let alertCache = [];
 let alertSupplierCache = [];
 
 // ✅ View mode: 'flat' (รายการ) | 'matrix' (Matrix)
-let alertViewMode = 'flat';
+let alertViewMode = 'matrix';   // ✅ default = Matrix
 
 // ✅ Size Filter
 let alertSelectedSizes = [];
@@ -1146,26 +1147,29 @@ function applyAlertFiltersAndRender() {
     });
   }
 
-  // 4) สั่งซื้อ
+  // 4) สั่งซื้อ — ใช้ qty รวม
   if (!alertSelectedOrderFilters.includes('all') && alertSelectedOrderFilters.length > 0) {
     result = result.filter(r => {
-      const lsKey = alertLS_Key(r.gradegram, r.size);
-      const lsVal = getAlertInput(lsKey);
-      const hasQty = lsVal.qty && Number(lsVal.qty) > 0;
+      const totalQty = getAlertQtyTotal(r.gradegram, r.size);
+      const hasQty = totalQty > 0;
       if (alertSelectedOrderFilters.includes('filled') && hasQty) return true;
       if (alertSelectedOrderFilters.includes('not_filled') && !hasQty) return true;
       return false;
     });
   }
 
-  // 5) Sup.
+  // 5) Sup. — เช็คจากทุก items ใน cell
   if (alertSelectedSupFilters.length > 0) {
     result = result.filter(r => {
-      const lsKey = alertLS_Key(r.gradegram, r.size);
-      const lsVal = getAlertInput(lsKey);
-      const sup = lsVal.sup || '';
-      if (!sup && alertSelectedSupFilters.includes('__NONE__')) return true;
-      return alertSelectedSupFilters.includes(sup);
+      const items = getAlertItems(r.gradegram, r.size);
+      if (!items.length) {
+        return alertSelectedSupFilters.includes('__NONE__');
+      }
+      return items.some(it => {
+        const sup = it.sup || '';
+        if (!sup && alertSelectedSupFilters.includes('__NONE__')) return true;
+        return alertSelectedSupFilters.includes(sup);
+      });
     });
   }
 
@@ -1234,7 +1238,7 @@ function renderAlertTableBody(rows) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ✅ Render: โหมดตารางรายการ (Flat)
+// ✅ Render: โหมดตารางรายการ (Flat) — Multi-item (N แถว)
 // ═══════════════════════════════════════════════════════════════
 function renderAlertFlatView(rows) {
   const tbody = document.querySelector('.alert-flat-table tbody');
@@ -1260,49 +1264,85 @@ function renderAlertFlatView(rows) {
     else if (a === 0) { rowCls = 'row-yellow'; statusTxt = '🟡 พอดี'; }
     else             { rowCls = 'row-green';  statusTxt = `🟢 เกิน ${Math.floor(a)}`; }
 
-    const lsKey = alertLS_Key(r.gradegram, r.size);
-    const lsVal = getAlertInput(lsKey);
-
-    const supOptions = alertSupplierCache.map(code =>
-      `<option value="${esc(code)}" ${lsVal.sup === code ? 'selected' : ''}>${esc(code)}</option>`
-    ).join('');
-
-    const custOptions = ALERT_CUSTOMER_ROLLS.map(c =>
-      `<option value="${c.value}" ${lsVal.customer_roll === c.value ? 'selected' : ''}>${c.label}</option>`
-    ).join('');
-
-    const qualOptions = ALERT_QUALITY_B.map(q =>
-      `<option value="${q.value}" ${lsVal.quality_b === q.value ? 'selected' : ''}>${q.label}</option>`
-    ).join('');
-
+    const items = getAlertItems(r.gradegram, r.size);
     const isFSC = isFSCGrade(r.gradegram);
     const fscBadge = isFSC
       ? '<span class="badge ok" style="font-size:10px">🟢 FSC</span>'
       : '<span class="badge" style="background:#f1f5f9;color:#64748b;font-size:10px">⚪ Non-FSC</span>';
 
-    const clsQty   = (lsVal.qty && Number(lsVal.qty) > 0) ? ' filled' : '';
-    const clsSup   = lsVal.sup ? ' filled' : '';
-    const clsCust  = (lsVal.customer_roll && lsVal.customer_roll !== 'normal') ? ' filled' : '';
-    const clsQual  = (lsVal.quality_b && lsVal.quality_b !== 'normal') ? ' filled' : '';
-    const clsNote  = lsVal.note ? ' filled' : '';
+    // ✅ ถ้าไม่มี items → แสดง 1 แถวเปล่า (ให้กรอกได้)
+    const displayItems = items.length > 0
+      ? items
+      : [{ qty: '', sup: '', customer_roll: 'normal', quality_b: 'normal', note: '' }];
 
-    html += `<tr class="${rowCls}">`;
-    html += `<td class="grade-col clickable" onclick="openAlertDetail('${esc(r.gradegram)}', ${r.size})">${esc(r.gradegram)}</td>`;
-    html += `<td class="clickable" onclick="openAlertDetail('${esc(r.gradegram)}', ${r.size})">${r.size}</td>`;
-    html += `<td>${r.snapshot}</td>`;
-    html += `<td>${Number(r.stock).toFixed(2)}</td>`;
-    html += `<td>${r.receive}</td>`;
-    html += `<td class="usage-cell">${r.usage_plan ? Number(r.usage_plan).toFixed(2) : '-'}</td>`;
-    html += `<td class="alert-cell"><b>${a > 0 ? '+' + a : a}</b></td>`;
-    html += `<td class="status-cell">${statusTxt}</td>`;
-    html += `<td><input type="number" class="alert-input-qty${clsQty}" placeholder="-" value="${lsVal.qty || ''}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'qty', this.value, this)"></td>`;
-    html += `<td><select class="alert-input-sup${clsSup}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'sup', this.value, this)">
-      <option value="">-- Sup --</option>${supOptions}</select></td>`;
-    html += `<td><select class="alert-input-customer${clsCust}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'customer_roll', this.value, this)">${custOptions}</select></td>`;
-    html += `<td><select class="alert-input-quality${clsQual}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'quality_b', this.value, this)">${qualOptions}</select></td>`;
-    html += `<td class="fsc-cell">${fscBadge}</td>`;
-    html += `<td><input type="text" class="alert-input-note${clsNote}" placeholder="-" value="${esc(lsVal.note || '')}" onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'note', this.value, this)"></td>`;
-    html += '</tr>';
+    // ✅ แสดง N แถว
+    displayItems.forEach((it, idx) => {
+      const isFirst = idx === 0;
+
+      html += `<tr class="${rowCls}" data-gradegram="${esc(r.gradegram)}" data-size="${r.size}" data-item-idx="${idx}">`;
+
+      // Gradegram + Size (แสดงเฉพาะแถวแรก)
+      if (isFirst) {
+        html += `<td class="grade-col clickable" rowspan="${displayItems.length}"
+                     onclick="openAlertDetail('${esc(r.gradegram)}', ${r.size})">${esc(r.gradegram)}</td>`;
+        html += `<td class="clickable" rowspan="${displayItems.length}"
+                     onclick="openAlertDetail('${esc(r.gradegram)}', ${r.size})">${r.size}</td>`;
+        html += `<td rowspan="${displayItems.length}">${r.snapshot}</td>`;
+        html += `<td rowspan="${displayItems.length}">${Number(r.stock).toFixed(2)}</td>`;
+        html += `<td rowspan="${displayItems.length}">${r.receive}</td>`;
+        html += `<td class="usage-cell" rowspan="${displayItems.length}">${r.usage_plan ? Number(r.usage_plan).toFixed(2) : '-'}</td>`;
+        html += `<td class="alert-cell" rowspan="${displayItems.length}"><b>${a > 0 ? '+' + a : a}</b></td>`;
+        html += `<td class="status-cell" rowspan="${displayItems.length}">${statusTxt}</td>`;
+      }
+
+      // ✅ ช่องกรอก (qty/sup/cust/qual/note)
+      const clsQty   = (it.qty && Number(it.qty) > 0) ? ' filled' : '';
+      const clsSup   = it.sup ? ' filled' : '';
+      const clsCust  = (it.customer_roll && it.customer_roll !== 'normal') ? ' filled' : '';
+      const clsQual  = (it.quality_b && it.quality_b !== 'normal') ? ' filled' : '';
+      const clsNote  = it.note ? ' filled' : '';
+
+      const supOptions = alertSupplierCache.map(code =>
+        `<option value="${esc(code)}" ${it.sup === code ? 'selected' : ''}>${esc(code)}</option>`
+      ).join('');
+
+      const custOptions = ALERT_CUSTOMER_ROLLS.map(c =>
+        `<option value="${c.value}" ${it.customer_roll === c.value ? 'selected' : ''}>${c.label}</option>`
+      ).join('');
+
+      const qualOptions = ALERT_QUALITY_B.map(q =>
+        `<option value="${q.value}" ${it.quality_b === q.value ? 'selected' : ''}>${q.label}</option>`
+      ).join('');
+
+      html += `<td><input type="number" class="alert-input-qty${clsQty}" placeholder="-" value="${it.qty || ''}"
+                       onchange="onAlertItemInput('${esc(r.gradegram)}', ${r.size}, ${idx}, 'qty', this.value, this)"></td>`;
+
+      html += `<td><select class="alert-input-sup${clsSup}"
+                       onchange="onAlertItemInput('${esc(r.gradegram)}', ${r.size}, ${idx}, 'sup', this.value, this)">
+                <option value="">-- Sup --</option>${supOptions}</select></td>`;
+
+      html += `<td><select class="alert-input-customer${clsCust}"
+                       onchange="onAlertItemInput('${esc(r.gradegram)}', ${r.size}, ${idx}, 'customer_roll', this.value, this)">${custOptions}</select></td>`;
+
+      html += `<td><select class="alert-input-quality${clsQual}"
+                       onchange="onAlertItemInput('${esc(r.gradegram)}', ${r.size}, ${idx}, 'quality_b', this.value, this)">${qualOptions}</select></td>`;
+
+      html += `<td class="fsc-cell">${isFirst ? fscBadge : ''}</td>`;
+
+      html += `<td><input type="text" class="alert-input-note${clsNote}" placeholder="-" value="${esc(it.note || '')}"
+                       onchange="onAlertItemInput('${esc(r.gradegram)}', ${r.size}, ${idx}, 'note', this.value, this)"></td>`;
+
+      // ✅ ปุ่ม + เพิ่มบรรทัด (เฉพาะแถวล่าสุดของ cell นั้น)
+      html += `<td style="text-align:center;white-space:nowrap">`;
+      if (idx === displayItems.length - 1) {
+        html += `<button type="button" class="add-flat-row-btn"
+                   onclick="addFlatRow('${esc(r.gradegram)}', ${r.size})"
+                   title="เพิ่มบรรทัด">➕</button>`;
+      }
+      html += `</td>`;
+
+      html += '</tr>';
+    });
   });
 
   html += `<tr class="total-row">
@@ -1313,6 +1353,48 @@ function renderAlertFlatView(rows) {
 
   tbody.innerHTML = html;
   initAlertRowHover();
+}
+
+// ========== บันทึก input ต่อ item ==========
+function onAlertItemInput(gradegram, size, idx, field, value, el) {
+  const items = getAlertItems(gradegram, size);
+
+  // ✅ ถ้า idx เกิน array → push item ใหม่
+  while (items.length <= idx) {
+    items.push({ qty: '', sup: '', customer_roll: 'normal', quality_b: 'normal', note: '' });
+  }
+
+  items[idx][field] = value;
+
+  saveAlertItems(gradegram, size, items);
+
+  // update visual
+  if (el) {
+    const isFilled = (field === 'customer_roll' || field === 'quality_b')
+      ? (value && value !== 'normal')
+      : (value && String(value).trim() !== '');
+    el.classList.toggle('filled', !!isFilled);
+  }
+
+  // re-render ถ้ามี filter ที่ต้อง apply
+  const hasOrderFilter = !alertSelectedOrderFilters.includes('all') && alertSelectedOrderFilters.length > 0;
+  const hasSupFilter = alertSelectedSupFilters.length > 0;
+  if (field === 'qty' || field === 'sup' || hasOrderFilter || hasSupFilter) {
+    applyAlertFiltersAndRender();
+  }
+}
+
+// ========== เพิ่มบรรทัดใน Flat view ==========
+function addFlatRow(gradegram, size) {
+  const items = getAlertItems(gradegram, size);
+  if (items.length >= 5) {
+    alert('⚠️ เพิ่มได้สูงสุด 5 รายการต่อ cell');
+    return;
+  }
+
+  items.push({ qty: '', sup: '', customer_roll: 'normal', quality_b: 'normal', note: '' });
+  saveAlertItems(gradegram, size, items);
+  applyAlertFiltersAndRender();
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1376,12 +1458,12 @@ function renderAlertMatrixView(rows) {
       else if (a === 0) cellCls = 'matrix-yellow';
       else              cellCls = 'matrix-green';
 
-      const lsKey = alertLS_Key(r.gradegram, r.size);
-      const lsVal = getAlertInput(lsKey);
-      const hasOrder = lsVal.qty && Number(lsVal.qty) > 0;
+      // ✅ ใช้ qty รวมจากทุก items
+      const totalQty = getAlertQtyTotal(r.gradegram, r.size);
+      const hasOrder = totalQty > 0;
 
       const orderBadge = hasOrder
-        ? `<div class="matrix-order-badge">📦 ${lsVal.qty}</div>`
+        ? `<div class="matrix-order-badge">📦 ${totalQty}</div>`
         : '';
 
       html += `<td class="matrix-cell ${cellCls} ${hasOrder ? 'has-order' : ''}"
@@ -1391,7 +1473,7 @@ function renderAlertMatrixView(rows) {
                </td>`;
     });
 
-    html += `<td class="total-col-matrix">${rowTotal > 0 ? '+' + rowTotal : rowTotal}</td>`;
+    html += `<td class="total-col-matrix">${rowTotal > 0 ? '+' + rowTotal.toFixed(2) : rowTotal.toFixed(2)}</td>`;
     html += '</tr>';
   });
 
@@ -1404,10 +1486,10 @@ function renderAlertMatrixView(rows) {
       const r = dataMap[`${grade}|${size}`];
       if (r) colTotal += Number(r.alert) || 0;
     });
-    html += `<td>${colTotal > 0 ? '+' + colTotal : colTotal}</td>`;
+    html += `<td>${colTotal > 0 ? '+' + colTotal.toFixed(2) : colTotal.toFixed(2)}</td>`;
   });
   const grandTotal = rows.reduce((s, r) => s + (Number(r.alert) || 0), 0);
-  html += `<td class="total-col-matrix">${grandTotal > 0 ? '+' + grandTotal : grandTotal}</td>`;
+  html += `<td class="total-col-matrix">${grandTotal > 0 ? '+' + grandTotal.toFixed(2) : grandTotal.toFixed(2)}</td>`;
   html += '</tr>';
 
   html += '</tbody></table>';
@@ -1416,7 +1498,7 @@ function renderAlertMatrixView(rows) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ✅ Modal: Alert Matrix Cell Detail + ฟอร์มสั่งซื้อ
+// ✅ Modal: Alert Matrix Cell Detail + ฟอร์มสั่งซื้อ (Multi-item)
 // ═══════════════════════════════════════════════════════════════
 function openAlertMatrixCell(gradegram, size) {
   const r = alertCache.find(x => x.gradegram === gradegram && Number(x.size) === Number(size));
@@ -1436,9 +1518,6 @@ function openAlertMatrixCell(gradegram, size) {
 
   const bodyEl = $('alertMatrixCellBody');
   if (!bodyEl) return;
-
-  const lsKey = alertLS_Key(gradegram, size);
-  const lsVal = getAlertInput(lsKey);
 
   let html = `
     <div class="matrix-cell-summary">
@@ -1470,7 +1549,8 @@ function openAlertMatrixCell(gradegram, size) {
     </div>
   `;
 
-  const hasOrder = lsVal.qty && Number(lsVal.qty) > 0;
+  const items = getAlertItems(gradegram, size);
+  const hasOrder = items.length > 0;
   const isLocked = document.getElementById('alertBody')?.classList.contains('alert-locked');
 
   if (isLocked) {
@@ -1487,41 +1567,81 @@ function openAlertMatrixCell(gradegram, size) {
       </div>
     `;
   } else {
-    html += renderMatrixOrderForm(gradegram, size, lsVal);
+    // ✅ แสดงฟอร์มทันที (เพราะมี items อยู่แล้ว)
+    html += renderMatrixOrderForm(gradegram, size, items);
   }
 
   bodyEl.innerHTML = html;
   openModal('modalAlertMatrixCell');
 }
 
-// ========== ฟอร์มกรอกสั่งซื้อ (Matrix) ==========
-function renderMatrixOrderForm(gradegram, size, lsVal) {
+// ========== ฟอร์มกรอกสั่งซื้อ (Matrix) — Multi-item ==========
+function renderMatrixOrderForm(gradegram, size, items) {
+  // ✅ ถ้าไม่มี items → สร้าง 1 รายการว่าง
+  if (!items || !items.length) {
+    items = [{ qty: '', sup: '', customer_roll: 'normal', quality_b: 'normal', note: '' }];
+  }
+
+  const rowsHtml = items.map((it, idx) => renderMatrixOrderRow(idx, it)).join('');
+
+  return `
+    <div class="matrix-order-form" id="matrixOrderForm"
+         data-gradegram="${esc(gradegram)}" data-size="${size}">
+      <div class="matrix-order-form-header">
+        <h4>✏️ กรอกรายการสั่งซื้อ</h4>
+        <button type="button" class="add-row-btn"
+                onclick="addMatrixOrderRow('${esc(gradegram)}', ${size})">
+          ➕ เพิ่มรายการ
+        </button>
+      </div>
+
+      <div id="matrixOrderRows" class="matrix-order-rows">
+        ${rowsHtml}
+      </div>
+
+      <div class="form-actions">
+        <button type="button" onclick="closeModal('modalAlertMatrixCell')">ยกเลิก</button>
+        <button type="button" class="primary"
+                onclick="saveMatrixOrder('${esc(gradegram)}', ${size})">
+          💾 บันทึก
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+// ========== 1 รายการ (row) ==========
+function renderMatrixOrderRow(idx, it) {
   const supOptions = alertSupplierCache.map(code =>
-    `<option value="${esc(code)}" ${lsVal.sup === code ? 'selected' : ''}>${esc(code)}</option>`
+    `<option value="${esc(code)}" ${it.sup === code ? 'selected' : ''}>${esc(code)}</option>`
   ).join('');
 
   const custOptions = ALERT_CUSTOMER_ROLLS.map(c =>
-    `<option value="${c.value}" ${lsVal.customer_roll === c.value ? 'selected' : ''}>${c.label}</option>`
+    `<option value="${c.value}" ${it.customer_roll === c.value ? 'selected' : ''}>${c.label}</option>`
   ).join('');
 
   const qualOptions = ALERT_QUALITY_B.map(q =>
-    `<option value="${q.value}" ${lsVal.quality_b === q.value ? 'selected' : ''}>${q.label}</option>`
+    `<option value="${q.value}" ${it.quality_b === q.value ? 'selected' : ''}>${q.label}</option>`
   ).join('');
 
   return `
-    <div class="matrix-order-form" id="matrixOrderForm">
-      <h4>✏️ กรอกข้อมูลสั่งซื้อ</h4>
+    <div class="matrix-order-row" data-row-idx="${idx}">
+      <div class="matrix-order-row-head">
+        <span class="row-label">รายการที่ ${idx + 1}</span>
+        <button type="button" class="row-remove-btn"
+                onclick="removeMatrixOrderRow(this)" title="ลบรายการนี้">✕</button>
+      </div>
 
       <div class="form-row">
         <div class="form-field">
           <label>จำนวนม้วน *</label>
-          <input type="number" class="qty-input" id="matrixOrderQty"
+          <input type="number" class="qty-input matrix-row-qty"
                  min="1" step="1" placeholder="0"
-                 value="${lsVal.qty || ''}">
+                 value="${it.qty || ''}">
         </div>
         <div class="form-field">
           <label>Sup.</label>
-          <select id="matrixOrderSup">
+          <select class="matrix-row-sup">
             <option value="">-- เลือก Sup --</option>
             ${supOptions}
           </select>
@@ -1531,38 +1651,77 @@ function renderMatrixOrderForm(gradegram, size, lsVal) {
       <div class="form-row">
         <div class="form-field">
           <label>ม้วนลูกค้า</label>
-          <select id="matrixOrderCust">${custOptions}</select>
+          <select class="matrix-row-cust">${custOptions}</select>
         </div>
         <div class="form-field">
           <label>คุณภาพ B</label>
-          <select id="matrixOrderQual">${qualOptions}</select>
+          <select class="matrix-row-qual">${qualOptions}</select>
         </div>
       </div>
 
       <div class="form-row full">
         <div class="form-field">
           <label>หมายเหตุ</label>
-          <input type="text" id="matrixOrderNote"
-                 placeholder="-" value="${esc(lsVal.note || '')}">
+          <input type="text" class="matrix-row-note"
+                 placeholder="-" value="${esc(it.note || '')}">
         </div>
-      </div>
-
-      <div class="form-actions">
-        <button type="button" onclick="closeModal('modalAlertMatrixCell')">ยกเลิก</button>
-        <button type="button" class="primary" onclick="saveMatrixOrder('${esc(gradegram)}', ${size})">
-          💾 บันทึก
-        </button>
       </div>
     </div>
   `;
 }
 
+// ========== เพิ่มรายการใหม่ ==========
+function addMatrixOrderRow(gradegram, size) {
+  const rowsBox = document.getElementById('matrixOrderRows');
+  if (!rowsBox) return;
+
+  const currentCount = rowsBox.querySelectorAll('.matrix-order-row').length;
+  if (currentCount >= 5) {
+    alert('⚠️ เพิ่มได้สูงสุด 5 รายการ');
+    return;
+  }
+
+  const newRow = { qty: '', sup: '', customer_roll: 'normal', quality_b: 'normal', note: '' };
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = renderMatrixOrderRow(currentCount, newRow);
+  rowsBox.appendChild(wrapper.firstElementChild);
+  renumberMatrixOrderRows();
+}
+
+// ========== ลบรายการ ==========
+function removeMatrixOrderRow(btn) {
+  const rowsBox = document.getElementById('matrixOrderRows');
+  if (!rowsBox) return;
+
+  const row = btn.closest('.matrix-order-row');
+  if (row) row.remove();
+
+  // ✅ ถ้าลบหมด → เพิ่มแถวว่างกลับมา 1 แถว (ไม่ให้ว่างเปล่า)
+  const remaining = rowsBox.querySelectorAll('.matrix-order-row').length;
+  if (remaining === 0) {
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = renderMatrixOrderRow(0, { qty: '', sup: '', customer_roll: 'normal', quality_b: 'normal', note: '' });
+    rowsBox.appendChild(wrapper.firstElementChild);
+  }
+
+  // ✅ Re-number ทุกรายการ
+  renumberMatrixOrderRows();
+}
+
+// ========== อัปเดตเลขรายการ (1, 2, 3, ...) ==========
+function renumberMatrixOrderRows() {
+  const rows = document.querySelectorAll('#matrixOrderRows .matrix-order-row');
+  rows.forEach((row, idx) => {
+    const label = row.querySelector('.row-label');
+    if (label) label.textContent = `รายการที่ ${idx + 1}`;
+    row.dataset.rowIdx = idx;
+  });
+}
+
 // ========== เปิดฟอร์มจากปุ่ม "กรอกข้อมูล" ==========
 function showMatrixOrderForm(gradegram, size) {
-  const lsKey = alertLS_Key(gradegram, size);
-  const lsVal = getAlertInput(lsKey);
-
-  const formHtml = renderMatrixOrderForm(gradegram, size, lsVal);
+  const items = getAlertItems(gradegram, size);
+  const formHtml = renderMatrixOrderForm(gradegram, size, items);
 
   const prompt = document.getElementById('matrixOrderPrompt');
   if (prompt) {
@@ -1571,40 +1730,62 @@ function showMatrixOrderForm(gradegram, size) {
     prompt.parentNode.replaceChild(wrapper.firstElementChild, prompt);
   }
 
-  setTimeout(() => document.getElementById('matrixOrderQty')?.focus(), 100);
+  setTimeout(() => document.querySelector('#matrixOrderRows .matrix-row-qty')?.focus(), 100);
 }
 
-// ========== บันทึกสั่งซื้อ (Matrix) ==========
+// ========== บันทึกสั่งซื้อ (Matrix) — Multi-item ==========
 function saveMatrixOrder(gradegram, size) {
-  const qty = document.getElementById('matrixOrderQty')?.value;
-  const sup = document.getElementById('matrixOrderSup')?.value || '';
-  const cust = document.getElementById('matrixOrderCust')?.value || 'normal';
-  const qual = document.getElementById('matrixOrderQual')?.value || 'normal';
-  const note = document.getElementById('matrixOrderNote')?.value || '';
-
-  if (!qty || Number(qty) <= 0) {
-    alert('⚠️ กรุณากรอกจำนวนม้วน > 0');
+  const rows = document.querySelectorAll('#matrixOrderRows .matrix-order-row');
+  if (!rows.length) {
+    alert('⚠️ ต้องมีอย่างน้อย 1 รายการ');
     return;
   }
 
-  const lsKey = alertLS_Key(gradegram, size);
+  const items = [];
 
-  saveAlertInput(lsKey, 'qty', String(Number(qty)));
-  saveAlertInput(lsKey, 'sup', sup);
-  saveAlertInput(lsKey, 'customer_roll', cust);
-  saveAlertInput(lsKey, 'quality_b', qual);
-  saveAlertInput(lsKey, 'note', note);
+  for (const row of rows) {
+    const qty = row.querySelector('.matrix-row-qty')?.value;
+    const sup = row.querySelector('.matrix-row-sup')?.value || '';
+    const cust = row.querySelector('.matrix-row-cust')?.value || 'normal';
+    const qual = row.querySelector('.matrix-row-qual')?.value || 'normal';
+    const note = row.querySelector('.matrix-row-note')?.value || '';
 
-  console.log('[Matrix] บันทึกสำเร็จ:', { gradegram, size, qty, sup, cust, qual, note });
+    // ⏭️ ข้ามแถวที่ว่าง (ไม่มี qty)
+    if (!qty || Number(qty) <= 0) continue;
+
+    items.push({
+      qty: String(Number(qty)),
+      sup,
+      customer_roll: cust,
+      quality_b: qual,
+      note
+    });
+  }
+
+  // ✅ ถ้าไม่มี items เลย → ลบข้อมูลทั้งหมด (กลับเป็น "-")
+  if (!items.length) {
+    if (!confirm('⚠️ ไม่มีรายการที่กรอก → ต้องการลบข้อมูลของ cell นี้ทั้งหมดหรือไม่?')) return;
+
+    saveAlertItems(gradegram, size, []);
+    closeModal('modalAlertMatrixCell');
+    applyAlertFiltersAndRender();
+    return;
+  }
+
+  // ✅ บันทึก
+  saveAlertItems(gradegram, size, items);
+
+  console.log('[Matrix] บันทึกสำเร็จ:', { gradegram, size, items });
 
   closeModal('modalAlertMatrixCell');
-
   applyAlertFiltersAndRender();
 
+  // Toast
+  const total = items.reduce((s, i) => s + Number(i.qty), 0);
   const msg = document.createElement('div');
   msg.className = 'msg ok';
   msg.style.cssText = 'position:fixed;top:80px;right:20px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.15)';
-  msg.textContent = `✅ บันทึกสั่งซื้อ ${gradegram}-${size} จำนวน ${qty} ม้วน`;
+  msg.textContent = `✅ บันทึก ${items.length} รายการ (${gradegram}-${size}) รวม ${total} ม้วน`;
   document.body.appendChild(msg);
   setTimeout(() => msg.remove(), 2000);
 }
@@ -1641,26 +1822,117 @@ function _attachAlertDropdown(btnId, dropdownId, boxId, docKey) {
 function alertLS_Key(gradegram, size) {
   return `${gradegram}|${size}`;
 }
+
+// ═══════════════════════════════════════════════════════════════
+// ✅ Helpers ใหม่ — Multi-item per cell
+// ═══════════════════════════════════════════════════════════════
+
+// โหลดข้อมูล + auto-migrate schema เก่า → ใหม่
 function loadAlertInputs(dateIdx = alertActiveDateIdx) {
   try {
     const raw = localStorage.getItem(getAlertLSKey(dateIdx));
-    return raw ? JSON.parse(raw) : {};
+    const data = raw ? JSON.parse(raw) : {};
+
+    // ✅ Auto-migrate: structure เก่า → ใหม่
+    Object.keys(data).forEach(key => {
+      const v = data[key];
+
+      // ถ้ามี structure เก่า (มี qty แต่ไม่มี items)
+      if (v && !v.items && (v.qty !== undefined || v.sup || v.customer_roll || v.quality_b || v.note)) {
+        data[key] = {
+          items: [{
+            qty: v.qty || '',
+            sup: v.sup || '',
+            customer_roll: v.customer_roll || 'normal',
+            quality_b: v.quality_b || 'normal',
+            note: v.note || ''
+          }]
+        };
+      }
+
+      // ถ้าไม่มี items เลย → สร้าง items ว่าง
+      if (data[key] && !data[key].items) {
+        data[key] = { items: [] };
+      }
+    });
+
+    return data;
   } catch { return {}; }
 }
-function saveAlertInput(key, field, value) {
-  const data = loadAlertInputs();
-  if (!data[key]) data[key] = {};
-  data[key][field] = value;
-  localStorage.setItem(getAlertLSKey(), JSON.stringify(data));
 
-  const MARK_FIELDS = ['qty', 'sup', 'customer_roll', 'quality_b', 'note'];
-  if (MARK_FIELDS.includes(field) && hasPOCreated()) {
+// ดึง items array ของ cell
+function getAlertItems(gradegram, size, dateIdx = alertActiveDateIdx) {
+  const data = loadAlertInputs(dateIdx);
+  const key = alertLS_Key(gradegram, size);
+  const cell = data[key];
+  if (!cell || !cell.items) return [];
+
+  // ✅ กรองเฉพาะ items ที่มี qty > 0
+  return cell.items.filter(it => it.qty && Number(it.qty) > 0);
+}
+
+// บันทึก items array ทั้งชุดของ cell
+function saveAlertItems(gradegram, size, items, dateIdx = alertActiveDateIdx) {
+  const data = loadAlertInputs(dateIdx);
+  const key = alertLS_Key(gradegram, size);
+
+  // ✅ ถ้า items ว่าง → ลบ key ทิ้ง
+  if (!items || !items.length) {
+    delete data[key];
+  } else {
+    data[key] = { items: items };
+  }
+
+  localStorage.setItem(getAlertLSKey(dateIdx), JSON.stringify(data));
+
+  // Mark PO edited ถ้า relevant
+  if (items && items.length && hasPOCreated()) {
     markAlertPOEdited();
   }
 }
-function getAlertInput(key, dateIdx = alertActiveDateIdx) {
-  const data = loadAlertInputs(dateIdx);
-  return data[key] || {};
+
+// รวมยอด qty ทั้งหมดของ cell (สำหรับ badge 📦 + filter)
+function getAlertQtyTotal(gradegram, size, dateIdx = alertActiveDateIdx) {
+  const items = getAlertItems(gradegram, size, dateIdx);
+  return items.reduce((sum, it) => sum + (Number(it.qty) || 0), 0);
+}
+
+// ✅ Backward compat: getAlertInput() คืน items[0] (รายการแรก) — รับ key หรือ gradegram
+function getAlertInput(keyOrGradegram, dateIdx = alertActiveDateIdx) {
+  let gradegram, size;
+
+  if (typeof keyOrGradegram === 'string' && keyOrGradegram.includes('|')) {
+    // รับ key แบบ "gradegram|size"
+    [gradegram, size] = keyOrGradegram.split('|');
+    size = Number(size);
+  } else {
+    // รับ gradegram, size
+    gradegram = keyOrGradegram;
+    size = dateIdx; // argument ที่ 2 คือ size
+    dateIdx = alertActiveDateIdx;
+  }
+
+  const items = getAlertItems(gradegram, size, dateIdx);
+  return items.length > 0 ? items[0] : {};
+}
+
+// ✅ Backward compat: saveAlertInput() — สำหรับ Flat view (กรอก 1 รายการ)
+function saveAlertInput(key, field, value) {
+  // key = "gradegram|size"
+  const [gradegram, size] = key.split('|');
+  const items = getAlertItems(gradegram, Number(size));
+
+  if (!items.length) {
+    // ยังไม่มีรายการ → สร้างใหม่
+    items.push({
+      qty: '', sup: '', customer_roll: 'normal', quality_b: 'normal', note: ''
+    });
+  }
+
+  // อัปเดต field ในรายการแรก
+  items[0][field] = value;
+
+  saveAlertItems(gradegram, Number(size), items);
 }
 
 // ================= PO FLAG =================
@@ -2089,10 +2361,9 @@ async function renderAlert() {
 
     alertAllSupsInData = [...new Set(
       display.map(r => {
-        const lsKey = alertLS_Key(r.gradegram, r.size);
-        const lsVal = getAlertInput(lsKey);
-        return lsVal.sup || '';
-      }).filter(Boolean)
+        const items = getAlertItems(r.gradegram, r.size);
+        return items.map(it => it.sup || '');
+      }).flat().filter(Boolean)
     )].sort();
 
     renderAlertGradeList();
@@ -2165,8 +2436,9 @@ function dismissPOWarning() {
   if (modal) modal.classList.remove('show');
 }
 
-// ================= INPUT =================
+// ================= INPUT (Flat view — single item compat) =================
 function onAlertInput(gradegram, size, field, value, el) {
+  // ใช้ saveAlertInput เพื่อ backward compat (แก้ items[0])
   const key = alertLS_Key(gradegram, size);
   saveAlertInput(key, field, value);
 
@@ -2224,24 +2496,26 @@ async function createPOFromAlert() {
   for (let dateIdx = 0; dateIdx < alertReceiveDates.length; dateIdx++) {
     const dateKey = alertReceiveDates[dateIdx];
     for (const r of alertCache) {
-      const lsKey = alertLS_Key(r.gradegram, r.size);
-      const lsVal = getAlertInput(lsKey, dateIdx);
+      const items = getAlertItems(r.gradegram, r.size, dateIdx);
 
-      if (!lsVal.qty || Number(lsVal.qty) <= 0) continue;
+      // ✅ วนทุก items ใน cell
+      for (const it of items) {
+        if (!it.qty || Number(it.qty) <= 0) continue;
 
-      allItems.push({
-        seq: allItems.length + 1,
-        receive_date: dateKey,
-        receive_date_idx: dateIdx,
-        gradegram: r.gradegram,
-        size: r.size,
-        gradegram_size: `${r.gradegram}-${Number(r.size).toFixed(2)}`,
-        quantity: Number(lsVal.qty),
-        sup: lsVal.sup || '',
-        customer_roll: lsVal.customer_roll || 'normal',
-        quality_b: lsVal.quality_b || 'normal',
-        note: lsVal.note || ''
-      });
+        allItems.push({
+          seq: allItems.length + 1,
+          receive_date: dateKey,
+          receive_date_idx: dateIdx,
+          gradegram: r.gradegram,
+          size: r.size,
+          gradegram_size: `${r.gradegram}-${Number(r.size).toFixed(2)}`,
+          quantity: Number(it.qty),
+          sup: it.sup || '',
+          customer_roll: it.customer_roll || 'normal',
+          quality_b: it.quality_b || 'normal',
+          note: it.note || ''
+        });
+      }
     }
   }
 
@@ -2599,7 +2873,7 @@ async function handleUsagePlanFile(file) {
 
     _usagePlanRows = rows;
     _usagePlanDateCols = dateCols.sort((a, b) => a.iso.localeCompare(b.iso));
-    
+
     renderUsagePlanImportModal();
     openModal('modalUsagePlanImport');
 
@@ -2780,7 +3054,10 @@ function exportAlert() {
   if (!alertCache || !alertCache.length) return alert('ไม่มีข้อมูล');
 
   const data = alertCache.map(r => {
-    const lsVal = getAlertInput(alertLS_Key(r.gradegram, r.size));
+    const items = getAlertItems(r.gradegram, r.size);
+    const firstItem = items.length > 0 ? items[0] : {};
+    const totalQty = getAlertQtyTotal(r.gradegram, r.size);
+
     return {
       Gradegrams: r.gradegram,
       Size: r.size,
@@ -2790,12 +3067,17 @@ function exportAlert() {
       'Usage Plan': r.usage_plan || 0,
       Alert: r.alert,
       สถานะ: r.alert < 0 ? `ขาด ${Math.ceil(Math.abs(r.alert))}` : (r.alert === 0 ? 'พอดี' : `เกิน ${Math.floor(r.alert)}`),
-      สั่งซื้อ: lsVal.qty || '',
-      Sup: lsVal.sup || '',
-      ม้วนลูกค้า: ALERT_CUSTOMER_ROLLS.find(c => c.value === lsVal.customer_roll)?.label || 'ปกติ',
-      'คุณภาพ B': ALERT_QUALITY_B.find(q => q.value === lsVal.quality_b)?.label || 'ปกติ',
+      'จำนวนรายการ': items.length,
+      สั่งซื้อ: totalQty || '',
+      Sup: items.map(it => it.sup).filter(Boolean).join(', '),
+      'ม้วนลูกค้า': firstItem.customer_roll
+        ? (ALERT_CUSTOMER_ROLLS.find(c => c.value === firstItem.customer_roll)?.label || 'ปกติ')
+        : 'ปกติ',
+      'คุณภาพ B': firstItem.quality_b
+        ? (ALERT_QUALITY_B.find(q => q.value === firstItem.quality_b)?.label || 'ปกติ')
+        : 'ปกติ',
       FSC: isFSCGrade(r.gradegram) ? 'FSC' : 'Non-FSC',
-      หมายเหตุ: lsVal.note || ''
+      หมายเหตุ: items.map(it => it.note).filter(Boolean).join(', ')
     };
   });
   const ws = XLSX.utils.json_to_sheet(data);
