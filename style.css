@@ -2147,3 +2147,404 @@ table tbody tr:hover > td:first-child {
   cursor: not-allowed !important;
   border-color: var(--border) !important;
 }
+/* ═══════════════════════════════════════════════════════════ */
+/* ========== ALERT TABLE — ลดความสูงแถว (-2px) ========== */
+/* ═══════════════════════════════════════════════════════════ */
+.alert-flat-table tbody td {
+  padding: 6px 10px !important;
+  line-height: 1.25 !important;
+}
+.alert-flat-table thead th {
+  padding: 8px 8px !important;
+  line-height: 1.2 !important;
+}
+.alert-flat-table .alert-input-qty,
+.alert-flat-table .alert-input-sup,
+.alert-flat-table .alert-input-customer,
+.alert-flat-table .alert-input-quality,
+.alert-flat-table .alert-input-note {
+  padding: 3px 6px !important;
+  line-height: 1.2 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════ */
+/* ========== ALERT VIEW TOGGLE (Matrix / รายการ) ========== */
+/* ═══════════════════════════════════════════════════════════ */
+.alert-view-toggle {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin: 10px 0;
+  width: fit-content;
+}
+.alert-view-toggle button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  transition: var(--transition);
+  transform: none;
+  box-shadow: none;
+}
+.alert-view-toggle button:hover {
+  background: var(--surface);
+  color: var(--text);
+  transform: none;
+  box-shadow: none;
+}
+.alert-view-toggle button.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+  box-shadow: 0 2px 6px rgba(59,130,246,.25);
+  font-weight: 700;
+}
+.alert-view-toggle button.active:hover {
+  background: var(--primary-dark);
+  border-color: var(--primary-dark);
+  color: #fff;
+}
+
+/* ═══════════════════════════════════════════════════════════ */
+/* ========== ALERT MATRIX VIEW (ตารางไขว้) ========== */
+/* ═══════════════════════════════════════════════════════════ */
+.alert-matrix-wrap {
+  overflow: auto;
+  max-height: 70vh;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-top: 10px;
+}
+
+.alert-matrix-new-table {
+  border-collapse: collapse;
+  font-size: 12px;
+  width: max-content;
+  min-width: 100%;
+}
+
+.alert-matrix-new-table th,
+.alert-matrix-new-table td {
+  border: 1px solid var(--border);
+  padding: 5px 7px;
+  text-align: center;
+  vertical-align: middle;
+  white-space: nowrap;
+  line-height: 1.25;
+}
+
+.alert-matrix-new-table thead th {
+  background: var(--primary-dark);
+  color: #fff;
+  font-weight: 700;
+  font-size: 11.5px;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+  padding: 7px 6px;
+}
+
+/* คอลัมน์ Gradegram (sticky ซ้าย) */
+.alert-matrix-new-table .grade-col-matrix {
+  background: var(--surface-soft);
+  font-weight: 700;
+  text-align: left;
+  padding-left: 8px;
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  min-width: 80px;
+  color: var(--text);
+}
+.alert-matrix-new-table thead .grade-col-matrix {
+  background: var(--primary-dark);
+  color: #fff;
+  z-index: 6;
+}
+
+/* คอลัมน์ TOTAL (sticky ขวา) */
+.alert-matrix-new-table .total-col-matrix {
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  font-weight: 700;
+  position: sticky;
+  right: 0;
+  z-index: 4;
+  min-width: 70px;
+}
+.alert-matrix-new-table thead .total-col-matrix {
+  background: var(--primary);
+  color: #fff;
+  z-index: 6;
+}
+
+/* แถว TOTAL (ท้าย) */
+.alert-matrix-new-table tr.total-row-matrix td {
+  background: #cbd5e1;
+  font-weight: 700;
+  font-size: 12.5px;
+  padding: 7px 8px;
+  color: var(--text);
+}
+
+/* เซลล์แต่ละช่อง */
+.alert-matrix-new-table .matrix-cell {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  min-width: 52px;
+  padding: 5px 4px;
+  position: relative;
+}
+.alert-matrix-new-table .matrix-cell:hover {
+  filter: brightness(0.94);
+  box-shadow: inset 0 0 0 2px var(--primary-dark);
+}
+
+.alert-matrix-new-table .matrix-value {
+  font-weight: 700;
+  font-size: 12.5px;
+}
+
+/* สีตามสถานะ */
+.alert-matrix-new-table .matrix-red {
+  background: #fef2f2;
+}
+.alert-matrix-new-table .matrix-red .matrix-value {
+  color: var(--red);
+}
+.alert-matrix-new-table .matrix-yellow {
+  background: #fffbeb;
+}
+.alert-matrix-new-table .matrix-yellow .matrix-value {
+  color: var(--yellow-dark);
+}
+.alert-matrix-new-table .matrix-green {
+  background: #f0fdf4;
+}
+.alert-matrix-new-table .matrix-green .matrix-value {
+  color: var(--green-dark);
+}
+
+.alert-matrix-new-table .empty-cell {
+  color: var(--text-light);
+  background: var(--surface-soft);
+}
+
+/* Badge "สั่งซื้อแล้ว" ในเซลล์ */
+.alert-matrix-new-table .matrix-order-badge {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--primary);
+  padding: 1px 5px;
+  border-radius: 999px;
+  margin-top: 2px;
+  display: inline-block;
+}
+.alert-matrix-new-table .matrix-cell.has-order {
+  box-shadow: inset 0 0 0 2px var(--primary);
+}
+
+/* ═══════════════════════════════════════════════════════════ */
+/* ========== ALERT MATRIX CELL MODAL ========== */
+/* ═══════════════════════════════════════════════════════════ */
+
+.matrix-cell-summary {
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  border: 1px solid #93c5fd;
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+
+.matrix-cell-summary-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e3a8a;
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.matrix-cell-summary-title .alert-status-badge {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+  background: #fff;
+  border: 1px solid #93c5fd;
+  color: #1e40af;
+}
+
+.matrix-cell-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 16px;
+}
+
+.matrix-cell-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px dashed #bfdbfe;
+  font-size: 13px;
+}
+.matrix-cell-row:last-child {
+  border-bottom: none;
+}
+.matrix-cell-row .label {
+  color: #475569;
+  font-weight: 600;
+}
+.matrix-cell-row .value {
+  font-weight: 700;
+  color: #1e293b;
+}
+.matrix-cell-row .value.red    { color: var(--red); }
+.matrix-cell-row .value.green  { color: var(--green-dark); }
+.matrix-cell-row .value.yellow { color: var(--yellow-dark); }
+.matrix-cell-row .value.blue   { color: var(--primary-dark); }
+
+.matrix-alert-big {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  margin-top: 8px;
+  font-size: 18px;
+  font-weight: 800;
+}
+.matrix-alert-big.red {
+  background: var(--red-soft);
+  color: var(--red-dark);
+  border: 1px solid var(--red-bg);
+}
+.matrix-alert-big.yellow {
+  background: var(--yellow-soft);
+  color: var(--yellow-dark);
+  border: 1px solid var(--orange-bg);
+}
+.matrix-alert-big.green {
+  background: var(--green-soft);
+  color: var(--green-dark);
+  border: 1px solid var(--green-bg);
+}
+
+/* ═══════════════════════════════════════════════════════════ */
+/* ========== MATRIX CELL ORDER FORM ========== */
+/* ═══════════════════════════════════════════════════════════ */
+
+.matrix-order-prompt {
+  background: var(--orange-soft);
+  border: 1px solid var(--orange-bg);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  text-align: center;
+  margin-bottom: 14px;
+}
+.matrix-order-prompt p {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--orange-dark);
+}
+.matrix-order-prompt button {
+  padding: 8px 20px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.matrix-order-form {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  background: var(--surface-soft);
+}
+
+.matrix-order-form h4 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary-dark);
+}
+
+.matrix-order-form .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 14px;
+  margin-bottom: 10px;
+}
+
+.matrix-order-form .form-row.full {
+  grid-template-columns: 1fr;
+}
+
+.matrix-order-form .form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.matrix-order-form .form-field label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.matrix-order-form .form-field input,
+.matrix-order-form .form-field select {
+  padding: 6px 10px;
+  font-size: 13px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  font-family: inherit;
+}
+
+.matrix-order-form .form-field input:focus,
+.matrix-order-form .form-field select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(59,130,246,.15);
+}
+
+.matrix-order-form .form-field input.qty-input {
+  font-weight: 800;
+  color: var(--red);
+  font-size: 15px;
+  text-align: center;
+}
+
+.matrix-order-form .form-actions {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  justify-content: flex-end;
+}
+
+.matrix-order-form .form-actions button {
+  padding: 7px 18px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.matrix-order-form .form-actions button.primary {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
