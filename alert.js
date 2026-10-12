@@ -1,7 +1,8 @@
 // ═══════════════════════════════════════════════════════════════
 // STOCK V8 — alert.js (Flat Table + Filter + PO + Lock Date + FSC + History + Lock + Usage Plan)
 // + ✅ Hover Effect (เด่นทั้งแถว — ทับสี row-red/yellow/green)
-// + ✅ View Toggle: Flat / Matrix
+// + ✅ View Toggle: Flat / Matrix (ตารางไขว้ Gradegram × Size)
+// + ✅ Matrix Cell Modal + ฟอร์มสั่งซื้อ
 // ═══════════════════════════════════════════════════════════════
 
 let alertSelectedGrades = [];
@@ -167,15 +168,9 @@ function applyCalculatedDates(analyzedDate) {
 
   const stockDate = calcStockDate(analyzedDate);
   const receiveDate = calcReceiveDate(analyzedDate);
-  // ❌ ไม่ set snapshotMonth ที่นี่ — ปล่อยให้ loadSnapshotMonths() จัดการ
-  // const snapshotMonth = calcSnapshotMonth(analyzedDate);
 
   if ($('alertStockDate')) $('alertStockDate').value = stockDate;
   if ($('alertReceiveDate')) $('alertReceiveDate').value = receiveDate;
-  // ❌ ลบ 3 บรรทัดนี้:
-  // if ($('alertSnapshotMonth') && !$('alertSnapshotMonth').value) {
-  //   $('alertSnapshotMonth').value = snapshotMonth;
-  // }
 }
 
 function attachAlertDateListener() {
@@ -267,7 +262,6 @@ async function onAlertDateChange() {
   if (snapshot) {
     await applyAlertSnapshot(snapshot);
 
-    // ✅ lock เฉพาะเมื่อ snapshot เป็นของ "วันเก่า" (ข้ามวันมาแล้ว)
     const today = toISODate(new Date());
     const isPastDay = analyzedDate < today;
     setAlertLocked(isPastDay, analyzedDate);
@@ -293,13 +287,11 @@ function setAlertLocked(locked, analyzedDate) {
 
     if (body) body.classList.add('alert-locked');
 
-    // ✅ ล็อกทุกช่อง "ยกเว้น alertDate" → user เปลี่ยนวันกลับไปดูวันอื่นได้เสมอ
     ['alertStockDate', 'alertReceiveDate', 'alertSnapshotMonth', 'alertIncludeCustomer'].forEach(id => {
       const el = $(id);
       if (el) el.disabled = true;
     });
 
-    // ✅ alertDate ต้องเปิดใช้งานเสมอ — ไม่แตะเลย
     const dateEl = $('alertDate');
     if (dateEl) {
       dateEl.disabled = false;
@@ -317,7 +309,6 @@ function setAlertLocked(locked, analyzedDate) {
     if (lockBanner) lockBanner.classList.add('hidden');
     if (body) body.classList.remove('alert-locked');
 
-    // ✅ ปลดล็อกทุกช่อง
     ['alertStockDate', 'alertReceiveDate', 'alertSnapshotMonth', 'alertIncludeCustomer'].forEach(id => {
       const el = $(id);
       if (el) {
@@ -327,7 +318,6 @@ function setAlertLocked(locked, analyzedDate) {
       }
     });
 
-    // ✅ alertDate เปิดใช้งานเสมอ
     const dateEl = $('alertDate');
     if (dateEl) {
       dateEl.disabled = false;
@@ -355,9 +345,6 @@ async function applyAlertSnapshot(snapshot) {
       renderAlertDateTabs();
     }
 
-    // ✅ ไม่ลบ inputs — เก็บถาวรจนกว่าจะกด "ล้างค่า"
-    // clearAllAlertInputsAllDates();
-
     alertCache = snapshot.result_json || [];
     renderAlertFromCache();
   } catch (e) {
@@ -373,12 +360,10 @@ function renderAlertFromCache() {
     return;
   }
 
-  // ✅ เก็บ full cache
   window._alertFullCache = [...alertCache];
 
-  // ✅ Render (summary ย้ายไปอยู่ใน date tabs แล้ว)
   let html = `<div id="alertDateTabsBox" class="alert-date-tabs"></div>`;
-  html += `<div id="alertViewToggleWrap"></div>`;   // ✅ เพิ่ม view toggle
+  html += `<div id="alertViewToggleWrap"></div>`;
 
   const sorted = [...alertCache].sort((a, b) => {
     if (a.gradegram !== b.gradegram) return a.gradegram.localeCompare(b.gradegram);
@@ -417,8 +402,7 @@ function renderAlertFromCache() {
     </div>
   </th>`;
   html += '<th>Stock Level</th>';
-  
-  // ✅ Stock Filter
+
   html += `<th class="th-with-filter">
     <div class="th-filter-wrap" id="alertStockFilterBox">
       <button type="button" class="th-filter-btn" id="alertStockFilterBtn">
@@ -435,7 +419,6 @@ function renderAlertFromCache() {
     </div>
   </th>`;
 
-  // ✅ Receive Filter
   html += `<th class="th-with-filter">
     <div class="th-filter-wrap" id="alertReceiveFilterBox">
       <button type="button" class="th-filter-btn" id="alertReceiveFilterBtn">
@@ -452,7 +435,6 @@ function renderAlertFromCache() {
     </div>
   </th>`;
 
-  // ✅ Usage Plan (คอลัมน์ใหม่ + Filter)
   html += `<th class="th-with-filter">
     <div class="th-filter-wrap" id="alertUsageFilterBox">
       <button type="button" class="th-filter-btn" id="alertUsageFilterBtn">
@@ -559,7 +541,6 @@ function renderAlertFromCache() {
   _attachAlertDropdown('alertUsageFilterBtn', 'alertUsageFilterDropdown', 'alertUsageFilterBox', 'alertUsageFilter');
   renderAlertReceiveDates();
 
-  // ✅ Apply filter แล้ว render ใหม่ (จะ auto-detect โหมด)
   applyAlertFiltersAndRender();
 }
 
@@ -574,7 +555,6 @@ function setAlertViewMode(mode) {
   alertViewMode = mode;
   console.log('[Alert] เปลี่ยนโหมดเป็น:', mode);
 
-  // Re-render (ใช้ filter ปัจจุบัน)
   renderAlertTableBody(alertCache);
 }
 
@@ -602,7 +582,7 @@ function initAlertRowHover() {
   setTimeout(() => {
     const alertRows = document.querySelectorAll('.alert-flat-table tbody tr');
     alertRows.forEach(row => {
-      if (row.classList.contains('total-row')) return;  // ข้ามแถวรวม
+      if (row.classList.contains('total-row')) return;
 
       row.style.cursor = 'pointer';
       row.style.transition = 'background-color 0.15s ease';
@@ -613,7 +593,6 @@ function initAlertRowHover() {
         originalColors[idx] = cell.style.backgroundColor || '';
       });
 
-      // ✅ ใช้ flag กัน duplicate listener
       if (row._hoverAttached) return;
       row._hoverAttached = true;
 
@@ -651,7 +630,6 @@ async function loadAlertSuppliers() {
 }
 
 // ================= SNAPSHOT MONTHS =================
-// ✅ แก้ #5: set snapshotMonth = เดือนล่าสุดเสมอ (override ค่าที่อาจค้าง)
 async function loadSnapshotMonths() {
   try {
     const { data, error } = await supabase
@@ -666,11 +644,9 @@ async function loadSnapshotMonths() {
     });
     const months = [...set].sort().reverse();
 
-    // ✅ set snapshotMonth = เดือนล่าสุดเสมอ (override ค่าที่อาจค้าง)
     if ($('alertSnapshotMonth') && months.length > 0) {
-      let defaultMonth = months[0];  // เดือนล่าสุดที่มี snapshot
+      let defaultMonth = months[0];
 
-      // ✅ ถ้ามี selectedMonths (จาก stock-level.js) → ใช้เดือนล่าสุดของ Stock Level
       if (typeof selectedMonths !== 'undefined' && selectedMonths.length > 0) {
         const latest = selectedMonths[selectedMonths.length - 1];
         if (months.includes(latest)) defaultMonth = latest;
@@ -1160,7 +1136,7 @@ function applyAlertFiltersAndRender() {
     });
   }
 
-  // 3.7) Usage Plan (Phase 6)
+  // 3.7) Usage Plan
   if (!alertSelectedUsageFilters.includes('all') && alertSelectedUsageFilters.length > 0) {
     result = result.filter(r => {
       const v = Number(r.usage_plan) || 0;
@@ -1199,10 +1175,8 @@ function applyAlertFiltersAndRender() {
 
 // ✅ Render ใหม่เฉพาะ summary + tbody (thead คงเดิม → filter ไม่หาย)
 function renderAlertTableBody(rows) {
-  // ✅ อัปเดต summary + date tabs
   renderAlertDateTabs();
 
-  // ✅ อัปเดต Size + Grade list จาก full cache
   const fullCache = window._alertFullCache || [];
   if (fullCache.length > 0) {
     const sizes = [...new Set(
@@ -1224,16 +1198,21 @@ function renderAlertTableBody(rows) {
     }
   }
 
-  // ✅ หา container
   const container = document.getElementById('alertBody');
   if (!container) return;
 
-  // ✅ อัปเดตปุ่ม toggle (ถ้ายังไม่มี หรือมีอยู่ → re-render)
+  // ✅ Reset display — ซ่อนทั้ง 2 view ก่อน แล้วค่อยเปิดตามโหมด
+  const flatWrap = container.querySelector('.report-wrap.alert-scroll');
+  const matrixWrapOld = document.getElementById('alertMatrixWrap');
+
+  if (flatWrap) flatWrap.style.display = 'none';
+  if (matrixWrapOld) matrixWrapOld.style.display = 'none';
+
+  // ✅ จัดการปุ่ม toggle
   let toggleEl = document.getElementById('alertViewToggleWrap');
   if (!toggleEl) {
     toggleEl = document.createElement('div');
     toggleEl.id = 'alertViewToggleWrap';
-    // แทรกก่อนตาราง
     const dateTabsBox = document.getElementById('alertDateTabsBox');
     if (dateTabsBox && dateTabsBox.parentNode) {
       dateTabsBox.parentNode.insertBefore(toggleEl, dateTabsBox.nextSibling);
@@ -1245,8 +1224,11 @@ function renderAlertTableBody(rows) {
 
   // ✅ เลือกโหมด render
   if (alertViewMode === 'matrix') {
+    if (flatWrap) flatWrap.style.display = 'none';
     renderAlertMatrixView(rows);
   } else {
+    if (flatWrap) flatWrap.style.display = '';
+    if (matrixWrapOld) matrixWrapOld.style.display = 'none';
     renderAlertFlatView(rows);
   }
 }
@@ -1334,28 +1316,21 @@ function renderAlertFlatView(rows) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ✅ Render: โหมด Matrix (ตารางไขว้)
+// ✅ Render: โหมด Matrix — ตารางไขว้ Gradegram × Size
 // ═══════════════════════════════════════════════════════════════
-
 function renderAlertMatrixView(rows) {
   const container = document.getElementById('alertBody');
   if (!container) return;
 
-  // ✅ หา wrapper ของตารางเดิม หรือสร้างใหม่
-  let matrixWrap = document.getElementById('alertMatrixWrap');
-  const flatTable = container.querySelector('.alert-flat-table');
+  const flatWrap = container.querySelector('.report-wrap.alert-scroll');
+  if (flatWrap) flatWrap.style.display = 'none';
 
+  let matrixWrap = document.getElementById('alertMatrixWrap');
   if (!matrixWrap) {
     matrixWrap = document.createElement('div');
     matrixWrap.id = 'alertMatrixWrap';
     matrixWrap.className = 'alert-matrix-wrap';
 
-    // ✅ ถ้ามี flat table อยู่ → ซ่อนไว้ (ไม่ลบ เพื่อสลับกลับได้เร็ว)
-    if (flatTable) {
-      flatTable.parentNode.style.display = 'none';
-    }
-
-    // แทรกก่อน report-foot
     const reportFoot = container.querySelector('.report-foot');
     if (reportFoot) {
       container.insertBefore(matrixWrap, reportFoot);
@@ -1363,152 +1338,275 @@ function renderAlertMatrixView(rows) {
       container.appendChild(matrixWrap);
     }
   } else {
-    // ✅ ถ้ามี matrixWrap อยู่แล้ว → แสดง + ซ่อน flat
     matrixWrap.style.display = '';
-    if (flatTable) flatTable.parentNode.style.display = 'none';
   }
 
-  // ✅ สร้างข้อมูล Matrix
   if (!rows.length) {
     matrixWrap.innerHTML = '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่มีรายการ 🎉</p>';
     return;
   }
 
-  // ✅ หา unique grades + sizes
   const grades = [...new Set(rows.map(r => r.gradegram))].sort();
   const sizes  = [...new Set(rows.map(r => Number(r.size)))].sort((a, b) => a - b);
 
-  // ✅ สร้าง map: key = `${grade}|${size}` → row data
   const dataMap = {};
-  rows.forEach(r => {
-    dataMap[`${r.gradegram}|${r.size}`] = r;
-  });
+  rows.forEach(r => { dataMap[`${r.gradegram}|${r.size}`] = r; });
 
-  // ✅ คำนวณ total ต่อ grade และต่อ size
-  const gradeTotals = {};   // grade → { snapshot, stock, receive, usage, alert, qty }
-  const sizeTotals  = {};   // size  → { snapshot, stock, receive, usage, alert, qty }
-  let grandTotal = { snapshot: 0, stock: 0, receive: 0, usage: 0, alert: 0, qty: 0 };
-
-  grades.forEach(g => {
-    gradeTotals[g] = { snapshot: 0, stock: 0, receive: 0, usage: 0, alert: 0, qty: 0 };
-  });
-  sizes.forEach(s => {
-    sizeTotals[s] = { snapshot: 0, stock: 0, receive: 0, usage: 0, alert: 0, qty: 0 };
-  });
-
-  // ✅ Header row
   let html = '<table class="alert-matrix-new-table"><thead><tr>';
-  html += '<th class="grade-col">Gradegram</th>';
-  html += '<th class="size-col">Size</th>';
-
-  // คอลัมน์ตัวเลข (ตามโหมดเดิม)
-  html += '<th>Snapshot</th>';
-  html += '<th>Stock</th>';
-  html += '<th>Receive</th>';
-  html += '<th>Usage Plan</th>';
-  html += '<th>Alert</th>';
-  html += '<th>สถานะ</th>';
-  html += '<th style="background:#dc2626">🛒 สั่งซื้อ</th>';
+  html += '<th class="grade-col-matrix">GRADEGRAMS</th>';
+  sizes.forEach(s => { html += `<th>${s}</th>`; });
+  html += '<th class="total-col-matrix">TOTAL</th>';
   html += '</tr></thead><tbody>';
 
-  // ✅ วนแต่ละ grade → วนแต่ละ size
   grades.forEach(grade => {
-    // เช็คว่า grade นี้มี size อะไรบ้าง
-    const sizesOfGrade = sizes.filter(s => dataMap[`${grade}|${s}`]);
+    html += '<tr>';
+    html += `<td class="grade-col-matrix">${esc(grade)}</td>`;
 
-    sizesOfGrade.forEach((size, idx) => {
+    let rowTotal = 0;
+
+    sizes.forEach(size => {
       const r = dataMap[`${grade}|${size}`];
-      if (!r) return;
+      if (!r) { html += '<td class="empty-cell">-</td>'; return; }
 
       const a = Number(r.alert) || 0;
-      let rowCls, statusTxt;
-      if (a < 0)      { rowCls = 'row-red';    statusTxt = `🔴 ขาด ${Math.ceil(Math.abs(a))}`; }
-      else if (a === 0) { rowCls = 'row-yellow'; statusTxt = '🟡 พอดี'; }
-      else             { rowCls = 'row-green';  statusTxt = `🟢 เกิน ${Math.floor(a)}`; }
+      rowTotal += a;
+
+      let cellCls = '';
+      if (a < 0)        cellCls = 'matrix-red';
+      else if (a === 0) cellCls = 'matrix-yellow';
+      else              cellCls = 'matrix-green';
 
       const lsKey = alertLS_Key(r.gradegram, r.size);
       const lsVal = getAlertInput(lsKey);
-      const qty = Number(lsVal.qty) || 0;
+      const hasOrder = lsVal.qty && Number(lsVal.qty) > 0;
 
-      // ✅ สะสมค่า
-      gradeTotals[grade].snapshot += Number(r.snapshot) || 0;
-      gradeTotals[grade].stock    += Number(r.stock) || 0;
-      gradeTotals[grade].receive  += Number(r.receive) || 0;
-      gradeTotals[grade].usage    += Number(r.usage_plan) || 0;
-      gradeTotals[grade].alert    += a;
-      gradeTotals[grade].qty      += qty;
+      const orderBadge = hasOrder
+        ? `<div class="matrix-order-badge">📦 ${lsVal.qty}</div>`
+        : '';
 
-      sizeTotals[size].snapshot += Number(r.snapshot) || 0;
-      sizeTotals[size].stock    += Number(r.stock) || 0;
-      sizeTotals[size].receive  += Number(r.receive) || 0;
-      sizeTotals[size].usage    += Number(r.usage_plan) || 0;
-      sizeTotals[size].alert    += a;
-      sizeTotals[size].qty      += qty;
-
-      grandTotal.snapshot += Number(r.snapshot) || 0;
-      grandTotal.stock    += Number(r.stock) || 0;
-      grandTotal.receive  += Number(r.receive) || 0;
-      grandTotal.usage    += Number(r.usage_plan) || 0;
-      grandTotal.alert    += a;
-      grandTotal.qty      += qty;
-
-      // ✅ แสดง grade + size เฉพาะแถวแรกของ grade (rowspan)
-      const showGrade = idx === 0;
-      const rowspanAttr = showGrade ? ` rowspan="${sizesOfGrade.length}"` : '';
-
-      html += `<tr class="${rowCls}">`;
-      if (showGrade) {
-        html += `<td class="grade-col"${rowspanAttr}><b>${esc(grade)}</b></td>`;
-      }
-      html += `<td class="size-col">${size}</td>`;
-      html += `<td>${r.snapshot}</td>`;
-      html += `<td>${Number(r.stock).toFixed(2)}</td>`;
-      html += `<td>${r.receive}</td>`;
-      html += `<td>${r.usage_plan ? Number(r.usage_plan).toFixed(2) : '-'}</td>`;
-      html += `<td class="alert-cell"><b>${a > 0 ? '+' + a : a}</b></td>`;
-      html += `<td style="font-size:11px">${statusTxt}</td>`;
-
-      // ✅ คอลัมน์กรอกจำนวนสั่งซื้อ
-      const clsQty = qty > 0 ? ' filled' : '';
-      html += `<td><input type="number"
-        class="alert-matrix-input${clsQty}"
-        placeholder="-"
-        value="${lsVal.qty || ''}"
-        onchange="onAlertInput('${esc(r.gradegram)}', ${r.size}, 'qty', this.value, this)"></td>`;
-
-      html += '</tr>';
+      html += `<td class="matrix-cell ${cellCls} ${hasOrder ? 'has-order' : ''}"
+                    onclick="openAlertMatrixCell('${esc(grade)}', ${size})">
+                 <div class="matrix-value">${a > 0 ? '+' + a : a}</div>
+                 ${orderBadge}
+               </td>`;
     });
+
+    html += `<td class="total-col-matrix">${rowTotal > 0 ? '+' + rowTotal : rowTotal}</td>`;
+    html += '</tr>';
   });
 
-  // ✅ แถว Total (ท้ายตาราง)
-  html += `<tr class="total-row">`;
-  html += `<td class="grade-col" colspan="2" style="text-align:right">รวม</td>`;
-  html += `<td>${grandTotal.snapshot}</td>`;
-  html += `<td>${grandTotal.stock.toFixed(2)}</td>`;
-  html += `<td>${grandTotal.receive}</td>`;
-  html += `<td>${grandTotal.usage.toFixed(2)}</td>`;
-  html += `<td style="color:#dc2626">${grandTotal.alert > 0 ? '+' + grandTotal.alert : grandTotal.alert}</td>`;
-  html += `<td></td>`;
-  html += `<td style="color:#dc2626;font-weight:700">${grandTotal.qty > 0 ? grandTotal.qty : '-'}</td>`;
-  html += `</tr>`;
+  // Total row
+  html += '<tr class="total-row-matrix">';
+  html += '<td class="grade-col-matrix" style="text-align:right">TOTAL</td>';
+  sizes.forEach(size => {
+    let colTotal = 0;
+    grades.forEach(grade => {
+      const r = dataMap[`${grade}|${size}`];
+      if (r) colTotal += Number(r.alert) || 0;
+    });
+    html += `<td>${colTotal > 0 ? '+' + colTotal : colTotal}</td>`;
+  });
+  const grandTotal = rows.reduce((s, r) => s + (Number(r.alert) || 0), 0);
+  html += `<td class="total-col-matrix">${grandTotal > 0 ? '+' + grandTotal : grandTotal}</td>`;
+  html += '</tr>';
 
   html += '</tbody></table>';
 
   matrixWrap.innerHTML = html;
+}
 
-  // ✅ ปรับความสูงของ grade-col / size-col ให้ไม่ทับกัน
-  setTimeout(() => {
-    const gradeCols = matrixWrap.querySelectorAll('.grade-col');
-    const sizeCols  = matrixWrap.querySelectorAll('.size-col');
+// ═══════════════════════════════════════════════════════════════
+// ✅ Modal: Alert Matrix Cell Detail + ฟอร์มสั่งซื้อ
+// ═══════════════════════════════════════════════════════════════
+function openAlertMatrixCell(gradegram, size) {
+  const r = alertCache.find(x => x.gradegram === gradegram && Number(x.size) === Number(size));
+  if (!r) { alert('ไม่พบข้อมูล'); return; }
 
-    // หาความกว้างจริงของ grade-col แรก แล้ว set left ให้ size-col
-    if (gradeCols.length > 0) {
-      const gradeWidth = gradeCols[0].offsetWidth;
-      sizeCols.forEach(sc => {
-        sc.style.left = gradeWidth + 'px';
-      });
-    }
-  }, 50);
+  const a = Number(r.alert) || 0;
+  let alertCls, alertTxt, alertIcon;
+  if (a < 0)        { alertCls = 'red';    alertIcon = '🔴'; alertTxt = `ขาด ${Math.ceil(Math.abs(a))} ม้วน`; }
+  else if (a === 0) { alertCls = 'yellow'; alertIcon = '🟡'; alertTxt = 'พอดี'; }
+  else              { alertCls = 'green';  alertIcon = '🟢'; alertTxt = `เกิน ${Math.floor(a)} ม้วน`; }
+
+  const titleEl = $('alertMatrixCellTitle');
+  if (titleEl) {
+    titleEl.innerHTML = `📊 ${esc(gradegram)}-${size} <span style="color:#64748b;font-weight:400;font-size:13px">
+      (Gradegrams ${esc(gradegram)} · Size ${size})</span>`;
+  }
+
+  const bodyEl = $('alertMatrixCellBody');
+  if (!bodyEl) return;
+
+  const lsKey = alertLS_Key(gradegram, size);
+  const lsVal = getAlertInput(lsKey);
+
+  let html = `
+    <div class="matrix-cell-summary">
+      <div class="matrix-cell-summary-title">
+        📋 ข้อมูลสรุป
+        <span class="alert-status-badge">${alertIcon} ${alertTxt}</span>
+      </div>
+      <div class="matrix-cell-grid">
+        <div class="matrix-cell-row">
+          <span class="label">Stock Level:</span>
+          <span class="value blue">${r.snapshot}</span>
+        </div>
+        <div class="matrix-cell-row">
+          <span class="label">Stock:</span>
+          <span class="value">${Number(r.stock).toFixed(2)}</span>
+        </div>
+        <div class="matrix-cell-row">
+          <span class="label">Receive:</span>
+          <span class="value">${r.receive}</span>
+        </div>
+        <div class="matrix-cell-row">
+          <span class="label">Usage Plan:</span>
+          <span class="value">${r.usage_plan ? Number(r.usage_plan).toFixed(2) : '-'}</span>
+        </div>
+      </div>
+      <div class="matrix-alert-big ${alertCls}">
+        Alert: ${a > 0 ? '+' + a : a} ม้วน
+      </div>
+    </div>
+  `;
+
+  const hasOrder = lsVal.qty && Number(lsVal.qty) > 0;
+  const isLocked = document.getElementById('alertBody')?.classList.contains('alert-locked');
+
+  if (isLocked) {
+    html += `<div class="matrix-order-prompt" style="background:#fef3c7;border-color:#fcd34d">
+      <p style="color:#92400e">🔒 ข้อมูลนี้ถูกล็อก (ข้ามวันแล้ว) — ดูได้อย่างเดียว</p>
+    </div>`;
+  } else if (!hasOrder) {
+    html += `
+      <div class="matrix-order-prompt" id="matrixOrderPrompt">
+        <p>📦 ต้องการสั่งซื้อหรือไม่?</p>
+        <button type="button" class="primary" onclick="showMatrixOrderForm('${esc(gradegram)}', ${size})">
+          ✏️ กรอกข้อมูลสั่งซื้อ
+        </button>
+      </div>
+    `;
+  } else {
+    html += renderMatrixOrderForm(gradegram, size, lsVal);
+  }
+
+  bodyEl.innerHTML = html;
+  openModal('modalAlertMatrixCell');
+}
+
+// ========== ฟอร์มกรอกสั่งซื้อ (Matrix) ==========
+function renderMatrixOrderForm(gradegram, size, lsVal) {
+  const supOptions = alertSupplierCache.map(code =>
+    `<option value="${esc(code)}" ${lsVal.sup === code ? 'selected' : ''}>${esc(code)}</option>`
+  ).join('');
+
+  const custOptions = ALERT_CUSTOMER_ROLLS.map(c =>
+    `<option value="${c.value}" ${lsVal.customer_roll === c.value ? 'selected' : ''}>${c.label}</option>`
+  ).join('');
+
+  const qualOptions = ALERT_QUALITY_B.map(q =>
+    `<option value="${q.value}" ${lsVal.quality_b === q.value ? 'selected' : ''}>${q.label}</option>`
+  ).join('');
+
+  return `
+    <div class="matrix-order-form" id="matrixOrderForm">
+      <h4>✏️ กรอกข้อมูลสั่งซื้อ</h4>
+
+      <div class="form-row">
+        <div class="form-field">
+          <label>จำนวนม้วน *</label>
+          <input type="number" class="qty-input" id="matrixOrderQty"
+                 min="1" step="1" placeholder="0"
+                 value="${lsVal.qty || ''}">
+        </div>
+        <div class="form-field">
+          <label>Sup.</label>
+          <select id="matrixOrderSup">
+            <option value="">-- เลือก Sup --</option>
+            ${supOptions}
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-field">
+          <label>ม้วนลูกค้า</label>
+          <select id="matrixOrderCust">${custOptions}</select>
+        </div>
+        <div class="form-field">
+          <label>คุณภาพ B</label>
+          <select id="matrixOrderQual">${qualOptions}</select>
+        </div>
+      </div>
+
+      <div class="form-row full">
+        <div class="form-field">
+          <label>หมายเหตุ</label>
+          <input type="text" id="matrixOrderNote"
+                 placeholder="-" value="${esc(lsVal.note || '')}">
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" onclick="closeModal('modalAlertMatrixCell')">ยกเลิก</button>
+        <button type="button" class="primary" onclick="saveMatrixOrder('${esc(gradegram)}', ${size})">
+          💾 บันทึก
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+// ========== เปิดฟอร์มจากปุ่ม "กรอกข้อมูล" ==========
+function showMatrixOrderForm(gradegram, size) {
+  const lsKey = alertLS_Key(gradegram, size);
+  const lsVal = getAlertInput(lsKey);
+
+  const formHtml = renderMatrixOrderForm(gradegram, size, lsVal);
+
+  const prompt = document.getElementById('matrixOrderPrompt');
+  if (prompt) {
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = formHtml;
+    prompt.parentNode.replaceChild(wrapper.firstElementChild, prompt);
+  }
+
+  setTimeout(() => document.getElementById('matrixOrderQty')?.focus(), 100);
+}
+
+// ========== บันทึกสั่งซื้อ (Matrix) ==========
+function saveMatrixOrder(gradegram, size) {
+  const qty = document.getElementById('matrixOrderQty')?.value;
+  const sup = document.getElementById('matrixOrderSup')?.value || '';
+  const cust = document.getElementById('matrixOrderCust')?.value || 'normal';
+  const qual = document.getElementById('matrixOrderQual')?.value || 'normal';
+  const note = document.getElementById('matrixOrderNote')?.value || '';
+
+  if (!qty || Number(qty) <= 0) {
+    alert('⚠️ กรุณากรอกจำนวนม้วน > 0');
+    return;
+  }
+
+  const lsKey = alertLS_Key(gradegram, size);
+
+  saveAlertInput(lsKey, 'qty', String(Number(qty)));
+  saveAlertInput(lsKey, 'sup', sup);
+  saveAlertInput(lsKey, 'customer_roll', cust);
+  saveAlertInput(lsKey, 'quality_b', qual);
+  saveAlertInput(lsKey, 'note', note);
+
+  console.log('[Matrix] บันทึกสำเร็จ:', { gradegram, size, qty, sup, cust, qual, note });
+
+  closeModal('modalAlertMatrixCell');
+
+  applyAlertFiltersAndRender();
+
+  const msg = document.createElement('div');
+  msg.className = 'msg ok';
+  msg.style.cssText = 'position:fixed;top:80px;right:20px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.15)';
+  msg.textContent = `✅ บันทึกสั่งซื้อ ${gradegram}-${size} จำนวน ${qty} ม้วน`;
+  document.body.appendChild(msg);
+  setTimeout(() => msg.remove(), 2000);
 }
 
 // ================= DROPDOWN HELPER =================
@@ -1712,12 +1810,10 @@ function switchAlertDate(idx) {
   renderAlert();
 }
 
-// ✅ Render date tabs + summary ฝั่งขวา
 function renderAlertDateTabs() {
   const box = $('alertDateTabsBox');
   if (!box) return;
 
-  // ✅ คำนวณ summary จาก full cache
   const cache = window._alertFullCache || alertCache || [];
   const totalShortage = cache.filter(r => Number(r.alert) < 0).length;
   const totalOK       = cache.filter(r => Number(r.alert) === 0).length;
@@ -1745,7 +1841,6 @@ function renderAlertDateTabs() {
   html += `<button type="button" class="alert-date-add-btn" onclick="addAlertReceiveDate()">+ เพิ่มวันที่รับสินค้า</button>`;
   html += '</div>';
 
-  // ✅ Summary ฝั่งขวา
   html += '<div class="alert-date-tabs-right">';
   html += `<span class="item red">🔴 ${totalShortage}</span>`;
   html += `<span class="item yellow">🟡 ${totalOK}</span>`;
@@ -1773,7 +1868,7 @@ function isFSCGrade(gradegram) {
   return match[1].includes('F');
 }
 
-// ================= RENDER ALERT (Flat Table) =================
+// ================= RENDER ALERT (Main) =================
 async function renderAlert() {
   const snapshotMonth = $('alertSnapshotMonth')?.value;
   const stockDate     = $('alertStockDate')?.value;
@@ -1784,7 +1879,6 @@ async function renderAlert() {
     return;
   }
 
-  // ✅ โหลด Usage Ranges (ถ้ายังไม่มี)
   if (!alertUsageRanges.length) {
     await loadUsagePlanRanges();
   }
@@ -1823,19 +1917,16 @@ async function renderAlert() {
       };
     });
 
-    // ✅ เก็บข้อมูลเต็ม (ก่อนกรอง)
     window._alertFullCache = [...result];
 
     alertAllSizes = [...new Set(result.map(r => Number(r.size)))].sort((a, b) => a - b);
     renderAlertSizeList();
     updateAlertSizeLabel();
 
-    // ✅ ใช้ result เต็ม render (การกรองจะทำใน renderAlertTableBody)
     const display = result;
 
-    // ✅ Summary block ถูกลบออก (ย้ายไปอยู่ใน renderAlertDateTabs)
     let html = `<div id="alertDateTabsBox" class="alert-date-tabs"></div>`;
-    html += `<div id="alertViewToggleWrap"></div>`;   // ✅ เพิ่ม view toggle
+    html += `<div id="alertViewToggleWrap"></div>`;
 
     if (!display.length) {
       html += '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่มีรายการ 🎉</p>';
@@ -1845,11 +1936,7 @@ async function renderAlert() {
       return;
     }
 
-    const sorted = [...display].sort((a, b) => {
-      if (a.gradegram !== b.gradegram) return a.gradegram.localeCompare(b.gradegram);
-      return a.size - b.size;
-    });
-
+    // สร้างโครงตาราง Flat (thead)
     html += '<div class="report-wrap alert-scroll"><table class="alert-flat-table"><thead><tr>';
 
     html += `<th class="th-with-filter">
@@ -1886,7 +1973,6 @@ async function renderAlert() {
 
     html += '<th>Stock Level</th>';
 
-    // ✅ Stock Filter
     html += `<th class="th-with-filter">
       <div class="th-filter-wrap" id="alertStockFilterBox">
         <button type="button" class="th-filter-btn" id="alertStockFilterBtn">
@@ -1903,7 +1989,6 @@ async function renderAlert() {
       </div>
     </th>`;
 
-    // ✅ Receive Filter
     html += `<th class="th-with-filter">
       <div class="th-filter-wrap" id="alertReceiveFilterBox">
         <button type="button" class="th-filter-btn" id="alertReceiveFilterBtn">
@@ -1920,7 +2005,6 @@ async function renderAlert() {
       </div>
     </th>`;
 
-    // ✅ Usage Plan (คอลัมน์ใหม่ + Filter)
     html += `<th class="th-with-filter">
       <div class="th-filter-wrap" id="alertUsageFilterBox">
         <button type="button" class="th-filter-btn" id="alertUsageFilterBtn">
@@ -2001,10 +2085,8 @@ async function renderAlert() {
 
     $('alertBody').innerHTML = html;
 
-    // ✅ alertCache = ข้อมูลเต็ม (สำหรับ createPO)
     alertCache = display;
 
-    // ✅ อัปเดตรายชื่อ Sup ที่มีในข้อมูล
     alertAllSupsInData = [...new Set(
       display.map(r => {
         const lsKey = alertLS_Key(r.gradegram, r.size);
@@ -2013,7 +2095,6 @@ async function renderAlert() {
       }).filter(Boolean)
     )].sort();
 
-    // ✅ Render filter ทั้งหมด
     renderAlertGradeList();
     renderAlertFilterList();
     renderAlertSizeList();
@@ -2040,7 +2121,6 @@ async function renderAlert() {
     _attachAlertDropdown('alertUsageFilterBtn', 'alertUsageFilterDropdown', 'alertUsageFilterBox', 'alertUsageFilter');
     renderAlertDateTabs();
 
-    // ✅ Apply filter แล้ว render ใหม่ (จะ auto-detect โหมด)
     applyAlertFiltersAndRender();
 
     if (hasPOEdited()) {
@@ -2097,14 +2177,12 @@ function onAlertInput(gradegram, size, field, value, el) {
     el.classList.toggle('filled', !!isFilled);
   }
 
-  // ✅ ถ้ากรอก Sup → อัปเดตรายชื่อ Sup ใน filter
   if (field === 'sup' && value && !alertAllSupsInData.includes(value)) {
     alertAllSupsInData.push(value);
     alertAllSupsInData.sort();
     renderAlertSupFilterList();
   }
 
-  // ✅ ถ้ามี filter "สั่งซื้อ" หรือ "Sup." อยู่ → re-apply filter
   const hasOrderFilter = !alertSelectedOrderFilters.includes('all') && alertSelectedOrderFilters.length > 0;
   const hasSupFilter = alertSelectedSupFilters.length > 0;
   if (field === 'qty' || field === 'sup' || hasOrderFilter || hasSupFilter) {
@@ -2149,7 +2227,6 @@ async function createPOFromAlert() {
       const lsKey = alertLS_Key(r.gradegram, r.size);
       const lsVal = getAlertInput(lsKey, dateIdx);
 
-      // ✅ เก็บแค่ "กรอกจำนวน" → ไม่ต้องเช็ค Sup ที่นี่
       if (!lsVal.qty || Number(lsVal.qty) <= 0) continue;
 
       allItems.push({
@@ -2160,7 +2237,7 @@ async function createPOFromAlert() {
         size: r.size,
         gradegram_size: `${r.gradegram}-${Number(r.size).toFixed(2)}`,
         quantity: Number(lsVal.qty),
-        sup: lsVal.sup || '',   // ✅ ปล่อยว่างได้
+        sup: lsVal.sup || '',
         customer_roll: lsVal.customer_roll || 'normal',
         quality_b: lsVal.quality_b || 'normal',
         note: lsVal.note || ''
@@ -2209,7 +2286,6 @@ function renderAlertPODetail(items) {
     const dayItems = byDate[dateKey];
     const dayTotal = dayItems.reduce((s, i) => s + i.quantity, 0);
 
-    // ✅ สรุปตาม Sup
     const supSummary = {};
     dayItems.forEach(it => {
       const sup = it.sup || '(ไม่ระบุ)';
@@ -2234,7 +2310,6 @@ function renderAlertPODetail(items) {
     dayItems.forEach((it, idx) => {
       totalQty += it.quantity;
 
-      // ✅ แสดงหมายเหตุเฉพาะที่ไม่ใช่ ปกติ/ปกติ
       const parts = [];
       if (it.customer_roll && it.customer_roll !== 'normal') {
         parts.push(labelCustomer(it.customer_roll));
@@ -2280,7 +2355,6 @@ function confirmCreatePO() {
     return;
   }
 
-  // ✅ เช็ค Sup ก่อนสร้าง PO — กันพลาด
   const missingSup = _pendingPOItems.filter(it => !it.sup || String(it.sup).trim() === '');
   if (missingSup.length > 0) {
     alert(`⚠️ ไม่สามารถสร้าง PO ได้\n\nมี ${missingSup.length} รายการที่ยังไม่ได้ระบุผู้ขาย (Sup.)\nกรุณาตรวจสอบและเลือก Sup. ให้ครบก่อน`);
@@ -2303,12 +2377,7 @@ function confirmCreatePO() {
   saveAlertSnapshot([...alertReceiveDates]).then(res => {
     if (res.ok) {
       console.log('✅ Alert snapshot saved:', res.data);
-
-      // ✅ ไม่ล้าง inputs — เก็บไว้ให้ user ดูย้อนหลัง/แก้ไข
-      // clearAllAlertInputsAllDates();
-
       renderAlert();
-
       console.log('✅ Alert inputs kept (not cleared)');
     } else {
       console.warn('❌ Alert snapshot save failed:', res.error);
@@ -2323,7 +2392,7 @@ function confirmCreatePO() {
   else alert('ยังไม่ได้เพิ่ม Tab Purchase Order');
 }
 
-// ================= DETAIL MODAL =================
+// ================= DETAIL MODAL (เดิม) =================
 async function openAlertDetail(gradegram, size) {
   const snapshotMonth = $('alertSnapshotMonth')?.value;
   const stockDate     = $('alertStockDate')?.value;
@@ -2439,7 +2508,6 @@ async function loadUsagePlanRanges() {
   }
 }
 
-// ✅ เปลี่ยนช่วง Usage
 async function onUsagePlanRangeChange(value) {
   if (!value || value === '__NONE__') {
     alertUsageSelected = null;
@@ -2450,7 +2518,6 @@ async function onUsagePlanRangeChange(value) {
   await renderAlert();
 }
 
-// ✅ Render dropdown Usage Plan
 function renderUsageRangeDropdown() {
   const sel = $('alertUsageRange');
   if (!sel) return;
@@ -2479,9 +2546,8 @@ function renderUsageRangeDropdown() {
 // ═══════════════════════════════════════════════════════════════
 
 let _usagePlanRows = [];
-let _usagePlanDateCols = [];   // [{ key, iso, thai }]
+let _usagePlanDateCols = [];
 
-// ✅ แปลง '28/09/26' → { iso: '2026-09-28', thai: '28/09/2569' }
 function parseExcelDateKey(key) {
   const m = String(key).match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
   if (!m) return null;
@@ -2496,7 +2562,6 @@ function parseExcelDateKey(key) {
   };
 }
 
-// ✅ เปิด dialog เลือกไฟล์
 function openUsagePlanImport() {
   const input = document.createElement('input');
   input.type = 'file';
@@ -2505,14 +2570,12 @@ function openUsagePlanImport() {
   input.click();
 }
 
-// ✅ อ่านไฟล์ + เปิด modal เลือกวันที่
 async function handleUsagePlanFile(file) {
   if (!file) return;
   try {
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, { type: 'array' });
 
-    // ✅ เก็บไว้ debug
     window._debugWB = wb;
 
     const sheet = wb.Sheets[wb.SheetNames[0]];
@@ -2522,7 +2585,6 @@ async function handleUsagePlanFile(file) {
       return;
     }
 
-    // ✅ หา date columns
     const firstRow = rows[0];
     const dateCols = [];
     Object.keys(firstRow).forEach(k => {
@@ -2536,10 +2598,8 @@ async function handleUsagePlanFile(file) {
     }
 
     _usagePlanRows = rows;
-    // ✅ เรียงตามวันที่ (น้อย → มาก)
     _usagePlanDateCols = dateCols.sort((a, b) => a.iso.localeCompare(b.iso));
     
-    // ✅ เปิด modal
     renderUsagePlanImportModal();
     openModal('modalUsagePlanImport');
 
@@ -2549,12 +2609,10 @@ async function handleUsagePlanFile(file) {
   }
 }
 
-// ✅ Render modal
 function renderUsagePlanImportModal() {
   const body = $('usagePlanImportBody');
   if (!body) return;
 
-  // ✅ ใช้คอลัมน์แรก-สุดท้าย (หลังจาก sort แล้ว)
   const minDate = _usagePlanDateCols[0].iso;
   const maxDate = _usagePlanDateCols[_usagePlanDateCols.length - 1].iso;
 
@@ -2583,7 +2641,6 @@ function renderUsagePlanImportModal() {
   body.innerHTML = html;
 }
 
-// ✅ คำนวณ + ส่งไป RPC
 async function confirmUsagePlanImport() {
   const from = $('usagePlanFrom')?.value;
   const to   = $('usagePlanTo')?.value;
@@ -2597,14 +2654,12 @@ async function confirmUsagePlanImport() {
     return;
   }
 
-  // ✅ หาคอลัมน์ที่อยู่ในช่วง
   const activeCols = _usagePlanDateCols.filter(c => c.iso >= from && c.iso <= to);
   if (!activeCols.length) {
     alert('ไม่มีคอลัมน์วันที่อยู่ในช่วงที่เลือก');
     return;
   }
 
-  // ✅ ประมวลผล
   const result = [];
   const skipped = [];
 
@@ -2613,14 +2668,13 @@ async function confirmUsagePlanImport() {
     const size = Number(row['SIZE']);
     if (!gradegram || !size) return;
 
-    // ✅ หา master — ใช้วิธี match แบบเดียวกับ getAvailableSizesFor()
-    const targetNorm = normalizeGrade(gradegram);   // 'CA097' → 'CA097'
+    const targetNorm = normalizeGrade(gradegram);
     const targetRaw  = String(gradegram).toUpperCase();
 
     const spec = masterCache.find(m => {
-      const mGrade = normalizeGrade(m.grade);       // 'CA' → 'CA'
-      const mGram  = String(m.gram);                // '097'
-      const mFull  = mGrade + mGram;                // 'CA097'
+      const mGrade = normalizeGrade(m.grade);
+      const mGram  = String(m.gram);
+      const mFull  = mGrade + mGram;
       return (mFull === targetNorm || mFull === targetRaw)
           && Number(m.size) === size;
     });
@@ -2636,13 +2690,12 @@ async function confirmUsagePlanImport() {
       return;
     }
 
-    // ✅ รวม kg ทุกคอลัมน์ในช่วง
     let totalKg = 0;
     activeCols.forEach(col => {
       totalKg += Number(row[col.key]) || 0;
     });
 
-    if (totalKg <= 0) return;   // ข้ามถ้าไม่มีค่า
+    if (totalKg <= 0) return;
 
     const rolls = Number((totalKg / stdWeight).toFixed(4));
 
@@ -2659,7 +2712,6 @@ async function confirmUsagePlanImport() {
     return;
   }
 
-  // ✅ ส่งไป RPC
   const btn = $('usagePlanImportConfirmBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'กำลังบันทึก...'; }
 
@@ -2678,18 +2730,15 @@ async function confirmUsagePlanImport() {
 
     closeModal('modalUsagePlanImport');
 
-    // ✅ Toast สรุปผล
     showToast(
       `✅ Import สำเร็จ ${data.inserted} รายการ` +
       (skipped.length ? ` · ข้าม ${skipped.length}` : ''),
       'ok', 4000
     );
 
-    // ✅ Reload Usage Ranges + dropdown
     await loadUsagePlanRanges();
     renderUsageRangeDropdown();
 
-    // ✅ Refresh Alert
     await renderAlert();
 
   } catch (e) {
@@ -2699,7 +2748,6 @@ async function confirmUsagePlanImport() {
   }
 }
 
-// ✅ ล้าง Usage Plan (ถามวันที่)
 async function clearUsagePlan() {
   const from = prompt('📅 ลบ Usage Plan จากวันที่ (YYYY-MM-DD):');
   if (!from) return;
@@ -2717,12 +2765,10 @@ async function clearUsagePlan() {
 
     showToast(`✅ ลบ ${data?.deleted || 0} รายการ`, 'ok', 3000);
 
-    // ✅ Reset selection + reload
     alertUsageSelected = null;
     await loadUsagePlanRanges();
     renderUsageRangeDropdown();
 
-    // ✅ Refresh Alert
     await renderAlert();
   } catch (e) {
     alert('❌ ' + e.message);
