@@ -350,7 +350,11 @@
         </div>
 
         <div class="filters no-print">
-          <label>📅 วันที่วิเคราะห์ <input type="date" id="alertDate" onchange="onAlertDateChange()"></label>
+          <!-- ✅ ล็อกวันที่วิเคราะห์ = วันนี้ (readonly + สไตล์) -->
+          <label>📅 วันที่วิเคราะห์
+            <input type="date" id="alertDate" readonly
+                   style="pointer-events:none;background:#f1f5f9;cursor:not-allowed">
+          </label>
 
           <label>📅 Stock วันที่ <input type="date" id="alertStockDate"></label>
 
@@ -370,12 +374,35 @@
 
           <button class="primary" onclick="renderAlert()">🔍 วิเคราะห์</button>
           <button class="primary" onclick="openUsagePlanImport()">📥 Import Usage Plan</button>
-          <button onclick="window.print()">🖨 พิมพ์</button>
         </div>
 
         <div id="alertLockBanner" class="alert-lock-banner hidden"></div>
 
         <div id="alertBody"></div>
+
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <!-- ✅ ส่วนตรวจสอบ Alert ย้อนหลัง -->
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <div class="alert-history-card" id="alertHistoryCard" style="display:none">
+          <div class="alert-history-head">
+            <h3>📜 ตรวจสอบ Alert ย้อนหลัง</h3>
+            <div class="alert-history-controls">
+              <label>📅 วันที่วิเคราะห์:</label>
+              <input type="date" id="alertHistoryDate">
+              <button type="button" class="primary" onclick="loadAlertHistory()">🔍 ดู</button>
+              <div class="alert-history-toggle" id="alertHistoryToggle">
+                <button type="button" class="active" data-mode="matrix" onclick="setAlertHistoryMode('matrix')">📊 Matrix</button>
+                <button type="button" data-mode="flat" onclick="setAlertHistoryMode('flat')">📋 รายการ</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="alertHistoryBody" class="alert-history-body">
+            <p style="text-align:center;color:#94a3b8;padding:30px">เลือกวันที่แล้วกด "ดู"</p>
+          </div>
+
+          <div class="alert-history-note">⚠️ โหมดดูอย่างเดียว — ไม่ผูกกับการสั่งซื้อ</div>
+        </div>
       </div>
     </div>
 
