@@ -378,7 +378,31 @@
 
         <div id="alertLockBanner" class="alert-lock-banner hidden"></div>
 
-        <div id="alertBody"></div>
+<div id="alertBody"></div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- ✅ ตรวจสอบ Alert ย้อนหลัง -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="alert-history-card" id="alertHistoryCard">
+  <div class="alert-history-head">
+    <h3>📜 ตรวจสอบ Alert ย้อนหลัง</h3>
+    <div class="alert-history-controls">
+      <label>📅 วันที่วิเคราะห์:</label>
+      <input type="date" id="alertHistoryDate">
+      <button type="button" class="primary" onclick="loadAlertHistory()">🔍 ดู</button>
+      <div class="alert-history-toggle" id="alertHistoryToggle">
+        <button type="button" class="active" data-mode="matrix" onclick="setAlertHistoryMode('matrix')">📊 Matrix</button>
+        <button type="button" data-mode="flat" onclick="setAlertHistoryMode('flat')">📋 รายการ</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="alertHistoryBody" class="alert-history-body">
+    <p style="text-align:center;color:#94a3b8;padding:30px">เลือกวันที่แล้วกด "ดู"</p>
+  </div>
+
+  <div class="alert-history-note">⚠️ โหมดดูอย่างเดียว — ไม่ผูกกับการสั่งซื้อ</div>
+</div>
 
         <!-- ═══════════════════════════════════════════════════════════ -->
         <!-- ✅ ส่วนตรวจสอบ Alert ย้อนหลัง -->
