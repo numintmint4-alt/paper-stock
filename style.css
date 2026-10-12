@@ -2548,3 +2548,102 @@ table tbody tr:hover > td:first-child {
   color: #fff;
   border-color: var(--primary);
 }
+/* ═══════════════════════════════════════════════════════════ */
+/* ========== MATRIX ORDER FORM — Multi-item ========== */
+/* ═══════════════════════════════════════════════════════════ */
+
+.matrix-order-form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.matrix-order-form-header h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary-dark);
+}
+.matrix-order-form-header .add-row-btn {
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  border: 1px dashed var(--primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+}
+.matrix-order-form-header .add-row-btn:hover {
+  background: var(--primary);
+  color: #fff;
+  border-style: solid;
+}
+
+.matrix-order-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 50vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.matrix-order-row {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  background: #fff;
+  position: relative;
+}
+
+.matrix-order-row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.matrix-order-row-head .row-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary-dark);
+}
+.matrix-order-row-head .row-remove-btn {
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--red-soft);
+  color: var(--red);
+  border: 1px solid var(--red-bg);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+  line-height: 1;
+}
+.matrix-order-row-head .row-remove-btn:hover {
+  background: var(--red);
+  color: #fff;
+  border-color: var(--red-dark);
+}
+
+/* ========== Flat view — ปุ่ม + เพิ่มบรรทัด ========== */
+.add-flat-row-btn {
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  border: 1px dashed var(--primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+  line-height: 1;
+}
+.add-flat-row-btn:hover {
+  background: var(--primary);
+  color: #fff;
+  border-style: solid;
+}
