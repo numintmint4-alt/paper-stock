@@ -1,38 +1,57 @@
 // ═══════════════════════════════════════════════════════════════
-// STOCK V9 — purchase-order.js
-// Purchase Order Management (List + Form + Auto-Split + Export)
-// + Date Split + Verify Password + Mark Saved + Deleted History
-// + Column Filters (PO No. / วันที่ออก / วันที่รับ / Sup. / สถานะ)
-// + Filter Label ด้านบน (PO No. / วันที่ออก / วันที่รับ)
-// + Add PO Items (Phase 3)
-// + Inline Edit Items (Phase 3E)
-// + closePOForm() — แก้ไข → กลับ PO List
-// + 🔄 Re-price — ดึงราคาใหม่จาก Price Master (ใน PO Form)
-// ✅ NEW: โหลดราคาตามเดือนของ PO (ref_receive) — ไม่ merge ไม่ fallback
-// ✅ NEW: เก็บ scroll position + focus กลับหลัง render (Inline Edit)
-// ✅ NEW: Drag & Drop เรียงลำดับ PO Items (Sortable.js) — ใช้ uid แทน index
-// ✅ NEW (V10): แก้ไข Header (Sup / วันที่รับ / วันที่ออก) ใน PO Form
-// ✅ NEW (V11): ปุ่ม "สร้าง PO ใหม่" — สร้าง PO เปล่าจากหน้า List
-// ✅ NEW (V12): เก็บลำดับเดิม (_editOriginalOrder) + ตรวจ isOrderChanged() + reorder_po_items
-// ✅ NEW (V16): Verify Password — ใช้ window.supabase.createClient() (Supabase Auth)
-// ✅ NEW (V17): เพิ่มช่องกรอกเลข PO เองในหน้า "สร้าง PO ใหม่" (default = Auto)
+//  STOCK V10.1 — purchase-order.js
+//  Purchase Order Management (List + Form + Auto-Split + Export)
+//  + Date Split + Verify Password + Mark Saved + Deleted History
+//  + Column Filters (PO No. / วันที่ออก / วันที่รับ / Sup. / สถานะ)
+//  + Filter Label ด้านบน (PO No. / วันที่ออก / วันที่รับ)
+//  + Add PO Items (Phase 3)
+//  + Inline Edit Items (Phase 3E)
+//  + closePOForm() — แก้ไข → กลับ PO List
+//  + Re-price — ดึงราคาใหม่จาก Price Master (ใน PO Form)
+//  + โหลดราคาตามเดือนของ PO (ref_receive) — ไม่ merge ไม่ fallback
+//  + เก็บ scroll position + focus กลับหลัง render (Inline Edit)
+//  + Drag & Drop เรียงลำดับ PO Items (Sortable.js) — ใช้ uid แทน index
+//  + แก้ไข Header (Sup / วันที่รับ / วันที่ออก) ใน PO Form
+//  + ปุ่ม "สร้าง PO ใหม่" — สร้าง PO เปล่าจากหน้า List
+//  + เก็บลำดับเดิม (_editOriginalOrder) + ตรวจ isOrderChanged() + reorder_po_items
+//  + Verify Password — ใช้ window.supabase.createClient() (Supabase Auth)
+//  + เพิ่มช่องกรอกเลข PO เองในหน้า "สร้าง PO ใหม่" (default = Auto)
+// ═══════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════
+//  STATE
 // ═══════════════════════════════════════════════════════════════
 
 let poCache = [];
 let poSuppliers = [];
-let poSuppliersFull = [];   // ✅ เก็บ {code, name} สำหรับ dropdown
+let poSuppliersFull = [];   // เก็บ {code, name} สำหรับ dropdown
 let poPriceMaster = [];
 let poSelectedMonth = '';
 let poEditingId = null;
 
-// ✅ Filter state
+// Filter state
 let poFilterPONo = '';
 let poFilterDateFrom = '';
 let poFilterDateTo = '';
 let poFilterSup = [];
 let poFilterStatus = [];
 
-// ================= STD WEIGHT HELPER =================
+// Edit state
+let _editItemsRows = [];
+let _editPOHeader = null;
+let _editHeaderDirty = false;
+let _editOriginalOrder = [];   // เก็บลำดับ id เดิม เพื่อเทียบว่า seq เปลี่ยนไหม
+
+// Drag & Drop
+let _poItemsSortable = null;
+
+// Add items modal
+let _addItemsRows = [];
+
+// ═══════════════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════════════
+
 function getStdWeight(gradegram, size) {
   const match = String(gradegram).match(/^([A-Z]+F?)(\d+)$/);
   if (!match) return 0;
@@ -54,7 +73,6 @@ function calcKgTotal(gradegram, size, quantity) {
   return Number((std * Number(quantity)).toFixed(2));
 }
 
-// ================= DATE FORMAT HELPER =================
 function fmtDateTH(d) {
   if (!d) return '-';
   const dObj = new Date(d);
@@ -65,14 +83,16 @@ function fmtDateTH(d) {
   return `${dd}/${mm}/${yyyy}`;
 }
 
-// ✅ แปลงวันที่ (YYYY-MM-DD) → เดือน (YYYY-MM)
 function getMonthFromDate(dateStr) {
   if (!dateStr) return poSelectedMonth;
   const s = String(dateStr).slice(0, 7);
   return s || poSelectedMonth;
 }
 
-// ================= INIT =================
+// ═══════════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════════
+
 async function initPurchaseOrderTab() {
   const today = new Date();
   if (!poSelectedMonth) {
@@ -97,7 +117,10 @@ async function initPurchaseOrderTab() {
   }
 }
 
-// ================= SUPPLIERS =================
+// ═══════════════════════════════════════════════════════════════
+//  SUPPLIERS
+// ═══════════════════════════════════════════════════════════════
+
 async function loadPOSuppliers() {
   try {
     const { data, error } = await supabase
@@ -123,7 +146,10 @@ async function loadPOSuppliers() {
   }
 }
 
-// ================= PRICE MASTER =================
+// ═══════════════════════════════════════════════════════════════
+//  PRICE MASTER
+// ═══════════════════════════════════════════════════════════════
+
 async function loadPriceMasterForMonth(month) {
   try {
     console.log('[PriceMaster] → ดึงราคาเดือน: ' + month);
@@ -167,7 +193,10 @@ function getPriceFromMaster(gradegram, customerRoll, qualityB) {
   return Number(base.toFixed(2));
 }
 
-// ================= RENDER PO LIST =================
+// ═══════════════════════════════════════════════════════════════
+//  RENDER PO LIST
+// ═══════════════════════════════════════════════════════════════
+
 async function renderPOList() {
   const listEl = $('poListBody');
   if (!listEl) return;
@@ -189,6 +218,7 @@ async function renderPOList() {
 
     let html = '<div class="data-scroll po-list-scroll"><table class="data-table po-list-table"><thead><tr>';
 
+    // PO No.
     html += `<th class="th-with-filter">
       <div class="th-filter-wrap po-filter-stack">
         <span class="po-filter-label">PO No.</span>
@@ -198,6 +228,7 @@ async function renderPOList() {
       </div>
     </th>`;
 
+    // วันที่ออก
     html += `<th class="th-with-filter">
       <div class="th-filter-wrap po-filter-stack">
         <span class="po-filter-label">วันที่ออก</span>
@@ -207,6 +238,7 @@ async function renderPOList() {
       </div>
     </th>`;
 
+    // วันที่รับ
     html += `<th class="th-with-filter">
       <div class="th-filter-wrap po-filter-stack">
         <span class="po-filter-label">วันที่รับ</span>
@@ -216,6 +248,7 @@ async function renderPOList() {
       </div>
     </th>`;
 
+    // Sup.
     const supList = [...new Set(poCache.map(p => p.sup_code))].sort();
     html += `<th class="th-with-filter">
       <div class="th-filter-wrap" id="poFilterSupBox">
@@ -236,6 +269,7 @@ async function renderPOList() {
     html += '<th style="text-align:right">จำนวน</th>';
     html += '<th style="text-align:right">KG รวม</th>';
 
+    // สถานะ
     html += `<th class="th-with-filter">
       <div class="th-filter-wrap" id="poFilterStatusBox">
         <button type="button" class="th-filter-btn" id="poFilterStatusBtn">
@@ -305,6 +339,10 @@ function renderPOListRows(rows) {
   });
   tbody.innerHTML = html;
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  PO FILTERS
+// ═══════════════════════════════════════════════════════════════
 
 function onPOFilterChange() {
   const ponoEl = $('poFilterPONoInput');
@@ -480,12 +518,11 @@ function _attachPOFilterDropdown(btnId, dropdownId, boxId, docKey) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ✅ NEW: สร้าง PO ใหม่ (ปุ่มจากหน้า List)
-// ✅ NEW (V17): เพิ่มช่องกรอกเลข PO เอง (default = Auto)
+//  CREATE PO MODAL (จากหน้า List)
 // ═══════════════════════════════════════════════════════════════
+
 async function openCreatePOModal() {
   try {
-    // 1. ดึงเลข PO ถัดไปจาก RPC
     const today = new Date();
     const yy = String(today.getFullYear()).slice(-2);
     const mm = pad(today.getMonth() + 1);
@@ -499,19 +536,16 @@ async function openCreatePOModal() {
       nextPoNo = nextNo;
     } catch (e) {
       console.warn('[Create PO] get_next_po_no ล้มเหลว:', e.message);
-      nextPoNo = `PO${yy}${mm}0001`; // fallback
+      nextPoNo = `PO${yy}${mm}0001`;
     }
 
-    // 2. โหลดราคาเดือนปัจจุบัน
     await loadPriceMasterForMonth(poSelectedMonth);
 
-    // 3. สร้าง header เปล่า
-    // ✅ (V17) เก็บค่าเดิม + เพิ่ม flag บอกว่าเป็น auto หรือ manual
     const todayISO = toISODate(today);
     const emptyHeader = {
       id: null,
-      po_no: nextPoNo || '',           // ← ปล่อยว่างไว้ ให้ User กรอกเองได้
-      po_no_auto: nextPoNo || '',      // ✅ เก็บค่าที่ระบบแนะนำ
+      po_no: nextPoNo || '',
+      po_no_auto: nextPoNo || '',
       po_date: todayISO,
       sup_code: poSuppliers[0] || 'EKP',
       status: 'draft',
@@ -524,15 +558,13 @@ async function openCreatePOModal() {
       created_by: currentUser?.id
     };
 
-    // 4. ตั้ง state เป็น "สร้างใหม่"
     poEditingId = null;
     _editItemsRows = [];
     _editPOHeader = emptyHeader;
     _editHeaderDirty = false;
-    _editOriginalOrder = [];   // ✅ NEW
-    window._isCreateMode = true;   // ✅ flag ว่าเป็นโหมดสร้างใหม่
+    _editOriginalOrder = [];
+    window._isCreateMode = true;
 
-    // 5. Render ฟอร์ม
     $('poFormTitle').textContent = '🧾 สร้าง PO ใหม่';
     renderPOFormTable();
     openModal('modalPOForm');
@@ -543,7 +575,10 @@ async function openCreatePOModal() {
   }
 }
 
-// ================= OPEN PO FORM =================
+// ═══════════════════════════════════════════════════════════════
+//  OPEN PO FORM
+// ═══════════════════════════════════════════════════════════════
+
 async function openPOForm(poId) {
   poEditingId = poId || null;
   window._isCreateMode = false;
@@ -569,7 +604,10 @@ async function openPOForm(poId) {
   }
 }
 
-// ================= OPEN PO FORM WITH VERIFY =================
+// ═══════════════════════════════════════════════════════════════
+//  OPEN PO FORM WITH VERIFY
+// ═══════════════════════════════════════════════════════════════
+
 async function openPOFormWithVerify(poId) {
   const po = poCache.find(p => p.id === poId);
   if (!po) return;
@@ -588,17 +626,14 @@ async function openPOFormWithVerify(poId) {
   openPOForm(poId);
 }
 
-// ✅ [V16] Verify Password — ใช้ window.supabase.createClient()
 async function verifyAndOpen(po, password, note) {
   try {
-    // ✅ ใช้ email ของ user ปัจจุบัน
     const email = currentUser?.email || '';
 
     if (!email) {
       return { ok: false, error: 'ไม่พบ email ผู้ใช้' };
     }
 
-    // ✅ สร้าง Supabase Client ชั่วคราว (ไม่ทับ session หลัก)
     const tempClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: {
         persistSession: false,
@@ -607,7 +642,6 @@ async function verifyAndOpen(po, password, note) {
       }
     });
 
-    // ✅ ใช้ Supabase Auth verify password
     const { data, error } = await tempClient.auth.signInWithPassword({
       email: email,
       password: password
@@ -618,14 +652,12 @@ async function verifyAndOpen(po, password, note) {
       return { ok: false, error: 'รหัสผ่านไม่ถูกต้อง' };
     }
 
-    // ✅ Sign out client ชั่วคราว (session หลักไม่กระทบ)
     try {
       await tempClient.auth.signOut();
     } catch (e) {
       console.warn('[Verify] tempClient signOut error:', e);
     }
 
-    // Log การแก้ไข
     try {
       await supabase.from('po_change_log').insert({
         po_id: po.id,
@@ -645,7 +677,10 @@ async function verifyAndOpen(po, password, note) {
   }
 }
 
-// ================= MARK PO AS SAVED =================
+// ═══════════════════════════════════════════════════════════════
+//  MARK PO AS SAVED
+// ═══════════════════════════════════════════════════════════════
+
 async function markPOSaved(poId) {
   const po = poCache.find(p => p.id === poId);
   if (!po) return;
@@ -670,7 +705,10 @@ async function markPOSaved(poId) {
   }
 }
 
-// ================= VERIFY PASSWORD MODAL =================
+// ═══════════════════════════════════════════════════════════════
+//  VERIFY PASSWORD MODAL
+// ═══════════════════════════════════════════════════════════════
+
 function openVerifyModal({ username, title, message, onConfirm }) {
   $('verifyPasswordTitle').textContent = title || '🔒 ยืนยันรหัสผ่าน';
   $('verifyPasswordMessage').textContent = message || '';
@@ -686,7 +724,6 @@ function openVerifyModal({ username, title, message, onConfirm }) {
   setTimeout(() => $('verifyPasswordInput')?.focus(), 100);
 }
 
-// ✅ [V16] Verify Password — ไม่มี logout/หน่วงเวลาแล้ว (tempClient จัดการเอง)
 async function confirmVerifyPassword() {
   const password = $('verifyPasswordInput').value;
   const note = $('verifyPasswordNote').value.trim();
@@ -728,7 +765,10 @@ async function confirmVerifyPassword() {
   btn.textContent = '✅ ยืนยัน';
 }
 
-// ================= OPEN PO FORM FROM ALERT =================
+// ═══════════════════════════════════════════════════════════════
+//  OPEN PO FORM FROM ALERT
+// ═══════════════════════════════════════════════════════════════
+
 async function openPOFormFromAlert(alertData) {
   poEditingId = null;
   window._isCreateMode = false;
@@ -765,7 +805,10 @@ async function openPOFormFromAlert(alertData) {
   renderMultiPOForm(pos, alertData);
 }
 
-// ================= AUTO GROUP PO =================
+// ═══════════════════════════════════════════════════════════════
+//  AUTO GROUP PO
+// ═══════════════════════════════════════════════════════════════
+
 function autoGroupPOItems(items) {
   const supOrder = { EKP: 1, MKP: 2, SCK: 3 };
 
@@ -814,7 +857,10 @@ function autoGroupPOItems(items) {
   return pos;
 }
 
-// ================= RENDER MULTI PO FORM =================
+// ═══════════════════════════════════════════════════════════════
+//  RENDER MULTI PO FORM
+// ═══════════════════════════════════════════════════════════════
+
 function renderMultiPOForm(posList, alertData) {
   const analyzedDate = alertData.analyzed_date || toISODate(new Date());
 
@@ -901,7 +947,10 @@ function renderMultiPOForm(posList, alertData) {
   $('poFormBody').innerHTML = html;
 }
 
-// ================= SAVE ALL POs =================
+// ═══════════════════════════════════════════════════════════════
+//  SAVE ALL POs
+// ═══════════════════════════════════════════════════════════════
+
 async function saveAllPOs(btnEl) {
   const posList = window._pendingPOs || [];
   const alertData = window._pendingAlertData || {};
@@ -920,7 +969,6 @@ async function saveAllPOs(btnEl) {
         title: `🔒 ยืนยันการบันทึก PO ${po.po_no}`,
         message: 'PO นี้ Saved แล้ว — ต้องยืนยันรหัสผ่าน + หมายเหตุ',
         onConfirm: async (password, note) => {
-          // ✅ [V16] ใช้ window.supabase.createClient()
           const email = currentUser?.email || '';
 
           const tempClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -946,7 +994,6 @@ async function saveAllPOs(btnEl) {
             console.warn('[Verify] tempClient signOut error:', e);
           }
 
-          // Log การแก้ไข
           try {
             await supabase.from('po_change_log').insert({
               po_id: po.id,
@@ -1070,16 +1117,9 @@ async function _doSaveAllPOs(posList, alertData, btnEl) {
   window._isCreateMode = false;
 }
 
-// ================= STATE: Edit Items =================
-let _editItemsRows = [];
-let _editPOHeader = null;
-let _editHeaderDirty = false;
-let _editOriginalOrder = [];   // ✅ เก็บลำดับ id เดิม เพื่อเทียบว่า seq เปลี่ยนไหม
-
 // ═══════════════════════════════════════════════════════════════
-// ✅ Drag & Drop เรียงลำดับ PO Items
+//  DRAG & DROP
 // ═══════════════════════════════════════════════════════════════
-let _poItemsSortable = null;
 
 function initPOItemsSortable() {
   const tbody = document.getElementById('poItemsTbody');
@@ -1137,7 +1177,6 @@ function initPOItemsSortable() {
 
       console.log('[PO Sort] ✅ ย้าย uid=' + draggedUid + ' จาก index ' + fromIdx + ' → ' + toIdx);
 
-      // ✅ เพิ่ม log ดูว่าลำดับเปลี่ยนจริงไหม
       console.log('[PO Sort] ลำดับใหม่:', _editItemsRows
         .filter(r => !r.isNew && !r.removed)
         .map(r => r.id)
@@ -1150,7 +1189,6 @@ function initPOItemsSortable() {
   });
 }
 
-// ✅ ตรวจสอบว่าลำดับ items เปลี่ยนไปหรือไม่
 function isOrderChanged() {
   const currentOrder = _editItemsRows
     .filter(r => !r.isNew && !r.removed)
@@ -1161,7 +1199,10 @@ function isOrderChanged() {
   return currentOrder.some((id, idx) => id !== _editOriginalOrder[idx]);
 }
 
-// ================= RENDER PO FORM (EDIT) =================
+// ═══════════════════════════════════════════════════════════════
+//  RENDER PO FORM (EDIT)
+// ═══════════════════════════════════════════════════════════════
+
 function renderPOFormContent(header, items) {
   if (!header) {
     $('poFormBody').innerHTML = '<p style="text-align:center;color:#94a3b8">ไม่มีข้อมูล</p>';
@@ -1187,7 +1228,6 @@ function renderPOFormContent(header, items) {
     removed: false
   }));
 
-  // ✅ เก็บลำดับเดิม
   _editOriginalOrder = _editItemsRows
     .filter(r => !r.isNew && !r.removed)
     .map(r => r.id);
@@ -1196,9 +1236,9 @@ function renderPOFormContent(header, items) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ✅ Render ตาราง items + ปุ่ม + Info Bar (Editable)
-// ✅ (V17) เพิ่มช่องกรอก PO No. สำหรับโหมดสร้างใหม่
+//  RENDER PO FORM TABLE
 // ═══════════════════════════════════════════════════════════════
+
 function renderPOFormTable() {
   const container = $('poFormBody');
   if (!container) return;
@@ -1213,14 +1253,12 @@ function renderPOFormTable() {
 
   const priceMonth = getMonthFromDate(header.ref_receive || header.po_date);
 
-  // ✅ สร้าง options สำหรับ Supplier dropdown
   const supOptions = poSuppliersFull.map(s =>
     `<option value="${esc(s.code)}" ${s.code === header.sup_code ? 'selected' : ''}>${esc(s.code)} — ${esc(s.name)}</option>`
   ).join('');
 
   const isCreate = window._isCreateMode === true;
 
-  // ✅ (V17) สำหรับโหมดสร้างใหม่ — ให้กรอก PO No. ได้
   const poNoField = isCreate
     ? `<div class="po-info-field" style="flex:1;min-width:200px">
          <label>เลขที่ PO (เว้นว่าง = Auto):</label>
@@ -1378,7 +1416,6 @@ function renderPOFormTable() {
     </div>
   </div>`;
 
-  // ✅ ปุ่มด้านล่างเปลี่ยนตามโหมด
   html += `<div class="form-actions" style="margin-top:16px;border-top:1px solid #e2e8f0;padding-top:14px">
     <button onclick="closePOForm()">ยกเลิก</button>
     ${!isCreate ? `<button onclick="repricePO()" 
@@ -1399,8 +1436,9 @@ function renderPOFormTable() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ✅ NEW: ปุ่มบันทึก统一 (แยกโหมดสร้าง/แก้ไข)
+//  SAVE FORM INLINE
 // ═══════════════════════════════════════════════════════════════
+
 async function savePOFormInline(btnEl) {
   const isCreate = window._isCreateMode === true;
   if (isCreate) {
@@ -1411,14 +1449,14 @@ async function savePOFormInline(btnEl) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ✅ NEW: สร้าง PO ใหม่ (INSERT)
-// ✅ (V17) ใช้เลข PO ที่ User กรอก (ถ้ามี) + ตรวจซ้ำ + validate format
+//  CREATE PO (INSERT)
 // ═══════════════════════════════════════════════════════════════
+
 async function saveCreatePO(btnEl) {
   const header = _editPOHeader;
   const activeRows = _editItemsRows.filter(r => !r.removed);
 
-  // ✅ Validation
+  // Validation
   if (!header.sup_code) {
     alert('⚠️ กรุณาเลือกผู้ขาย');
     return;
@@ -1452,11 +1490,9 @@ async function saveCreatePO(btnEl) {
   }
 
   try {
-    // ✅ (V17) ใช้เลขที่ User กรอกก่อน ถ้าเว้นว่างค่อยขอจากระบบ
     let poNo = (header.po_no || '').trim();
 
     if (!poNo) {
-      // ถ้าเว้นว่าง → ขอจากระบบ
       const today = new Date();
       const yy = String(today.getFullYear()).slice(-2);
       const mm = pad(today.getMonth() + 1);
@@ -1470,8 +1506,7 @@ async function saveCreatePO(btnEl) {
       } catch (e) {
         throw new Error('ขอเลข PO ไม่สำเร็จ: ' + e.message);
       }
-           } else {
-      // ✅ เช็คว่าซ้ำกับ PO ที่มีอยู่ไหม
+    } else {
       const { data: existing } = await supabase
         .from('purchase_orders')
         .select('id')
@@ -1482,14 +1517,11 @@ async function saveCreatePO(btnEl) {
         throw new Error(`⚠️ เลข PO "${poNo}" มีอยู่แล้วในระบบ กรุณาใช้เลขอื่น`);
       }
 
-      // ✅ ตรวจสอบ format: PO + ตัวเลข 9 หลัก (เช่น PO226100055)
       if (!/^PO\d{9}$/.test(poNo)) {
         throw new Error(`⚠️ รูปแบบเลข PO ไม่ถูกต้อง\n\nต้องเป็น PO + ตัวเลข 9 หลัก เช่น PO226100055\n(กรอก: ${poNo})`);
       }
+    }
 
-    }  // ✅ ปิด else ตรงนี้ ← จุดสำคัญที่ทำให้หน้า PO กลับมา!
-
-    // ✅ เตรียม items
     const items = activeRows.map((row, idx) => {
       const price = Number(row.price) || getPriceFromMaster(row.gradegram, row.customer_roll, row.quality_b);
       const kgTotal = calcKgTotal(row.gradegram, row.size, row.quantity);
@@ -1514,7 +1546,6 @@ async function saveCreatePO(btnEl) {
       };
     });
 
-    // ✅ Header
     const newHeader = {
       po_no: poNo,
       po_date: header.po_date || toISODate(new Date()),
@@ -1557,9 +1588,9 @@ async function saveCreatePO(btnEl) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ✅ ตรวจจับการแก้ไข Header
-// ✅ (V17) รองรับ po_no
+//  EDIT HEADER
 // ═══════════════════════════════════════════════════════════════
+
 function onEditHeaderChange(field, value) {
   if (!_editPOHeader) return;
 
@@ -1575,10 +1606,8 @@ function onEditHeaderChange(field, value) {
     return;
   }
 
-  // ✅ (V17) เพิ่ม: กรณีเปลี่ยน po_no
   if (field === 'po_no') {
     _editHeaderDirty = true;
-    // ไม่ต้อง render ใหม่ เพราะ input ยัง focus อยู่
     return;
   }
 
@@ -1588,9 +1617,6 @@ function onEditHeaderChange(field, value) {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// ✅ บันทึก Header
-// ═══════════════════════════════════════════════════════════════
 async function saveEditPOHeader() {
   if (!poEditingId || !_editPOHeader) return { ok: true, changed: false };
   if (!_editHeaderDirty) return { ok: true, changed: false };
@@ -1639,8 +1665,9 @@ async function saveEditPOHeader() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 🔄 RE-PRICE
+//  RE-PRICE
 // ═══════════════════════════════════════════════════════════════
+
 async function repricePO() {
   if (!_editItemsRows || !_editItemsRows.length) {
     alert('ไม่มีรายการใน PO');
@@ -1705,7 +1732,10 @@ async function repricePO() {
   alert(msg);
 }
 
-// ✅ Add row ใหม่
+// ═══════════════════════════════════════════════════════════════
+//  ADD / REMOVE EDIT ROW
+// ═══════════════════════════════════════════════════════════════
+
 function addEditRow() {
   const activeCount = _editItemsRows.filter(r => !r.removed).length;
   if (activeCount >= 15) {
@@ -1728,7 +1758,6 @@ function addEditRow() {
   renderPOFormTable();
 }
 
-// ✅ Change handler (พร้อม حفظ focus + cursor)
 function onEditRowChange(uid, field, value) {
   const row = _editItemsRows.find(r => r.uid === uid);
   if (!row) return;
@@ -1759,7 +1788,6 @@ function onEditRowChange(uid, field, value) {
   }
 }
 
-// ✅ Remove row
 async function removeEditRow(uid) {
   const row = _editItemsRows.find(r => r.uid === uid);
   if (!row) return;
@@ -1795,7 +1823,10 @@ async function removeEditRow(uid) {
   }
 }
 
-// ✅ บันทึกการแก้ไข (รวม Header)
+// ═══════════════════════════════════════════════════════════════
+//  SAVE EDIT ITEMS
+// ═══════════════════════════════════════════════════════════════
+
 async function saveEditPOItems(btnEl) {
   if (!poEditingId) {
     alert('ไม่พบ PO ที่กำลังแก้ไข');
@@ -1840,11 +1871,8 @@ async function saveEditPOItems(btnEl) {
   });
 
   const headerChanged = _editHeaderDirty;
-
-  // ✅ เช็คว่าลำดับเปลี่ยนไหม
   const orderChanged = isOrderChanged();
 
-  // ✅ ถ้าลำดับเปลี่ยน ก็ให้ถือว่ามีการเปลี่ยนแปลง
   if (!updatedOld.length && !newRows.length && !headerChanged && !orderChanged) {
     alert('ไม่มีการเปลี่ยนแปลง');
     return;
@@ -1931,7 +1959,7 @@ async function saveEditPOItems(btnEl) {
     }
   }
 
-  // ✅ 3. บันทึกลำดับใหม่ (Reorder)
+  // 3. บันทึกลำดับใหม่ (Reorder)
   if (orderChanged) {
     try {
       const orderedIds = _editItemsRows
@@ -1992,7 +2020,10 @@ async function saveEditPOItems(btnEl) {
   await renderPOList();
 }
 
-// ================= EDIT ITEM (single field — legacy) =================
+// ═══════════════════════════════════════════════════════════════
+//  EDIT ITEM (single field — legacy)
+// ═══════════════════════════════════════════════════════════════
+
 async function onPOItemEdit(itemId, field, value) {
   try {
     const payload = {};
@@ -2009,7 +2040,6 @@ async function onPOItemEdit(itemId, field, value) {
   }
 }
 
-// ================= CANCEL ITEM =================
 async function cancelPOItem(itemId) {
   const note = prompt('❓ หมายเหตุการยกเลิกรายการ:');
   if (note === null) return;
@@ -2037,7 +2067,10 @@ async function cancelPOItem(itemId) {
   }
 }
 
-// ================= PO DETAIL =================
+// ═══════════════════════════════════════════════════════════════
+//  PO DETAIL
+// ═══════════════════════════════════════════════════════════════
+
 async function openPODetail(poId) {
   $('poDetailTitle').textContent = '📄 รายละเอียด PO';
   $('poDetailBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
@@ -2120,8 +2153,9 @@ async function openPODetail(poId) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ================= ประวัติ PO ที่ถูกลบ =================
+//  DELETED PO HISTORY
 // ═══════════════════════════════════════════════════════════════
+
 async function openDeletedPOList() {
   $('poDetailTitle').textContent = '📜 ประวัติ PO ที่ถูกลบ';
   $('poDetailBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
@@ -2247,7 +2281,10 @@ async function openDeletedPODetail(poId) {
   }
 }
 
-// ================= DELETE PO =================
+// ═══════════════════════════════════════════════════════════════
+//  DELETE PO
+// ═══════════════════════════════════════════════════════════════
+
 async function deletePO(poId) {
   const po = poCache.find(p => p.id === poId);
   if (!po) return;
@@ -2279,7 +2316,10 @@ async function deletePO(poId) {
   }
 }
 
-// ================= PO MONTH CHANGE =================
+// ═══════════════════════════════════════════════════════════════
+//  MONTH CHANGE
+// ═══════════════════════════════════════════════════════════════
+
 async function onPOMonthChange() {
   const monthEl = $('poMonth');
   if (!monthEl) return;
@@ -2288,11 +2328,13 @@ async function onPOMonthChange() {
   await renderPOList();
 }
 
-// ================= CANCEL PO FORM =================
+// ═══════════════════════════════════════════════════════════════
+//  CANCEL / CLOSE FORM
+// ═══════════════════════════════════════════════════════════════
+
 function cancelPOForm() {
   closeModal('modalPOForm');
 
-  // ล้าง State ทั้งหมด
   window._pendingPOs = null;
   window._pendingAlertData = null;
   window._isCreateMode = false;
@@ -2302,10 +2344,6 @@ function cancelPOForm() {
   _editHeaderDirty = false;
   _editOriginalOrder = [];
 
-  // ✅ ให้อยู่ที่ Tab Purchase Order เหมือนเดิม
-  // ไม่ต้อง switchTab ใดๆ — เพราะเราอยู่ที่หน้านี้อยู่แล้ว
-  
-  // ถ้าต้องการรีเฟรชตาราง PO หลังปิด Modal
   if (typeof loadPurchaseOrders === 'function') {
     loadPurchaseOrders();
   }
@@ -2322,7 +2360,10 @@ function closePOForm() {
   renderPOList();
 }
 
-// ================= EXPORT PO TO EXCEL =================
+// ═══════════════════════════════════════════════════════════════
+//  EXPORT PO TO EXCEL
+// ═══════════════════════════════════════════════════════════════
+
 function exportPOToExcel() {
   if (!poCache || !poCache.length) {
     alert('ไม่มีข้อมูล PO');
@@ -2424,9 +2465,8 @@ async function exportPOToExcel_Async() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ================= ADD PO ITEMS (Phase 3) =====================
+//  ADD PO ITEMS (Phase 3)
 // ═══════════════════════════════════════════════════════════════
-let _addItemsRows = [];
 
 async function openAddPOItemsModal() {
   if (!poEditingId) {
