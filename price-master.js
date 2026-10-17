@@ -1,17 +1,24 @@
 // ═══════════════════════════════════════════════════════════════
-// STOCK V8 — price-master.js
-// Master ราคา (Price Master) — ราคาต่อ Gradegram รายเดือน
-// + Auto-copy จากเดือนก่อนหน้า (ลบปุ่ม Sync ออก)
-// + ➕ ปุ่ม "เพิ่มราคาใหม่" (Add Mode)
-// + Pre-fill ราคาจากเดือนก่อนหน้า
-// + 🔄 ปุ่ม "Copy จากเดือนก่อน" (forceRecopy)
+//  STOCK V10.1 — price-master.js
+//  Master ราคา (Price Master) — ราคาต่อ Gradegram รายเดือน
+//  + Auto-copy จากเดือนก่อนหน้า (ลบปุ่ม Sync ออก)
+//  + ปุ่ม "เพิ่มราคาใหม่" (Add Mode)
+//  + Pre-fill ราคาจากเดือนก่อนหน้า
+//  + ปุ่ม "Copy จากเดือนก่อน" (forceRecopy)
+// ═══════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════
+//  STATE
 // ═══════════════════════════════════════════════════════════════
 
 let pmCache = [];
 let pmSelectedMonth = '';
 let pmEditingId = null;
 
-// ================= HELPER: showMsg =================
+// ═══════════════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════════════
+
 function showMsg(elId, text, type = 'ok') {
   const el = $(elId);
   if (!el) return;
@@ -19,7 +26,6 @@ function showMsg(elId, text, type = 'ok') {
   setTimeout(() => { el.innerHTML = ''; }, 3000);
 }
 
-// ================= HELPER: getPrevMonth =================
 function getPrevMonth(ym) {
   if (!ym) return ym;
   const [y, m] = ym.split('-').map(Number);
@@ -29,23 +35,26 @@ function getPrevMonth(ym) {
   return `${prevY}-${pad(prevM)}`;
 }
 
-// ================= INIT =================
+// ═══════════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════════
+
 async function initPriceMaster() {
   const today = new Date();
   if (!pmSelectedMonth) {
-    pmSelectedMonth = `${today.getFullYear()}-${pad(today.getMonth()+1)}`;
+    pmSelectedMonth = `${today.getFullYear()}-${pad(today.getMonth() + 1)}`;
   }
 
   const monthEl = $('pmMonth');
   if (monthEl && !monthEl.value) monthEl.value = pmSelectedMonth;
 
-  // ✅ เติม NC discount default จาก localStorage
+  // เติม NC discount default จาก localStorage
   const savedNc = localStorage.getItem('stockv8_pm_nc_discount');
   if (savedNc && $('pmNcDiscount')) $('pmNcDiscount').value = savedNc;
 
   await loadPriceMasterList();
 
-  // ✅ ถ้าเดือนนี้ยังไม่มีราคา → auto-copy จากเดือนก่อนหน้า
+  // ถ้าเดือนนี้ยังไม่มีราคา → auto-copy จากเดือนก่อนหน้า
   if (!pmCache.length) {
     await autoCopyFromPrevMonth();
   }
@@ -53,8 +62,11 @@ async function initPriceMaster() {
   renderPMList();
 }
 
-// ================= AUTO COPY FROM PREV MONTH =================
-// ✅ ถ้าเดือนนี้ไม่มีราคาเลย → copy จากเดือนก่อนหน้าอัตโนมัติ
+// ═══════════════════════════════════════════════════════════════
+//  AUTO COPY FROM PREV MONTH
+//  ถ้าเดือนนี้ไม่มีราคาเลย → copy จากเดือนก่อนหน้าอัตโนมัติ
+// ═══════════════════════════════════════════════════════════════
+
 async function autoCopyFromPrevMonth() {
   try {
     const prevMonth = getPrevMonth(pmSelectedMonth);
@@ -103,12 +115,12 @@ async function autoCopyFromPrevMonth() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 🔄 FORCE RE-COPY — ปุ่ม "Copy จากเดือนก่อน" (Manual)
+//  FORCE RE-COPY — ปุ่ม "Copy จากเดือนก่อน" (Manual)
+//  - ลบราคาเดือนปัจจุบันทั้งหมดก่อน
+//  - แล้ว copy ใหม่จากเดือนก่อน
+//  - ใช้เมื่อ auto-copy ทำงานผิดพลาด หรือต้องการ refresh
 // ═══════════════════════════════════════════════════════════════
-// ✅ Force re-copy ราคาจากเดือนก่อนหน้า (สำหรับปุ่มใน UI)
-//    - ลบราคาเดือนปัจจุบันทั้งหมดก่อน
-//    - แล้ว copy ใหม่จากเดือนก่อน
-//    - ใช้เมื่อ auto-copy ทำงานผิดพลาด หรือต้องการ refresh
+
 async function forceRecopy() {
   const prevMonth = getPrevMonth(pmSelectedMonth);
 
@@ -140,7 +152,10 @@ async function forceRecopy() {
   }
 }
 
-// ================= LOAD =================
+// ═══════════════════════════════════════════════════════════════
+//  LOAD
+// ═══════════════════════════════════════════════════════════════
+
 async function loadPriceMasterList() {
   try {
     const { data, error } = await supabase
@@ -157,7 +172,10 @@ async function loadPriceMasterList() {
   }
 }
 
-// ================= MONTH CHANGE =================
+// ═══════════════════════════════════════════════════════════════
+//  MONTH CHANGE
+// ═══════════════════════════════════════════════════════════════
+
 async function onPMonthChange() {
   const monthEl = $('pmMonth');
   if (!monthEl) return;
@@ -165,7 +183,7 @@ async function onPMonthChange() {
 
   await loadPriceMasterList();
 
-  // ✅ ถ้าเดือนใหม่ไม่มีราคา → auto-copy จากเดือนก่อนหน้า
+  // ถ้าเดือนใหม่ไม่มีราคา → auto-copy จากเดือนก่อนหน้า
   if (!pmCache.length) {
     await autoCopyFromPrevMonth();
   }
@@ -173,18 +191,24 @@ async function onPMonthChange() {
   renderPMList();
 }
 
-// ================= NC DISCOUNT (Global) =================
+// ═══════════════════════════════════════════════════════════════
+//  NC DISCOUNT (Global)
+// ═══════════════════════════════════════════════════════════════
+
 async function onPMNcDiscountChange() {
   const val = Number($('pmNcDiscount')?.value || 1);
   localStorage.setItem('stockv8_pm_nc_discount', String(val));
 }
 
-// ================= RENDER LIST =================
+// ═══════════════════════════════════════════════════════════════
+//  RENDER LIST
+// ═══════════════════════════════════════════════════════════════
+
 function renderPMList() {
   const body = $('pmBody');
   if (!body) return;
 
-  // ✅ ปุ่ม "เพิ่มราคาใหม่" ด้านบน
+  // ปุ่ม "เพิ่มราคาใหม่" ด้านบน
   const topBar = `<div style="margin-bottom:12px;display:flex;justify-content:flex-end;gap:8px">
     <button class="primary" onclick="openPMAddForm()" style="padding:8px 16px">
       ➕ เพิ่มราคาใหม่
@@ -222,10 +246,9 @@ function renderPMList() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ➕ ADD MODE — เพิ่มราคาใหม่
+//  ADD MODE — เพิ่มราคาใหม่
 // ═══════════════════════════════════════════════════════════════
 
-// ✅ เปิดฟอร์มเพิ่มราคาใหม่
 async function openPMAddForm() {
   pmEditingId = null;
   $('pmFormError').innerHTML = '';
@@ -234,12 +257,12 @@ async function openPMAddForm() {
   const gradeSelect = $('pmfGradegram');
   if (!gradeSelect) return;
 
-  // ✅ ดึง gradegram ทั้งหมดจาก masterCache
+  // ดึง gradegram ทั้งหมดจาก masterCache
   const allGradegrams = [...new Set(
     masterCache.map(m => normalizeGrade(m.grade) + m.gram)
   )].sort();
 
-  // ✅ กรอง gradegram ที่มีอยู่แล้วในเดือนนี้
+  // กรอง gradegram ที่มีอยู่แล้วในเดือนนี้
   const existingGradegrams = new Set(pmCache.map(r => r.gradegram));
   const availableGradegrams = allGradegrams.filter(g => !existingGradegrams.has(g));
 
@@ -262,7 +285,7 @@ async function openPMAddForm() {
   $('pmfKTP').value = '';
   $('pmfNcDiscount').value = localStorage.getItem('stockv8_pm_nc_discount') || 1;
 
-  // ✅ เมื่อเลือก gradegram → ดึงราคาจากเดือนก่อนมา pre-fill
+  // เมื่อเลือก gradegram → ดึงราคาจากเดือนก่อนมา pre-fill
   gradeSelect.onchange = () => {
     const g = gradeSelect.value;
     if (!g) return;
@@ -276,7 +299,7 @@ async function openPMAddForm() {
   openModal('modalPM');
 }
 
-// ✅ Pre-fill ราคาจากเดือนก่อนหน้า
+// Pre-fill ราคาจากเดือนก่อนหน้า
 async function prefillFromPrevMonth(gradegram) {
   try {
     const prevMonth = getPrevMonth(pmSelectedMonth);
@@ -303,7 +326,10 @@ async function prefillFromPrevMonth(gradegram) {
   }
 }
 
-// ================= OPEN FORM (EDIT) =================
+// ═══════════════════════════════════════════════════════════════
+//  OPEN FORM (EDIT)
+// ═══════════════════════════════════════════════════════════════
+
 async function openPMForm(id) {
   if (!id) {
     alert('ใช้ปุ่ม "auto-copy" ที่โหลดอัตโนมัติ\nหรือกด "✏️ Edit" ที่แถวเพื่อแก้ราคา');
@@ -347,12 +373,13 @@ function updatePM_NC_Auto() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// SAVE — รองรับทั้ง ADD และ EDIT
+//  SAVE — รองรับทั้ง ADD และ EDIT
 // ═══════════════════════════════════════════════════════════════
+
 async function savePMForm() {
   const gradegram = $('pmfGradegram').value;
 
-  // ✅ Validation
+  // Validation
   if (!gradegram) {
     $('pmFormError').innerHTML = '<div class="msg err">กรุณาเลือก gradegram</div>';
     return;
@@ -374,7 +401,7 @@ async function savePMForm() {
 
   try {
     if (pmEditingId) {
-      // ✅ EDIT MODE
+      // EDIT MODE
       const { error } = await supabase
         .from('price_master')
         .update(payload)
@@ -386,7 +413,7 @@ async function savePMForm() {
       renderPMList();
       showMsg('pmMsg', `✅ แก้ไขราคา ${gradegram} สำเร็จ`, 'ok');
     } else {
-      // ✅ ADD MODE
+      // ADD MODE
       payload.gradegram = gradegram;
       payload.month = pmSelectedMonth;
       payload.is_active = true;
@@ -406,7 +433,10 @@ async function savePMForm() {
   }
 }
 
-// ================= DELETE =================
+// ═══════════════════════════════════════════════════════════════
+//  DELETE
+// ═══════════════════════════════════════════════════════════════
+
 async function deletePM(id) {
   const row = pmCache.find(r => String(r.id) === String(id));
   if (!row) return;
@@ -428,7 +458,10 @@ async function deletePM(id) {
   }
 }
 
-// ================= EXPORT =================
+// ═══════════════════════════════════════════════════════════════
+//  EXPORT
+// ═══════════════════════════════════════════════════════════════
+
 function exportPriceMaster() {
   if (!pmCache.length) return alert('ไม่มีข้อมูล');
 
@@ -449,7 +482,10 @@ function exportPriceMaster() {
   XLSX.writeFile(wb, `price_master_${pmSelectedMonth}.xlsx`);
 }
 
-// ================= IMPORT =================
+// ═══════════════════════════════════════════════════════════════
+//  IMPORT
+// ═══════════════════════════════════════════════════════════════
+
 async function importPriceMaster(event) {
   const file = event.target.files?.[0];
   if (!file) return;
@@ -497,9 +533,3 @@ async function importPriceMaster(event) {
     event.target.value = '';
   }
 }
-
-// ═══════════════════════════════════════════════════════════════
-// ❌ ลบ syncPriceMaster() ออก — ไม่ใช้แล้ว
-//    เพราะมี autoCopyFromPrevMonth() ทำงานอัตโนมัติตอนเปิดหน้า
-//    และมี forceRecopy() สำหรับปุ่ม Manual
-// ═══════════════════════════════════════════════════════════════
