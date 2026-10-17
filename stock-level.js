@@ -1,25 +1,31 @@
 // ═══════════════════════════════════════════════════════════════
-// STOCK V6.3 — stock-level.js (FULL)
-// Month Filter + Customer Filter + Gradegrams Filter + Size Filter
-// + Matrix + Snapshot
-// ✅ Matrix: format ตาม mode (full → floor, actual → toFixed(2))
+//  STOCK V10.1 — stock-level.js (FULL)
+//  Month Filter + Customer Filter + Gradegrams Filter + Size Filter
+//  + Matrix + Snapshot
+//  + Matrix: format ตาม mode (full → floor, actual → toFixed(2))
 // ═══════════════════════════════════════════════════════════════
 
-// ================= STATE =================
+// ═══════════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════════
+
 let selectedMonths = [];
 let allMonthsList = [];
 let currentSnapshotData = null;
 
-// ✅ Size Filter
+// Size Filter
 let selectedSizes = [];
 let allSizesList = [];
 
-// ✅ Customer Filter (ใหม่)
+// Customer Filter
 let selectedCustomers = [];
 let allCustomersList = [];
 
-// ================= MONTH FILTER =================
-// ✅ แก้จุดที่ 1: ใช้เดือน Report Title เป็น default (ไม่ใช่ today)
+// ═══════════════════════════════════════════════════════════════
+//  MONTH FILTER
+//  V.10 Fix: ใช้เดือน Report Title เป็น default (ไม่ใช่ today)
+// ═══════════════════════════════════════════════════════════════
+
 function loadMonthFilter() {
   const yearEl = $('filterYear');
   const yearCE = yearEl ? Number(yearEl.value) - 543 : new Date().getFullYear();
@@ -29,8 +35,8 @@ function loadMonthFilter() {
     allMonthsList.push(`${yearCE}-${pad(m)}`);
   }
 
-  // ✅ default = 3 เดือนก่อน "เดือนของ Report Title" (titleMonth/titleYear)
-  //    ไม่ใช่ today — กันบั๊กวันที่ 1 ของเดือนใหม่
+  // default = 3 เดือนก่อน "เดือนของ Report Title" (titleMonth/titleYear)
+  // ไม่ใช่ today — กันบั๊กวันที่ 1 ของเดือนใหม่
   if (selectedMonths.length === 0) {
     const titleMEl = $('titleMonth');
     const titleYEl = $('titleYear');
@@ -52,7 +58,7 @@ function loadMonthFilter() {
   updateMonthLabel();
   attachMonthFilterListeners();
 
-  // ✅ เพิ่ม: sync titleMonth/titleYear ตามเดือนล่าสุดใน selectedMonths
+  // sync titleMonth/titleYear ตามเดือนล่าสุดใน selectedMonths
   if (selectedMonths.length > 0) {
     const latest = selectedMonths[selectedMonths.length - 1];
     const [ly, lm] = latest.split('-').map(Number);
@@ -144,10 +150,13 @@ function selectAllMonths() { selectedMonths = [...allMonthsList]; renderMonthLis
 function clearAllMonths() { selectedMonths = []; renderMonthList(); updateMonthLabel(); }
 function onYearChange() { selectedMonths = []; loadMonthFilter(); }
 
-// ================= SIZE FILTER =================
-// ✅ แก้จุดที่ 2: loadSizeFilter() เป็น async + retry มี limit
+// ═══════════════════════════════════════════════════════════════
+//  SIZE FILTER
+//  V.10 Fix: loadSizeFilter() เป็น async + retry มี limit
+// ═══════════════════════════════════════════════════════════════
+
 async function loadSizeFilter() {
-  // ✅ retry แบบมี limit (กัน infinite loop)
+  // retry แบบมี limit (กัน infinite loop)
   if (!masterCache || masterCache.length === 0) {
     console.log('[SizeFilter] masterCache ว่าง — รอ 300ms แล้วลองใหม่');
     await new Promise(r => setTimeout(r, 300));
@@ -245,7 +254,10 @@ function selectAllSizes() { selectedSizes = [...allSizesList]; renderSizeList();
 function clearAllSizes() { selectedSizes = []; renderSizeList(); updateSizeFilterLabel(); }
 function getSelectedSizes() { return selectedSizes; }
 
-// ================= CUSTOMER FILTER (ใหม่) =================
+// ═══════════════════════════════════════════════════════════════
+//  CUSTOMER FILTER
+// ═══════════════════════════════════════════════════════════════
+
 function loadCustomerFilter(custList) {
   if (Array.isArray(custList) && custList.length > 0) {
     const merged = new Set([...custList, ...selectedCustomers]);
@@ -367,7 +379,10 @@ function getSelectedCustomers() {
   return selectedCustomers;
 }
 
-// ================= TITLE BUILDER =================
+// ═══════════════════════════════════════════════════════════════
+//  TITLE BUILDER
+// ═══════════════════════════════════════════════════════════════
+
 function updateReportTitle() {
   const mEl = $('titleMonth');
   const yEl = $('titleYear');
@@ -387,7 +402,10 @@ function getCurrentTitle() {
   return `ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ ประจำเดือน ${THAI_MONTHS[m-1]} ${y}`;
 }
 
-// ================= MATRIX =================
+// ═══════════════════════════════════════════════════════════════
+//  MATRIX
+// ═══════════════════════════════════════════════════════════════
+
 async function renderMatrix() {
   if (selectedMonths.length === 0) {
     alert('กรุณาเลือกเดือนก่อน');
@@ -499,9 +517,9 @@ async function renderMatrix() {
     return;
   }
 
-  // ✅ Helper: format ตาม mode
-  //    - "ม้วนเต็ม" → Math.floor (ตัดทศนิยม)
-  //    - "ใช้จริง"   → toFixed(2) (ทศนิยม 2 ตำแหน่ง)
+  // Helper: format ตาม mode
+  //   - "ม้วนเต็ม" → Math.floor (ตัดทศนิยม)
+  //   - "ใช้จริง"   → toFixed(2) (ทศนิยม 2 ตำแหน่ง)
   const fmtVal = (v) => {
     const num = Number(v) || 0;
     return mode === 'full' ? Math.floor(num) : num.toFixed(2);
@@ -536,8 +554,11 @@ async function renderMatrix() {
   });
 }
 
-// ================= SNAPSHOT =================
-// ✅ แก้จุดที่ 4: saveStockLevelSnapshot() — ใช้ titleMonth/titleYear + fallback
+// ═══════════════════════════════════════════════════════════════
+//  SNAPSHOT
+//  V.10 Fix: saveStockLevelSnapshot() — ใช้ titleMonth/titleYear + fallback
+// ═══════════════════════════════════════════════════════════════
+
 async function saveStockLevelSnapshot() {
   const title = getCurrentTitle();
   const msgEl = $('snapshotMsg');
@@ -574,7 +595,7 @@ async function saveStockLevelSnapshot() {
     finalTitle = `${title}/${n}`;
   }
 
-  // ✅ เพิ่ม: ถ้า titleMonth/titleYear ว่าง → fallback ไป selectedMonths
+  // fallback: ถ้า titleMonth/titleYear ว่าง → ไป selectedMonths
   const mEl = $('titleMonth');
   const yEl = $('titleYear');
   let titleMonthYM;
@@ -712,14 +733,14 @@ async function viewSnapshot(id) {
   $('snapshotViewBody').innerHTML = html;
 }
 
-// ✅ แก้: deleteSnapshot() — เพิ่ม .select() + เช็ค data.length
+// V.10 Fix: deleteSnapshot() — เพิ่ม .select() + เช็ค data.length
 async function deleteSnapshot(id, title) {
   if (!confirm(`ลบ "${title}" ?`)) return;
   const { data, error } = await supabase
     .from('stock_level_snapshots')
     .delete()
     .eq('id', id)
-    .select();   // ✅ เพิ่ม .select() เพื่อดูว่าลบจริงกี่ row
+    .select();   // เพิ่ม .select() เพื่อดูว่าลบจริงกี่ row
 
   if (error) {
     alert('ลบไม่สำเร็จ: ' + error.message);
@@ -736,8 +757,9 @@ async function deleteSnapshot(id, title) {
 function printSnapshot() { window.print(); }
 
 // ═══════════════════════════════════════════════════════════════
-// INIT — โหลด Month Filter + Snapshot + Title
+//  INIT
 // ═══════════════════════════════════════════════════════════════
+
 (function initStockLevel() {
   const run = () => {
     setTimeout(() => {
@@ -759,8 +781,9 @@ function printSnapshot() { window.print(); }
 })();
 
 // ═══════════════════════════════════════════════════════════════
-// PRINT HANDLER — เปลี่ยน <select> เป็น <span> ตอนพิมพ์
+//  PRINT HANDLER — เปลี่ยน <select> เป็น <span> ตอนพิมพ์
 // ═══════════════════════════════════════════════════════════════
+
 window.addEventListener('beforeprint', () => {
   const mSel = document.getElementById('titleMonth');
   const ySel = document.getElementById('titleYear');
