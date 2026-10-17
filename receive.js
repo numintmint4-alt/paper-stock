@@ -1,12 +1,20 @@
 // ═══════════════════════════════════════════════════════════════
-// STOCK V9 — receive.js (V9.1 - Fix Date Query + Debug)
+//  STOCK V10.1 — receive.js
+//  Fix Date Query + Debug + Auto-Fetch + Excel Export 2 Sheets
+// ═══════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════
+//  STATE
 // ═══════════════════════════════════════════════════════════════
 
 let receiveSelectedGrades = [];
 let receiveAllGrades = [];
 let receiveCache = [];
 
-// ✅ Helper: ฟอร์แมตตัวเลข KG → 0,000,000.00
+// ═══════════════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════════════
+
 function fmtKg(n) {
   const num = Number(n) || 0;
   return num.toLocaleString('en-US', {
@@ -15,7 +23,6 @@ function fmtKg(n) {
   });
 }
 
-// ✅ Helper: แปลง date → DD/MM/YYYY (พ.ศ.)
 function fmtDateThai(d) {
   if (!d) return '-';
   const dObj = new Date(d);
@@ -25,23 +32,29 @@ function fmtDateThai(d) {
   return `${dd}/${mm}/${yyyy}`;
 }
 
-// ✅ [FIX-1] Helper: ดึงวันที่จาก input → normalize เป็น 'yyyy-mm-dd' เสมอ
+// ดึงวันที่จาก input → normalize เป็น 'yyyy-mm-dd' เสมอ
 function getReceiveDateISO() {
   const raw = $('receiveDate')?.value;
   if (!raw) return '';
-  // <input type="date"> คืน 'yyyy-mm-dd' อยู่แล้ว — ตัดให้เหลือ 10 ตัวอักษร
   return String(raw).slice(0, 10);
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════════
 
 async function initReceiveTab() {
   const dateInput = $('receiveDate');
   if (dateInput && !dateInput.value) dateInput.value = toISODate(new Date());
   await loadReceiveGradeFilter();
-  // ✅ Auto-fetch ทันทีที่เข้า Tab
+  // Auto-fetch ทันทีที่เข้า Tab
   await renderReceive();
 }
 
-// ================= GRADE FILTER =================
+// ═══════════════════════════════════════════════════════════════
+//  GRADE FILTER
+// ═══════════════════════════════════════════════════════════════
+
 async function loadReceiveGradeFilter() {
   receiveAllGrades = [...new Set(
     masterCache.map(m => normalizeGrade(m.grade) + m.gram)
@@ -119,7 +132,10 @@ function clearAllReceiveGrades() {
   renderReceiveGradeList(); updateReceiveGradeLabel();
 }
 
-// ================= SUPPLIER SUMMARY =================
+// ═══════════════════════════════════════════════════════════════
+//  SUPPLIER SUMMARY
+// ═══════════════════════════════════════════════════════════════
+
 function renderSupplierSummary(rows, dateThai) {
   const supplierSummary = {};
   rows.forEach(r => {
@@ -147,9 +163,11 @@ function renderSupplierSummary(rows, dateThai) {
   return html;
 }
 
-// ================= RENDER RECEIVE =================
+// ═══════════════════════════════════════════════════════════════
+//  RENDER RECEIVE
+// ═══════════════════════════════════════════════════════════════
+
 async function renderReceive() {
-  // ✅ [FIX-1] ใช้ helper แทน
   const receiveDate = getReceiveDateISO();
   const supplier = $('receiveSupplier')?.value || '';
   const fsc = $('receiveFsc')?.value || 'all';
@@ -167,8 +185,7 @@ async function renderReceive() {
   $('receiveBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
 
   try {
-    // ✅ Step 1: เช็คว่ามีข้อมูลใน po_receive ของวันนี้ไหม
-    // [FIX-3] ใช้ .eq() เพราะ DB เป็น date
+    // Step 1: เช็คว่ามีข้อมูลใน po_receive ของวันนี้ไหม
     const { count: existCount, error: countErr } = await supabase
       .from('po_receive')
       .select('*', { count: 'exact', head: true })
@@ -176,7 +193,7 @@ async function renderReceive() {
 
     if (countErr) throw countErr;
 
-    // ✅ Step 2: ถ้าไม่มี → auto-fetch จาก PO
+    // Step 2: ถ้าไม่มี → auto-fetch จาก PO
     if (!existCount || existCount === 0) {
       const fetchResult = await fetchFromPO(receiveDate, { silent: true });
       if (!fetchResult.ok) {
@@ -188,7 +205,7 @@ async function renderReceive() {
       }
     }
 
-    // ✅ Step 3: Query ปกติ
+    // Step 3: Query ปกติ
     const normalizedGrades = receiveSelectedGrades.map(g => normalizeGrade(g));
 
     const { data, error } = await supabase.rpc('get_receive_list', {
@@ -218,12 +235,15 @@ async function renderReceive() {
   }
 }
 
-// ================= FETCH FROM PO =================
+// ═══════════════════════════════════════════════════════════════
+//  FETCH FROM PO
+// ═══════════════════════════════════════════════════════════════
+
 async function fetchFromPO(receiveDate, opts = {}) {
   const { silent = false } = opts;
 
   try {
-    // ✅ [FIX-3] Step 1: ใช้ .eq() เพราะ DB เป็น date
+    // Step 1: ใช้ .eq() เพราะ DB เป็น date
     const { data: pos, error: poErr } = await supabase
       .from('purchase_orders')
       .select('id, po_no, sup_code, ref_receive, status')
@@ -236,7 +256,7 @@ async function fetchFromPO(receiveDate, opts = {}) {
       return { ok: false, reason: 'no_po' };
     }
 
-    // ✅ Step 2: ลบ po_receive ของวันนั้นทั้งหมด (replace by date)
+    // Step 2: ลบ po_receive ของวันนั้นทั้งหมด (replace by date)
     const { error: delErr } = await supabase
       .from('po_receive')
       .delete()
@@ -244,7 +264,7 @@ async function fetchFromPO(receiveDate, opts = {}) {
 
     if (delErr) throw delErr;
 
-    // ✅ Step 3: ดึง items ของทุก PO
+    // Step 3: ดึง items ของทุก PO
     const payload = [];
     for (const po of pos) {
       const { data: detail, error: detailErr } = await supabase.rpc('get_purchase_order_detail', { p_po_id: po.id });
@@ -274,7 +294,7 @@ async function fetchFromPO(receiveDate, opts = {}) {
       return { ok: false, reason: 'no_po' };
     }
 
-    // ✅ Step 4: Insert ผ่าน RPC เดิม
+    // Step 4: Insert ผ่าน RPC เดิม
     const { data: importResult, error: importErr } = await supabase.rpc('import_po_receive', {
       rows: payload,
       p_po_date: receiveDate
@@ -296,9 +316,8 @@ async function fetchFromPO(receiveDate, opts = {}) {
   }
 }
 
-// ✅ ปุ่ม "รีเฟรชจาก PO" — manual refresh
+// ปุ่ม "รีเฟรชจาก PO" — manual refresh
 async function refreshFromPO() {
-  // ✅ [FIX-1]
   const receiveDate = getReceiveDateISO();
   if (!receiveDate) { alert('กรุณาเลือกวันที่รับเข้า'); return; }
 
@@ -324,7 +343,10 @@ async function refreshFromPO() {
   await renderReceive();
 }
 
-// ================= MATRIX =================
+// ═══════════════════════════════════════════════════════════════
+//  MATRIX
+// ═══════════════════════════════════════════════════════════════
+
 function renderReceiveMatrix(rows, dateThai, supHtml = '') {
   const rowSet = new Map(); const colSet = new Set();
   const cells = {}; const rowTotals = {}; const colTotals = {};
@@ -350,7 +372,7 @@ function renderReceiveMatrix(rows, dateThai, supHtml = '') {
   });
 
   const rowKeys = [...rowSet.keys()].sort();
-  const colKeys = [...colSet].sort((a,b) => a - b);
+  const colKeys = [...colSet].sort((a, b) => a - b);
 
   let html = '<div class="report-wrap"><table class="report-table"><thead><tr>';
   html += '<th class="grade-col">Gradegrams</th>';
@@ -388,7 +410,10 @@ function renderReceiveMatrix(rows, dateThai, supHtml = '') {
   $('receiveBody').innerHTML = supHtml + html;
 }
 
-// ================= LIST =================
+// ═══════════════════════════════════════════════════════════════
+//  LIST
+// ═══════════════════════════════════════════════════════════════
+
 function renderReceiveList(rows, dateThai, supHtml = '') {
   let html = '<div class="data-scroll"><table class="data-table"><thead><tr>';
   html += '<th>#</th><th>PO No.</th><th>Supplier</th><th>Gradegrams</th>';
@@ -398,10 +423,10 @@ function renderReceiveList(rows, dateThai, supHtml = '') {
 
   rows.forEach((r, i) => {
     const fscBadge = r.is_fsc ? '<span class="badge ok">FSC</span>' : '<span class="badge bad">-</span>';
-    const custBadge = r.is_customer_roll ? `<span class="badge ok">👤 ${esc(r.remark)||''}</span>` : '-';
+    const custBadge = r.is_customer_roll ? `<span class="badge ok">👤 ${esc(r.remark) || ''}</span>` : '-';
     const priceTxt = r.price != null ? Number(r.price).toFixed(2) : '-';
     html += `<tr>
-      <td>${i+1}</td>
+      <td>${i + 1}</td>
       <td><b>${esc(r.po_no)}</b></td>
       <td>${esc(r.supplier)}</td>
       <td>${esc(r.gradegram || r.grade)}</td>
@@ -414,7 +439,7 @@ function renderReceiveList(rows, dateThai, supHtml = '') {
     </tr>`;
   });
 
-  const totalQty = rows.reduce((s, r) => s + (Number(r.quantity)||0), 0);
+  const totalQty = rows.reduce((s, r) => s + (Number(r.quantity) || 0), 0);
 
   html += `<tr class="total-row" style="background:#cbd5e1;font-weight:700">
     <td colspan="5" style="text-align:right">Total</td>
@@ -428,9 +453,11 @@ function renderReceiveList(rows, dateThai, supHtml = '') {
   $('receiveBody').innerHTML = supHtml + html;
 }
 
-// ================= RECEIVE DETAIL =================
+// ═══════════════════════════════════════════════════════════════
+//  RECEIVE DETAIL
+// ═══════════════════════════════════════════════════════════════
+
 async function openReceiveDetail(gradegram, size, dateThai) {
-  // ✅ [FIX-1]
   const receiveDate = getReceiveDateISO();
   if (!receiveDate) return;
 
@@ -454,8 +481,8 @@ async function openReceiveDetail(gradegram, size, dateThai) {
       return;
     }
 
-    const totalQty = rows.reduce((s, r) => s + (Number(r.quantity)||0), 0);
-    const totalKg  = rows.reduce((s, r) => s + (Number(r.kg_total)||0), 0);
+    const totalQty = rows.reduce((s, r) => s + (Number(r.quantity) || 0), 0);
+    const totalKg  = rows.reduce((s, r) => s + (Number(r.kg_total) || 0), 0);
 
     let html = `<div class="msg info" style="margin-bottom:10px">
       📦 รวม ${totalQty} ม้วน · ${fmtKg(totalKg)} kg · ${rows.length} รายการ
@@ -470,7 +497,7 @@ async function openReceiveDetail(gradegram, size, dateThai) {
       const fscBadge = r.is_fsc ? '<span class="badge ok">FSC</span>' : '-';
       const priceTxt = r.price != null ? Number(r.price).toFixed(2) : '-';
       html += `<tr>
-        <td>${i+1}</td>
+        <td>${i + 1}</td>
         <td><b>${esc(r.po_no)}</b></td>
         <td>${esc(r.supplier)}</td>
         <td style="text-align:right">${r.quantity}</td>
@@ -488,13 +515,16 @@ async function openReceiveDetail(gradegram, size, dateThai) {
   }
 }
 
-// ================= EXPORT RECEIVE TO EXCEL =================
+// ═══════════════════════════════════════════════════════════════
+//  EXPORT RECEIVE TO EXCEL (2 Sheets)
+// ═══════════════════════════════════════════════════════════════
+
 function exportReceive() {
   if (!receiveCache || !receiveCache.length) {
     alert('ไม่มีข้อมูลให้ Export');
     return;
   }
-  const receiveDate = getReceiveDateISO();   // ✅ [FIX-1]
+  const receiveDate = getReceiveDateISO();
 
   const supMap = {};
   receiveCache.forEach(r => {
@@ -549,7 +579,3 @@ function exportReceive() {
   const fileName = `Receive_${receiveDate || 'export'}.xlsx`;
   XLSX.writeFile(wb, fileName);
 }
-
-// ═══════════════════════════════════════════════════════════════
-// ✅ จบ receive.js V9.1 — Fix Date Query + Debug
-// ═══════════════════════════════════════════════════════════════
