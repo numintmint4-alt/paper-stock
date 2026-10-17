@@ -1,10 +1,18 @@
 // ═══════════════════════════════════════════════════════════════
-// STOCK V6 — summary.js
+//  STOCK V10.1 — summary.js
+// ═══════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════
+//  STATE
 // ═══════════════════════════════════════════════════════════════
 
 let summarySelectedGrades = [];
 let summaryAllGrades = [];
 let summaryCache = [];
+
+// ═══════════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════════
 
 async function initSummaryTab() {
   const dateInput = $('summaryDate');
@@ -12,6 +20,10 @@ async function initSummaryTab() {
   await loadSummaryGradeFilter();
   await renderSummary();
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  GRADE FILTER
+// ═══════════════════════════════════════════════════════════════
 
 async function loadSummaryGradeFilter() {
   summaryAllGrades = [...new Set(
@@ -87,6 +99,10 @@ function clearAllSummaryGrades() {
   renderSummaryGradeList(); updateSummaryGradeLabel();
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  RENDER SUMMARY
+// ═══════════════════════════════════════════════════════════════
+
 async function renderSummary() {
   const summaryDate = $('summaryDate')?.value;
   const fsc = $('summaryFsc')?.value || 'all';
@@ -109,7 +125,7 @@ async function renderSummary() {
   $('summaryBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
 
   try {
-    // ✅ แก้: normalize grade
+    // normalize grade
     const normalizedGrades = summarySelectedGrades.map(g => normalizeGrade(g));
 
     const { data, error } = await supabase.rpc('get_receive_list', {
@@ -183,7 +199,7 @@ async function renderSummary() {
     });
 
     const rowKeys = [...rowSet.keys()].sort();
-    const colKeys = [...colSet].sort((a,b) => a - b);
+    const colKeys = [...colSet].sort((a, b) => a - b);
 
     const renderCell = (v) => {
       if (!v || v.qty === 0) return '-';
@@ -230,8 +246,11 @@ async function renderSummary() {
   }
 }
 
-// ================= SUMMARY DETAIL =================
-// ✅ แก้: ใช้ parseGradegram() ดึง grade ที่ถูกต้อง
+// ═══════════════════════════════════════════════════════════════
+//  SUMMARY DETAIL
+//  V.10 Fix: ใช้ parseGradegram() ดึง grade ที่ถูกต้อง
+// ═══════════════════════════════════════════════════════════════
+
 async function openSummaryDetail(gradegram, size, dateThai) {
   const summaryDate = $('summaryDate')?.value;
   if (!summaryDate) return;
@@ -256,8 +275,8 @@ async function openSummaryDetail(gradegram, size, dateThai) {
       return;
     }
 
-    const totalQty = rows.reduce((s, r) => s + (Number(r.quantity)||0), 0);
-    const totalKg  = rows.reduce((s, r) => s + (Number(r.kg_total)||0), 0);
+    const totalQty = rows.reduce((s, r) => s + (Number(r.quantity) || 0), 0);
+    const totalKg  = rows.reduce((s, r) => s + (Number(r.kg_total) || 0), 0);
 
     let html = `<div class="msg info" style="margin-bottom:10px">
       📦 รวม ${totalQty} ม้วน · ${totalKg.toFixed(0)} kg · ${rows.length} รายการ
@@ -272,7 +291,7 @@ async function openSummaryDetail(gradegram, size, dateThai) {
       const fscBadge = r.is_fsc ? '<span class="badge ok">FSC</span>' : '-';
       const priceTxt = r.price != null ? Number(r.price).toFixed(2) : '-';
       html += `<tr>
-        <td>${i+1}</td>
+        <td>${i + 1}</td>
         <td><b>${esc(r.po_no)}</b></td>
         <td>${esc(r.supplier)}</td>
         <td style="text-align:right">${r.quantity}</td>
