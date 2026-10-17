@@ -1,10 +1,14 @@
 // ═══════════════════════════════════════════════════════════════
-// STOCK V8 — alert.js
-// + ✅ Multi-item per cell
-// + ✅ LocalStorage Key = ISO Date (ไม่ใช่ index)
-// + ✅ วันที่รับเริ่มจาก analyzedDate + 1 (ข้ามอาทิตย์)
-// + ✅ Alert History (snapshot)
-// + ✅ ล็อกวันที่วิเคราะห์ = วันนี้
+//  STOCK V10.1 — alert.js
+//  + Multi-item per cell
+//  + LocalStorage Key = ISO Date (ไม่ใช่ index)
+//  + วันที่รับเริ่มจาก analyzedDate + 1 (ข้ามอาทิตย์)
+//  + Alert History (snapshot)
+//  + ล็อกวันที่วิเคราะห์ = วันนี้
+// ═══════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════
+//  STATE
 // ═══════════════════════════════════════════════════════════════
 
 let alertSelectedGrades = [];
@@ -18,6 +22,30 @@ let alertSelectedSizes = [];
 let alertAllSizes = [];
 
 let alertSelectedFilters = ['all'];
+let alertSelectedOrderFilters = ['all'];
+let alertSelectedSupFilters = [];
+let alertAllSupsInData = [];
+
+let alertSelectedStockFilters = ['all'];
+let alertSelectedReceiveFilters = ['all'];
+let alertSelectedUsageFilters = ['all'];
+
+let alertReceiveDates = [];
+let alertActiveDateIdx = 0;
+
+let alertUsageRanges = [];
+let alertUsageSelected = null;
+
+let alertHistoryMode = 'matrix';
+let alertHistoryData = null;
+let alertHistoryMeta = null;
+
+let _pendingPOItems = [];
+
+// ═══════════════════════════════════════════════════════════════
+//  CONSTANTS
+// ═══════════════════════════════════════════════════════════════
+
 const ALERT_ALL_FILTERS = [
   { value: 'all', label: 'ทั้งหมด' },
   { value: 'lt0', label: '🔴 ขาด (< 0)' },
@@ -25,17 +53,12 @@ const ALERT_ALL_FILTERS = [
   { value: 'gt0', label: '🟢 เกิน (> 0)' }
 ];
 
-let alertSelectedOrderFilters = ['all'];
 const ALERT_ORDER_FILTERS = [
   { value: 'all',        label: 'ทั้งหมด' },
   { value: 'filled',     label: '✅ กรอกแล้ว' },
   { value: 'not_filled', label: '⬜ ยังไม่กรอก' }
 ];
 
-let alertSelectedSupFilters = [];
-let alertAllSupsInData = [];
-
-let alertSelectedStockFilters = ['all'];
 const ALERT_STOCK_FILTERS = [
   { value: 'all', label: 'ทั้งหมด' },
   { value: 'eq0', label: '= 0' },
@@ -43,7 +66,6 @@ const ALERT_STOCK_FILTERS = [
   { value: 'lt0', label: '< 0' }
 ];
 
-let alertSelectedReceiveFilters = ['all'];
 const ALERT_RECEIVE_FILTERS = [
   { value: 'all', label: 'ทั้งหมด' },
   { value: 'eq0', label: '= 0' },
@@ -51,7 +73,6 @@ const ALERT_RECEIVE_FILTERS = [
   { value: 'lt0', label: '< 0' }
 ];
 
-let alertSelectedUsageFilters = ['all'];
 const ALERT_USAGE_FILTERS = [
   { value: 'all', label: 'ทั้งหมด' },
   { value: 'has', label: 'มี Usage' },
@@ -74,20 +95,8 @@ const ALERT_LS_KEY_PREFIX = 'stockv8_alert_inputs_v';
 const ALERT_PO_FLAG_KEY = 'stockv8_alert_po_created';
 const ALERT_RECEIVE_DATES_KEY = 'stockv8_alert_receive_dates';
 
-let alertReceiveDates = [];
-let alertActiveDateIdx = 0;
-
-let alertUsageRanges = [];
-let alertUsageSelected = null;
-
-let alertHistoryMode = 'matrix';
-let alertHistoryData = null;
-let alertHistoryMeta = null;
-
-let _pendingPOItems = [];
-
 // ═══════════════════════════════════════════════════════════════
-// ✅ ขั้นตอนที่ 4.1: LS Key — ใช้ ISO Date แทน Index
+//  LOCALSTORAGE KEY (ISO Date)
 // ═══════════════════════════════════════════════════════════════
 
 function getAlertLSKeyByDate(isoDate) {
@@ -99,21 +108,22 @@ function getAlertLSKeyByDate(isoDate) {
   return `${ALERT_LS_KEY_PREFIX}${isoDate}`;
 }
 
-// ✅ Backward-compat: รับ idx → คืน key ตามวันที่ของ idx นั้น
 function getAlertLSKey(dateIdx = alertActiveDateIdx) {
   const activeDate = alertReceiveDates[dateIdx];
   if (!activeDate) return `${ALERT_LS_KEY_PREFIX}default`;
   return `${ALERT_LS_KEY_PREFIX}${activeDate}`;
 }
 
-// ================= DATE HELPERS =================
+// ═══════════════════════════════════════════════════════════════
+//  DATE HELPERS
+// ═══════════════════════════════════════════════════════════════
+
 function _parseLocalDate(iso) {
   if (!iso) return null;
   const [y, m, d] = String(iso).split('-').map(Number);
   return new Date(y, m - 1, d);
 }
 
-// ✅ ขั้นตอนที่ 6: +1 แล้วข้ามอาทิตย์
 function _nextWorkingDay(fromDate) {
   const d = new Date(fromDate);
   d.setDate(d.getDate() + 1);
@@ -149,8 +159,9 @@ function fmtDateThai(d) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ✅ ขั้นตอนที่ 5: ล้าง key เก่า (v1, v2, ...)
+//  CLEAN OLD KEYS
 // ═══════════════════════════════════════════════════════════════
+
 function cleanOldAlertKeys() {
   try {
     const toRemove = [];
@@ -169,13 +180,16 @@ function cleanOldAlertKeys() {
   }
 }
 
-// ================= INIT =================
+// ═══════════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════════
+
 async function initAlertTab() {
-  cleanOldAlertKeys();   // ✅ ขั้นตอนที่ 5
+  cleanOldAlertKeys();
 
   const today = toISODate(new Date());
 
-  // ✅ ขั้นตอนที่ 8: ล็อกวันที่วิเคราะห์ = วันนี้
+  // ล็อกวันที่วิเคราะห์ = วันนี้
   const alertDateEl = $('alertDate');
   if (alertDateEl) {
     alertDateEl.value = today;
@@ -213,9 +227,9 @@ function applyCalculatedDates(analyzedDate) {
 
   if ($('alertStockDate')) $('alertStockDate').value = stockDate;
   if ($('alertReceiveDate')) $('alertReceiveDate').value = receiveDate;
+  // ✅ V.10 Fix: ไม่ Set alertSnapshotMonth ที่นี่ (ปล่อยให้ loadSnapshotMonths จัดการ)
 }
 
-// ✅ ขั้นตอนที่ 8: ล็อกไม่ให้แก้
 function attachAlertDateListener() {
   const el = $('alertDate');
   if (!el) return;
@@ -230,7 +244,10 @@ function attachAlertDateListener() {
   // ไม่ผูก change listener (ล็อกแล้ว)
 }
 
-// ================= ALERT HISTORY =================
+// ═══════════════════════════════════════════════════════════════
+//  ALERT HISTORY
+// ═══════════════════════════════════════════════════════════════
+
 async function saveAlertSnapshot(receiveDates) {
   const analyzedDate = $('alertDate')?.value;
   if (!analyzedDate) {
@@ -385,7 +402,10 @@ async function applyAlertSnapshot(snapshot) {
   }
 }
 
-// ✅ Render Alert จาก cache
+// ═══════════════════════════════════════════════════════════════
+//  RENDER ALERT FROM CACHE
+// ═══════════════════════════════════════════════════════════════
+
 function renderAlertFromCache() {
   if (!alertCache || !alertCache.length) {
     $('alertBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่มีข้อมูล</p>';
@@ -397,185 +417,23 @@ function renderAlertFromCache() {
   let html = `<div id="alertDateTabsBox" class="alert-date-tabs"></div>`;
 
   html += '<div class="report-wrap alert-scroll"><table class="alert-flat-table"><thead><tr>';
-  // ... (thead filter headers — เหมือนเดิม)
-  html += `<th class="th-with-filter">
-    <div class="th-filter-wrap" id="alertGradeFilterBox">
-      <button type="button" class="th-filter-btn" id="alertGradeFilterBtn">
-        <span id="alertGradeFilterLabel">Gradegrams</span>
-        <span class="arrow">▼</span>
-      </button>
-      <div class="grade-dropdown hidden" id="alertGradeDropdown" style="min-width:220px">
-        <div class="grade-actions">
-          <button type="button" onclick="selectAllAlertGrades()">✓ เลือกทั้งหมด</button>
-          <button type="button" onclick="clearAllAlertGrades()">✗ ล้างทั้งหมด</button>
-        </div>
-        <div class="grade-list" id="alertGradeList"></div>
-      </div>
-    </div>
-  </th>`;
-  html += `<th class="th-with-filter">
-    <div class="th-filter-wrap" id="alertSizeFilterBox">
-      <button type="button" class="th-filter-btn" id="alertSizeFilterBtn">
-        <span id="alertSizeLabel">Size</span>
-        <span class="arrow">▼</span>
-      </button>
-      <div class="grade-dropdown hidden" id="alertSizeDropdown" style="min-width:160px">
-        <div class="grade-actions">
-          <button type="button" onclick="selectAllAlertSizes()">✓ เลือกทั้งหมด</button>
-          <button type="button" onclick="clearAllAlertSizes()">✗ ล้างทั้งหมด</button>
-        </div>
-        <div class="grade-list" id="alertSizeList"></div>
-      </div>
-    </div>
-  </th>`;
-  html += '<th>Stock Level</th>';
-  html += `<th class="th-with-filter">
-    <div class="th-filter-wrap" id="alertStockFilterBox">
-      <button type="button" class="th-filter-btn" id="alertStockFilterBtn">
-        <span id="alertStockFilterLabel">Stock</span>
-        <span class="arrow">▼</span>
-      </button>
-      <div class="grade-dropdown hidden" id="alertStockFilterDropdown" style="min-width:180px">
-        <div class="grade-actions">
-          <button type="button" onclick="selectAllAlertStockFilters()">✓ เลือกทั้งหมด</button>
-          <button type="button" onclick="clearAllAlertStockFilters()">✗ ล้างทั้งหมด</button>
-        </div>
-        <div class="grade-list" id="alertStockFilterList"></div>
-      </div>
-    </div>
-  </th>`;
-  html += `<th class="th-with-filter">
-    <div class="th-filter-wrap" id="alertReceiveFilterBox">
-      <button type="button" class="th-filter-btn" id="alertReceiveFilterBtn">
-        <span id="alertReceiveFilterLabel">Receive</span>
-        <span class="arrow">▼</span>
-      </button>
-      <div class="grade-dropdown hidden" id="alertReceiveFilterDropdown" style="min-width:180px">
-        <div class="grade-actions">
-          <button type="button" onclick="selectAllAlertReceiveFilters()">✓ เลือกทั้งหมด</button>
-          <button type="button" onclick="clearAllAlertReceiveFilters()">✗ ล้างทั้งหมด</button>
-        </div>
-        <div class="grade-list" id="alertReceiveFilterList"></div>
-      </div>
-    </div>
-  </th>`;
-  html += `<th class="th-with-filter">
-    <div class="th-filter-wrap" id="alertUsageFilterBox">
-      <button type="button" class="th-filter-btn" id="alertUsageFilterBtn">
-        <span id="alertUsageFilterLabel">Usage Plan</span>
-        <span class="arrow">▼</span>
-      </button>
-      <div class="grade-dropdown hidden" id="alertUsageFilterDropdown" style="min-width:180px">
-        <div class="grade-actions">
-          <button type="button" onclick="selectAllAlertUsageFilters()">✓ เลือกทั้งหมด</button>
-          <button type="button" onclick="clearAllAlertUsageFilters()">✗ ล้างทั้งหมด</button>
-        </div>
-        <div class="grade-list" id="alertUsageFilterList"></div>
-      </div>
-    </div>
-  </th>`;
-  html += `<th class="th-with-filter">
-    <div class="th-filter-wrap" id="alertFilterBox">
-      <button type="button" class="th-filter-btn" id="alertFilterBtn">
-        <span id="alertFilterLabel">Alert</span>
-        <span class="arrow">▼</span>
-      </button>
-      <div class="grade-dropdown hidden" id="alertFilterDropdown" style="min-width:200px">
-        <div class="grade-actions">
-          <button type="button" onclick="selectAllAlertFilters()">✓ เลือกทั้งหมด</button>
-          <button type="button" onclick="clearAllAlertFilters()">✗ ล้างทั้งหมด</button>
-        </div>
-        <div class="grade-list" id="alertFilterList"></div>
-      </div>
-    </div>
-  </th>`;
-  html += '<th>สถานะ</th>';
-  html += `<th class="th-with-filter">
-    <div class="th-filter-wrap" id="alertOrderFilterBox">
-      <button type="button" class="th-filter-btn" id="alertOrderFilterBtn">
-        <span id="alertOrderFilterLabel">สั่งซื้อ</span>
-        <span class="arrow">▼</span>
-      </button>
-      <div class="grade-dropdown hidden" id="alertOrderFilterDropdown" style="min-width:180px">
-        <div class="grade-actions">
-          <button type="button" onclick="selectAllAlertOrderFilters()">✓ เลือกทั้งหมด</button>
-          <button type="button" onclick="clearAllAlertOrderFilters()">✗ ล้างทั้งหมด</button>
-        </div>
-        <div class="grade-list" id="alertOrderFilterList"></div>
-      </div>
-    </div>
-  </th>`;
-  html += `<th class="th-with-filter">
-    <div class="th-filter-wrap" id="alertSupFilterBox">
-      <button type="button" class="th-filter-btn" id="alertSupFilterBtn">
-        <span id="alertSupFilterLabel">Sup.</span>
-        <span class="arrow">▼</span>
-      </button>
-      <div class="grade-dropdown hidden" id="alertSupFilterDropdown" style="min-width:180px">
-        <div class="grade-actions">
-          <button type="button" onclick="selectAllAlertSupFilters()">✓ เลือกทั้งหมด</button>
-          <button type="button" onclick="clearAllAlertSupFilters()">✗ ล้างทั้งหมด</button>
-        </div>
-        <div class="grade-list" id="alertSupFilterList"></div>
-      </div>
-    </div>
-  </th>`;
-  html += '<th>ม้วนลูกค้า</th><th>คุณภาพ B</th><th>FSC</th><th>หมายเหตุ</th>';
+  html += buildAlertTableHead();
   html += '</tr></thead><tbody></tbody></table></div>';
-
-  // ✅ report-foot
-  const footCache = window._alertFullCache || alertCache || [];
-  const footShortage = footCache.filter(r => Number(r.alert) < 0).length;
-  const footOK       = footCache.filter(r => Number(r.alert) === 0).length;
-  const footOver     = footCache.filter(r => Number(r.alert) > 0).length;
-
-  html += `<div class="report-foot" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-    <div class="alert-foot-summary">
-      <span class="item red">🔴 ${footShortage}</span>
-      <span class="item yellow">🟡 ${footOK}</span>
-      <span class="item green">🟢 ${footOver}</span>
-    </div>
-    <div style="display:flex;gap:6px">
-      <button class="primary" onclick="createPOFromAlert()">📄 สร้าง PO</button>
-      <button class="danger" onclick="clearAlertInputs()">🗑 ล้างค่า</button>
-    </div>
-  </div>`;
+  html += buildAlertFoot();
 
   $('alertBody').innerHTML = html;
 
   renderAlertDateTabs();
-  renderAlertGradeList();
-  renderAlertSizeList();
-  renderAlertFilterList();
-  renderAlertOrderFilterList();
-  renderAlertSupFilterList();
-  renderAlertStockFilterList();
-  renderAlertReceiveFilterList();
-  renderAlertUsageFilterList();
-  updateAlertGradeLabel();
-  updateAlertSizeLabel();
-  updateAlertFilterLabel();
-  updateAlertOrderFilterLabel();
-  updateAlertSupFilterLabel();
-  updateAlertStockFilterLabel();
-  updateAlertReceiveFilterLabel();
-  updateAlertUsageFilterLabel();
-  _attachAlertDropdown('alertGradeFilterBtn', 'alertGradeDropdown', 'alertGradeFilterBox', 'alertGrade');
-  _attachAlertDropdown('alertSizeFilterBtn', 'alertSizeDropdown', 'alertSizeFilterBox', 'alertSize');
-  _attachAlertDropdown('alertFilterBtn', 'alertFilterDropdown', 'alertFilterBox', 'alertFilter');
-  _attachAlertDropdown('alertOrderFilterBtn', 'alertOrderFilterDropdown', 'alertOrderFilterBox', 'alertOrderFilter');
-  _attachAlertDropdown('alertSupFilterBtn', 'alertSupFilterDropdown', 'alertSupFilterBox', 'alertSupFilter');
-  _attachAlertDropdown('alertStockFilterBtn', 'alertStockFilterDropdown', 'alertStockFilterBox', 'alertStockFilter');
-  _attachAlertDropdown('alertReceiveFilterBtn', 'alertReceiveFilterDropdown', 'alertReceiveFilterBox', 'alertReceiveFilter');
-  _attachAlertDropdown('alertUsageFilterBtn', 'alertUsageFilterDropdown', 'alertUsageFilterBox', 'alertUsageFilter');
+  renderAllAlertFilters();
   renderAlertReceiveDates();
 
   applyAlertFiltersAndRender();
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ✅ View Toggle
+//  VIEW TOGGLE
 // ═══════════════════════════════════════════════════════════════
+
 function setAlertViewMode(mode) {
   if (mode !== 'flat' && mode !== 'matrix') return;
   if (alertViewMode === mode) return;
@@ -608,7 +466,10 @@ function initAlertRowHover() {
   }, 50);
 }
 
-// ================= SUPPLIERS =================
+// ═══════════════════════════════════════════════════════════════
+//  SUPPLIERS
+// ═══════════════════════════════════════════════════════════════
+
 async function loadAlertSuppliers() {
   try {
     const { data, error } = await supabase
@@ -624,7 +485,10 @@ async function loadAlertSuppliers() {
   }
 }
 
-// ================= SNAPSHOT MONTHS =================
+// ═══════════════════════════════════════════════════════════════
+//  SNAPSHOT MONTHS
+// ═══════════════════════════════════════════════════════════════
+
 async function loadSnapshotMonths() {
   try {
     const { data, error } = await supabase
@@ -640,19 +504,20 @@ async function loadSnapshotMonths() {
     const months = [...set].sort().reverse();
 
     if ($('alertSnapshotMonth') && months.length > 0) {
-      let defaultMonth = months[0];
-      if (typeof selectedMonths !== 'undefined' && selectedMonths.length > 0) {
-        const latest = selectedMonths[selectedMonths.length - 1];
-        if (months.includes(latest)) defaultMonth = latest;
-      }
-      $('alertSnapshotMonth').value = defaultMonth;
+      // ✅ V.10 Fix: Set เป็นเดือนล่าสุดของ Snapshot เสมอ
+      $('alertSnapshotMonth').value = months[0];
     }
   } catch (e) {
     console.warn('loadSnapshotMonths:', e);
   }
 }
 
-// ================= GRADE FILTER =================
+// ═══════════════════════════════════════════════════════════════
+//  FILTERS (GRADE / SIZE / ALERT / ORDER / SUP / STOCK / RECEIVE / USAGE)
+// ═══════════════════════════════════════════════════════════════
+
+// ─── GRADE ──────────────────────────────────────────────────────
+
 async function loadAlertGradeFilter() {
   alertAllGrades = [...new Set(
     masterCache.map(m => normalizeGrade(m.grade) + m.gram)
@@ -702,18 +567,21 @@ function updateAlertGradeLabel() {
     label.textContent = `Gradegrams (${alertSelectedGrades.length})`;
   }
 }
+
 function selectAllAlertGrades() {
   alertSelectedGrades = [...alertAllGrades];
   renderAlertGradeList(); updateAlertGradeLabel();
   applyAlertFiltersAndRender();
 }
+
 function clearAllAlertGrades() {
   alertSelectedGrades = [];
   renderAlertGradeList(); updateAlertGradeLabel();
   applyAlertFiltersAndRender();
 }
 
-// ================= SIZE FILTER =================
+// ─── SIZE ───────────────────────────────────────────────────────
+
 function renderAlertSizeList() {
   const list = $('alertSizeList');
   if (!list) return;
@@ -758,18 +626,21 @@ function updateAlertSizeLabel() {
     label.style.color = '#fbbf24';
   }
 }
+
 function selectAllAlertSizes() {
   alertSelectedSizes = [...alertAllSizes];
   renderAlertSizeList(); updateAlertSizeLabel();
   applyAlertFiltersAndRender();
 }
+
 function clearAllAlertSizes() {
   alertSelectedSizes = [];
   renderAlertSizeList(); updateAlertSizeLabel();
   applyAlertFiltersAndRender();
 }
 
-// ================= ALERT FILTER =================
+// ─── ALERT ──────────────────────────────────────────────────────
+
 function loadAlertFilter() {
   renderAlertFilterList();
   updateAlertFilterLabel();
@@ -813,18 +684,21 @@ function updateAlertFilterLabel() {
     label.textContent = `Alert (${alertSelectedFilters.length})`;
   }
 }
+
 function selectAllAlertFilters() {
   alertSelectedFilters = ['all'];
   renderAlertFilterList(); updateAlertFilterLabel();
   applyAlertFiltersAndRender();
 }
+
 function clearAllAlertFilters() {
   alertSelectedFilters = [];
   renderAlertFilterList(); updateAlertFilterLabel();
   applyAlertFiltersAndRender();
 }
 
-// ================= ORDER FILTER =================
+// ─── ORDER ──────────────────────────────────────────────────────
+
 function renderAlertOrderFilterList() {
   const list = $('alertOrderFilterList');
   if (!list) return;
@@ -863,18 +737,21 @@ function updateAlertOrderFilterLabel() {
     label.textContent = `สั่งซื้อ (${alertSelectedOrderFilters.length})`;
   }
 }
+
 function selectAllAlertOrderFilters() {
   alertSelectedOrderFilters = ['all'];
   renderAlertOrderFilterList(); updateAlertOrderFilterLabel();
   applyAlertFiltersAndRender();
 }
+
 function clearAllAlertOrderFilters() {
   alertSelectedOrderFilters = [];
   renderAlertOrderFilterList(); updateAlertOrderFilterLabel();
   applyAlertFiltersAndRender();
 }
 
-// ================= SUP FILTER =================
+// ─── SUP ────────────────────────────────────────────────────────
+
 function renderAlertSupFilterList() {
   const list = $('alertSupFilterList');
   if (!list) return;
@@ -918,18 +795,21 @@ function updateAlertSupFilterLabel() {
     label.textContent = `Sup. (${alertSelectedSupFilters.length})`;
   }
 }
+
 function selectAllAlertSupFilters() {
   alertSelectedSupFilters = [...alertAllSupsInData];
   renderAlertSupFilterList(); updateAlertSupFilterLabel();
   applyAlertFiltersAndRender();
 }
+
 function clearAllAlertSupFilters() {
   alertSelectedSupFilters = [];
   renderAlertSupFilterList(); updateAlertSupFilterLabel();
   applyAlertFiltersAndRender();
 }
 
-// ================= STOCK FILTER =================
+// ─── STOCK ──────────────────────────────────────────────────────
+
 function renderAlertStockFilterList() {
   const list = $('alertStockFilterList');
   if (!list) return;
@@ -968,18 +848,21 @@ function updateAlertStockFilterLabel() {
     label.textContent = `Stock (${alertSelectedStockFilters.length})`;
   }
 }
+
 function selectAllAlertStockFilters() {
   alertSelectedStockFilters = ['all'];
   renderAlertStockFilterList(); updateAlertStockFilterLabel();
   applyAlertFiltersAndRender();
 }
+
 function clearAllAlertStockFilters() {
   alertSelectedStockFilters = [];
   renderAlertStockFilterList(); updateAlertStockFilterLabel();
   applyAlertFiltersAndRender();
 }
 
-// ================= RECEIVE FILTER =================
+// ─── RECEIVE ────────────────────────────────────────────────────
+
 function renderAlertReceiveFilterList() {
   const list = $('alertReceiveFilterList');
   if (!list) return;
@@ -1018,18 +901,21 @@ function updateAlertReceiveFilterLabel() {
     label.textContent = `Receive (${alertSelectedReceiveFilters.length})`;
   }
 }
+
 function selectAllAlertReceiveFilters() {
   alertSelectedReceiveFilters = ['all'];
   renderAlertReceiveFilterList(); updateAlertReceiveFilterLabel();
   applyAlertFiltersAndRender();
 }
+
 function clearAllAlertReceiveFilters() {
   alertSelectedReceiveFilters = [];
   renderAlertReceiveFilterList(); updateAlertReceiveFilterLabel();
   applyAlertFiltersAndRender();
 }
 
-// ================= USAGE PLAN FILTER =================
+// ─── USAGE PLAN ─────────────────────────────────────────────────
+
 function renderAlertUsageFilterList() {
   const list = $('alertUsageFilterList');
   if (!list) return;
@@ -1068,18 +954,23 @@ function updateAlertUsageFilterLabel() {
     label.textContent = `Usage (${alertSelectedUsageFilters.length})`;
   }
 }
+
 function selectAllAlertUsageFilters() {
   alertSelectedUsageFilters = ['all'];
   renderAlertUsageFilterList(); updateAlertUsageFilterLabel();
   applyAlertFiltersAndRender();
 }
+
 function clearAllAlertUsageFilters() {
   alertSelectedUsageFilters = [];
   renderAlertUsageFilterList(); updateAlertUsageFilterLabel();
   applyAlertFiltersAndRender();
 }
 
-// ================= APPLY FILTERS =================
+// ═══════════════════════════════════════════════════════════════
+//  APPLY FILTERS
+// ═══════════════════════════════════════════════════════════════
+
 function applyAlertFiltersAndRender() {
   if (!window._alertFullCache || !window._alertFullCache.length) return;
 
@@ -1160,6 +1051,10 @@ function applyAlertFiltersAndRender() {
   renderAlertTableBody(result);
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  RENDER TABLE
+// ═══════════════════════════════════════════════════════════════
+
 function renderAlertTableBody(rows) {
   renderAlertDateTabs();
 
@@ -1204,8 +1099,9 @@ function renderAlertTableBody(rows) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ✅ Flat view
+//  FLAT VIEW
 // ═══════════════════════════════════════════════════════════════
+
 function renderAlertFlatView(rows) {
   const tbody = document.querySelector('.alert-flat-table tbody');
   if (!tbody) return;
@@ -1354,8 +1250,9 @@ function addFlatRow(gradegram, size) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ✅ Matrix view
+//  MATRIX VIEW
 // ═══════════════════════════════════════════════════════════════
+
 function renderAlertMatrixView(rows) {
   const container = document.getElementById('alertBody');
   if (!container) return;
@@ -1462,7 +1359,10 @@ function renderAlertMatrixView(rows) {
   matrixWrap.innerHTML = html;
 }
 
-// ========== Modal Cell ==========
+// ═══════════════════════════════════════════════════════════════
+//  MODAL CELL
+// ═══════════════════════════════════════════════════════════════
+
 function openAlertMatrixCell(gradegram, size) {
   const r = alertCache.find(x => x.gradegram === gradegram && Number(x.size) === Number(size));
   if (!r) { alert('ไม่พบข้อมูล'); return; }
@@ -1536,6 +1436,10 @@ function openAlertMatrixCell(gradegram, size) {
   bodyEl.innerHTML = html;
   openModal('modalAlertMatrixCell');
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  MATRIX ORDER FORM
+// ═══════════════════════════════════════════════════════════════
 
 function renderMatrixOrderForm(gradegram, size, items) {
   if (!items || !items.length) {
@@ -1736,7 +1640,10 @@ function saveMatrixOrder(gradegram, size) {
   setTimeout(() => msg.remove(), 2000);
 }
 
-// ================= DROPDOWN HELPER =================
+// ═══════════════════════════════════════════════════════════════
+//  DROPDOWN HELPER
+// ═══════════════════════════════════════════════════════════════
+
 function _attachAlertDropdown(btnId, dropdownId, boxId, docKey) {
   const btn = $(btnId);
   const dropdown = $(dropdownId);
@@ -1765,13 +1672,13 @@ function _attachAlertDropdown(btnId, dropdownId, boxId, docKey) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ✅ LOCAL STORAGE — ใช้ isoDate
+//  LOCALSTORAGE (ISO Date)
 // ═══════════════════════════════════════════════════════════════
+
 function alertLS_Key(gradegram, size) {
   return `${gradegram}|${size}`;
 }
 
-// ✅ ขั้นตอนที่ 4.1.1
 function loadAlertInputs(dateOrIdx) {
   try {
     let isoDate;
@@ -1787,7 +1694,7 @@ function loadAlertInputs(dateOrIdx) {
     const raw = localStorage.getItem(`${ALERT_LS_KEY_PREFIX}${isoDate}`);
     const data = raw ? JSON.parse(raw) : {};
 
-    // ✅ Auto-migrate: structure เก่า → ใหม่
+    // Auto-migrate: structure เก่า → ใหม่
     Object.keys(data).forEach(key => {
       const v = data[key];
       if (v && !v.items && (v.qty !== undefined || v.sup || v.customer_roll || v.quality_b || v.note)) {
@@ -1810,17 +1717,12 @@ function loadAlertInputs(dateOrIdx) {
   } catch { return {}; }
 }
 
-// ✅ ขั้นตอนที่ 4.1.4
 function getAlertItems(gradegram, size, dateOrIdx) {
   const data = loadAlertInputs(dateOrIdx);
-  const key = alertLS_Key(gradegram, size);
-  const cell = data[key];
-  if (!cell || !cell.items) return [];
-
-  return cell.items.filter(it => it.qty && Number(it.qty) > 0);
+  const cell = data[alertLS_Key(gradegram, size)];
+  return (cell?.items || []).filter(it => it.qty && Number(it.qty) > 0);
 }
 
-// ✅ ขั้นตอนที่ 4.1.5
 function saveAlertItems(gradegram, size, items, dateOrIdx) {
   const data = loadAlertInputs(dateOrIdx);
   const key = alertLS_Key(gradegram, size);
@@ -1845,13 +1747,11 @@ function saveAlertItems(gradegram, size, items, dateOrIdx) {
   }
 }
 
-// ✅ ขั้นตอนที่ 4.1.6
 function getAlertQtyTotal(gradegram, size, dateOrIdx) {
   const items = getAlertItems(gradegram, size, dateOrIdx);
   return items.reduce((sum, it) => sum + (Number(it.qty) || 0), 0);
 }
 
-// ✅ ขั้นตอนที่ 4.1.3
 function getAlertInput(keyOrGradegram, dateOrIdx) {
   let gradegram, size;
 
@@ -1868,7 +1768,6 @@ function getAlertInput(keyOrGradegram, dateOrIdx) {
   return items.length > 0 ? items[0] : {};
 }
 
-// ✅ ขั้นตอนที่ 4.1.2
 function saveAlertInput(key, field, value) {
   const data = loadAlertInputs();
   if (!data[key]) data[key] = { items: [] };
@@ -1890,13 +1789,17 @@ function saveAlertInput(key, field, value) {
   }
 }
 
-// ================= PO FLAG =================
+// ═══════════════════════════════════════════════════════════════
+//  PO FLAG
+// ═══════════════════════════════════════════════════════════════
+
 function loadPOFlag() {
   try {
     const raw = localStorage.getItem(ALERT_PO_FLAG_KEY);
     return raw ? JSON.parse(raw) : {};
   } catch { return {}; }
 }
+
 function savePOFlag(data) {
   localStorage.setItem(ALERT_PO_FLAG_KEY, JSON.stringify(data));
 }
@@ -1934,7 +1837,10 @@ function clearPOFlags() {
   localStorage.removeItem(ALERT_PO_FLAG_KEY);
 }
 
-// ================= วันที่รับสินค้า =================
+// ═══════════════════════════════════════════════════════════════
+//  RECEIVE DATES
+// ═══════════════════════════════════════════════════════════════
+
 function getNextWorkingDay(baseDate = new Date()) {
   const d = new Date(baseDate);
   d.setDate(d.getDate() + 1);
@@ -1954,7 +1860,6 @@ function saveAlertReceiveDates() {
   localStorage.setItem(ALERT_RECEIVE_DATES_KEY, JSON.stringify(alertReceiveDates));
 }
 
-// ✅ ขั้นตอนที่ 7
 function addAlertReceiveDate() {
   const analyzedDate = $('alertDate')?.value;
   if (!analyzedDate) {
@@ -1968,7 +1873,6 @@ function addAlertReceiveDate() {
     return;
   }
 
-  // ✅ วันถัดไปจากวันที่วิเคราะห์ (ข้ามอาทิตย์)
   const firstReceiveD = new Date(analyzedD);
   firstReceiveD.setDate(firstReceiveD.getDate() + 1);
   while (firstReceiveD.getDay() === 0) firstReceiveD.setDate(firstReceiveD.getDate() + 1);
@@ -2019,7 +1923,6 @@ function addAlertReceiveDate() {
   renderAlertDateTabs();
 }
 
-// ✅ ขั้นตอนที่ 4.3
 function removeAlertReceiveDate(idx) {
   if (alertReceiveDates.length <= 1) {
     alert('ต้องมีวันที่รับสินค้าอย่างน้อย 1 วัน');
@@ -2053,7 +1956,6 @@ function renderAlertReceiveDates() {
   renderAlertDateTabs();
 }
 
-// ================= TAB วันที่ =================
 function switchAlertDate(idx) {
   if (idx < 0 || idx >= alertReceiveDates.length) return;
   alertActiveDateIdx = idx;
@@ -2095,7 +1997,6 @@ function renderAlertDateTabs() {
   box.innerHTML = html;
 }
 
-// ✅ ขั้นตอนที่ 6
 function initAlertReceiveDates() {
   alertReceiveDates = loadAlertReceiveDates();
 
@@ -2120,7 +2021,10 @@ function initAlertReceiveDates() {
   renderAlertDateTabs();
 }
 
-// ================= HELPER: FSC =================
+// ═══════════════════════════════════════════════════════════════
+//  HELPER: FSC
+// ═══════════════════════════════════════════════════════════════
+
 function isFSCGrade(gradegram) {
   if (!gradegram) return false;
   const match = String(gradegram).match(/^([A-Z]+)/);
@@ -2128,7 +2032,10 @@ function isFSCGrade(gradegram) {
   return match[1].includes('F');
 }
 
-// ================= RENDER ALERT (Main) =================
+// ═══════════════════════════════════════════════════════════════
+//  RENDER ALERT (Main)
+// ═══════════════════════════════════════════════════════════════
+
 async function renderAlert() {
   const snapshotMonth = $('alertSnapshotMonth')?.value;
   const stockDate     = $('alertStockDate')?.value;
@@ -2197,26 +2104,9 @@ async function renderAlert() {
     }
 
     html += '<div class="report-wrap alert-scroll"><table class="alert-flat-table"><thead><tr>';
-    // ... (thead filter headers เหมือน renderAlertFromCache)
-
+    html += buildAlertTableHead();
     html += '</tr></thead><tbody></tbody></table></div>';
-
-    const footCache = window._alertFullCache || alertCache || [];
-    const footShortage = footCache.filter(r => Number(r.alert) < 0).length;
-    const footOK       = footCache.filter(r => Number(r.alert) === 0).length;
-    const footOver     = footCache.filter(r => Number(r.alert) > 0).length;
-
-    html += `<div class="report-foot" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-      <div class="alert-foot-summary">
-        <span class="item red">🔴 ${footShortage}</span>
-        <span class="item yellow">🟡 ${footOK}</span>
-        <span class="item green">🟢 ${footOver}</span>
-      </div>
-      <div style="display:flex;gap:6px">
-        <button class="primary" onclick="createPOFromAlert()">📄 สร้าง PO</button>
-        <button class="danger" onclick="clearAlertInputs()">🗑 ล้างค่า</button>
-      </div>
-    </div>`;
+    html += buildAlertFoot();
 
     $('alertBody').innerHTML = html;
 
@@ -2229,30 +2119,7 @@ async function renderAlert() {
       }).flat().filter(Boolean)
     )].sort();
 
-    renderAlertGradeList();
-    renderAlertFilterList();
-    renderAlertSizeList();
-    renderAlertOrderFilterList();
-    renderAlertSupFilterList();
-    renderAlertStockFilterList();
-    renderAlertReceiveFilterList();
-    renderAlertUsageFilterList();
-    updateAlertGradeLabel();
-    updateAlertFilterLabel();
-    updateAlertSizeLabel();
-    updateAlertOrderFilterLabel();
-    updateAlertSupFilterLabel();
-    updateAlertStockFilterLabel();
-    updateAlertReceiveFilterLabel();
-    updateAlertUsageFilterLabel();
-    _attachAlertDropdown('alertGradeFilterBtn', 'alertGradeDropdown', 'alertGradeFilterBox', 'alertGrade');
-    _attachAlertDropdown('alertSizeFilterBtn', 'alertSizeDropdown', 'alertSizeFilterBox', 'alertSize');
-    _attachAlertDropdown('alertFilterBtn', 'alertFilterDropdown', 'alertFilterBox', 'alertFilter');
-    _attachAlertDropdown('alertOrderFilterBtn', 'alertOrderFilterDropdown', 'alertOrderFilterBox', 'alertOrderFilter');
-    _attachAlertDropdown('alertSupFilterBtn', 'alertSupFilterDropdown', 'alertSupFilterBox', 'alertSupFilter');
-    _attachAlertDropdown('alertStockFilterBtn', 'alertStockFilterDropdown', 'alertStockFilterBox', 'alertStockFilter');
-    _attachAlertDropdown('alertReceiveFilterBtn', 'alertReceiveFilterDropdown', 'alertReceiveFilterBox', 'alertReceiveFilter');
-    _attachAlertDropdown('alertUsageFilterBtn', 'alertUsageFilterDropdown', 'alertUsageFilterBox', 'alertUsageFilter');
+    renderAllAlertFilters();
     renderAlertDateTabs();
 
     applyAlertFiltersAndRender();
@@ -2269,7 +2136,10 @@ async function renderAlert() {
   }
 }
 
-// ================= PO Edited Warning =================
+// ═══════════════════════════════════════════════════════════════
+//  PO EDITED WARNING
+// ═══════════════════════════════════════════════════════════════
+
 function showPOEditedWarning() {
   let modal = document.getElementById('modalPOEditedWarning');
   if (!modal) {
@@ -2299,7 +2169,10 @@ function dismissPOWarning() {
   if (modal) modal.classList.remove('show');
 }
 
-// ================= INPUT =================
+// ═══════════════════════════════════════════════════════════════
+//  INPUT
+// ═══════════════════════════════════════════════════════════════
+
 function onAlertInput(gradegram, size, field, value, el) {
   const key = alertLS_Key(gradegram, size);
   saveAlertInput(key, field, value);
@@ -2324,8 +2197,10 @@ function onAlertInput(gradegram, size, field, value, el) {
   }
 }
 
-// ================= CLEAR =================
-// ✅ ขั้นตอนที่ 4.4
+// ═══════════════════════════════════════════════════════════════
+//  CLEAR
+// ═══════════════════════════════════════════════════════════════
+
 function clearAlertInputs() {
   if (!confirm('⚠️ ล้างค่าที่กรอกของวันนี้ (สั่งซื้อ / Sup. / ม้วนลูกค้า / คุณภาพ B / หมายเหตุ)?')) return;
 
@@ -2344,15 +2219,16 @@ function clearAlertInputs() {
   setTimeout(() => msg.remove(), 2000);
 }
 
-// ✅ ขั้นตอนที่ 4.5
 function clearAllAlertInputsAllDates() {
   alertReceiveDates.forEach(date => {
     localStorage.removeItem(`${ALERT_LS_KEY_PREFIX}${date}`);
   });
 }
 
-// ================= CREATE PO =================
-// ✅ ขั้นตอนที่ 4.2
+// ═══════════════════════════════════════════════════════════════
+//  CREATE PO
+// ═══════════════════════════════════════════════════════════════
+
 async function createPOFromAlert() {
   if (!alertCache || !alertCache.length) {
     alert('ไม่มีข้อมูล Alert');
@@ -2365,7 +2241,6 @@ async function createPOFromAlert() {
     const dateKey = alertReceiveDates[dateIdx];
 
     for (const r of alertCache) {
-      // ✅ ใช้ isoDate แทน idx
       const items = getAlertItems(r.gradegram, r.size, dateKey);
 
       for (const it of items) {
@@ -2534,7 +2409,10 @@ function confirmCreatePO() {
   else alert('ยังไม่ได้เพิ่ม Tab Purchase Order');
 }
 
-// ================= DETAIL MODAL =================
+// ═══════════════════════════════════════════════════════════════
+//  DETAIL MODAL
+// ═══════════════════════════════════════════════════════════════
+
 async function openAlertDetail(gradegram, size) {
   const snapshotMonth = $('alertSnapshotMonth')?.value;
   const stockDate     = $('alertStockDate')?.value;
@@ -2634,7 +2512,10 @@ async function openAlertDetail(gradegram, size) {
   }
 }
 
-// ================= USAGE PLAN =================
+// ═══════════════════════════════════════════════════════════════
+//  USAGE PLAN
+// ═══════════════════════════════════════════════════════════════
+
 async function loadUsagePlanRanges() {
   try {
     const { data, error } = await supabase.rpc('get_all_usage_plan_ranges');
@@ -2679,7 +2560,8 @@ function renderUsageRangeDropdown() {
   sel.innerHTML = html;
 }
 
-// ========== Usage Plan Import ==========
+// ─── Usage Plan Import ──────────────────────────────────────────
+
 let _usagePlanRows = [];
 let _usagePlanDateCols = [];
 
@@ -2877,9 +2759,9 @@ async function clearUsagePlan() {
   }
 }
 
-// ═══════════════════════════════════════════════════════════
-// ✅ Alert History
-// ═══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+//  ALERT HISTORY
+// ═══════════════════════════════════════════════════════════════
 
 function showAlertHistoryCard() {
   const card = $('alertHistoryCard');
@@ -3134,7 +3016,10 @@ function openAlertHistoryCell(gradegram, size) {
   openModal('modalAlertMatrixCell');
 }
 
-// ================= EXPORT =================
+// ═══════════════════════════════════════════════════════════════
+//  EXPORT
+// ═══════════════════════════════════════════════════════════════
+
 function exportAlert() {
   if (!alertCache || !alertCache.length) return alert('ไม่มีข้อมูล');
 
@@ -3169,4 +3054,205 @@ function exportAlert() {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Alert');
   XLSX.writeFile(wb, `alert_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  HELPER: BUILD TABLE HEAD / FOOT
+//  (เพิ่มใหม่เพื่อลด Code ซ้ำใน renderAlert / renderAlertFromCache)
+// ═══════════════════════════════════════════════════════════════
+
+function buildAlertTableHead() {
+  let html = '';
+
+  // Gradegrams
+  html += `<th class="th-with-filter">
+    <div class="th-filter-wrap" id="alertGradeFilterBox">
+      <button type="button" class="th-filter-btn" id="alertGradeFilterBtn">
+        <span id="alertGradeFilterLabel">Gradegrams</span>
+        <span class="arrow">▼</span>
+      </button>
+      <div class="grade-dropdown hidden" id="alertGradeDropdown" style="min-width:220px">
+        <div class="grade-actions">
+          <button type="button" onclick="selectAllAlertGrades()">✓ เลือกทั้งหมด</button>
+          <button type="button" onclick="clearAllAlertGrades()">✗ ล้างทั้งหมด</button>
+        </div>
+        <div class="grade-list" id="alertGradeList"></div>
+      </div>
+    </div>
+  </th>`;
+
+  // Size
+  html += `<th class="th-with-filter">
+    <div class="th-filter-wrap" id="alertSizeFilterBox">
+      <button type="button" class="th-filter-btn" id="alertSizeFilterBtn">
+        <span id="alertSizeLabel">Size</span>
+        <span class="arrow">▼</span>
+      </button>
+      <div class="grade-dropdown hidden" id="alertSizeDropdown" style="min-width:160px">
+        <div class="grade-actions">
+          <button type="button" onclick="selectAllAlertSizes()">✓ เลือกทั้งหมด</button>
+          <button type="button" onclick="clearAllAlertSizes()">✗ ล้างทั้งหมด</button>
+        </div>
+        <div class="grade-list" id="alertSizeList"></div>
+      </div>
+    </div>
+  </th>`;
+
+  html += '<th>Stock Level</th>';
+
+  // Stock
+  html += `<th class="th-with-filter">
+    <div class="th-filter-wrap" id="alertStockFilterBox">
+      <button type="button" class="th-filter-btn" id="alertStockFilterBtn">
+        <span id="alertStockFilterLabel">Stock</span>
+        <span class="arrow">▼</span>
+      </button>
+      <div class="grade-dropdown hidden" id="alertStockFilterDropdown" style="min-width:180px">
+        <div class="grade-actions">
+          <button type="button" onclick="selectAllAlertStockFilters()">✓ เลือกทั้งหมด</button>
+          <button type="button" onclick="clearAllAlertStockFilters()">✗ ล้างทั้งหมด</button>
+        </div>
+        <div class="grade-list" id="alertStockFilterList"></div>
+      </div>
+    </div>
+  </th>`;
+
+  // Receive
+  html += `<th class="th-with-filter">
+    <div class="th-filter-wrap" id="alertReceiveFilterBox">
+      <button type="button" class="th-filter-btn" id="alertReceiveFilterBtn">
+        <span id="alertReceiveFilterLabel">Receive</span>
+        <span class="arrow">▼</span>
+      </button>
+      <div class="grade-dropdown hidden" id="alertReceiveFilterDropdown" style="min-width:180px">
+        <div class="grade-actions">
+          <button type="button" onclick="selectAllAlertReceiveFilters()">✓ เลือกทั้งหมด</button>
+          <button type="button" onclick="clearAllAlertReceiveFilters()">✗ ล้างทั้งหมด</button>
+        </div>
+        <div class="grade-list" id="alertReceiveFilterList"></div>
+      </div>
+    </div>
+  </th>`;
+
+  // Usage Plan
+  html += `<th class="th-with-filter">
+    <div class="th-filter-wrap" id="alertUsageFilterBox">
+      <button type="button" class="th-filter-btn" id="alertUsageFilterBtn">
+        <span id="alertUsageFilterLabel">Usage Plan</span>
+        <span class="arrow">▼</span>
+      </button>
+      <div class="grade-dropdown hidden" id="alertUsageFilterDropdown" style="min-width:180px">
+        <div class="grade-actions">
+          <button type="button" onclick="selectAllAlertUsageFilters()">✓ เลือกทั้งหมด</button>
+          <button type="button" onclick="clearAllAlertUsageFilters()">✗ ล้างทั้งหมด</button>
+        </div>
+        <div class="grade-list" id="alertUsageFilterList"></div>
+      </div>
+    </div>
+  </th>`;
+
+  // Alert
+  html += `<th class="th-with-filter">
+    <div class="th-filter-wrap" id="alertFilterBox">
+      <button type="button" class="th-filter-btn" id="alertFilterBtn">
+        <span id="alertFilterLabel">Alert</span>
+        <span class="arrow">▼</span>
+      </button>
+      <div class="grade-dropdown hidden" id="alertFilterDropdown" style="min-width:200px">
+        <div class="grade-actions">
+          <button type="button" onclick="selectAllAlertFilters()">✓ เลือกทั้งหมด</button>
+          <button type="button" onclick="clearAllAlertFilters()">✗ ล้างทั้งหมด</button>
+        </div>
+        <div class="grade-list" id="alertFilterList"></div>
+      </div>
+    </div>
+  </th>`;
+
+  html += '<th>สถานะ</th>';
+
+  // Order
+  html += `<th class="th-with-filter">
+    <div class="th-filter-wrap" id="alertOrderFilterBox">
+      <button type="button" class="th-filter-btn" id="alertOrderFilterBtn">
+        <span id="alertOrderFilterLabel">สั่งซื้อ</span>
+        <span class="arrow">▼</span>
+      </button>
+      <div class="grade-dropdown hidden" id="alertOrderFilterDropdown" style="min-width:180px">
+        <div class="grade-actions">
+          <button type="button" onclick="selectAllAlertOrderFilters()">✓ เลือกทั้งหมด</button>
+          <button type="button" onclick="clearAllAlertOrderFilters()">✗ ล้างทั้งหมด</button>
+        </div>
+        <div class="grade-list" id="alertOrderFilterList"></div>
+      </div>
+    </div>
+  </th>`;
+
+  // Sup
+  html += `<th class="th-with-filter">
+    <div class="th-filter-wrap" id="alertSupFilterBox">
+      <button type="button" class="th-filter-btn" id="alertSupFilterBtn">
+        <span id="alertSupFilterLabel">Sup.</span>
+        <span class="arrow">▼</span>
+      </button>
+      <div class="grade-dropdown hidden" id="alertSupFilterDropdown" style="min-width:180px">
+        <div class="grade-actions">
+          <button type="button" onclick="selectAllAlertSupFilters()">✓ เลือกทั้งหมด</button>
+          <button type="button" onclick="clearAllAlertSupFilters()">✗ ล้างทั้งหมด</button>
+        </div>
+        <div class="grade-list" id="alertSupFilterList"></div>
+      </div>
+    </div>
+  </th>`;
+
+  html += '<th>ม้วนลูกค้า</th><th>คุณภาพ B</th><th>FSC</th><th>หมายเหตุ</th>';
+
+  return html;
+}
+
+function buildAlertFoot() {
+  const footCache = window._alertFullCache || alertCache || [];
+  const footShortage = footCache.filter(r => Number(r.alert) < 0).length;
+  const footOK       = footCache.filter(r => Number(r.alert) === 0).length;
+  const footOver     = footCache.filter(r => Number(r.alert) > 0).length;
+
+  return `<div class="report-foot" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+    <div class="alert-foot-summary">
+      <span class="item red">🔴 ${footShortage}</span>
+      <span class="item yellow">🟡 ${footOK}</span>
+      <span class="item green">🟢 ${footOver}</span>
+    </div>
+    <div style="display:flex;gap:6px">
+      <button class="primary" onclick="createPOFromAlert()">📄 สร้าง PO</button>
+      <button class="danger" onclick="clearAlertInputs()">🗑 ล้างค่า</button>
+    </div>
+  </div>`;
+}
+
+function renderAllAlertFilters() {
+  renderAlertGradeList();
+  renderAlertSizeList();
+  renderAlertFilterList();
+  renderAlertOrderFilterList();
+  renderAlertSupFilterList();
+  renderAlertStockFilterList();
+  renderAlertReceiveFilterList();
+  renderAlertUsageFilterList();
+
+  updateAlertGradeLabel();
+  updateAlertSizeLabel();
+  updateAlertFilterLabel();
+  updateAlertOrderFilterLabel();
+  updateAlertSupFilterLabel();
+  updateAlertStockFilterLabel();
+  updateAlertReceiveFilterLabel();
+  updateAlertUsageFilterLabel();
+
+  _attachAlertDropdown('alertGradeFilterBtn', 'alertGradeDropdown', 'alertGradeFilterBox', 'alertGrade');
+  _attachAlertDropdown('alertSizeFilterBtn', 'alertSizeDropdown', 'alertSizeFilterBox', 'alertSize');
+  _attachAlertDropdown('alertFilterBtn', 'alertFilterDropdown', 'alertFilterBox', 'alertFilter');
+  _attachAlertDropdown('alertOrderFilterBtn', 'alertOrderFilterDropdown', 'alertOrderFilterBox', 'alertOrderFilter');
+  _attachAlertDropdown('alertSupFilterBtn', 'alertSupFilterDropdown', 'alertSupFilterBox', 'alertSupFilter');
+  _attachAlertDropdown('alertStockFilterBtn', 'alertStockFilterDropdown', 'alertStockFilterBox', 'alertStockFilter');
+  _attachAlertDropdown('alertReceiveFilterBtn', 'alertReceiveFilterDropdown', 'alertReceiveFilterBox', 'alertReceiveFilter');
+  _attachAlertDropdown('alertUsageFilterBtn', 'alertUsageFilterDropdown', 'alertUsageFilterBox', 'alertUsageFilter');
 }
