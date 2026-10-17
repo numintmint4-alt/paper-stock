@@ -1,8 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK ม้วนกระดาษ V7 — stock.js
+//  STOCK V10.1 — stock.js
 //  เพิ่ม: multi-select Customer/Location/Status + waiting status
-//  ✅ แก้: tooltip, total ล่าง, คลิก cell, ส่ง gradegram เต็ม
-//  ✅ แก้: default date = เมื่อวาน (ถ้าเป็นอาทิตย์ → เสาร์)
+//  + แก้: tooltip, total ล่าง, คลิก cell, ส่ง gradegram เต็ม
+//  + แก้: default date = เมื่อวาน (ถ้าเป็นอาทิตย์ → เสาร์)
+// ═══════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════
+//  STATE
 // ═══════════════════════════════════════════════════════════════
 
 let stockSelectedGrades = [];
@@ -17,11 +21,18 @@ let stockAllLocs = [];
 let stockSelectedStatuses = [];
 const STOCK_ALL_STATUSES = ['full', 'scrap', 'waiting'];
 
+const STOCK_STATUS_LABELS = {
+  full: '✅ ม้วนเต็ม',
+  scrap: '♻️ ม้วนเศษ',
+  waiting: '⏳ รอกรอ'
+};
+
 let stockCache = [];
 
 // ═══════════════════════════════════════════════════════════════
-// SUCCESS MODAL
+//  SUCCESS MODAL
 // ═══════════════════════════════════════════════════════════════
+
 function showSuccessModal(message) {
   let modal = document.getElementById('successModal');
   if (!modal) {
@@ -41,14 +52,15 @@ function showSuccessModal(message) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// INIT
+//  INIT
 // ═══════════════════════════════════════════════════════════════
+
 async function initStockTab() {
   const dateInput = $('stockDate');
   if (dateInput && !dateInput.value) {
     const target = new Date();
     target.setDate(target.getDate() - 1);
-    // ✅ ถ้าเป็นวันอาทิตย์ (0) → ย้อนไปวันเสาร์
+    // ถ้าเป็นวันอาทิตย์ (0) → ย้อนไปวันเสาร์
     if (target.getDay() === 0) target.setDate(target.getDate() - 1);
     dateInput.value = toISODate(target);
   }
@@ -60,8 +72,9 @@ async function initStockTab() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// GENERIC MULTI-SELECT HELPERS
+//  GENERIC MULTI-SELECT HELPERS
 // ═══════════════════════════════════════════════════════════════
+
 function _attachDropdown(btnId, dropdownId, boxId, docKey) {
   const btn = $(btnId);
   const dropdown = $(dropdownId);
@@ -88,8 +101,9 @@ function _attachDropdown(btnId, dropdownId, boxId, docKey) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// GRADE FILTER
+//  GRADE FILTER
 // ═══════════════════════════════════════════════════════════════
+
 async function loadStockGradeFilter() {
   stockAllGrades = [...new Set(
     masterCache.map(m => normalizeGrade(m.grade) + m.gram)
@@ -151,8 +165,9 @@ function clearAllStockGrades() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// CUSTOMER FILTER
+//  CUSTOMER FILTER
 // ═══════════════════════════════════════════════════════════════
+
 async function loadStockCustomers() {
   try {
     const { data, error } = await supabase
@@ -223,8 +238,9 @@ function clearAllStockCustomers() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// LOCATION FILTER
+//  LOCATION FILTER
 // ═══════════════════════════════════════════════════════════════
+
 async function loadStockLocs() {
   try {
     const { data, error } = await supabase
@@ -295,19 +311,14 @@ function clearAllStockLocs() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// STATUS FILTER (full / scrap / waiting)
+//  STATUS FILTER (full / scrap / waiting)
 // ═══════════════════════════════════════════════════════════════
+
 function loadStockStatusFilter() {
   renderStockStatusList();
   updateStockStatusLabel();
   _attachDropdown('stockStatusFilterBtn', 'stockStatusDropdown', 'stockStatusFilterBox', 'stockStatus');
 }
-
-const STOCK_STATUS_LABELS = {
-  full: '✅ ม้วนเต็ม',
-  scrap: '♻️ ม้วนเศษ',
-  waiting: '⏳ รอกรอ'
-};
 
 function renderStockStatusList() {
   const list = $('stockStatusList');
@@ -358,15 +369,15 @@ function clearAllStockStatuses() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// RENDER STOCK MATRIX
+//  RENDER STOCK MATRIX
 // ═══════════════════════════════════════════════════════════════
+
 async function renderStockMatrix() {
   const stockDate = $('stockDate')?.value;
   if (!stockDate) { alert('กรุณาเลือกวันที่ Stock'); return; }
 
   const dateThai = thaiDateFull(stockDate);
 
-  // สร้าง subtitle
   const custLabel = stockSelectedCustomers.length
     ? ` · ลูกค้า: ${stockSelectedCustomers.length === 1 ? stockSelectedCustomers[0] : stockSelectedCustomers.length + ' ราย'}`
     : '';
@@ -441,9 +452,9 @@ async function renderStockMatrix() {
     });
 
     const rowKeys = [...rowSet.keys()].sort();
-    const colKeys = [...colSet].sort((a,b) => a - b);
+    const colKeys = [...colSet].sort((a, b) => a - b);
 
-    // ═══ Helper: สร้าง text ของ cell ปกติ (เต็ม+เศษ·รอกรอ) ═══
+    // Helper: สร้าง text ของ cell ปกติ (เต็ม+เศษ·รอกรอ)
     function buildCellText(v) {
       const parts = [];
       if (v.full > 0)    parts.push(`${v.full}`);
@@ -453,7 +464,7 @@ async function renderStockMatrix() {
       return parts.join('').replace(/^\+/, '');
     }
 
-    // ═══ Helper: สร้าง text ของ Total (ผลรวมล้วน) ═══
+    // Helper: สร้าง text ของ Total (ผลรวมล้วน)
     function buildTotalText(v) {
       const total = (v.full || 0) + (v.scrap || 0) + (v.waiting || 0);
       return total > 0 ? `${total}` : '';
@@ -474,7 +485,6 @@ async function renderStockMatrix() {
           html += '<td class="empty">-</td>';
         } else {
           const cellTxt = buildCellText(v);
-          // ✅ ปัญหาที่ 1: เพิ่ม data-tip สำหรับ custom tooltip
           html += `<td class="clickable" data-tip="Gradegrams ${esc(rk)} · Size ${s}" onclick="openStockDetail('${esc(rk)}', ${s})">
             <div class="cell-content">
               <div class="cell-main">${cellTxt}</div>
@@ -490,7 +500,6 @@ async function renderStockMatrix() {
     html += '<tr class="total-row"><td class="grade-col">Total</td>';
     colKeys.forEach(s => {
       const ct = colTotals[s];
-      // ✅ ปัญหาที่ 2: เปลี่ยน buildCellText → buildTotalText
       html += `<td>${buildTotalText(ct)}</td>`;
     });
     const grand = { full: 0, scrap: 0, waiting: 0 };
@@ -502,7 +511,7 @@ async function renderStockMatrix() {
     html += `<td class="total-col">${buildTotalText(grand)}</td>`;
     html += '</tr></tbody></table></div>';
 
-    // ═══ สรุปยอดรวมแต่ละสถานะ ═══
+    // สรุปยอดรวมแต่ละสถานะ
     const totalFull    = grand.full;
     const totalScrap   = grand.scrap;
     const totalWaiting = grand.waiting;
@@ -526,15 +535,13 @@ async function renderStockMatrix() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// STOCK DETAIL MODAL
+//  STOCK DETAIL MODAL
 // ═══════════════════════════════════════════════════════════════
+
 async function openStockDetail(gradegram, size) {
   const stockDate = $('stockDate')?.value;
   if (!stockDate) return;
 
-  // ✅ ลบ parseGradegram ออก — ส่ง gradegram เต็ม (เช่น "CA112") ไปที่ RPC
-
-  // ✅ Title ฟอนต์ใหญ่ + subtitle
   $('stockDetailTitle').innerHTML = `
     ${esc(gradegram)} · Size ${size}
     <span class="stock-detail-sub">(วันที่ ${stockDate})</span>
@@ -543,24 +550,22 @@ async function openStockDetail(gradegram, size) {
   $('stockDetailBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
 
   try {
-    // ✅ ส่ง p_roll_status ตาม filter ที่เลือก (ถ้าไม่มี → null = full+scrap+waiting)
     const rollStatusParam = stockSelectedStatuses.length > 0
       ? stockSelectedStatuses
       : null;
 
     const { data, error } = await supabase.rpc('get_stock_detail', {
       p_stock_date: stockDate,
-      p_grade: gradegram,        // ✅ ส่ง "CA112" เต็ม (ไม่ตัดเหลือ "CA")
+      p_grade: gradegram,
       p_width: size,
       p_roll_status: rollStatusParam
     });
     if (error) throw error;
 
-    // ✅ Debug log เพื่อดูค่า RPC ที่ return จริง
     console.log('🔍 RPC raw data:', data);
     console.log('🔍 type:', typeof data, '| isArray:', Array.isArray(data), '| length:', data?.length);
 
-    // ✅ รองรับทั้ง array ตรงๆ และ object ที่มี .data ซ้อน
+    // รองรับทั้ง array ตรงๆ และ object ที่มี .data ซ้อน
     let rows = [];
     if (Array.isArray(data)) {
       rows = data;
@@ -605,7 +610,7 @@ async function openStockDetail(gradegram, size) {
       const custTxt = r.is_customer_roll ? `👤 ${esc(r.customer)}` : esc(r.customer) || '-';
 
       html += `<tr class="${st.cls}">
-        <td>${i+1}</td>
+        <td>${i + 1}</td>
         <td><b>${esc(r.sn)}</b></td>
         <td>${Number(r.dimeter).toFixed(2)}</td>
         <td>${Number(r.kgs).toFixed(2)}</td>
@@ -627,12 +632,13 @@ async function openStockDetail(gradegram, size) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// IMPORT STOCK
+//  IMPORT STOCK
 // ═══════════════════════════════════════════════════════════════
+
 function openStockImportModal() {
   const target = new Date();
   target.setDate(target.getDate() - 1);
-  // ✅ ถ้าเป็นวันอาทิตย์ (0) → ย้อนไปวันเสาร์
+  // ถ้าเป็นวันอาทิตย์ (0) → ย้อนไปวันเสาร์
   if (target.getDay() === 0) target.setDate(target.getDate() - 1);
   $('stockImportDate').value = toISODate(target);
   $('stockImportError').innerHTML = '';
