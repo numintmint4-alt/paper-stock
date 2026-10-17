@@ -1,133 +1,210 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK ม้วนกระดาษ V6 — app.js (Core)
+//  STOCK ม้วนกระดาษ V.10.1 — app.js (Core)
 //  ⚙️ แก้ 3 ค่าด้านล่างก่อนใช้งาน
 // ═══════════════════════════════════════════════════════════════
+
 const SUPABASE_URL      = 'https://gwwgycbqzdjlijsuxahx.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_rMoUE6tUsQZHnJu2ULDxFg_4NAiw6wg';
 const EDGE_FUNCTION_URL = 'https://gwwgycbqzdjlijsuxahx.supabase.co/functions/v1/admin-users';
+
+// ═══════════════════════════════════════════════════════════════
+//  CONFIG CHECK
 // ═══════════════════════════════════════════════════════════════
 
 if (SUPABASE_URL.includes('xxxxx')) {
-  document.body.innerHTML = '<div style="padding:40px;font-family:sans-serif;color:#dc2626;background:#fee2e2;border-radius:8px;max-width:600px;margin:40px auto"><h2>⚠️ ยังไม่ได้ตั้งค่า</h2><p>กรุณาแก้ 3 ค่าด้านบนสุดของ app.js</p></div>';
+  document.body.innerHTML = `
+    <div style="padding:40px;font-family:sans-serif;color:#dc2626;background:#fee2e2;border-radius:8px;max-width:600px;margin:40px auto">
+      <h2>⚠️ ยังไม่ได้ตั้งค่า</h2>
+      <p>กรุณาแก้ 3 ค่าด้านบนสุดของ app.js</p>
+    </div>`;
   throw new Error('Config not set');
 }
 
 const HAS_EDGE_FUNCTION = !EDGE_FUNCTION_URL.includes('xxxxx');
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// ================= GLOBAL STATE =================
+// ═══════════════════════════════════════════════════════════════
+//  GLOBAL STATE
+// ═══════════════════════════════════════════════════════════════
+
 let currentUser = null;
 let currentProfile = null;
 let masterCache = [];
 let dataCache = [];
 let matrixRange = { from: '', to: '' };
 
-// ================= V6: Normalize Grade =================
+// ═══════════════════════════════════════════════════════════════
+//  GRADE HELPERS
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Normalize Grade — แปลง grade ให้อยู่ในรูปแบบมาตรฐาน
+ * ตัวอย่าง:
+ *   'CA097'  → 'CA097'
+ *   'CAF097' → 'CAF097'
+ *   'CA'     → 'CA'
+ *   'CAF'    → 'CAF'
+ */
 function normalizeGrade(g) {
   if (!g) return '';
   g = String(g).trim().toUpperCase();
 
+  // CAF097 (F อยู่หน้า gram)
   let m = g.match(/^([A-Z]+)F(\d+)$/);
   if (m) return m[1] + 'F' + m[2].padStart(3, '0');
 
+  // CA097F (F อยู่หลัง gram)
   m = g.match(/^([A-Z]+)(\d+)F$/);
   if (m) return m[1] + 'F' + m[2].padStart(3, '0');
 
+  // CAF (F อยู่ท้าย ไม่มี gram)
   if (/^[A-Z]+F$/.test(g)) return g;
 
+  // CA097
   m = g.match(/^([A-Z]+)(\d+)$/);
   if (m) return m[1] + m[2].padStart(3, '0');
 
   return g;
 }
 
-// ================= V6: Parse Gradegram =================
+/**
+ * Parse Gradegram — แยก grade กับ gram
+ * ตัวอย่าง:
+ *   'CA097'  → { grade: 'CA', gram: '097' }
+ *   'CAF097' → { grade: 'CAF', gram: '097' }
+ *   'CA'     → { grade: 'CA', gram: null }
+ *   'CAF'    → { grade: 'CAF', gram: null }
+ */
 function parseGradegram(gradegram) {
   if (!gradegram) return { grade: '', gram: null };
   const s = String(gradegram).trim().toUpperCase();
 
+  // CAF097
   let m = s.match(/^([A-Z]+F)(\d+)$/);
   if (m) return { grade: m[1], gram: m[2].padStart(3, '0') };
 
+  // CA097F
   m = s.match(/^([A-Z]+)(\d+)F$/);
   if (m) return { grade: m[1] + 'F', gram: m[2].padStart(3, '0') };
 
+  // CAF (F อยู่ท้าย)
   if (/^[A-Z]+F$/.test(s)) return { grade: s, gram: null };
 
+  // CA097
   m = s.match(/^([A-Z]+)(\d+)$/);
   if (m) return { grade: m[1], gram: m[2].padStart(3, '0') };
 
   return { grade: s, gram: null };
 }
 
-// ================= HELPERS =================
+// ═══════════════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════════════
+
 const $ = id => document.getElementById(id);
 const pad = n => String(n).padStart(2, '0');
-const THAI_MONTHS = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
-const THAI_MONTHS_SHORT = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 
-function openModal(id) { $(id).classList.add('show'); }
+const THAI_MONTHS = [
+  'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+  'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+];
+const THAI_MONTHS_SHORT = [
+  'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+  'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
+];
+
+function openModal(id)  { $(id).classList.add('show'); }
 function closeModal(id) { $(id).classList.remove('show'); }
-function showMsg(elId, html, type = 'ok') { $(elId).innerHTML = `<div class="msg ${type}">${html}</div>`; }
+
+function showMsg(elId, html, type = 'ok') {
+  $(elId).innerHTML = `<div class="msg ${type}">${html}</div>`;
+}
+
 const isAdmin = () => currentProfile?.role === 'admin';
 const GENERAL_CUSTOMER = '__GENERAL__';
 
+// ─── DATE HELPERS ───────────────────────────────────────────────
+
 function currentMonthStr() {
   const d = new Date();
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
 }
+
 function reportMonthRange(reportMonthStr, monthsBack = 3) {
   if (!reportMonthStr) return { from: '', to: '' };
   const [y, m] = reportMonthStr.split('-').map(Number);
   const toDate = new Date(y, m - 1, 0);
+
   let fromM = m - monthsBack + 1, fromY = y;
   while (fromM <= 0) { fromM += 12; fromY -= 1; }
+
   return {
     from: `${fromY}-${pad(fromM)}-01`,
-    to:   `${toDate.getFullYear()}-${pad(toDate.getMonth()+1)}-${pad(toDate.getDate())}`
+    to: `${toDate.getFullYear()}-${pad(toDate.getMonth() + 1)}-${pad(toDate.getDate())}`
   };
 }
+
 function thaiMonthTitle(monthStr) {
   if (!monthStr) return '(ทั้งหมด)';
   const [y, m] = monthStr.split('-').map(Number);
-  return `เดือน ${THAI_MONTHS[m-1]} ${y + 543}`;
+  return `เดือน ${THAI_MONTHS[m - 1]} ${y + 543}`;
 }
+
 function thaiMonthShort(monthStr) {
   if (!monthStr) return '-';
   const [y, m] = monthStr.split('-').map(Number);
-  return `${THAI_MONTHS_SHORT[m-1]} ${String(y+543).slice(-2)}`;
+  return `${THAI_MONTHS_SHORT[m - 1]} ${String(y + 543).slice(-2)}`;
 }
+
 function thaiDateFull(dateStr) {
   if (!dateStr) return '-';
   const d = new Date(dateStr);
   return d.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
 }
+
 function toISODate(v) {
   if (v == null || v === '') return '';
+
+  // Excel serial date
   if (typeof v === 'number') {
     const d = new Date(Date.UTC(1899, 11, 30) + v * 86400000);
     return d.toISOString().slice(0, 10);
   }
-  if (v instanceof Date) return `${v.getFullYear()}-${pad(v.getMonth()+1)}-${pad(v.getDate())}`;
+
+  if (v instanceof Date) {
+    return `${v.getFullYear()}-${pad(v.getMonth() + 1)}-${pad(v.getDate())}`;
+  }
+
   const s = String(v).trim();
   if (!s) return '';
+
+  // DD/MM/YYYY
   let m = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/);
   if (m) return `${m[3]}-${pad(m[2])}-${pad(m[1])}`;
+
+  // YYYY/MM/DD
   m = s.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/);
   if (m) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
+
   return s.slice(0, 10);
 }
+
 function excelDateToThai(serial) {
   if (!serial && serial !== 0) return '';
   if (typeof serial !== 'number') return String(serial);
+
   const utcDays = serial - 25569;
   const msPerDay = 86400 * 1000;
   const d = new Date(utcDays * msPerDay);
+
   const day = d.getUTCDate();
   const month = d.getUTCMonth() + 1;
   const year = d.getUTCFullYear() + 543;
   return `${day}/${month}/${year}`;
 }
+
+// ─── COLUMN HELPERS ─────────────────────────────────────────────
+
 function findColumn(row, aliases) {
   const keys = Object.keys(row);
   for (const alias of aliases) {
@@ -138,18 +215,24 @@ function findColumn(row, aliases) {
   }
   return undefined;
 }
+
 function esc(s) {
   if (s == null) return '';
-  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
 }
 
-// ================= TOAST =================
+// ═══════════════════════════════════════════════════════════════
+//  TOAST
+// ═══════════════════════════════════════════════════════════════
+
 function showToast(message, type = 'info', duration = 3000) {
   const colors = {
-    info:    { bg: '#dbeafe', color: '#1e40af', border: '#93c5fd' },
-    ok:      { bg: '#dcfce7', color: '#166534', border: '#86efac' },
-    warn:    { bg: '#fef3c7', color: '#b45309', border: '#fcd34d' },
-    err:     { bg: '#fee2e2', color: '#dc2626', border: '#fca5a5' }
+    info: { bg: '#dbeafe', color: '#1e40af', border: '#93c5fd' },
+    ok:   { bg: '#dcfce7', color: '#166534', border: '#86efac' },
+    warn: { bg: '#fef3c7', color: '#b45309', border: '#fcd34d' },
+    err:  { bg: '#fee2e2', color: '#dc2626', border: '#fca5a5' }
   };
   const c = colors[type] || colors.info;
 
@@ -166,6 +249,7 @@ function showToast(message, type = 'info', duration = 3000) {
     `;
     document.body.appendChild(toast);
   }
+
   toast.style.background = c.bg;
   toast.style.color = c.color;
   toast.style.border = `1px solid ${c.border}`;
@@ -173,28 +257,36 @@ function showToast(message, type = 'info', duration = 3000) {
   toast.style.opacity = '1';
 
   clearTimeout(toast.__timer);
-  toast.__timer = setTimeout(() => {
-    toast.style.opacity = '0';
-  }, duration);
+  toast.__timer = setTimeout(() => { toast.style.opacity = '0'; }, duration);
 }
 
-// ================= PAGINATION =================
+// ═══════════════════════════════════════════════════════════════
+//  PAGINATION
+// ═══════════════════════════════════════════════════════════════
+
 async function fetchAllRows(buildQuery, pageSize = 1000, onProgress = null) {
   const all = [];
   let from = 0;
+
   while (true) {
     const { data, error } = await buildQuery().range(from, from + pageSize - 1);
     if (error) throw error;
     if (!data || data.length === 0) break;
+
     all.push(...data);
     if (onProgress) onProgress(all.length);
+
     if (data.length < pageSize) break;
     from += pageSize;
   }
+
   return all;
 }
 
-// ================= COLUMN ALIASES =================
+// ═══════════════════════════════════════════════════════════════
+//  COLUMN ALIASES
+// ═══════════════════════════════════════════════════════════════
+
 const MASTER_COLS = {
   grade:         ['grade', 'เกรด'],
   gram:          ['gram', 'แกรม'],
@@ -230,12 +322,14 @@ const USAGE_COLS = {
 function findItemCode(grade, width) {
   const g = String(grade).trim().toUpperCase();
   const w = String(width).trim();
+
   const patterns = [];
   patterns.push(`${g}-${w}`);
   patterns.push(`${g}-${w.padStart(2, '0')}`);
   patterns.push(`${g}-${w.padStart(3, '0')}`);
   patterns.push(`${g}/${w}`);
   patterns.push(`${g}_${w}`);
+
   const m = g.match(/^([A-Z]+)(\d+)$/);
   if (m) {
     const p = m[1] + m[2].padStart(3, '0');
@@ -245,24 +339,33 @@ function findItemCode(grade, width) {
     patterns.push(`${p}/${w}`);
     patterns.push(`${p}_${w}`);
   }
+
   for (const code of patterns) {
     if (masterCache.find(x => x.item_code === code)) return code;
   }
   return null;
 }
 
-// ================= PROGRESS =================
+// ═══════════════════════════════════════════════════════════════
+//  PROGRESS
+// ═══════════════════════════════════════════════════════════════
+
 function showProgress(elId, current, total, label = '') {
   const el = $(elId);
   if (!el) return;
+
   el.classList.remove('hidden');
   const pct = total > 0 ? Math.round(current / total * 100) : 0;
+
   el.innerHTML = `
     <div class="progress-wrap">
       <div class="progress-bar" style="width:${pct}%"></div>
-      <div class="progress-text">${label || `กำลังประมวลผล... ${current.toLocaleString()} / ${total.toLocaleString()} (${pct}%)`}</div>
+      <div class="progress-text">
+        ${label || `กำลังประมวลผล... ${current.toLocaleString()} / ${total.toLocaleString()} (${pct}%)`}
+      </div>
     </div>`;
 }
+
 function hideProgress(elId) {
   const el = $(elId);
   if (!el) return;
@@ -270,44 +373,73 @@ function hideProgress(elId) {
   el.innerHTML = '';
 }
 
-// ================= ACCORDION =================
+// ═══════════════════════════════════════════════════════════════
+//  ACCORDION
+// ═══════════════════════════════════════════════════════════════
+
 function toggleAcc(head, bodyId) {
   const body = $(bodyId);
   const isOpen = !body.classList.contains('hidden');
+
   if (isOpen) {
     body.classList.add('hidden');
     head.classList.remove('open');
   } else {
     body.classList.remove('hidden');
     head.classList.add('open');
-    if (bodyId === 'accMaster') renderMaster();
-    if (bodyId === 'accRolluse') renderLatestBatch();
+
+    if (bodyId === 'accMaster')       renderMaster();
+    if (bodyId === 'accRolluse')      renderLatestBatch();
     if (bodyId === 'accUsers' && HAS_EDGE_FUNCTION) loadUsers();
-    if (bodyId === 'accArchive') loadArchiveStats();
+    if (bodyId === 'accArchive')      loadArchiveStats();
     if (bodyId === 'accPriceMaster' && typeof initPriceMaster === 'function') initPriceMaster();
   }
 }
 
-// ================= AUTH =================
+// ═══════════════════════════════════════════════════════════════
+//  AUTH
+// ═══════════════════════════════════════════════════════════════
+
 async function initSession() {
   const { data: { session } } = await supabase.auth.getSession();
+
   if (session) {
     currentUser = session.user;
     await loadProfile();
     showApp();
-  } else showLogin();
+  } else {
+    showLogin();
+  }
 }
+
 async function loadProfile() {
-  const { data } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
+  const { data } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', currentUser.id)
+    .single();
+
   currentProfile = data || { role: 'user', full_name: currentUser.email };
 }
-function showLogin() { $('loginScreen').classList.remove('hidden'); $('app').classList.add('hidden'); }
+
+function showLogin() {
+  $('loginScreen').classList.remove('hidden');
+  $('app').classList.add('hidden');
+}
+
 function showApp() {
   $('loginScreen').classList.add('hidden');
   $('app').classList.remove('hidden');
-  $('userBadge').textContent = (currentProfile?.full_name || currentUser.email) + ' · ' + (isAdmin() ? 'Admin' : 'User');
-  document.querySelectorAll('.admin-only').forEach(el => el.classList.toggle('hidden', !isAdmin()));
+
+  $('userBadge').textContent =
+    (currentProfile?.full_name || currentUser.email) + ' · ' + (isAdmin() ? 'Admin' : 'User');
+
+  document.querySelectorAll('.admin-only').forEach(el => {
+    el.classList.toggle('hidden', !isAdmin());
+  });
+
   if (!HAS_EDGE_FUNCTION) $('accUsersWrap').classList.add('hidden');
+
   refreshAll();
 }
 
@@ -315,33 +447,67 @@ $('loginBtn').onclick = async () => {
   const username = $('loginUser').value.trim().toLowerCase();
   const password = $('loginPass').value;
   const msg = $('loginMsg');
+
   msg.className = 'login-msg hidden';
-  if (!username || !password) { msg.className='login-msg err'; msg.textContent='กรอกชื่อผู้ใช้และรหัสผ่าน'; return; }
-  $('loginBtn').disabled = true; $('loginBtn').textContent = 'กำลังเข้าสู่ระบบ...';
-  const { data, error } = await supabase.auth.signInWithPassword({ email: username + '@paper.local', password });
-  $('loginBtn').disabled = false; $('loginBtn').textContent = 'เข้าสู่ระบบ';
-  if (error) { msg.className='login-msg err'; msg.textContent='ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'; return; }
+
+  if (!username || !password) {
+    msg.className = 'login-msg err';
+    msg.textContent = 'กรอกชื่อผู้ใช้และรหัสผ่าน';
+    return;
+  }
+
+  $('loginBtn').disabled = true;
+  $('loginBtn').textContent = 'กำลังเข้าสู่ระบบ...';
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: username + '@paper.local',
+    password
+  });
+
+  $('loginBtn').disabled = false;
+  $('loginBtn').textContent = 'เข้าสู่ระบบ';
+
+  if (error) {
+    msg.className = 'login-msg err';
+    msg.textContent = 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
+    return;
+  }
+
   currentUser = data.user;
   await loadProfile();
   $('loginPass').value = '';
   showApp();
 };
-$('loginPass').addEventListener('keypress', e => { if (e.key === 'Enter') $('loginBtn').click(); });
-$('loginUser').addEventListener('keypress', e => { if (e.key === 'Enter') $('loginPass').focus(); });
+
+$('loginPass').addEventListener('keypress', e => {
+  if (e.key === 'Enter') $('loginBtn').click();
+});
+
+$('loginUser').addEventListener('keypress', e => {
+  if (e.key === 'Enter') $('loginPass').focus();
+});
+
 $('logoutBtn').onclick = async () => {
   if (!confirm('ออกจากระบบ?')) return;
   await supabase.auth.signOut();
-  currentUser = null; currentProfile = null; showLogin();
+  currentUser = null;
+  currentProfile = null;
+  showLogin();
 };
 
-// ================= TABS =================
-const TAB_LIST = ['matrix','stock','receive','alert','purchase-order','data','settings'];
+// ═══════════════════════════════════════════════════════════════
+//  TABS
+// ═══════════════════════════════════════════════════════════════
+
+const TAB_LIST = ['matrix', 'stock', 'receive', 'alert', 'purchase-order', 'data', 'settings'];
 
 document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
   btn.onclick = () => {
     document.querySelectorAll('.nav button[data-tab]').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    TAB_LIST.forEach(t => $('tab-'+t).classList.toggle('hidden', t !== btn.dataset.tab));
+
+    TAB_LIST.forEach(t => $('tab-' + t).classList.toggle('hidden', t !== btn.dataset.tab));
+
     const t = btn.dataset.tab;
     if (t === 'matrix' && typeof renderMatrix === 'function') renderMatrix();
     if (t === 'stock' && typeof initStockTab === 'function') initStockTab();
@@ -352,30 +518,39 @@ document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
   };
 });
 
-// ================= MASTER =================
+// ═══════════════════════════════════════════════════════════════
+//  MASTER
+// ═══════════════════════════════════════════════════════════════
+
 async function loadMaster(onProgress = null) {
   masterCache = await fetchAllRows(
-    () => supabase.from('paper_specs').select('*').order('grade').order('gram').order('size'),
-    1000, onProgress
+    () => supabase.from('paper_specs').select('*')
+      .order('grade').order('gram').order('size'),
+    1000,
+    onProgress
   );
   return masterCache;
 }
 
-// ✅ แก้จุดที่ 2: refreshAll() — await loadSizeFilter()
 async function refreshAll() {
   await loadMaster();
-  if (typeof loadGradeFilter === 'function') await loadGradeFilter();
-  if (typeof loadSizeFilter === 'function') await loadSizeFilter();      // ✅ await
-  if (typeof loadMonthFilter === 'function') loadMonthFilter();
-  if (typeof loadStockGradeFilter === 'function') await loadStockGradeFilter();
+
+  if (typeof loadGradeFilter === 'function')        await loadGradeFilter();
+  if (typeof loadSizeFilter === 'function')         await loadSizeFilter();
+  if (typeof loadMonthFilter === 'function')        loadMonthFilter();
+  if (typeof loadStockGradeFilter === 'function')   await loadStockGradeFilter();
   if (typeof loadReceiveGradeFilter === 'function') await loadReceiveGradeFilter();
-  if (typeof loadAlertGradeFilter === 'function') await loadAlertGradeFilter();
+  if (typeof loadAlertGradeFilter === 'function')   await loadAlertGradeFilter();
   if (typeof loadStockLevelSnapshots === 'function') await loadStockLevelSnapshots();
-  if (typeof updateReportTitle === 'function') updateReportTitle();
+  if (typeof updateReportTitle === 'function')      updateReportTitle();
+
   renderMatrix();
 }
 
-// ================= V6: MATRIX GRADE FILTER (grade+gram) =================
+// ═══════════════════════════════════════════════════════════════
+//  MATRIX GRADE FILTER (grade+gram)
+// ═══════════════════════════════════════════════════════════════
+
 let selectedGrades = [];
 let allGradesList = [];
 
@@ -416,10 +591,12 @@ async function loadGradeFilter() {
 function renderGradeList() {
   const list = $('gradeList');
   if (!list) return;
+
   if (!allGradesList.length) {
     list.innerHTML = '<div style="padding:10px;text-align:center;color:#94a3b8;font-size:13px">ไม่มีข้อมูล</div>';
     return;
   }
+
   list.innerHTML = allGradesList.map(g => {
     const checked = selectedGrades.includes(g);
     return `<label class="item ${checked ? 'checked' : ''}" data-grade="${esc(g)}">
@@ -427,6 +604,7 @@ function renderGradeList() {
       <span>${esc(g)}</span>
     </label>`;
   }).join('');
+
   list.querySelectorAll('.item').forEach(el => {
     const cb = el.querySelector('input[type="checkbox"]');
     cb.addEventListener('change', () => {
@@ -445,6 +623,7 @@ function renderGradeList() {
 function updateGradeFilterLabel() {
   const label = $('gradeFilterLabel');
   if (!label) return;
+
   if (selectedGrades.length === 0) {
     label.textContent = 'ทั้งหมด';
     label.style.color = '#1e293b';
@@ -473,11 +652,16 @@ function getSelectedGrades() {
   return selectedGrades;
 }
 
-// ================= DRILL MODAL =================
+// ═══════════════════════════════════════════════════════════════
+//  DRILL MODAL
+// ═══════════════════════════════════════════════════════════════
+
 async function openDrill(gradegram, size) {
   const m = masterCache.find(r => (r.grade + r.gram) === gradegram && r.size === size);
   if (!m) return alert('ไม่พบ Item Code');
-  $('drillTitle').innerHTML = `${m.item_code} <span style="font-weight:400;color:#64748b;font-size:14px">(Gradegrams ${gradegram} · Size ${size})</span>`;
+
+  $('drillTitle').innerHTML =
+    `${m.item_code} <span style="font-weight:400;color:#64748b;font-size:14px">(Gradegrams ${gradegram} · Size ${size})</span>`;
   openModal('modalDrill');
 
   const usage = await fetchAllRows(() => {
@@ -506,117 +690,206 @@ async function openDrill(gradegram, size) {
     byDate[u.usage_date].kg += Number(u.used_kgs);
     byDate[u.usage_date].records.push(u);
   });
+
   const dates = Object.keys(byDate).sort();
 
   let html = '<table><thead><tr><th>วันที่</th><th>kg รวม</th><th>Std Weight</th><th>จำนวนม้วน</th><th>รายการ</th><th></th></tr></thead><tbody>';
-  if (!dates.length) html += '<tr><td colspan="6" style="text-align:center;color:#94a3b8">ไม่มีข้อมูล</td></tr>';
+
+  if (!dates.length) {
+    html += '<tr><td colspan="6" style="text-align:center;color:#94a3b8">ไม่มีข้อมูล</td></tr>';
+  }
+
   dates.forEach(d => {
     const info = byDate[d];
     const rolls = mode === 'full' ? Math.ceil(info.kg / std) : info.kg / std;
-    html += `<tr><td>${d}</td><td>${info.kg.toFixed(2)}</td><td>${std}</td>
-      <td><b>${rolls.toFixed(2)}</b></td><td>${info.records.length}</td>
-      <td><button onclick="toggleDate('${d}')">ดู</button></td></tr>
-      <tr id="rec-${d}" class="hidden"><td colspan="6">
-        <table style="background:#fff"><thead><tr><th>Doc No</th><th>ลูกค้า</th><th style="text-align:right">kg</th></tr></thead>
-        <tbody>${info.records.map(r => `<tr><td>${esc(r.doc_no)||'-'}</td>
-          <td>${esc(r.roll_for_customer)||'ทั่วไป'}</td>
-          <td style="text-align:right">${Number(r.used_kgs).toFixed(2)}</td></tr>`).join('')}
-        </tbody></table></td></tr>`;
+
+    html += `<tr>
+      <td>${d}</td>
+      <td>${info.kg.toFixed(2)}</td>
+      <td>${std}</td>
+      <td><b>${rolls.toFixed(2)}</b></td>
+      <td>${info.records.length}</td>
+      <td><button onclick="toggleDate('${d}')">ดู</button></td>
+    </tr>
+    <tr id="rec-${d}" class="hidden"><td colspan="6">
+      <table style="background:#fff"><thead><tr><th>Doc No</th><th>ลูกค้า</th><th style="text-align:right">kg</th></tr></thead>
+      <tbody>${info.records.map(r => `
+        <tr>
+          <td>${esc(r.doc_no) || '-'}</td>
+          <td>${esc(r.roll_for_customer) || 'ทั่วไป'}</td>
+          <td style="text-align:right">${Number(r.used_kgs).toFixed(2)}</td>
+        </tr>`).join('')}
+      </tbody></table>
+    </td></tr>`;
   });
+
   html += '</tbody></table>';
   $('drillBody').innerHTML = html;
 }
-function toggleDate(d) { $('rec-'+d).classList.toggle('hidden'); }
 
-// ================= MASTER CRUD =================
+function toggleDate(d) {
+  $('rec-' + d).classList.toggle('hidden');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MASTER CRUD
+// ═══════════════════════════════════════════════════════════════
+
 function renderMaster() {
   const q = ($('masterSearch').value || '').toLowerCase();
-  const rows = masterCache.filter(r => !q || (r.grade + r.gram + r.size + r.item_code).toLowerCase().includes(q));
+  const rows = masterCache.filter(r =>
+    !q || (r.grade + r.gram + r.size + r.item_code).toLowerCase().includes(q)
+  );
+
   let html = '<div style="max-height:550px;overflow:auto"><table><thead><tr><th>#</th><th>Gradegrams</th><th>Gram</th><th>Size</th><th>Item Code</th><th>Std Weight</th><th></th></tr></thead><tbody>';
-  if (!rows.length) html += '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:20px">ไม่มีข้อมูล</td></tr>';
+
+  if (!rows.length) {
+    html += '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:20px">ไม่มีข้อมูล</td></tr>';
+  }
+
   rows.forEach((r, i) => {
-    html += `<tr><td>${i+1}</td><td>${r.grade}</td><td>${r.gram}</td><td>${r.size}</td>
-      <td>${r.item_code}</td><td>${Number(r.std_weight_kg).toFixed(2)}</td>
-      <td class="admin-only">${isAdmin() ? `<button onclick="editMaster(${r.id})">แก้ไข</button> <button class="danger" onclick="delMaster(${r.id})">ลบ</button>` : '-'}</td></tr>`;
+    html += `<tr>
+      <td>${i + 1}</td>
+      <td>${r.grade}</td>
+      <td>${r.gram}</td>
+      <td>${r.size}</td>
+      <td>${r.item_code}</td>
+      <td>${Number(r.std_weight_kg).toFixed(2)}</td>
+      <td class="admin-only">${isAdmin() ? `
+        <button onclick="editMaster(${r.id})">แก้ไข</button>
+        <button class="danger" onclick="delMaster(${r.id})">ลบ</button>` : '-'}
+      </td>
+    </tr>`;
   });
+
   html += '</tbody></table></div>';
   html += `<div style="margin-top:8px;font-size:13px;color:#64748b">แสดง ${rows.length} / ${masterCache.length} แถว</div>`;
   $('masterBody').innerHTML = html;
 }
+
 let editingMasterId = null;
+
 function openMasterForm(row) {
   editingMasterId = row ? row.id : null;
   $('masterFormTitle').textContent = row ? 'แก้ไข Master Data' : 'เพิ่ม Master Data';
   $('masterFormError').innerHTML = '';
-  ['Grade','Gram','Size','Item','Weight'].forEach(k => $('f'+k).value = '');
+
+  ['Grade', 'Gram', 'Size', 'Item', 'Weight'].forEach(k => $('f' + k).value = '');
+
   if (row) {
-    $('fGrade').value = row.grade; $('fGram').value = row.gram; $('fSize').value = row.size;
+    $('fGrade').value = row.grade;
+    $('fGram').value = row.gram;
+    $('fSize').value = row.size;
     $('fItem').value = row.item_code;
     $('fWeight').value = row.std_weight_kg;
   }
+
   openModal('modalMaster');
 }
-function editMaster(id) { openMasterForm(masterCache.find(r => r.id === id)); }
 
-// ✅ แก้จุดที่ 3: saveMaster() — rebuild filter ทุกตัวหลัง loadMaster()
+function editMaster(id) {
+  openMasterForm(masterCache.find(r => r.id === id));
+}
+
 async function saveMaster() {
   const grade = $('fGrade').value.trim();
   const gram = Number($('fGram').value);
   const size = Number($('fSize').value);
   const item_code = $('fItem').value.trim();
   const std_weight_kg = Number($('fWeight').value);
+
   if (!grade || !gram || !size || !item_code || !std_weight_kg) {
-    $('masterFormError').innerHTML = '<div class="msg err">กรอกให้ครบ (std_weight ต้อง > 0)</div>'; return;
+    $('masterFormError').innerHTML = '<div class="msg err">กรอกให้ครบ (std_weight ต้อง > 0)</div>';
+    return;
   }
-  const dup = masterCache.find(r => r.grade === grade && r.gram === gram && r.size === size && r.id !== editingMasterId);
-  if (dup) { $('masterFormError').innerHTML = `<div class="msg err">⚠ ซ้ำกับ ${dup.item_code}</div>`; return; }
+
+  const dup = masterCache.find(r =>
+    r.grade === grade && r.gram === gram && r.size === size && r.id !== editingMasterId
+  );
+  if (dup) {
+    $('masterFormError').innerHTML = `<div class="msg err">⚠ ซ้ำกับ ${dup.item_code}</div>`;
+    return;
+  }
+
   const payload = { grade, gram, size, item_code, std_weight_kg };
   let error;
-  if (editingMasterId) ({ error } = await supabase.from('paper_specs').update(payload).eq('id', editingMasterId));
-  else ({ error } = await supabase.from('paper_specs').insert(payload));
-  if (error) { $('masterFormError').innerHTML = `<div class="msg err">${error.message}</div>`; return; }
+
+  if (editingMasterId) {
+    ({ error } = await supabase.from('paper_specs').update(payload).eq('id', editingMasterId));
+  } else {
+    ({ error } = await supabase.from('paper_specs').insert(payload));
+  }
+
+  if (error) {
+    $('masterFormError').innerHTML = `<div class="msg err">${error.message}</div>`;
+    return;
+  }
+
   closeModal('modalMaster');
   await loadMaster();
-  await loadGradeFilter();
-  if (typeof loadSizeFilter === 'function') await loadSizeFilter();          // ✅ เพิ่ม
-  if (typeof loadStockGradeFilter === 'function') await loadStockGradeFilter();  // ✅ เพิ่ม
-  if (typeof loadReceiveGradeFilter === 'function') await loadReceiveGradeFilter(); // ✅ เพิ่ม
-  if (typeof loadAlertGradeFilter === 'function') await loadAlertGradeFilter();     // ✅ เพิ่ม
+
+  if (typeof loadGradeFilter === 'function')        await loadGradeFilter();
+  if (typeof loadSizeFilter === 'function')         await loadSizeFilter();
+  if (typeof loadStockGradeFilter === 'function')   await loadStockGradeFilter();
+  if (typeof loadReceiveGradeFilter === 'function') await loadReceiveGradeFilter();
+  if (typeof loadAlertGradeFilter === 'function')   await loadAlertGradeFilter();
+
   renderMaster();
 }
+
 async function delMaster(id) {
   if (!confirm('ยืนยันลบ?')) return;
+
   const { error } = await supabase.from('paper_specs').delete().eq('id', id);
   if (error) return alert(error.message);
-  await loadMaster(); renderMaster();
+
+  await loadMaster();
+  renderMaster();
 }
+
 async function clearMaster() {
   if (!confirm('ลบ Master Data ทั้งหมด?')) return;
+
   const { error } = await supabase.from('paper_specs').delete().neq('id', 0);
   if (error) return alert(error.message);
-  await loadMaster(); renderMaster();
+
+  await loadMaster();
+  renderMaster();
 }
+
 function exportMaster() {
   if (!masterCache.length) return alert('ไม่มีข้อมูล');
+
   const data = masterCache.map(r => ({
-    grade: r.grade, gram: r.gram, size: r.size,
-    item_code: r.item_code, std_weight_kg: r.std_weight_kg
+    grade: r.grade,
+    gram: r.gram,
+    size: r.size,
+    item_code: r.item_code,
+    std_weight_kg: r.std_weight_kg
   }));
+
   const ws = XLSX.utils.json_to_sheet(data);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Master');
-  XLSX.writeFile(wb, `master_${new Date().toISOString().slice(0,10)}.xlsx`);
+  XLSX.writeFile(wb, `master_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
-// ================= IMPORT MASTER =================
+// ═══════════════════════════════════════════════════════════════
+//  IMPORT MASTER
+// ═══════════════════════════════════════════════════════════════
+
 function importMaster(ev) {
-  const f = ev.target.files[0]; if (!f) return;
+  const f = ev.target.files[0];
+  if (!f) return;
+
   const r = new FileReader();
   r.onload = async e => {
     try {
       showProgress('masterProgress', 0, 1, 'กำลังอ่านไฟล์...');
+
       const wb = XLSX.read(e.target.result, { type: 'array' });
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+
       showProgress('masterProgress', 0, rows.length, `อ่านได้ ${rows.length} แถว กำลังตรวจสอบ...`);
 
       const payload = [];
@@ -631,14 +904,16 @@ function importMaster(ev) {
         const std_weight_kg = Number(findColumn(row, MASTER_COLS.std_weight_kg));
 
         if (!grade || !gram || !size || !item_code || !std_weight_kg) {
-          errors.push(`แถว ${i+2}: ข้อมูลไม่ครบ`);
+          errors.push(`แถว ${i + 2}: ข้อมูลไม่ครบ`);
           return;
         }
+
         const key = `${grade}|${gram}|${size}`;
         if (seenKeys.has(key)) {
-          errors.push(`แถว ${i+2} (${item_code}): ซ้ำในไฟล์`);
+          errors.push(`แถว ${i + 2} (${item_code}): ซ้ำในไฟล์`);
           return;
         }
+
         seenKeys.add(key);
         payload.push({ grade, gram, size, item_code, std_weight_kg });
       });
@@ -650,7 +925,9 @@ function importMaster(ev) {
       }
 
       showProgress('masterProgress', 0, 1, `กำลังบันทึก ${payload.length} แถว...`);
+
       const { data, error } = await supabase.rpc('import_master_batch', { rows: payload });
+
       if (error) {
         hideProgress('masterProgress');
         showMsg('importMasterMsg', '❌ บันทึกไม่สำเร็จ: ' + error.message, 'err');
@@ -658,26 +935,34 @@ function importMaster(ev) {
       }
 
       hideProgress('masterProgress');
-      let html = `✅ Master: เพิ่ม ${data.added} · อัปเดต ${data.updated}` + (errors.length ? ` · ⚠ ข้าม ${errors.length}` : '');
+
+      let html = `✅ Master: เพิ่ม ${data.added} · อัปเดต ${data.updated}` +
+                 (errors.length ? ` · ⚠ ข้าม ${errors.length}` : '');
       showMsg('importMasterMsg', html, errors.length ? 'err' : 'ok');
 
       await loadMaster();
-      await loadGradeFilter();
-      if (typeof loadSizeFilter === 'function') await loadSizeFilter();          // ✅ เพิ่ม
-      if (typeof loadStockGradeFilter === 'function') await loadStockGradeFilter();  // ✅ เพิ่ม
-      if (typeof loadReceiveGradeFilter === 'function') await loadReceiveGradeFilter(); // ✅ เพิ่ม
-      if (typeof loadAlertGradeFilter === 'function') await loadAlertGradeFilter();     // ✅ เพิ่ม
+
+      if (typeof loadGradeFilter === 'function')        await loadGradeFilter();
+      if (typeof loadSizeFilter === 'function')         await loadSizeFilter();
+      if (typeof loadStockGradeFilter === 'function')   await loadStockGradeFilter();
+      if (typeof loadReceiveGradeFilter === 'function') await loadReceiveGradeFilter();
+      if (typeof loadAlertGradeFilter === 'function')   await loadAlertGradeFilter();
+
       renderMaster();
     } catch (ex) {
       hideProgress('masterProgress');
       showMsg('importMasterMsg', 'อ่านไฟล์ไม่สำเร็จ: ' + ex.message, 'err');
     }
   };
+
   r.readAsArrayBuffer(f);
   ev.target.value = '';
 }
 
-// ================= DATA TAB =================
+// ═══════════════════════════════════════════════════════════════
+//  DATA TAB
+// ═══════════════════════════════════════════════════════════════
+
 const RAW_COLUMNS = [
   { key: 'id', label: 'id' },
   { key: 'error_msg', label: 'error' },
@@ -715,23 +1000,27 @@ async function renderData() {
   if (!$('dtBatch').dataset.loaded) {
     try {
       const batches = await fetchAllRows(() =>
-        supabase.from('usage_records_raw').select('import_batch_id, import_at').order('import_at', { ascending: false })
+        supabase.from('usage_records_raw')
+          .select('import_batch_id, import_at')
+          .order('import_at', { ascending: false })
       );
+
       const seen = new Map();
       batches.forEach(b => {
         if (b.import_batch_id && !seen.has(b.import_batch_id)) {
           seen.set(b.import_batch_id, b.import_at);
         }
       });
+
       const arr = [...seen.entries()];
       $('dtBatch').innerHTML = '<option value="">ทั้งหมด</option>' +
         arr.map(([id, at]) => `<option value="${id}">${new Date(at).toLocaleString('th-TH')}</option>`).join('');
       $('dtBatch').dataset.loaded = '1';
-    } catch(e) { /* ignore */ }
+    } catch (e) { /* ignore */ }
   }
 
   const from = $('dtFrom').value;
-  const to   = $('dtTo').value;
+  const to = $('dtTo').value;
   const valid = $('dtValid').value;
   const batch = $('dtBatch').value;
 
@@ -757,8 +1046,10 @@ async function renderData() {
     rows.slice(0, 2000).forEach(r => {
       const cls = r.is_valid === false ? 'invalid' : '';
       html += `<tr class="${cls}">`;
+
       RAW_COLUMNS.forEach(c => {
         let v = r[c.key];
+
         if (c.key === 'is_valid') {
           v = v ? '<span class="badge ok">✓</span>' : '<span class="badge bad">✗</span>';
         } else if (c.key === 'import_at' && v) {
@@ -768,11 +1059,14 @@ async function renderData() {
         } else {
           v = esc(v);
         }
+
         html += `<td>${v ?? ''}</td>`;
       });
+
       html += '</tr>';
     });
   }
+
   html += '</tbody></table></div>';
   html += `<div style="margin-top:8px;font-size:13px;color:#64748b">แสดง ${Math.min(rows.length, 2000)} / ${rows.length} แถว</div>`;
   $('dataBody').innerHTML = html;
@@ -780,6 +1074,7 @@ async function renderData() {
 
 function exportData() {
   if (!dataCache.length) return alert('ไม่มีข้อมูล');
+
   const data = dataCache.map(r => {
     const o = {};
     RAW_COLUMNS.forEach(c => {
@@ -791,13 +1086,17 @@ function exportData() {
     });
     return o;
   });
+
   const ws = XLSX.utils.json_to_sheet(data);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'RawData');
-  XLSX.writeFile(wb, `raw_usage_${new Date().toISOString().slice(0,10)}.xlsx`);
+  XLSX.writeFile(wb, `raw_usage_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
-// ================= LATEST BATCH =================
+// ═══════════════════════════════════════════════════════════════
+//  LATEST BATCH
+// ═══════════════════════════════════════════════════════════════
+
 async function renderLatestBatch() {
   const el = $('latestBatch');
   el.innerHTML = '<p style="color:#94a3b8;font-size:13px">กำลังโหลด...</p>';
@@ -817,13 +1116,16 @@ async function renderLatestBatch() {
   const batchAt = new Date(latest[0].import_at).toLocaleString('th-TH');
 
   const validRows = await fetchAllRows(() =>
-    supabase.from('usage_records_raw').select('*').eq('import_batch_id', batchId).eq('is_valid', true).limit(10)
+    supabase.from('usage_records_raw').select('*')
+      .eq('import_batch_id', batchId).eq('is_valid', true).limit(10)
   );
   const invalidRows = await fetchAllRows(() =>
-    supabase.from('usage_records_raw').select('*').eq('import_batch_id', batchId).eq('is_valid', false)
+    supabase.from('usage_records_raw').select('*')
+      .eq('import_batch_id', batchId).eq('is_valid', false)
   );
   const totalInBatch = await fetchAllRows(() =>
-    supabase.from('usage_records_raw').select('id', { count: 'exact', head: false }).eq('import_batch_id', batchId)
+    supabase.from('usage_records_raw').select('id', { count: 'exact', head: false })
+      .eq('import_batch_id', batchId)
   );
 
   let html = `<div class="msg info">
@@ -835,20 +1137,23 @@ async function renderLatestBatch() {
 
   html += '<h3 style="margin-top:16px">✅ ตัวอย่าง 10 แถวที่ถูกต้อง</h3>';
   html += '<div class="data-scroll" style="max-height:400px"><table class="data-table"><thead><tr>';
-  ['id','doc_date','doc_no','grade','width','used_kgs','item_code','usage_date','roll_for_customer'].forEach(k => html += `<th>${k}</th>`);
+  ['id', 'doc_date', 'doc_no', 'grade', 'width', 'used_kgs', 'item_code', 'usage_date', 'roll_for_customer']
+    .forEach(k => html += `<th>${k}</th>`);
   html += '</tr></thead><tbody>';
+
   if (!validRows.length) {
     html += '<tr><td colspan="9" style="text-align:center;color:#94a3b8">ไม่มีแถวที่ถูกต้อง</td></tr>';
   } else {
     validRows.forEach(r => {
       html += '<tr>';
-      ['id','doc_date','doc_no','grade','width','used_kgs','item_code','usage_date','roll_for_customer'].forEach(k => {
-        let v = r[k];
-        if (k === 'doc_date' && v !== null && v !== undefined && v !== '') {
-          v = excelDateToThai(Number(v));
-        }
-        html += `<td>${esc(v) ?? ''}</td>`;
-      });
+      ['id', 'doc_date', 'doc_no', 'grade', 'width', 'used_kgs', 'item_code', 'usage_date', 'roll_for_customer']
+        .forEach(k => {
+          let v = r[k];
+          if (k === 'doc_date' && v !== null && v !== undefined && v !== '') {
+            v = excelDateToThai(Number(v));
+          }
+          html += `<td>${esc(v) ?? ''}</td>`;
+        });
       html += '</tr>';
     });
   }
@@ -856,14 +1161,16 @@ async function renderLatestBatch() {
 
   html += `<h3 style="margin-top:16px">❌ แถวที่ไม่ผ่านทั้งหมด (${invalidRows.length} แถว)</h3>`;
   html += '<div class="data-scroll" style="max-height:400px"><table class="data-table"><thead><tr>';
-  ['id','doc_date','doc_no','grade','width','used_kgs','error_msg'].forEach(k => html += `<th>${k}</th>`);
+  ['id', 'doc_date', 'doc_no', 'grade', 'width', 'used_kgs', 'error_msg']
+    .forEach(k => html += `<th>${k}</th>`);
   html += '</tr></thead><tbody>';
+
   if (!invalidRows.length) {
     html += '<tr><td colspan="7" style="text-align:center;color:#94a3b8">ไม่มีแถวที่ไม่ผ่าน 🎉</td></tr>';
   } else {
     invalidRows.forEach(r => {
       html += '<tr class="invalid">';
-      ['id','doc_date','doc_no','grade','width','used_kgs'].forEach(k => {
+      ['id', 'doc_date', 'doc_no', 'grade', 'width', 'used_kgs'].forEach(k => {
         let v = r[k];
         if (k === 'doc_date' && v !== null && v !== undefined && v !== '') {
           v = excelDateToThai(Number(v));
@@ -879,25 +1186,34 @@ async function renderLatestBatch() {
   el.innerHTML = html;
 }
 
-// ================= IMPORT USAGE =================
+// ═══════════════════════════════════════════════════════════════
+//  IMPORT USAGE
+// ═══════════════════════════════════════════════════════════════
+
 function importUsage(ev) {
-  const f = ev.target.files[0]; if (!f) return;
+  const f = ev.target.files[0];
+  if (!f) return;
+
   const r = new FileReader();
   r.onload = async e => {
     try {
       showProgress('usageProgress', 0, 1, 'กำลังอ่านไฟล์...');
+
       const wb = XLSX.read(e.target.result, { type: 'array' });
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+
       showProgress('usageProgress', 0, rows.length, `อ่านได้ ${rows.length} แถว กำลังเตรียมข้อมูล...`);
 
       const payload = [];
       rows.forEach((row) => {
         const usage_date = toISODate(findColumn(row, USAGE_COLS.doc_date));
-        const gradegram  = String(findColumn(row, USAGE_COLS.grade) || '').trim();
-        const width      = Number(findColumn(row, USAGE_COLS.width));
-        const used_kgs   = Number(findColumn(row, USAGE_COLS.used_kgs));
+        const gradegram = String(findColumn(row, USAGE_COLS.grade) || '').trim();
+        const width = Number(findColumn(row, USAGE_COLS.width));
+        const used_kgs = Number(findColumn(row, USAGE_COLS.used_kgs));
 
-        const item_code = (usage_date && gradegram && width) ? findItemCode(gradegram, width) : null;
+        const item_code = (usage_date && gradegram && width)
+          ? findItemCode(gradegram, width)
+          : null;
 
         payload.push({
           plant_code:        findColumn(row, USAGE_COLS.plant_code) || '',
@@ -960,6 +1276,7 @@ function importUsage(ev) {
       }
 
       hideProgress('usageProgress');
+
       let html = `✅ ทั้งหมด ${sumTotal} แถว · 
         <b style="color:#166534">ผ่าน ${sumValid}</b> · 
         <b style="color:#dc2626">ไม่ผ่าน ${sumInvalid}</b>`;
@@ -971,11 +1288,15 @@ function importUsage(ev) {
       showMsg('importUsageMsg', 'อ่านไฟล์ไม่สำเร็จ: ' + ex.message, 'err');
     }
   };
+
   r.readAsArrayBuffer(f);
   ev.target.value = '';
 }
 
-// ================= DELETE BY MONTH =================
+// ═══════════════════════════════════════════════════════════════
+//  DELETE BY MONTH
+// ═══════════════════════════════════════════════════════════════
+
 function openDeleteMonth() {
   $('delMonth').value = currentMonthStr();
   $('deleteMonthMsg').innerHTML = '';
@@ -985,9 +1306,11 @@ function openDeleteMonth() {
 async function exportMonthBeforeDelete() {
   const m = $('delMonth').value;
   if (!m) return alert('เลือกเดือนก่อน');
+
   const [y, mo] = m.split('-').map(Number);
 
   $('deleteMonthMsg').innerHTML = '<div class="msg info">กำลังดึงข้อมูล...</div>';
+
   const rows = await fetchAllRows(() =>
     supabase.from('usage_records_raw').select('*')
       .gte('usage_date', `${m}-01`)
@@ -1009,32 +1332,47 @@ async function exportMonthBeforeDelete() {
 async function confirmDeleteMonth() {
   const m = $('delMonth').value;
   if (!m) return;
+
   const [y, mo] = m.split('-').map(Number);
   const fromShort = thaiMonthShort(m);
+
   if (!confirm(`⚠️ ยืนยันลบข้อมูลของเดือน ${fromShort}?`)) return;
 
   $('deleteMonthMsg').innerHTML = '<div class="msg info">กำลังลบ...</div>';
+
   const { data, error } = await supabase.rpc('delete_usage_by_month', { p_year: y, p_month: mo });
+
   if (error) {
     $('deleteMonthMsg').innerHTML = `<div class="msg err">ลบไม่สำเร็จ: ${error.message}</div>`;
     return;
   }
+
   $('deleteMonthMsg').innerHTML = `<div class="msg ok">
     ✅ ลบแล้วทั้งหมด ${data.deleted} แถว<br>
     (usage_records: ${data.deleted_main} · raw: ${data.deleted_raw})
   </div>`;
+
   setTimeout(() => { closeModal('modalDeleteMonth'); renderLatestBatch(); }, 2000);
 }
 
-// ================= ARCHIVE =================
+// ═══════════════════════════════════════════════════════════════
+//  ARCHIVE
+// ═══════════════════════════════════════════════════════════════
+
 async function previewArchive() {
   $('archiveMsg').innerHTML = '<div class="msg info">กำลังตรวจสอบ...</div>';
+
   const { data, error } = await supabase.rpc('count_archivable_usage');
+
   if (error) {
     $('archiveMsg').innerHTML = `<div class="msg err">ตรวจสอบไม่สำเร็จ: ${error.message}</div>`;
     return;
   }
-  const cutoffThai = new Date(data.cutoff).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  const cutoffThai = new Date(data.cutoff).toLocaleDateString('th-TH', {
+    year: 'numeric', month: 'long', day: 'numeric'
+  });
+
   $('archiveMsg').innerHTML = `<div class="msg info">
     📊 ข้อมูลที่เก่ากว่า <b>2 ปี</b> (ก่อน ${cutoffThai})<br>
     มีทั้งหมด <b>${data.count.toLocaleString()}</b> แถว พร้อมย้าย
@@ -1046,25 +1384,34 @@ async function runArchive() {
   if (!confirm('ยืนยันอีกครั้ง?')) return;
 
   $('archiveMsg').innerHTML = '<div class="msg info">กำลังย้ายข้อมูล...</div>';
+
   const { data, error } = await supabase.rpc('archive_old_usage');
+
   if (error) {
     $('archiveMsg').innerHTML = `<div class="msg err">ย้ายไม่สำเร็จ: ${error.message}</div>`;
     return;
   }
-  const cutoffThai = new Date(data.cutoff).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  const cutoffThai = new Date(data.cutoff).toLocaleDateString('th-TH', {
+    year: 'numeric', month: 'long', day: 'numeric'
+  });
+
   $('archiveMsg').innerHTML = `<div class="msg ok">
     ✅ ย้ายสำเร็จ ${data.archived.toLocaleString()} แถว<br>
     (ข้อมูลก่อน ${cutoffThai})
   </div>`;
+
   await loadArchiveStats();
 }
 
 async function loadArchiveStats() {
   $('archiveStats').innerHTML = '<p style="color:#94a3b8;font-size:13px">กำลังโหลด...</p>';
+
   try {
     const { count, error } = await supabase
       .from('usage_records_archive')
       .select('*', { count: 'exact', head: true });
+
     if (error) throw error;
 
     const { data: oldest } = await supabase
@@ -1072,6 +1419,7 @@ async function loadArchiveStats() {
       .select('usage_date')
       .order('usage_date', { ascending: true })
       .limit(1);
+
     const { data: newest } = await supabase
       .from('usage_records_archive')
       .select('usage_date')
@@ -1080,9 +1428,11 @@ async function loadArchiveStats() {
 
     let html = `<div class="msg info">
       📦 <b>Archive ทั้งหมด:</b> ${(count || 0).toLocaleString()} แถว<br>`;
+
     if (oldest?.[0]?.usage_date) {
       html += `<b>ช่วงวันที่:</b> ${oldest[0].usage_date} ถึง ${newest[0].usage_date}`;
     }
+
     html += `</div>`;
     $('archiveStats').innerHTML = html;
   } catch (e) {
@@ -1090,10 +1440,14 @@ async function loadArchiveStats() {
   }
 }
 
-// ================= USERS =================
+// ═══════════════════════════════════════════════════════════════
+//  USERS
+// ═══════════════════════════════════════════════════════════════
+
 async function callAdmin(action, payload = {}) {
   let { data: { session } } = await supabase.auth.getSession();
 
+  // Auto-refresh session ถ้าใกล้หมดอายุ (เหลือ < 60 วินาที)
   if (session && session.expires_at * 1000 < Date.now() + 60000) {
     const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
     if (refreshErr) {
@@ -1105,6 +1459,7 @@ async function callAdmin(action, payload = {}) {
 
   if (!session) return handleSessionExpired();
 
+  // Server-side check
   try {
     const { data: { user }, error: userErr } = await supabase.auth.getUser();
     if (userErr || !user) {
@@ -1117,9 +1472,13 @@ async function callAdmin(action, payload = {}) {
 
   const res = await fetch(EDGE_FUNCTION_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session.access_token}`
+    },
     body: JSON.stringify({ action, ...payload })
   });
+
   const json = await res.json();
   if (!res.ok) throw new Error(json.error || 'Edge function error');
   return json;
@@ -1127,33 +1486,51 @@ async function callAdmin(action, payload = {}) {
 
 async function handleSessionExpired() {
   showToast('Session หมดอายุ กำลังกลับหน้า login...', 'warn', 2000);
+
   try {
     await supabase.auth.signOut({ scope: 'global' });
   } catch (e) {
     console.warn('signOut error:', e);
   }
+
   localStorage.clear();
   sessionStorage.clear();
+
   setTimeout(() => location.reload(), 1500);
   throw new Error('Session หมดอายุ');
 }
 
 async function loadUsers() {
   if (!isAdmin() || !HAS_EDGE_FUNCTION) return;
+
   $('usersBody').innerHTML = '<p>กำลังโหลด...</p>';
+
   try {
     const { users } = await callAdmin('list');
+
     let html = '<table><thead><tr><th>#</th><th>ชื่อผู้ใช้</th><th>ชื่อ-นามสกุล</th><th>สิทธิ์</th><th>เข้าใช้ล่าสุด</th><th></th></tr></thead><tbody>';
+
     users.forEach((u, i) => {
-      const last = u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString('th-TH') : '-';
-      html += `<tr><td>${i+1}</td><td><b>${esc(u.username)}</b></td><td>${esc(u.full_name) || '-'}</td>
+      const last = u.last_sign_in_at
+        ? new Date(u.last_sign_in_at).toLocaleString('th-TH')
+        : '-';
+
+      html += `<tr>
+        <td>${i + 1}</td>
+        <td><b>${esc(u.username)}</b></td>
+        <td>${esc(u.full_name) || '-'}</td>
         <td><span class="badge ok">${u.role}</span></td>
         <td>${last}</td>
-        <td><button onclick='openChangeRole(${JSON.stringify(u)})'>เปลี่ยน Role</button>
+        <td>
+          <button onclick='openChangeRole(${JSON.stringify(u)})'>เปลี่ยน Role</button>
           <button onclick='openResetPass(${JSON.stringify(u)})'>Reset รหัส</button>
-          ${u.id !== currentUser.id ? `<button class="danger" onclick="delUser('${u.id}','${esc(u.username)}')">ลบ</button>` : ''}
-        </td></tr>`;
+          ${u.id !== currentUser.id ? `
+            <button class="danger" onclick="delUser('${u.id}','${esc(u.username)}')">ลบ</button>
+          ` : ''}
+        </td>
+      </tr>`;
     });
+
     html += '</tbody></table>';
     $('usersBody').innerHTML = html;
   } catch (e) {
@@ -1163,7 +1540,7 @@ async function loadUsers() {
 }
 
 function openUserForm() {
-  ['uName','uFullName','uPassword'].forEach(k => $(k).value = '');
+  ['uName', 'uFullName', 'uPassword'].forEach(k => $(k).value = '');
   $('uRole').value = 'user';
   $('userFormError').innerHTML = '';
   openModal('modalUser');
@@ -1174,18 +1551,23 @@ async function saveUser() {
   const full_name = $('uFullName').value.trim();
   const password = $('uPassword').value;
   const role = $('uRole').value;
+
   try {
     await callAdmin('create', { username, full_name, password, role });
     closeModal('modalUser');
     showMsg('usersMsg', `✅ สร้างผู้ใช้ ${username} สำเร็จ`, 'ok');
     loadUsers();
-  } catch (e) { $('userFormError').innerHTML = `<div class="msg err">${e.message}</div>`; }
+  } catch (e) {
+    $('userFormError').innerHTML = `<div class="msg err">${e.message}</div>`;
+  }
 }
 
 function openChangeRole(u) {
   const newRole = prompt(`เปลี่ยน role ของ "${u.username}" เป็น (admin/user):`, u.role);
-  if (!newRole || !['admin','user'].includes(newRole)) return;
+  if (!newRole || !['admin', 'user'].includes(newRole)) return;
+
   const newName = prompt('ชื่อ-นามสกุล:', u.full_name || u.username) || u.full_name;
+
   callAdmin('updateRole', { id: u.id, role: newRole, full_name: newName })
     .then(() => { showMsg('usersMsg', `✅ เปลี่ยน role เป็น ${newRole}`, 'ok'); loadUsers(); })
     .catch(e => showMsg('usersMsg', 'ผิดพลาด: ' + e.message, 'err'));
@@ -1194,6 +1576,7 @@ function openChangeRole(u) {
 function openResetPass(u) {
   const newPass = prompt(`รหัสผ่านใหม่สำหรับ "${u.username}" (อย่างน้อย 6 ตัว):`);
   if (!newPass || newPass.length < 6) return;
+
   callAdmin('resetPassword', { id: u.id, password: newPass })
     .then(() => showMsg('usersMsg', `✅ เปลี่ยนรหัสของ ${u.username} แล้ว`, 'ok'))
     .catch(e => showMsg('usersMsg', 'ผิดพลาด: ' + e.message, 'err'));
@@ -1201,22 +1584,31 @@ function openResetPass(u) {
 
 async function delUser(id, username) {
   if (!confirm(`ลบผู้ใช้ "${username}" ถาวร?`)) return;
+
   try {
     await callAdmin('delete', { id });
     showMsg('usersMsg', `✅ ลบ ${username} แล้ว`, 'ok');
     loadUsers();
-  } catch (e) { showMsg('usersMsg', 'ผิดพลาด: ' + e.message, 'err'); }
+  } catch (e) {
+    showMsg('usersMsg', 'ผิดพลาด: ' + e.message, 'err');
+  }
 }
 
-// ================= INIT =================
+// ═══════════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════════
+
 (function init() {
   const now = new Date();
+
   if ($('titleMonth')) $('titleMonth').value = now.getMonth() + 1;
   if ($('titleYear'))  $('titleYear').value = now.getFullYear() + 543;
   if ($('filterYear')) $('filterYear').value = now.getFullYear() + 543;
-  
+
+  // Modal backdrop click → close
   document.querySelectorAll('.modal-bg').forEach(el => {
     el.onclick = e => { if (e.target === el) el.classList.remove('show'); };
   });
+
   initSession();
 })();
