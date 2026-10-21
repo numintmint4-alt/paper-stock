@@ -3,11 +3,12 @@
 //  Month Filter + Customer Filter + Gradegrams Filter + Size Filter
 //  + Matrix + Snapshot
 //  + Matrix: format ตาม mode (full → floor, actual → toFixed(2))
-//  V.10.4 Fix (Snapshot View):
+//  V.10.5 Fix:
 //    - updateReportTitle() → เขียนแค่ <span id="reportTitleMain"> (ไม่ลบ Dropdown)
 //    - getCurrentTitle()   → ยึด Dropdown ก่อน fallback selectedMonths
 //    - saveStockLevelSnapshot() → fallback today ถ้าไม่มีเดือนเลย
-//    - viewSnapshot()      → ทำความสะอาด Gradegram + format ตามโหมด + แสดง grades/sizes
+//    - loadMonthFilter()   → ตั้ง default เป็นเดือน/ปีปัจจุบัน + จำ userChanged
+//    - viewSnapshot()      → ทำความสะอาด Gradegram + format ตามโหมด + แสดง monthsDisplay
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -28,7 +29,7 @@ let allCustomersList = [];
 
 // ═══════════════════════════════════════════════════════════════
 //  MONTH FILTER
-//  V.10 Fix: ใช้เดือน Report Title เป็น default (ไม่ใช่ today)
+//  V.10.5: default = เดือน/ปีปัจจุบัน (ครั้งแรก) + จำ userChanged
 // ═══════════════════════════════════════════════════════════════
 
 function loadMonthFilter() {
@@ -40,11 +41,30 @@ function loadMonthFilter() {
     allMonthsList.push(`${yearCE}-${pad(m)}`);
   }
 
+  // 🔽 ตั้งค่า Default เป็น "เดือนและปีปัจจุบัน" (เฉพาะครั้งแรกที่โหลด) 🔽
+  const titleMEl = $('titleMonth');
+  const titleYEl = $('titleYear');
+
+  if (titleMEl && titleYEl && !titleMEl.dataset.initialized) {
+    const now = new Date();
+    const currentM = now.getMonth() + 1; // getMonth() เริ่มที่ 0
+    const currentY = now.getFullYear() + 543; // แปลงเป็น พ.ศ.
+
+    titleMEl.value = currentM;
+    titleYEl.value = currentY;
+
+    // ทำเครื่องหมายว่าเซ็ตค่าเริ่มต้นแล้ว จะได้ไม่ไปทับเวลาผู้ใช้เปลี่ยนเอง
+    titleMEl.dataset.initialized = 'true';
+
+    // อัปเดตข้อความหัวตารางให้แสดงเดือนปัจจุบัน
+    if (typeof updateReportTitle === 'function') updateReportTitle();
+  }
+  // 🔼 จบส่วนที่เพิ่ม 🔼
+
   // default = 3 เดือนก่อน "เดือนของ Report Title" (titleMonth/titleYear)
   // ไม่ใช่ today — กันบั๊กวันที่ 1 ของเดือนใหม่
   if (selectedMonths.length === 0) {
-    const titleMEl = $('titleMonth');
-    const titleYEl = $('titleYear');
+    // เปลี่ยนมาใช้ค่าจาก titleMEl และ titleYEl ที่เพิ่งเซ็ตไปด้านบน
     const baseY = titleYEl ? Number(titleYEl.value) - 543 : new Date().getFullYear();
     const baseM = titleMEl ? Number(titleMEl.value) : (new Date().getMonth() + 1);
 
@@ -67,10 +87,13 @@ function loadMonthFilter() {
   if (selectedMonths.length > 0) {
     const latest = selectedMonths[selectedMonths.length - 1];
     const [ly, lm] = latest.split('-').map(Number);
-    const titleMEl = $('titleMonth');
-    const titleYEl = $('titleYear');
-    if (titleMEl) titleMEl.value = lm;
-    if (titleYEl) titleYEl.value = ly + 543;
+
+    // อัปเดต Dropdown ให้ตรงกับเดือนล่าสุดที่ถูกเลือกใน Filter (ถ้าผู้ใช้ยังไม่เคยแก้)
+    if (titleMEl && titleYEl && !titleMEl.dataset.userChanged) {
+      titleMEl.value = lm;
+      titleYEl.value = ly + 543;
+    }
+
     if (typeof updateReportTitle === 'function') updateReportTitle();
   }
 }
@@ -690,10 +713,10 @@ async function loadStockLevelSnapshots() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  viewSnapshot — V.10.4
-//  รวม 2 Fix:
-//    1) ทำความสะอาด Gradegram + format ตามโหมด (full → ceil, actual → toFixed(2))
-//    2) แสดง grades/sizes ใน report-foot (grid 2 คอลัมน์)
+//  viewSnapshot — V.10.5
+//  - ทำความสะอาด Gradegram
+//  - format ตามโหมด (full → Math.ceil, actual → toFixed(2))
+//  - แสดง monthsDisplay / gradesDisplay / sizesDisplay ใน report-foot
 // ═══════════════════════════════════════════════════════════════
 
 async function viewSnapshot(id) {
@@ -714,9 +737,7 @@ async function viewSnapshot(id) {
   const rowSet = new Set(), colSet = new Set(), cells = {}, rowTotals = {}, colTotals = {};
   let grand = 0;
   md.forEach(r => {
-    // ทำความสะอาดชื่อ Gradegram ป้องกันเครื่องหมาย ) หลุดมา
     const cleanGradegram = String(r.gradegram).replace(/[^A-Z0-9]/gi, '');
-
     rowSet.add(cleanGradegram);
     colSet.add(Number(r.size));
     const k = cleanGradegram + '|' + r.size;
@@ -756,6 +777,7 @@ async function viewSnapshot(id) {
   html += `<td class="total-col">${fmt(grand)}</td></tr>`;
   html += '</tbody></table></div>';
 
+  // --- ส่วนที่เพิ่มการแสดงผล "เดือนที่เลือก" ---
   const dt = new Date(data.created_at).toLocaleString('th-TH');
   let customerDisplay = 'ทั้งหมด';
   if (data.customer) {
@@ -765,23 +787,23 @@ async function viewSnapshot(id) {
     }
   }
 
-  // ดึงค่า Grades และ Sizes ที่บันทึกไว้
-  let gradesDisplay = 'ทั้งหมด';
-  if (data.grades && data.grades.length > 0) {
-    gradesDisplay = data.grades.join(', ');
+  let gradesDisplay = (data.grades && data.grades.length > 0) ? data.grades.join(', ') : 'ทั้งหมด';
+  let sizesDisplay = (data.sizes && data.sizes.length > 0) ? data.sizes.join(', ') : 'ทั้งหมด';
+
+  // แปลง Array ของเดือน (2026-09) ให้เป็นชื่อเดือนภาษาไทย
+  let monthsDisplay = 'ทั้งหมด';
+  if (data.months && data.months.length > 0) {
+    monthsDisplay = data.months.map(ym => {
+      const [y, m] = ym.split('-').map(Number);
+      return `${THAI_MONTHS[m-1]} ${y + 543}`;
+    }).join(', ');
   }
 
-  let sizesDisplay = 'ทั้งหมด';
-  if (data.sizes && data.sizes.length > 0) {
-    sizesDisplay = data.sizes.join(', ');
-  }
-
-  // report-foot แบบ 2 คอลัมน์ (grid)
   html += `<div class="report-foot" style="text-align: left; line-height: 1.6; background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; margin-top: 16px;">
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
       <div>
         <b>📅 บันทึกเมื่อ:</b> ${dt}<br>
-        <b>🗓️ เดือน:</b> ${(data.months || []).join(', ')}<br>
+        <b>🗓️ เดือนที่เลือก:</b> <span style="color:#2563eb;font-weight:bold;">${monthsDisplay}</span><br>
         <b>⚙️ โหมด:</b> ${data.mode === 'full' ? 'ม้วนเต็ม' : 'ใช้จริง'}
       </div>
       <div>
