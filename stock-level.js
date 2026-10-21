@@ -3,10 +3,11 @@
 //  Month Filter + Customer Filter + Gradegrams Filter + Size Filter
 //  + Matrix + Snapshot
 //  + Matrix: format ตาม mode (full → floor, actual → toFixed(2))
-//  V.10.3 Fix:
+//  V.10.4 Fix (Snapshot View):
 //    - updateReportTitle() → เขียนแค่ <span id="reportTitleMain"> (ไม่ลบ Dropdown)
 //    - getCurrentTitle()   → ยึด Dropdown ก่อน fallback selectedMonths
 //    - saveStockLevelSnapshot() → fallback today ถ้าไม่มีเดือนเลย
+//    - viewSnapshot()      → ทำความสะอาด Gradegram + format ตามโหมด + แสดง grades/sizes
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -688,6 +689,13 @@ async function loadStockLevelSnapshots() {
   }).join('');
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  viewSnapshot — V.10.4
+//  รวม 2 Fix:
+//    1) ทำความสะอาด Gradegram + format ตามโหมด (full → ceil, actual → toFixed(2))
+//    2) แสดง grades/sizes ใน report-foot (grid 2 คอลัมน์)
+// ═══════════════════════════════════════════════════════════════
+
 async function viewSnapshot(id) {
   $('snapshotViewTitle').textContent = 'กำลังโหลด...';
   $('snapshotViewBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
@@ -706,22 +714,31 @@ async function viewSnapshot(id) {
   const rowSet = new Set(), colSet = new Set(), cells = {}, rowTotals = {}, colTotals = {};
   let grand = 0;
   md.forEach(r => {
-    rowSet.add(r.gradegram);
-    colSet.add(r.size);
-    const k = r.gradegram + '|' + r.size;
+    // ทำความสะอาดชื่อ Gradegram ป้องกันเครื่องหมาย ) หลุดมา
+    const cleanGradegram = String(r.gradegram).replace(/[^A-Z0-9]/gi, '');
+
+    rowSet.add(cleanGradegram);
+    colSet.add(Number(r.size));
+    const k = cleanGradegram + '|' + r.size;
     cells[k] = r.max_rolls;
-    rowTotals[r.gradegram] = (rowTotals[r.gradegram] || 0) + r.max_rolls;
-    colTotals[r.size] = (colTotals[r.size] || 0) + r.max_rolls;
-    grand += r.max_rolls;
+    rowTotals[cleanGradegram] = (rowTotals[cleanGradegram] || 0) + Number(r.max_rolls);
+    colTotals[r.size] = (colTotals[r.size] || 0) + Number(r.max_rolls);
+    grand += Number(r.max_rolls);
   });
 
   const rowKeys = [...rowSet].sort();
   const colKeys = [...colSet].sort((a, b) => a - b);
 
+  // ฟังก์ชันช่วยจัดรูปแบบตัวเลขตามโหมดที่บันทึกไว้
+  const fmt = (num) => {
+    const n = Number(num) || 0;
+    return data.mode === 'full' ? Math.ceil(n) : n.toFixed(2);
+  };
+
   let html = '<div class="report-wrap"><table class="report-table"><thead><tr>';
-  html += '<th class="grade-col">Gradegrams</th>';
+  html += '<th class="grade-col">GRADEGRAMS</th>';
   colKeys.forEach(s => html += `<th>${s}</th>`);
-  html += '<th class="total-col">Total</th></tr></thead><tbody>';
+  html += '<th class="total-col">TOTAL</th></tr></thead><tbody>';
 
   rowKeys.forEach(rk => {
     html += '<tr>';
@@ -729,13 +746,14 @@ async function viewSnapshot(id) {
     colKeys.forEach(s => {
       const v = cells[rk + '|' + s];
       if (v == null) html += '<td class="empty">-</td>';
-      else html += `<td>${Number(v).toFixed(2)}</td>`;
+      else html += `<td>${fmt(v)}</td>`;
     });
-    html += `<td class="total-col">${Number(rowTotals[rk] || 0).toFixed(2)}</td></tr>`;
+    html += `<td class="total-col">${fmt(rowTotals[rk] || 0)}</td></tr>`;
   });
+
   html += '<tr class="total-row"><td class="grade-col">Total</td>';
-  colKeys.forEach(s => html += `<td>${Number(colTotals[s] || 0).toFixed(2)}</td>`);
-  html += `<td class="total-col">${Number(grand).toFixed(2)}</td></tr>`;
+  colKeys.forEach(s => html += `<td>${fmt(colTotals[s] || 0)}</td>`);
+  html += `<td class="total-col">${fmt(grand)}</td></tr>`;
   html += '</tbody></table></div>';
 
   const dt = new Date(data.created_at).toLocaleString('th-TH');
@@ -747,12 +765,33 @@ async function viewSnapshot(id) {
     }
   }
 
-  html += `<div class="report-foot">
-    บันทึกเมื่อ: ${dt}<br>
-    เดือน: ${(data.months || []).join(', ')} · 
-    โหมด: ${data.mode === 'full' ? 'ม้วนเต็ม' : 'ใช้จริง'}<br>
-    ลูกค้า: ${esc(customerDisplay)}
+  // ดึงค่า Grades และ Sizes ที่บันทึกไว้
+  let gradesDisplay = 'ทั้งหมด';
+  if (data.grades && data.grades.length > 0) {
+    gradesDisplay = data.grades.join(', ');
+  }
+
+  let sizesDisplay = 'ทั้งหมด';
+  if (data.sizes && data.sizes.length > 0) {
+    sizesDisplay = data.sizes.join(', ');
+  }
+
+  // report-foot แบบ 2 คอลัมน์ (grid)
+  html += `<div class="report-foot" style="text-align: left; line-height: 1.6; background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; margin-top: 16px;">
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+      <div>
+        <b>📅 บันทึกเมื่อ:</b> ${dt}<br>
+        <b>🗓️ เดือน:</b> ${(data.months || []).join(', ')}<br>
+        <b>⚙️ โหมด:</b> ${data.mode === 'full' ? 'ม้วนเต็ม' : 'ใช้จริง'}
+      </div>
+      <div>
+        <b>👥 ลูกค้า:</b> ${esc(customerDisplay)}<br>
+        <b>🏷️ Gradegrams:</b> ${esc(gradesDisplay)}<br>
+        <b>📏 Size:</b> ${esc(sizesDisplay)}
+      </div>
+    </div>
   </div>`;
+
   $('snapshotViewBody').innerHTML = html;
 }
 
