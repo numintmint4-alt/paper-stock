@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 //  STOCK V10.1 — receive.js
 //  Fix Date Query + Debug + Auto-Fetch + Excel Export 2 Sheets
+//  V.10.2 Fix: fetchFromPO() → เพิ่ม gram + size เป็น Number
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -237,6 +238,7 @@ async function renderReceive() {
 
 // ═══════════════════════════════════════════════════════════════
 //  FETCH FROM PO
+//  V.10.2 Fix: เพิ่ม gram + แปลง size เป็น Number
 // ═══════════════════════════════════════════════════════════════
 
 async function fetchFromPO(receiveDate, opts = {}) {
@@ -278,7 +280,8 @@ async function fetchFromPO(receiveDate, opts = {}) {
           pc_code:     it.pc_code || 'SDPC.01',
           supplier:    po.sup_code,
           grade:       it.gradegram,
-          size:        it.size,
+          gram:        it.gram || '',           // 👈 V.10.2 Fix: เพิ่ม gram
+          size:        Number(it.size),          // 👈 V.10.2 Fix: บังคับเป็น Number
           quantity:    Number(it.quantity) || 0,
           kg_total:    Number(it.kg_total) || 0,
           bu:          Number(it.bu) || 1,
