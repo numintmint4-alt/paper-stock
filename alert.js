@@ -5,6 +5,10 @@
 //  + วันที่รับเริ่มจาก analyzedDate + 1 (ข้ามอาทิตย์)
 //  + Alert History (snapshot)
 //  + ล็อกวันที่วิเคราะห์ = วันนี้
+//  V.10.8 Fix:
+//    - renderAlert() → Dedupe rows จาก DB (แก้ปัญหา CAF150 ซ้ำ)
+//    - createPOFromAlert() → Dedupe วันที่และ Cell
+//    - confirmCreatePO() → Lock ปุ่มกัน Double Click
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -227,7 +231,6 @@ function applyCalculatedDates(analyzedDate) {
 
   if ($('alertStockDate')) $('alertStockDate').value = stockDate;
   if ($('alertReceiveDate')) $('alertReceiveDate').value = receiveDate;
-  // ✅ V.10 Fix: ไม่ Set alertSnapshotMonth ที่นี่ (ปล่อยให้ loadSnapshotMonths จัดการ)
 }
 
 function attachAlertDateListener() {
@@ -241,7 +244,6 @@ function attachAlertDateListener() {
 
   if (el.dataset.listenerAttached === '1') return;
   el.dataset.listenerAttached = '1';
-  // ไม่ผูก change listener (ล็อกแล้ว)
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -504,7 +506,6 @@ async function loadSnapshotMonths() {
     const months = [...set].sort().reverse();
 
     if ($('alertSnapshotMonth') && months.length > 0) {
-      // ✅ V.10 Fix: Set เป็นเดือนล่าสุดของ Snapshot เสมอ
       $('alertSnapshotMonth').value = months[0];
     }
   } catch (e) {
@@ -2033,7 +2034,7 @@ function isFSCGrade(gradegram) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  RENDER ALERT (Main)
+//  RENDER ALERT (Main) — V.10.8 Dedupe Fix
 // ═══════════════════════════════════════════════════════════════
 
 async function renderAlert() {
@@ -2084,6 +2085,23 @@ async function renderAlert() {
         gradegram: m ? (normalizeGrade(m.grade) + m.gram) : r.grade
       };
     });
+
+    // 🔽 [FIX] Dedupe ข้อมูลจาก Database ที่ซ้ำกัน 🔽
+    const uniqueMap = new Map();
+    result.forEach(r => {
+      const key = `${r.gradegram}|${Number(r.size)}`;
+      if (!uniqueMap.has(key)) {
+        uniqueMap.set(key, r);
+      } else {
+        console.warn('⚠️ พบข้อมูล Alert ซ้ำ:', key, 'ทำการรวมยอด...');
+        const existing = uniqueMap.get(key);
+        existing.alert = Number(existing.alert) + Number(r.alert);
+        existing.stock = Number(existing.stock) + Number(r.stock);
+        existing.receive = Number(existing.receive) + Number(r.receive);
+      }
+    });
+    result = Array.from(uniqueMap.values());
+    // 🔼 จบส่วนที่เพิ่ม 🔼
 
     window._alertFullCache = [...result];
 
@@ -2226,7 +2244,7 @@ function clearAllAlertInputsAllDates() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  CREATE PO
+//  CREATE PO — V.10.8 Fix: Dedupe Date & Cell + Double Click Lock
 // ═══════════════════════════════════════════════════════════════
 
 async function createPOFromAlert() {
@@ -2236,12 +2254,26 @@ async function createPOFromAlert() {
   }
 
   const allItems = [];
+  const processedCells = new Set();
 
-  for (let dateIdx = 0; dateIdx < alertReceiveDates.length; dateIdx++) {
-    const dateKey = alertReceiveDates[dateIdx];
+  // ล้างค่าวันที่ซ้ำซ้อนใน Alert Dates
+  const uniqueDates = [...new Set(alertReceiveDates)].filter(Boolean);
+  if (uniqueDates.length === 0) {
+    alert('ไม่พบวันที่รับสินค้า');
+    return;
+  }
+
+  for (let dateIdx = 0; dateIdx < uniqueDates.length; dateIdx++) {
+    const dateKey = uniqueDates[dateIdx];
 
     for (const r of alertCache) {
+      const cellKey = `${r.gradegram}|${Number(r.size)}|${dateKey}`;
+
+      if (processedCells.has(cellKey)) continue;
+      processedCells.add(cellKey);
+
       const items = getAlertItems(r.gradegram, r.size, dateKey);
+      if (!items.length) continue;
 
       for (const it of items) {
         if (!it.qty || Number(it.qty) <= 0) continue;
@@ -2251,7 +2283,7 @@ async function createPOFromAlert() {
           receive_date: dateKey,
           receive_date_idx: dateIdx,
           gradegram: r.gradegram,
-          size: r.size,
+          size: Number(r.size),
           gradegram_size: `${r.gradegram}-${Number(r.size).toFixed(2)}`,
           quantity: Number(it.qty),
           sup: it.sup || '',
@@ -2368,23 +2400,31 @@ function renderAlertPODetail(items) {
 function confirmCreatePO() {
   if (!_pendingPOItems || !_pendingPOItems.length) return;
 
-  if (alertReceiveDates.length === 0) {
-    alert('กรุณากำหนดวันที่รับสินค้าอย่างน้อย 1 วัน');
-    return;
+  // 🔽 [FIX] ล็อกปุ่มกันการกดซ้ำ (Double Click)
+  const confirmBtn = document.querySelector('#modalAlertPODetail .form-actions .primary');
+  if (confirmBtn && confirmBtn.disabled) return; // ถ้าถูกกดไปแล้วให้หยุด
+  if (confirmBtn) {
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = '⏳ กำลังสร้าง PO...';
   }
 
+  // ตรวจสอบ Sup
   const missingSup = _pendingPOItems.filter(it => !it.sup || String(it.sup).trim() === '');
   if (missingSup.length > 0) {
     alert(`⚠️ ไม่สามารถสร้าง PO ได้\n\nมี ${missingSup.length} รายการที่ยังไม่ได้ระบุผู้ขาย (Sup.)\nกรุณาตรวจสอบและเลือก Sup. ให้ครบก่อน`);
+    if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = '✅ ยืนยันสร้าง PO'; }
     return;
   }
 
   const analyzedDate = toISODate(new Date());
+  
+  // 🔽 ใช้วันที่ที่ไม่ซ้ำแล้วส่งไปหน้า PO
+  const uniqueDates = [...new Set(alertReceiveDates)].filter(Boolean);
 
   sessionStorage.setItem('alert_to_po', JSON.stringify({
     items: _pendingPOItems,
     analyzed_date: analyzedDate,
-    receive_dates: [...alertReceiveDates],
+    receive_dates: uniqueDates,
     ref_snapshot: $('alertSnapshotMonth')?.value,
     ref_stock: $('alertStockDate')?.value,
     ref_receive: $('alertReceiveDate')?.value
@@ -2392,21 +2432,20 @@ function confirmCreatePO() {
 
   markAlertPOCreated(`ref_${Date.now()}`);
 
-  saveAlertSnapshot([...alertReceiveDates]).then(res => {
-    if (res.ok) {
-      console.log('✅ Alert snapshot saved:', res.data);
-      renderAlert();
-    } else {
-      console.warn('❌ Alert snapshot save failed:', res.error);
-    }
+  // Save snapshot
+  saveAlertSnapshot(uniqueDates).then(res => {
+    if (res.ok) console.log('✅ Alert snapshot saved:', res.data);
   });
 
-  closeModal('modalAlertPODetail');
-  _pendingPOItems = [];
-
-  const poBtn = document.querySelector('.nav button[data-tab="purchase-order"]');
-  if (poBtn) poBtn.click();
-  else alert('ยังไม่ได้เพิ่ม Tab Purchase Order');
+  setTimeout(() => {
+    closeModal('modalAlertPODetail');
+    _pendingPOItems = [];
+    
+    // เปิด Tab PO
+    const poBtn = document.querySelector('.nav button[data-tab="purchase-order"]');
+    if (poBtn) poBtn.click();
+    else alert('ยังไม่ได้เพิ่ม Tab Purchase Order');
+  }, 300);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -3058,7 +3097,6 @@ function exportAlert() {
 
 // ═══════════════════════════════════════════════════════════════
 //  HELPER: BUILD TABLE HEAD / FOOT
-//  (เพิ่มใหม่เพื่อลด Code ซ้ำใน renderAlert / renderAlertFromCache)
 // ═══════════════════════════════════════════════════════════════
 
 function buildAlertTableHead() {
