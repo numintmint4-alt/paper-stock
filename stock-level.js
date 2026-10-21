@@ -3,7 +3,10 @@
 //  Month Filter + Customer Filter + Gradegrams Filter + Size Filter
 //  + Matrix + Snapshot
 //  + Matrix: format ตาม mode (full → floor, actual → toFixed(2))
-//  V.10.2 Fix: getCurrentTitle() fallback → selectedMonths
+//  V.10.3 Fix:
+//    - updateReportTitle() → เขียนแค่ <span id="reportTitleMain"> (ไม่ลบ Dropdown)
+//    - getCurrentTitle()   → ยึด Dropdown ก่อน fallback selectedMonths
+//    - saveStockLevelSnapshot() → fallback today ถ้าไม่มีเดือนเลย
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -382,43 +385,43 @@ function getSelectedCustomers() {
 
 // ═══════════════════════════════════════════════════════════════
 //  TITLE BUILDER
+//  V.10.3 Fix: updateReportTitle() เขียนแค่ <span id="reportTitleMain">
+//             ไม่แตะ innerHTML ของ #reportTitle → Dropdown ไม่หาย
 // ═══════════════════════════════════════════════════════════════
 
 function updateReportTitle() {
   const mEl = $('titleMonth');
   const yEl = $('titleYear');
   if (!mEl || !yEl) return;
-  const m = Number(mEl.value);
-  const y = Number(yEl.value);
-  const titleEl = $('reportTitle');
-  if (titleEl) titleEl.innerHTML = `ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ<br>ประจำเดือน ${THAI_MONTHS[m-1]} ${y}`;
+
+  // ไม่ต้องแก้ innerHTML ทั้งก้อน ให้เปลี่ยนแค่ text ของหัวข้อบรรทัดแรก
+  const titleMain = document.getElementById('reportTitleMain');
+  if (titleMain) {
+    titleMain.innerHTML = `ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ<br>ประจำเดือน`;
+  }
 }
 
-// V.10.2 Fix: getCurrentTitle() — fallback ไป selectedMonths เมื่อ titleMonth/titleYear ว่าง
+// V.10.3 Fix: getCurrentTitle() — ยึด Dropdown ก่อน, fallback selectedMonths
 function getCurrentTitle() {
-  const mEl = $('titleMonth');
-  const yEl = $('titleYear');
+  const mEl = document.getElementById('titleMonth');
+  const yEl = document.getElementById('titleYear');
 
-  let m, y;
-
-  // 1) ถ้ามีค่าใน dropdown ให้ใช้ค่านั้น
+  // 1) ยึดค่าจาก Dropdown บนหัวตารางเป็นหลัก
   if (mEl && yEl && mEl.value && yEl.value) {
-    m = Number(mEl.value);
-    y = Number(yEl.value);
-  }
-  // 2) Fallback: ดึงจาก selectedMonths (เดือนล่าสุดที่เลือก)
-  else if (typeof selectedMonths !== 'undefined' && selectedMonths.length > 0) {
-    const latest = selectedMonths[selectedMonths.length - 1]; // เช่น "2026-10"
-    const [ly, lm] = latest.split('-').map(Number);
-    m = lm;
-    y = ly + 543; // แปลงเป็น พ.ศ.
-  }
-  // 3) ไม่มีอะไรเลย → ชื่อเปล่า
-  else {
-    return 'ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ';
+    const m = Number(mEl.value);
+    const y = Number(yEl.value);
+    return `ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ ประจำเดือน ${THAI_MONTHS[m-1]} ${y}`;
   }
 
-  return `ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ ประจำเดือน ${THAI_MONTHS[m-1]} ${y}`;
+  // 2) Fallback: ดึงจาก selectedMonths (ถ้า Dropdown ไม่มีค่า)
+  if (typeof selectedMonths !== 'undefined' && selectedMonths.length > 0) {
+    const latest = selectedMonths[selectedMonths.length - 1];
+    const [ly, lm] = latest.split('-').map(Number);
+    return `ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ ประจำเดือน ${THAI_MONTHS[lm-1]} ${ly + 543}`;
+  }
+
+  // 3) ไม่มีอะไรเลย → ชื่อเปล่า
+  return 'ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ';
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -575,7 +578,7 @@ async function renderMatrix() {
 
 // ═══════════════════════════════════════════════════════════════
 //  SNAPSHOT
-//  V.10 Fix: saveStockLevelSnapshot() — ใช้ titleMonth/titleYear + fallback
+//  V.10.3 Fix: saveStockLevelSnapshot() — fallback today ถ้าไม่มีเดือน
 // ═══════════════════════════════════════════════════════════════
 
 async function saveStockLevelSnapshot() {
@@ -614,17 +617,18 @@ async function saveStockLevelSnapshot() {
     finalTitle = `${title}/${n}`;
   }
 
-  // fallback: ถ้า titleMonth/titleYear ว่าง → ไป selectedMonths
-  const mEl = $('titleMonth');
-  const yEl = $('titleYear');
+  // V.10.3: ดึงค่าจาก Dropdown หัวตารางเป็นหลัก → selectedMonths → today
+  const mEl = document.getElementById('titleMonth');
+  const yEl = document.getElementById('titleYear');
   let titleMonthYM;
-  if (mEl?.value && yEl?.value) {
+
+  if (mEl && yEl && mEl.value && yEl.value) {
     titleMonthYM = `${Number(yEl.value) - 543}-${pad(Number(mEl.value))}`;
   } else if (selectedMonths.length > 0) {
-    titleMonthYM = selectedMonths[selectedMonths.length - 1];  // เดือนล่าสุด
+    titleMonthYM = selectedMonths[selectedMonths.length - 1];
   } else {
-    if (msgEl) msgEl.innerHTML = '<div class="msg err">⚠ ยังไม่ได้เลือกเดือน</div>';
-    return;
+    const now = new Date();
+    titleMonthYM = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
   }
 
   const payload = {
