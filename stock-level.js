@@ -3,12 +3,12 @@
 //  Month Filter + Customer Filter + Gradegrams Filter + Size Filter
 //  + Matrix + Snapshot
 //  + Matrix: format ตาม mode (full → floor, actual → toFixed(2))
-//  V.10.5 Fix:
-//    - updateReportTitle() → เขียนแค่ <span id="reportTitleMain"> (ไม่ลบ Dropdown)
-//    - getCurrentTitle()   → ยึด Dropdown ก่อน fallback selectedMonths
-//    - saveStockLevelSnapshot() → fallback today ถ้าไม่มีเดือนเลย
-//    - loadMonthFilter()   → ตั้ง default เป็นเดือน/ปีปัจจุบัน + จำ userChanged
-//    - viewSnapshot()      → ทำความสะอาด Gradegram + format ตามโหมด + แสดง monthsDisplay
+//  V.10.6 Fix:
+//    - loadMonthFilter()       → default เดือน/ปีปัจจุบัน + 3 เดือนย้อนหลัง (ไม่ sync title)
+//    - getCurrentTitle()       → ยึด Dropdown เท่านั้น
+//    - saveStockLevelSnapshot()→ months = selectedMonths ทั้งหมด
+//    - viewSnapshot()          → monthsDisplay แปลงทุกเดือนเป็นชื่อไทย
+//    - updateReportTitle()     → เขียนแค่ <span id="reportTitleMain">
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -29,7 +29,8 @@ let allCustomersList = [];
 
 // ═══════════════════════════════════════════════════════════════
 //  MONTH FILTER
-//  V.10.5: default = เดือน/ปีปัจจุบัน (ครั้งแรก) + จำ userChanged
+//  V.10.6: Dropdown = เดือน/ปีปัจจุบัน (ครั้งแรก) + Filter = 3 เดือนย้อนหลัง
+//          ❌ ไม่ sync titleMonth ตาม selectedMonths (หัวตารางเป็นปัจจุบันเสมอ)
 // ═══════════════════════════════════════════════════════════════
 
 function loadMonthFilter() {
@@ -41,61 +42,36 @@ function loadMonthFilter() {
     allMonthsList.push(`${yearCE}-${pad(m)}`);
   }
 
-  // 🔽 ตั้งค่า Default เป็น "เดือนและปีปัจจุบัน" (เฉพาะครั้งแรกที่โหลด) 🔽
+  // 1. ตั้งค่า Dropdown หัวตารางเป็น "เดือน/ปี ปัจจุบัน" ทันที
   const titleMEl = $('titleMonth');
   const titleYEl = $('titleYear');
 
   if (titleMEl && titleYEl && !titleMEl.dataset.initialized) {
     const now = new Date();
-    const currentM = now.getMonth() + 1; // getMonth() เริ่มที่ 0
-    const currentY = now.getFullYear() + 543; // แปลงเป็น พ.ศ.
-
-    titleMEl.value = currentM;
-    titleYEl.value = currentY;
-
-    // ทำเครื่องหมายว่าเซ็ตค่าเริ่มต้นแล้ว จะได้ไม่ไปทับเวลาผู้ใช้เปลี่ยนเอง
+    titleMEl.value = now.getMonth() + 1;
+    titleYEl.value = now.getFullYear() + 543;
     titleMEl.dataset.initialized = 'true';
-
-    // อัปเดตข้อความหัวตารางให้แสดงเดือนปัจจุบัน
     if (typeof updateReportTitle === 'function') updateReportTitle();
   }
-  // 🔼 จบส่วนที่เพิ่ม 🔼
 
-  // default = 3 เดือนก่อน "เดือนของ Report Title" (titleMonth/titleYear)
-  // ไม่ใช่ today — กันบั๊กวันที่ 1 ของเดือนใหม่
+  // 2. ถ้าเพิ่งเข้าเว็บครั้งแรก ให้ Default Filter เป็น 3 เดือนย้อนหลัง (นับจากเดือนปัจจุบัน)
   if (selectedMonths.length === 0) {
-    // เปลี่ยนมาใช้ค่าจาก titleMEl และ titleYEl ที่เพิ่งเซ็ตไปด้านบน
-    const baseY = titleYEl ? Number(titleYEl.value) - 543 : new Date().getFullYear();
-    const baseM = titleMEl ? Number(titleMEl.value) : (new Date().getMonth() + 1);
-
-    if (baseY === yearCE) {
-      let m = baseM;
-      for (let i = 0; i < 3; i++) {
-        m -= 1;
-        if (m <= 0) m += 12;
-        selectedMonths.push(`${yearCE}-${pad(m)}`);
-      }
-      selectedMonths.sort();
+    const now = new Date();
+    let m = now.getMonth() + 1; // เริ่มที่เดือนปัจจุบัน
+    for (let i = 0; i < 3; i++) {
+      selectedMonths.push(`${yearCE}-${pad(m)}`);
+      m -= 1;
+      if (m <= 0) m += 12;
     }
+    selectedMonths.sort();
   }
 
   renderMonthList();
   updateMonthLabel();
   attachMonthFilterListeners();
 
-  // sync titleMonth/titleYear ตามเดือนล่าสุดใน selectedMonths
-  if (selectedMonths.length > 0) {
-    const latest = selectedMonths[selectedMonths.length - 1];
-    const [ly, lm] = latest.split('-').map(Number);
-
-    // อัปเดต Dropdown ให้ตรงกับเดือนล่าสุดที่ถูกเลือกใน Filter (ถ้าผู้ใช้ยังไม่เคยแก้)
-    if (titleMEl && titleYEl && !titleMEl.dataset.userChanged) {
-      titleMEl.value = lm;
-      titleYEl.value = ly + 543;
-    }
-
-    if (typeof updateReportTitle === 'function') updateReportTitle();
-  }
+  // ❌ ลบโค้ดส่วนที่ Sync titleMonth ตาม selectedMonths ออก
+  // เพื่อให้หัวตารางเป็นเดือนปัจจุบัน (ตามข้อ 1) และไม่ไปทับกับ Filter
 }
 
 function attachMonthFilterListeners() {
@@ -425,26 +401,16 @@ function updateReportTitle() {
   }
 }
 
-// V.10.3 Fix: getCurrentTitle() — ยึด Dropdown ก่อน, fallback selectedMonths
+// V.10.6 Fix: getCurrentTitle() — ยึด Dropdown เท่านั้น (ลบ fallback selectedMonths)
 function getCurrentTitle() {
   const mEl = document.getElementById('titleMonth');
   const yEl = document.getElementById('titleYear');
 
-  // 1) ยึดค่าจาก Dropdown บนหัวตารางเป็นหลัก
   if (mEl && yEl && mEl.value && yEl.value) {
     const m = Number(mEl.value);
     const y = Number(yEl.value);
     return `ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ ประจำเดือน ${THAI_MONTHS[m-1]} ${y}`;
   }
-
-  // 2) Fallback: ดึงจาก selectedMonths (ถ้า Dropdown ไม่มีค่า)
-  if (typeof selectedMonths !== 'undefined' && selectedMonths.length > 0) {
-    const latest = selectedMonths[selectedMonths.length - 1];
-    const [ly, lm] = latest.split('-').map(Number);
-    return `ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ ประจำเดือน ${THAI_MONTHS[lm-1]} ${ly + 543}`;
-  }
-
-  // 3) ไม่มีอะไรเลย → ชื่อเปล่า
   return 'ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ';
 }
 
@@ -602,7 +568,7 @@ async function renderMatrix() {
 
 // ═══════════════════════════════════════════════════════════════
 //  SNAPSHOT
-//  V.10.3 Fix: saveStockLevelSnapshot() — fallback today ถ้าไม่มีเดือน
+//  V.10.6: months = selectedMonths ทั้งหมด (fallback [titleMonthYM])
 // ═══════════════════════════════════════════════════════════════
 
 async function saveStockLevelSnapshot() {
@@ -641,7 +607,7 @@ async function saveStockLevelSnapshot() {
     finalTitle = `${title}/${n}`;
   }
 
-  // V.10.3: ดึงค่าจาก Dropdown หัวตารางเป็นหลัก → selectedMonths → today
+  // V.10.6: ดึงค่าจาก Dropdown หัวตารางเป็นหลัก → selectedMonths → today
   const mEl = document.getElementById('titleMonth');
   const yEl = document.getElementById('titleYear');
   let titleMonthYM;
@@ -657,7 +623,7 @@ async function saveStockLevelSnapshot() {
 
   const payload = {
     title: finalTitle,
-    months: [titleMonthYM],
+    months: selectedMonths.length > 0 ? selectedMonths : [titleMonthYM], // 🔽 เก็บทุกเดือนที่เลือกใน Filter 🔽
     mode: document.querySelector('input[name="mode"]:checked').value,
     customer: getSelectedCustomers().join(','),
     grades: getSelectedGrades(),
@@ -713,7 +679,7 @@ async function loadStockLevelSnapshots() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  viewSnapshot — V.10.5
+//  viewSnapshot — V.10.6
 //  - ทำความสะอาด Gradegram
 //  - format ตามโหมด (full → Math.ceil, actual → toFixed(2))
 //  - แสดง monthsDisplay / gradesDisplay / sizesDisplay ใน report-foot
