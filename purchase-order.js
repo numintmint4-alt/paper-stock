@@ -16,6 +16,7 @@
 //  + เก็บลำดับเดิม (_editOriginalOrder) + ตรวจ isOrderChanged() + reorder_po_items
 //  + Verify Password — ใช้ window.supabase.createClient() (Supabase Auth)
 //  + เพิ่มช่องกรอกเลข PO เองในหน้า "สร้าง PO ใหม่" (default = Auto)
+//  + V.10.9 Fix: Lock ปุ่มบันทึกใน _doSaveAllPOs กัน Double Click
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -819,8 +820,18 @@ function autoGroupPOItems(items) {
     return match[1].includes('F');
   }
 
-  const bySup = {};
+  // 🔽 เพิ่ม Dedupe ป้องกันข้อมูลซ้ำหลุดเข้ามา
+  const seen = new Set();
+  const uniqueItems = [];
   items.forEach(it => {
+    const key = `${it.gradegram}|${Number(it.size)}|${it.customer_roll || 'normal'}|${it.quality_b || 'normal'}|${it.note || ''}`;
+    if (seen.has(key)) return; // ข้ามถ้าซ้ำ
+    seen.add(key);
+    uniqueItems.push(it);
+  });
+
+  const bySup = {};
+  uniqueItems.forEach(it => {
     if (!bySup[it.sup]) bySup[it.sup] = [];
     bySup[it.sup].push(it);
   });
@@ -1019,10 +1030,14 @@ async function saveAllPOs(btnEl) {
 
 async function _doSaveAllPOs(posList, alertData, btnEl) {
   const btn = btnEl || document.querySelector('#modalPOForm .form-actions .primary');
+  
+  // 🔽 เพิ่ม 2 บรรทัดนี้เพื่อล็อกปุ่มกันกดซ้ำ (Double Click) 🔽
+  if (btn && btn.disabled) return; // ถ้าปุ่มถูกกดไปแล้ว ให้หยุดทำงานทันที
   if (btn) {
     btn.disabled = true;
     btn.textContent = 'กำลังบันทึก...';
   }
+  // 🔼 จบส่วนที่แก้ไข 🔼
 
   let successCount = 0;
   let errorMsg = '';
