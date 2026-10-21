@@ -3,6 +3,7 @@
 //  Month Filter + Customer Filter + Gradegrams Filter + Size Filter
 //  + Matrix + Snapshot
 //  + Matrix: format ตาม mode (full → floor, actual → toFixed(2))
+//  V.10.2 Fix: getCurrentTitle() fallback → selectedMonths
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -393,12 +394,30 @@ function updateReportTitle() {
   if (titleEl) titleEl.innerHTML = `ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ<br>ประจำเดือน ${THAI_MONTHS[m-1]} ${y}`;
 }
 
+// V.10.2 Fix: getCurrentTitle() — fallback ไป selectedMonths เมื่อ titleMonth/titleYear ว่าง
 function getCurrentTitle() {
   const mEl = $('titleMonth');
   const yEl = $('titleYear');
-  if (!mEl || !yEl) return 'ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ';
-  const m = Number(mEl.value);
-  const y = Number(yEl.value);
+
+  let m, y;
+
+  // 1) ถ้ามีค่าใน dropdown ให้ใช้ค่านั้น
+  if (mEl && yEl && mEl.value && yEl.value) {
+    m = Number(mEl.value);
+    y = Number(yEl.value);
+  }
+  // 2) Fallback: ดึงจาก selectedMonths (เดือนล่าสุดที่เลือก)
+  else if (typeof selectedMonths !== 'undefined' && selectedMonths.length > 0) {
+    const latest = selectedMonths[selectedMonths.length - 1]; // เช่น "2026-10"
+    const [ly, lm] = latest.split('-').map(Number);
+    m = lm;
+    y = ly + 543; // แปลงเป็น พ.ศ.
+  }
+  // 3) ไม่มีอะไรเลย → ชื่อเปล่า
+  else {
+    return 'ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ';
+  }
+
   return `ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ ประจำเดือน ${THAI_MONTHS[m-1]} ${y}`;
 }
 
