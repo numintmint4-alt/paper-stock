@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 //  STOCK V10.1 — alert.js
 //  V.10.9 Fix: Matrix formatting (toFixed(2)) & Dedupe
+//  V.10.10 Fix: เปลี่ยนหัวข้อ Alert เป็น "Stock Alert"
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -2026,7 +2027,7 @@ function isFSCGrade(gradegram) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  RENDER ALERT (Main) — V.10.9
+//  RENDER ALERT (Main) — V.10.10
 // ═══════════════════════════════════════════════════════════════
 
 async function renderAlert() {
@@ -2046,12 +2047,14 @@ async function renderAlert() {
   const stockDateTH = stockDate ? thaiDateFull(stockDate) : '-';
   const receiveDateTH = receiveDate ? thaiDateFull(receiveDate) : '-';
 
+  // 🔽 แก้ไขหัวข้อรายงานตอนกดวิเคราะห์ 🔽
   $('alertReportTitle').innerHTML = `
-    🚨 แจ้งเตือนสั่งซื้อ (Roll Alert)
+    🚨 แจ้งเตือนสั่งซื้อ (Stock Alert)
     <div class="report-subtitle" style="font-size:12px;color:#64748b;margin-top:6px">
       (Stock Level: ${snapshotMonth} · Stock ${stockDateTH} · Receive ${receiveDateTH})
     </div>
   `;
+  // 🔼 จบส่วนที่แก้ไข 🔼
 
   $('alertBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังวิเคราะห์...</p>';
 
