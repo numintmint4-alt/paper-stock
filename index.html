@@ -34,7 +34,7 @@
     <strong>📦 Stock ม้วนกระดาษ</strong>
     <button data-tab="matrix" class="active">Stock Level</button>
     <button data-tab="stock">Stock</button>
-    <button data-tab="receive">Receive</button>
+    <button data-tab="receive">Purchase Summary</button>
     <button data-tab="alert">Alert</button>
     <button data-tab="purchase-order">Purchase Order</button>
     <button data-tab="data">Data</button>
@@ -287,19 +287,19 @@
     </div>
 
     <!-- ═══════════════════════════════════════════════════════════ -->
-    <!-- TAB 3: RECEIVE (Roll Receive) -->
+    <!-- TAB 3: RECEIVE (Purchase Summary) -->
     <!-- ═══════════════════════════════════════════════════════════ -->
     <div id="tab-receive" class="hidden">
       <div class="card">
         <div class="report-head">
           <div></div>
           <div class="report-title" id="receiveReportTitle">
-            รายการรับม้วนกระดาษเข้าคลัง<br>ประจำวันที่
+            สรุปรายการสั่งซื้อม้วนกระดาษ<br>ประจำวันที่
           </div>
         </div>
 
         <div class="filters no-print" id="receiveFilterBox">
-          <label>📅 วันที่รับเข้า <input type="date" id="receiveDate"></label>
+          <label>📅 วันที่สั่งซื้อ <input type="date" id="receiveDate"></label>
 
           <label class="grade-filter-wrap">
             Gradegrams
@@ -385,7 +385,7 @@
           </label>
 
           <label>📅 Stock วันที่ <input type="date" id="alertStockDate"></label>
-          <label>📅 Receive วันที่ <input type="date" id="alertReceiveDate"></label>
+          <label>📅 วันที่สั่งซื้อ <input type="date" id="alertReceiveDate"></label>
           <label>📅 Stock Level เดือน <input type="month" id="alertSnapshotMonth"></label>
           <label><input type="checkbox" id="alertIncludeCustomer"> รวมม้วนลูกค้า</label>
 
