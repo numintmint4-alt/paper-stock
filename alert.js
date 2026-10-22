@@ -1,14 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
 //  STOCK V10.1 — alert.js
-//  + Multi-item per cell
-//  + LocalStorage Key = ISO Date (ไม่ใช่ index)
-//  + วันที่รับเริ่มจาก analyzedDate + 1 (ข้ามอาทิตย์)
-//  + Alert History (snapshot)
-//  + ล็อกวันที่วิเคราะห์ = วันนี้
-//  V.10.8 Fix:
-//    - renderAlert() → Dedupe rows จาก DB (แก้ปัญหา CAF150 ซ้ำ)
-//    - createPOFromAlert() → Dedupe วันที่และ Cell
-//    - confirmCreatePO() → Lock ปุ่มกัน Double Click
+//  V.10.9 Fix: Matrix formatting (toFixed(2)) & Dedupe
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -193,7 +185,6 @@ async function initAlertTab() {
 
   const today = toISODate(new Date());
 
-  // ล็อกวันที่วิเคราะห์ = วันนี้
   const alertDateEl = $('alertDate');
   if (alertDateEl) {
     alertDateEl.value = today;
@@ -1331,9 +1322,10 @@ function renderAlertMatrixView(rows) {
       if (hasOrder && allHaveSup) orderCls = 'has-order';
       else if (hasQtyNoSup)        orderCls = 'order-incomplete';
 
+      // 🔽 FIX: ใช้ .toFixed(2) บังคับทศนิยม 🔽
       html += `<td class="matrix-cell ${cellCls} ${orderCls}"
                     onclick="openAlertMatrixCell('${esc(grade)}', ${size})">
-                 <div class="matrix-value">${a > 0 ? '+' + a : a}${cartIcon}</div>
+                 <div class="matrix-value">${a > 0 ? '+' + Number(a).toFixed(2) : Number(a).toFixed(2)}${cartIcon}</div>
                </td>`;
     });
 
@@ -2034,7 +2026,7 @@ function isFSCGrade(gradegram) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  RENDER ALERT (Main) — V.10.8 Dedupe Fix
+//  RENDER ALERT (Main) — V.10.9
 // ═══════════════════════════════════════════════════════════════
 
 async function renderAlert() {
@@ -2244,7 +2236,7 @@ function clearAllAlertInputsAllDates() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  CREATE PO — V.10.8 Fix: Dedupe Date & Cell + Double Click Lock
+//  CREATE PO — V.10.9 Fix: Dedupe Date & Cell + Double Click Lock
 // ═══════════════════════════════════════════════════════════════
 
 async function createPOFromAlert() {
