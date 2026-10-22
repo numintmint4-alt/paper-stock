@@ -2,6 +2,7 @@
 //  STOCK V10.1 — receive.js
 //  Fix Date Query + Debug + Auto-Fetch + Excel Export 2 Sheets
 //  V.10.2 Fix: fetchFromPO() → เพิ่ม gram + size เป็น Number
+//  V.10.3 Fix: เปลี่ยนข้อความหัวข้อรายงานเป็น "สรุปรายการสั่งซื้อ"
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -175,14 +176,17 @@ async function renderReceive() {
   const remark = $('receiveRemark')?.value || '';
   const mode = $('receiveMode')?.value || 'matrix';
 
-  if (!receiveDate) { alert('กรุณาเลือกวันที่รับเข้า'); return; }
+  if (!receiveDate) { alert('กรุณาเลือกวันที่สั่งซื้อ'); return; }
 
   const dateThai = thaiDateFull(receiveDate);
 
+  // 🔽 แก้ไขหัวข้อรายงาน 🔽
   $('receiveReportTitle').innerHTML = `
-    รายการรับม้วนกระดาษเข้าคลัง<br>
+    สรุปรายการสั่งซื้อม้วนกระดาษ<br>
     ประจำวันที่ ${dateThai}
   `;
+  // 🔼 จบส่วนที่แก้ไข 🔼
+
   $('receiveBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
 
   try {
@@ -306,7 +310,7 @@ async function fetchFromPO(receiveDate, opts = {}) {
     if (importErr) throw importErr;
 
     if (!silent) {
-      showToast(`✅ ดึงจาก PO สำเร็จ — ${importResult?.inserted || payload.length} รายการ`, 'ok', 3000);
+      showToast(`✅ ดึงข้อมูลจาก PO สำเร็จ — ${importResult?.inserted || payload.length} รายการ`, 'ok', 3000);
     }
 
     return { ok: true, inserted: importResult?.inserted || payload.length, po_count: pos.length };
@@ -322,11 +326,11 @@ async function fetchFromPO(receiveDate, opts = {}) {
 // ปุ่ม "รีเฟรชจาก PO" — manual refresh
 async function refreshFromPO() {
   const receiveDate = getReceiveDateISO();
-  if (!receiveDate) { alert('กรุณาเลือกวันที่รับเข้า'); return; }
+  if (!receiveDate) { alert('กรุณาเลือกวันที่สั่งซื้อ'); return; }
 
   const dateThai = thaiDateFull(receiveDate);
 
-  if (!confirm(`⚠️ ดึง PO ของวันที่ ${dateThai} ใหม่?\n\nจะลบข้อมูลรับเข้าของวันนี้ที่มีอยู่ แล้วดึงจาก PO แทน`)) {
+  if (!confirm(`⚠️ ดึง PO ของวันที่ ${dateThai} ใหม่?\n\nจะลบข้อมูลของวันนี้ที่มีอยู่ แล้วดึงจาก PO แทน`)) {
     return;
   }
 
