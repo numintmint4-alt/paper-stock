@@ -380,14 +380,15 @@
         </div>
 
         <div class="filters no-print">
-          <!-- ล็อกวันที่วิเคราะห์ = วันนี้ (readonly + สไตล์) -->
+          <!-- ✅ แก้ไข: เปลี่ยน type="date" → type="text" + placeholder -->
           <label>📅 วันที่วิเคราะห์
-            <input type="date" id="alertDate" readonly
+            <input type="text" id="alertDate" placeholder="DD/MM/YYYY" readonly
                    style="pointer-events:none;background:#f1f5f9;cursor:not-allowed">
           </label>
 
-          <label>📅 Stock วันที่ <input type="date" id="alertStockDate"></label>
-          <label>📅 วันที่สั่งซื้อ <input type="date" id="alertReceiveDate"></label>
+          <label>📅 Stock วันที่ <input type="text" id="alertStockDate" placeholder="DD/MM/YYYY"></label>
+          <label>📅 วันที่สั่งซื้อ <input type="text" id="alertReceiveDate" placeholder="DD/MM/YYYY"></label>
+          <!-- ✅ สิ้นสุดการแก้ไข -->
           <label>📅 Stock Level เดือน <input type="month" id="alertSnapshotMonth"></label>
           <label><input type="checkbox" id="alertIncludeCustomer"> รวมม้วนลูกค้า</label>
 
