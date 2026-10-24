@@ -4,6 +4,7 @@
 //  V.10.10 Fix: เปลี่ยนหัวข้อ Alert เป็น "Stock Alert"
 //  V.10.11 Fix: เปลี่ยนช่องวันที่เป็น Text + เพิ่มตัวแปลง DD/MM/YYYY ↔ YYYY-MM-DD
 //  V.10.12 Fix: เปลี่ยนกลับเป็น type="date" + บังคับเลือกเดือนล่าสุดใน loadSnapshotMonths
+//  V.10.13 Fix: Auto-analyze on load + on month change
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -96,32 +97,29 @@ const ALERT_RECEIVE_DATES_KEY = 'stockv8_alert_receive_dates';
 
 // ═══════════════════════════════════════════════════════════════
 //  DATE CONVERSION HELPERS (DD/MM/YYYY ↔ YYYY-MM-DD)
-//  V.10.11 — เพิ่มใหม่: แปลงค่าระหว่างหน้าจอกับ Database
 // ═══════════════════════════════════════════════════════════════
 
-// แปลง YYYY-MM-DD (Database) -> DD/MM/YYYY (หน้าจอ)
 function toThaiDateStr(isoDate) {
   if (!isoDate) return '';
   const str = String(isoDate).trim();
-  if (str.includes('/')) return str; // ถ้าเป็น / แล้วไม่ต้องแปลง
+  if (str.includes('/')) return str;
   const parts = str.split('-');
   if (parts.length !== 3) return str;
   const [y, m, d] = parts;
   return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
 }
 
-// แปลง DD/MM/YYYY (หน้าจอ) -> YYYY-MM-DD (Database)
 function toISODateStr(thaiDate) {
   if (!thaiDate) return '';
   const str = String(thaiDate).trim();
-  if (str.includes('-') && !str.includes('/')) return str; // เป็น ISO อยู่แล้ว
+  if (str.includes('-') && !str.includes('/')) return str;
   const parts = str.split('/');
   if (parts.length === 3) {
     const [d, m, y] = parts;
     if (!d || !m || !y) return '';
     return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
   }
-  return str; // ถ้ารูปแบบไม่ถูกต้องให้คืนค่าเดิม
+  return str;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -220,7 +218,6 @@ async function initAlertTab() {
 
   const alertDateEl = $('alertDate');
   if (alertDateEl) {
-    // ✅ V.10.12: แสดงเป็น ISO (YYYY-MM-DD) สำหรับ input type="date"
     alertDateEl.value = today;
     alertDateEl.readOnly = true;
     alertDateEl.style.pointerEvents = 'none';
@@ -235,10 +232,7 @@ async function initAlertTab() {
   attachAlertDateListener();
 
   await loadAlertSuppliers();
-
-  // 🔽 ต้องมี await เพื่อรอให้โหลดเดือนเสร็จก่อน 🔽
   await loadSnapshotMonths();
-
   await loadAlertGradeFilter();
   loadAlertFilter();
   initAlertReceiveDates();
@@ -246,10 +240,13 @@ async function initAlertTab() {
   await loadUsagePlanRanges();
   renderUsageRangeDropdown();
 
-  // 🔽 ต้องมี await ตรงนี้ด้วย 🔽
   await onAlertDateChange();
 
   showAlertHistoryCard();
+
+  // 🔽 Auto-analyze on load 🔽
+  console.log('[Alert] Auto-analyzing on load...');
+  setTimeout(() => { renderAlert(); }, 500);
 }
 
 function applyCalculatedDates(analyzedDate) {
@@ -258,7 +255,6 @@ function applyCalculatedDates(analyzedDate) {
   const stockDate = calcStockDate(analyzedDate);
   const receiveDate = calcReceiveDate(analyzedDate);
 
-  // ✅ V.10.12: แสดงเป็น ISO (YYYY-MM-DD) สำหรับ input type="date"
   if ($('alertStockDate')) $('alertStockDate').value = stockDate;
   if ($('alertReceiveDate')) $('alertReceiveDate').value = receiveDate;
 }
@@ -281,7 +277,6 @@ function attachAlertDateListener() {
 // ═══════════════════════════════════════════════════════════════
 
 async function saveAlertSnapshot(receiveDates) {
-  // ✅ V.10.12: ดึงค่าจาก input type="date" โดยตรง (ISO อยู่แล้ว)
   const analyzedDate = $('alertDate')?.value;
 
   if (!analyzedDate) {
@@ -306,7 +301,6 @@ async function saveAlertSnapshot(receiveDates) {
     const payload = {
       analyzed_date:  analyzedDate,
       snapshot_month: $('alertSnapshotMonth')?.value || null,
-      // ✅ V.10.12: input type="date" ให้ค่า ISO อยู่แล้ว
       stock_date:     $('alertStockDate')?.value || null,
       receive_date:   $('alertReceiveDate')?.value || null,
       receive_dates:  receiveDates || [...alertReceiveDates],
@@ -350,7 +344,6 @@ async function loadAlertSnapshot(analyzedDate) {
 }
 
 async function onAlertDateChange() {
-  // ✅ V.10.12: input type="date" ให้ค่า ISO อยู่แล้ว
   const analyzedDate = $('alertDate')?.value;
 
   if (!analyzedDate) return;
@@ -422,7 +415,6 @@ function setAlertLocked(locked, analyzedDate) {
 async function applyAlertSnapshot(snapshot) {
   try {
     if (snapshot.snapshot_month) $('alertSnapshotMonth').value = snapshot.snapshot_month;
-    // ✅ V.10.12: input type="date" รับค่า ISO โดยตรง
     if (snapshot.stock_date)     $('alertStockDate').value = snapshot.stock_date;
     if (snapshot.receive_date)   $('alertReceiveDate').value = snapshot.receive_date;
 
@@ -541,7 +533,6 @@ async function loadSnapshotMonths() {
     });
     const months = [...set].sort().reverse();
 
-    // 🔽 แก้ตรงนี้: บังคับให้เลือกเดือนล่าสุดเสมอ 🔽
     if ($('alertSnapshotMonth') && months.length > 0) {
       $('alertSnapshotMonth').value = months[0];
     }
@@ -1396,6 +1387,7 @@ function renderAlertMatrixView(rows) {
 
   matrixWrap.innerHTML = html;
 }
+
 // ═══════════════════════════════════════════════════════════════
 //  MODAL CELL
 // ═══════════════════════════════════════════════════════════════
@@ -1731,7 +1723,6 @@ function loadAlertInputs(dateOrIdx) {
     const raw = localStorage.getItem(`${ALERT_LS_KEY_PREFIX}${isoDate}`);
     const data = raw ? JSON.parse(raw) : {};
 
-    // Auto-migrate: structure เก่า → ใหม่
     Object.keys(data).forEach(key => {
       const v = data[key];
       if (v && !v.items && (v.qty !== undefined || v.sup || v.customer_roll || v.quality_b || v.note)) {
@@ -1898,7 +1889,6 @@ function saveAlertReceiveDates() {
 }
 
 function addAlertReceiveDate() {
-  // ✅ V.10.12: input type="date" ให้ค่า ISO อยู่แล้ว
   const analyzedDate = $('alertDate')?.value;
 
   if (!analyzedDate) {
@@ -2045,7 +2035,6 @@ function initAlertReceiveDates() {
   });
 
   if (alertReceiveDates.length === 0) {
-    // ✅ V.10.12: input type="date" ให้ค่า ISO อยู่แล้ว
     const analyzedDate = $('alertDate')?.value || toISODate(new Date());
     const analyzedD = _parseLocalDate(analyzedDate);
 
@@ -2073,18 +2062,16 @@ function isFSCGrade(gradegram) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  RENDER ALERT (Main) — V.10.12
+//  RENDER ALERT (Main)
 // ═══════════════════════════════════════════════════════════════
 
 async function renderAlert() {
   const snapshotMonth = $('alertSnapshotMonth')?.value;
-
-  // ✅ V.10.12: input type="date" ให้ค่า ISO อยู่แล้ว
-  const stockDate   = $('alertStockDate')?.value;
-  const receiveDate = $('alertReceiveDate')?.value;
+  const stockDate     = $('alertStockDate')?.value;
+  const receiveDate   = $('alertReceiveDate')?.value;
 
   if (!snapshotMonth || !stockDate || !receiveDate) {
-    alert('กรุณาเลือก Stock Level / Stock / Receive ให้ครบ');
+    console.warn('[Alert] ข้ามการวิเคราะห์: ข้อมูลไม่ครบ');
     return;
   }
 
@@ -2095,14 +2082,12 @@ async function renderAlert() {
   const stockDateTH = stockDate ? thaiDateFull(stockDate) : '-';
   const receiveDateTH = receiveDate ? thaiDateFull(receiveDate) : '-';
 
-  // 🔽 แก้ไขหัวข้อรายงานตอนกดวิเคราะห์ 🔽
   $('alertReportTitle').innerHTML = `
     🚨 แจ้งเตือนสั่งซื้อ (Stock Alert)
     <div class="report-subtitle" style="font-size:12px;color:#64748b;margin-top:6px">
       (Stock Level: ${snapshotMonth} · Stock ${stockDateTH} · Receive ${receiveDateTH})
     </div>
   `;
-  // 🔼 จบส่วนที่แก้ไข 🔼
 
   $('alertBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังวิเคราะห์...</p>';
 
@@ -2129,7 +2114,6 @@ async function renderAlert() {
       };
     });
 
-    // 🔽 [FIX] Dedupe ข้อมูลจาก Database ที่ซ้ำกัน 🔽
     const uniqueMap = new Map();
     result.forEach(r => {
       const key = `${r.gradegram}|${Number(r.size)}`;
@@ -2144,7 +2128,6 @@ async function renderAlert() {
       }
     });
     result = Array.from(uniqueMap.values());
-    // 🔼 จบส่วนที่เพิ่ม 🔼
 
     window._alertFullCache = [...result];
 
@@ -2287,7 +2270,7 @@ function clearAllAlertInputsAllDates() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  CREATE PO — V.10.12
+//  CREATE PO
 // ═══════════════════════════════════════════════════════════════
 
 async function createPOFromAlert() {
@@ -2299,7 +2282,6 @@ async function createPOFromAlert() {
   const allItems = [];
   const processedCells = new Set();
 
-  // ล้างค่าวันที่ซ้ำซ้อนใน Alert Dates
   const uniqueDates = [...new Set(alertReceiveDates)].filter(Boolean);
   if (uniqueDates.length === 0) {
     alert('ไม่พบวันที่รับสินค้า');
@@ -2443,7 +2425,6 @@ function renderAlertPODetail(items) {
 function confirmCreatePO() {
   if (!_pendingPOItems || !_pendingPOItems.length) return;
 
-  // 🔽 [FIX] ล็อกปุ่มกันการกดซ้ำ (Double Click)
   const confirmBtn = document.querySelector('#modalAlertPODetail .form-actions .primary');
   if (confirmBtn && confirmBtn.disabled) return;
   if (confirmBtn) {
@@ -2451,7 +2432,6 @@ function confirmCreatePO() {
     confirmBtn.textContent = '⏳ กำลังสร้าง PO...';
   }
 
-  // ตรวจสอบ Sup
   const missingSup = _pendingPOItems.filter(it => !it.sup || String(it.sup).trim() === '');
   if (missingSup.length > 0) {
     alert(`⚠️ ไม่สามารถสร้าง PO ได้\n\nมี ${missingSup.length} รายการที่ยังไม่ได้ระบุผู้ขาย (Sup.)\nกรุณาตรวจสอบและเลือก Sup. ให้ครบก่อน`);
@@ -2461,10 +2441,8 @@ function confirmCreatePO() {
 
   const analyzedDate = toISODate(new Date());
 
-  // 🔽 ใช้วันที่ที่ไม่ซ้ำแล้วส่งไปหน้า PO
   const uniqueDates = [...new Set(alertReceiveDates)].filter(Boolean);
 
-  // ✅ V.10.12: input type="date" ให้ค่า ISO อยู่แล้ว
   sessionStorage.setItem('alert_to_po', JSON.stringify({
     items: _pendingPOItems,
     analyzed_date: analyzedDate,
@@ -2476,7 +2454,6 @@ function confirmCreatePO() {
 
   markAlertPOCreated(`ref_${Date.now()}`);
 
-  // Save snapshot
   saveAlertSnapshot(uniqueDates).then(res => {
     if (res.ok) console.log('✅ Alert snapshot saved:', res.data);
   });
@@ -2485,7 +2462,6 @@ function confirmCreatePO() {
     closeModal('modalAlertPODetail');
     _pendingPOItems = [];
 
-    // เปิด Tab PO
     const poBtn = document.querySelector('.nav button[data-tab="purchase-order"]');
     if (poBtn) poBtn.click();
     else alert('ยังไม่ได้เพิ่ม Tab Purchase Order');
@@ -2493,16 +2469,13 @@ function confirmCreatePO() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  DETAIL MODAL — V.10.12
+//  DETAIL MODAL
 // ═══════════════════════════════════════════════════════════════
 
 async function openAlertDetail(gradegram, size) {
   const snapshotMonth = $('alertSnapshotMonth')?.value;
-
-  // ✅ V.10.12: input type="date" ให้ค่า ISO อยู่แล้ว
-  const stockDate   = $('alertStockDate')?.value;
-  const receiveDate = $('alertReceiveDate')?.value;
-
+  const stockDate     = $('alertStockDate')?.value;
+  const receiveDate   = $('alertReceiveDate')?.value;
   const { grade } = parseGradegram(gradegram);
 
   $('alertDetailTitle').innerHTML = `📊 ${esc(gradegram)} · Size ${size}`;
