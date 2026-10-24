@@ -6,7 +6,7 @@
 //  V.10.6 Fix:
 //    - loadMonthFilter()       → default เดือน/ปีปัจจุบัน + 3 เดือนย้อนหลัง (ไม่ sync title)
 //    - getCurrentTitle()       → ยึด Dropdown เท่านั้น
-//    - saveStockLevelSnapshot()→ months = selectedMonths ทั้งหมด
+//    - saveStockLevelSnapshot()→ months = titleMonthYM (เดือนบนหัวตารางเท่านั้น)
 //    - viewSnapshot()          → monthsDisplay แปลงทุกเดือนเป็นชื่อไทย
 //    - updateReportTitle()     → เขียนแค่ <span id="reportTitleMain">
 // ═══════════════════════════════════════════════════════════════
@@ -568,7 +568,7 @@ async function renderMatrix() {
 
 // ═══════════════════════════════════════════════════════════════
 //  SNAPSHOT
-//  V.10.6: months = selectedMonths ทั้งหมด (fallback [titleMonthYM])
+//  V.10.6: months = titleMonthYM (เดือนบนหัวตารางเท่านั้น)
 // ═══════════════════════════════════════════════════════════════
 
 async function saveStockLevelSnapshot() {
@@ -607,23 +607,27 @@ async function saveStockLevelSnapshot() {
     finalTitle = `${title}/${n}`;
   }
 
-  // V.10.6: ดึงค่าจาก Dropdown หัวตารางเป็นหลัก → selectedMonths → today
-  const mEl = document.getElementById('titleMonth');
-  const yEl = document.getElementById('titleYear');
+  // 🔽 แก้ไขส่วนการหาค่า titleMonthYM 🔽
+  // ดึงค่าจากหัวตาราง (titleMonth/titleYear) เป็นหลัก
+  const mEl = $('titleMonth');
+  const yEl = $('titleYear');
   let titleMonthYM;
 
   if (mEl && yEl && mEl.value && yEl.value) {
     titleMonthYM = `${Number(yEl.value) - 543}-${pad(Number(mEl.value))}`;
   } else if (selectedMonths.length > 0) {
+    // Fallback: ถ้าหัวตารางว่าง ให้ใช้เดือนล่าสุดที่เลือกใน Filter
     titleMonthYM = selectedMonths[selectedMonths.length - 1];
   } else {
     const now = new Date();
     titleMonthYM = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
   }
+  // 🔼 จบส่วนที่แก้ไข 🔼
 
   const payload = {
     title: finalTitle,
-    months: selectedMonths.length > 0 ? selectedMonths : [titleMonthYM], // 🔽 เก็บทุกเดือนที่เลือกใน Filter 🔽
+    // 🔽 สำคัญมาก: บังคับให้ months บันทึกเป็น "เดือนบนหัวตาราง" เพียงเดือนเดียว 🔽
+    months: [titleMonthYM],
     mode: document.querySelector('input[name="mode"]:checked').value,
     customer: getSelectedCustomers().join(','),
     grades: getSelectedGrades(),
