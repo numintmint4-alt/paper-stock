@@ -3,6 +3,7 @@
 //  V.10.9 Fix: Matrix formatting (toFixed(2)) & Dedupe
 //  V.10.10 Fix: เปลี่ยนหัวข้อ Alert เป็น "Stock Alert"
 //  V.10.11 Fix: เปลี่ยนช่องวันที่เป็น Text + เพิ่มตัวแปลง DD/MM/YYYY ↔ YYYY-MM-DD
+//  V.10.12 Fix: เปลี่ยนกลับเป็น type="date" + บังคับเลือกเดือนล่าสุดใน loadSnapshotMonths
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -219,8 +220,8 @@ async function initAlertTab() {
 
   const alertDateEl = $('alertDate');
   if (alertDateEl) {
-    // ✅ V.10.11: แสดงเป็น DD/MM/YYYY (แปลงจาก ISO)
-    alertDateEl.value = toThaiDateStr(today);
+    // ✅ V.10.12: แสดงเป็น ISO (YYYY-MM-DD) สำหรับ input type="date"
+    alertDateEl.value = today;
     alertDateEl.readOnly = true;
     alertDateEl.style.pointerEvents = 'none';
     alertDateEl.style.background = '#f1f5f9';
@@ -234,7 +235,10 @@ async function initAlertTab() {
   attachAlertDateListener();
 
   await loadAlertSuppliers();
+
+  // 🔽 ต้องมี await เพื่อรอให้โหลดเดือนเสร็จก่อน 🔽
   await loadSnapshotMonths();
+
   await loadAlertGradeFilter();
   loadAlertFilter();
   initAlertReceiveDates();
@@ -242,6 +246,7 @@ async function initAlertTab() {
   await loadUsagePlanRanges();
   renderUsageRangeDropdown();
 
+  // 🔽 ต้องมี await ตรงนี้ด้วย 🔽
   await onAlertDateChange();
 
   showAlertHistoryCard();
@@ -253,9 +258,9 @@ function applyCalculatedDates(analyzedDate) {
   const stockDate = calcStockDate(analyzedDate);
   const receiveDate = calcReceiveDate(analyzedDate);
 
-  // ✅ V.10.11: แปลง ISO → DD/MM/YYYY ก่อนแสดงผล
-  if ($('alertStockDate')) $('alertStockDate').value = toThaiDateStr(stockDate);
-  if ($('alertReceiveDate')) $('alertReceiveDate').value = toThaiDateStr(receiveDate);
+  // ✅ V.10.12: แสดงเป็น ISO (YYYY-MM-DD) สำหรับ input type="date"
+  if ($('alertStockDate')) $('alertStockDate').value = stockDate;
+  if ($('alertReceiveDate')) $('alertReceiveDate').value = receiveDate;
 }
 
 function attachAlertDateListener() {
@@ -276,9 +281,8 @@ function attachAlertDateListener() {
 // ═══════════════════════════════════════════════════════════════
 
 async function saveAlertSnapshot(receiveDates) {
-  // ✅ V.10.11: แปลงค่าจากช่อง Text (DD/MM/YYYY) → ISO (YYYY-MM-DD)
-  const rawDate = $('alertDate')?.value;
-  const analyzedDate = toISODateStr(rawDate);
+  // ✅ V.10.12: ดึงค่าจาก input type="date" โดยตรง (ISO อยู่แล้ว)
+  const analyzedDate = $('alertDate')?.value;
 
   if (!analyzedDate) {
     console.warn('saveAlertSnapshot: no analyzed_date');
@@ -302,9 +306,9 @@ async function saveAlertSnapshot(receiveDates) {
     const payload = {
       analyzed_date:  analyzedDate,
       snapshot_month: $('alertSnapshotMonth')?.value || null,
-      // ✅ V.10.11: แปลงเป็น ISO ก่อนบันทึก
-      stock_date:     toISODateStr($('alertStockDate')?.value) || null,
-      receive_date:   toISODateStr($('alertReceiveDate')?.value) || null,
+      // ✅ V.10.12: input type="date" ให้ค่า ISO อยู่แล้ว
+      stock_date:     $('alertStockDate')?.value || null,
+      receive_date:   $('alertReceiveDate')?.value || null,
       receive_dates:  receiveDates || [...alertReceiveDates],
       summary_json:   summary,
       result_json:    alertCache,
@@ -346,9 +350,8 @@ async function loadAlertSnapshot(analyzedDate) {
 }
 
 async function onAlertDateChange() {
-  // ✅ V.10.11: แปลงค่าจากช่อง Text → ISO ก่อนใช้งาน
-  const rawDate = $('alertDate')?.value;
-  const analyzedDate = toISODateStr(rawDate);
+  // ✅ V.10.12: input type="date" ให้ค่า ISO อยู่แล้ว
+  const analyzedDate = $('alertDate')?.value;
 
   if (!analyzedDate) return;
 
@@ -419,9 +422,9 @@ function setAlertLocked(locked, analyzedDate) {
 async function applyAlertSnapshot(snapshot) {
   try {
     if (snapshot.snapshot_month) $('alertSnapshotMonth').value = snapshot.snapshot_month;
-    // ✅ V.10.11: แปลง ISO → DD/MM/YYYY ก่อนแสดงผล
-    if (snapshot.stock_date)     $('alertStockDate').value = toThaiDateStr(snapshot.stock_date);
-    if (snapshot.receive_date)   $('alertReceiveDate').value = toThaiDateStr(snapshot.receive_date);
+    // ✅ V.10.12: input type="date" รับค่า ISO โดยตรง
+    if (snapshot.stock_date)     $('alertStockDate').value = snapshot.stock_date;
+    if (snapshot.receive_date)   $('alertReceiveDate').value = snapshot.receive_date;
 
     if (snapshot.receive_dates && Array.isArray(snapshot.receive_dates)) {
       alertReceiveDates = [...snapshot.receive_dates];
@@ -538,6 +541,7 @@ async function loadSnapshotMonths() {
     });
     const months = [...set].sort().reverse();
 
+    // 🔽 แก้ตรงนี้: บังคับให้เลือกเดือนล่าสุดเสมอ 🔽
     if ($('alertSnapshotMonth') && months.length > 0) {
       $('alertSnapshotMonth').value = months[0];
     }
@@ -1894,9 +1898,8 @@ function saveAlertReceiveDates() {
 }
 
 function addAlertReceiveDate() {
-  // ✅ V.10.11: แปลงค่าจากช่อง Text → ISO
-  const rawDate = $('alertDate')?.value;
-  const analyzedDate = toISODateStr(rawDate);
+  // ✅ V.10.12: input type="date" ให้ค่า ISO อยู่แล้ว
+  const analyzedDate = $('alertDate')?.value;
 
   if (!analyzedDate) {
     alert('กรุณาเลือกวันที่วิเคราะห์ก่อน');
@@ -2042,9 +2045,8 @@ function initAlertReceiveDates() {
   });
 
   if (alertReceiveDates.length === 0) {
-    // ✅ V.10.11: แปลงค่าจากช่อง Text → ISO
-    const rawDate = $('alertDate')?.value;
-    const analyzedDate = toISODateStr(rawDate) || toISODate(new Date());
+    // ✅ V.10.12: input type="date" ให้ค่า ISO อยู่แล้ว
+    const analyzedDate = $('alertDate')?.value || toISODate(new Date());
     const analyzedD = _parseLocalDate(analyzedDate);
 
     const nextD = new Date(analyzedD);
@@ -2071,15 +2073,15 @@ function isFSCGrade(gradegram) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  RENDER ALERT (Main) — V.10.11
+//  RENDER ALERT (Main) — V.10.12
 // ═══════════════════════════════════════════════════════════════
 
 async function renderAlert() {
   const snapshotMonth = $('alertSnapshotMonth')?.value;
 
-  // ✅ V.10.11: แปลงค่าจากช่อง Text (DD/MM/YYYY) → ISO (YYYY-MM-DD)
-  const stockDate   = toISODateStr($('alertStockDate')?.value);
-  const receiveDate = toISODateStr($('alertReceiveDate')?.value);
+  // ✅ V.10.12: input type="date" ให้ค่า ISO อยู่แล้ว
+  const stockDate   = $('alertStockDate')?.value;
+  const receiveDate = $('alertReceiveDate')?.value;
 
   if (!snapshotMonth || !stockDate || !receiveDate) {
     alert('กรุณาเลือก Stock Level / Stock / Receive ให้ครบ');
@@ -2285,7 +2287,7 @@ function clearAllAlertInputsAllDates() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  CREATE PO — V.10.11: แปลงวันที่จากช่อง Text ก่อนส่ง
+//  CREATE PO — V.10.12
 // ═══════════════════════════════════════════════════════════════
 
 async function createPOFromAlert() {
@@ -2462,14 +2464,14 @@ function confirmCreatePO() {
   // 🔽 ใช้วันที่ที่ไม่ซ้ำแล้วส่งไปหน้า PO
   const uniqueDates = [...new Set(alertReceiveDates)].filter(Boolean);
 
-  // ✅ V.10.11: แปลงค่าจากช่อง Text (DD/MM/YYYY) → ISO ก่อนส่ง
+  // ✅ V.10.12: input type="date" ให้ค่า ISO อยู่แล้ว
   sessionStorage.setItem('alert_to_po', JSON.stringify({
     items: _pendingPOItems,
     analyzed_date: analyzedDate,
     receive_dates: uniqueDates,
     ref_snapshot: $('alertSnapshotMonth')?.value,
-    ref_stock: toISODateStr($('alertStockDate')?.value),
-    ref_receive: toISODateStr($('alertReceiveDate')?.value)
+    ref_stock: $('alertStockDate')?.value,
+    ref_receive: $('alertReceiveDate')?.value
   }));
 
   markAlertPOCreated(`ref_${Date.now()}`);
@@ -2491,15 +2493,15 @@ function confirmCreatePO() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  DETAIL MODAL — V.10.11: แปลงวันที่ก่อนใช้
+//  DETAIL MODAL — V.10.12
 // ═══════════════════════════════════════════════════════════════
 
 async function openAlertDetail(gradegram, size) {
   const snapshotMonth = $('alertSnapshotMonth')?.value;
 
-  // ✅ V.10.11: แปลงค่าจากช่อง Text → ISO
-  const stockDate   = toISODateStr($('alertStockDate')?.value);
-  const receiveDate = toISODateStr($('alertReceiveDate')?.value);
+  // ✅ V.10.12: input type="date" ให้ค่า ISO อยู่แล้ว
+  const stockDate   = $('alertStockDate')?.value;
+  const receiveDate = $('alertReceiveDate')?.value;
 
   const { grade } = parseGradegram(gradegram);
 
