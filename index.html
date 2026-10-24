@@ -372,25 +372,22 @@
       <div class="card">
         <div class="report-head">
           <div></div>
-          <!-- 🔽 แก้ไขหัวข้อเริ่มต้นตรงนี้ 🔽 -->
           <div class="report-title" id="alertReportTitle">
             🚨 แจ้งเตือนสั่งซื้อ (Stock Alert)<br>ประจำวันที่
           </div>
-          <!-- 🔼 จบส่วนที่แก้ไข 🔼 -->
         </div>
 
         <div class="filters no-print">
-          <!-- ✅ แก้ไข: เปลี่ยนกลับเป็น type="date" (ช่องวันที่วิเคราะห์ล็อกอ่านอย่างเดียว) -->
           <label>📅 วันที่วิเคราะห์
             <input type="date" id="alertDate" readonly
                    style="pointer-events:none;background:#f1f5f9;cursor:not-allowed">
           </label>
 
-          <!-- ✅ เปลี่ยนกลับเป็น type="date" -->
           <label>📅 Stock วันที่ <input type="date" id="alertStockDate"></label>
           <label>📅 วันที่สั่งซื้อ <input type="date" id="alertReceiveDate"></label>
-          <!-- ✅ สิ้นสุดการแก้ไข -->
-          <label>📅 Stock Level เดือน <input type="month" id="alertSnapshotMonth"></label>
+          
+          <!-- ✅ เพิ่ม onchange="renderAlert()" เพื่อให้วิเคราะห์อัตโนมัติเมื่อเปลี่ยนเดือน -->
+          <label>📅 Stock Level เดือน <input type="month" id="alertSnapshotMonth" onchange="renderAlert()"></label>
           <label><input type="checkbox" id="alertIncludeCustomer"> รวมม้วนลูกค้า</label>
 
           <label>📊 Usage Plan
