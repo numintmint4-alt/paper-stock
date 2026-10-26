@@ -6,6 +6,7 @@
 //  V.10.12 Fix: เปลี่ยนกลับเป็น type="date" + บังคับเลือกเดือนล่าสุดใน loadSnapshotMonths
 //  V.10.13 Fix: Auto-analyze on load + on month change
 //  V.10.14 Fix: Default ไม่มีวันที่รับสินค้า (ว่างไว้) + แจ้งเตือนให้กดเพิ่มวัน
+//  V.10.15 Fix: applyCalculatedDates() ไม่เซ็ต alertReceiveDate (ปล่อยว่าง)
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -250,14 +251,14 @@ async function initAlertTab() {
   // setTimeout(() => { renderAlert(); }, 500);
 }
 
+// ✅ V.10.15: ไม่เซ็ต alertReceiveDate ที่นี่ (ปล่อยให้ว่างไว้)
 function applyCalculatedDates(analyzedDate) {
   if (!analyzedDate) return;
 
   const stockDate = calcStockDate(analyzedDate);
-  const receiveDate = calcReceiveDate(analyzedDate);
 
   if ($('alertStockDate')) $('alertStockDate').value = stockDate;
-  if ($('alertReceiveDate')) $('alertReceiveDate').value = receiveDate;
+  // ❌ ไม่ต้องเซ็ต alertReceiveDate ที่นี่ (ปล่อยให้ว่างไว้)
 }
 
 function attachAlertDateListener() {
