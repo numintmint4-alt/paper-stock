@@ -3,20 +3,9 @@
 //  Purchase Order Management (List + Form + Auto-Split + Export)
 //  + Date Split + Verify Password + Mark Saved + Deleted History
 //  + Column Filters (PO No. / วันที่ออก / วันที่รับ / Sup. / สถานะ)
-//  + Filter Label ด้านบน (PO No. / วันที่ออก / วันที่รับ)
-//  + Add PO Items (Phase 3)
-//  + Inline Edit Items (Phase 3E)
-//  + closePOForm() — แก้ไข → กลับ PO List
-//  + Re-price — ดึงราคาใหม่จาก Price Master (ใน PO Form)
-//  + โหลดราคาตามเดือนของ PO (ref_receive) — ไม่ merge ไม่ fallback
-//  + เก็บ scroll position + focus กลับหลัง render (Inline Edit)
-//  + Drag & Drop เรียงลำดับ PO Items (Sortable.js) — ใช้ uid แทน index
-//  + แก้ไข Header (Sup / วันที่รับ / วันที่ออก) ใน PO Form
-//  + ปุ่ม "สร้าง PO ใหม่" — สร้าง PO เปล่าจากหน้า List
-//  + เก็บลำดับเดิม (_editOriginalOrder) + ตรวจ isOrderChanged() + reorder_po_items
-//  + Verify Password — ใช้ window.supabase.createClient() (Supabase Auth)
-//  + เพิ่มช่องกรอกเลข PO เองในหน้า "สร้าง PO ใหม่" (default = Auto)
+//  + Add PO Items (Phase 3) + Inline Edit Items (Phase 3E)
 //  + V.10.9 Fix: Lock ปุ่มบันทึกใน _doSaveAllPOs กัน Double Click
+//  + V.10.14 Fix: Export Excel ตาม Format ตัวอย่าง + เลือกช่วงวันที่ได้
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -1031,13 +1020,11 @@ async function saveAllPOs(btnEl) {
 async function _doSaveAllPOs(posList, alertData, btnEl) {
   const btn = btnEl || document.querySelector('#modalPOForm .form-actions .primary');
   
-  // 🔽 เพิ่ม 2 บรรทัดนี้เพื่อล็อกปุ่มกันกดซ้ำ (Double Click) 🔽
-  if (btn && btn.disabled) return; // ถ้าปุ่มถูกกดไปแล้ว ให้หยุดทำงานทันที
+  if (btn && btn.disabled) return; 
   if (btn) {
     btn.disabled = true;
     btn.textContent = 'กำลังบันทึก...';
   }
-  // 🔼 จบส่วนที่แก้ไข 🔼
 
   let successCount = 0;
   let errorMsg = '';
@@ -2377,6 +2364,7 @@ function closePOForm() {
 
 // ═══════════════════════════════════════════════════════════════
 //  EXPORT PO TO EXCEL
+//  + V.10.14: ตาม Format ตัวอย่าง + เลือกช่วงวันที่ได้
 // ═══════════════════════════════════════════════════════════════
 
 function exportPOToExcel() {
@@ -2385,21 +2373,69 @@ function exportPOToExcel() {
     return;
   }
 
-  if (!confirm(`Export ${poCache.length} PO เป็น Excel?`)) return;
+  // 🔽 1. สร้าง Modal เลือกวันที่ (ถ้ายังไม่มีใน HTML)
+  let modal = document.getElementById('modalExportPO');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'modalExportPO';
+    modal.className = 'modal-bg';
+    modal.innerHTML = `
+      <div class="modal" style="max-width:480px">
+        <div class="modal-head">
+          <h3>📤 Export Excel (Purchase Order)</h3>
+          <button onclick="closeModal('modalExportPO')">ปิด</button>
+        </div>
+        <div class="form-grid" style="grid-template-columns:1fr">
+          <label>📅 จากวันที่รับ (Receive Date)
+            <input type="date" id="exportPoDateFrom">
+          </label>
+          <label>📅 ถึงวันที่รับ (Receive Date)
+            <input type="date" id="exportPoDateTo">
+          </label>
+        </div>
+        <div class="hint">เว้นว่างเพื่อ Export ทั้งหมดในเดือนที่เลือก</div>
+        <div class="form-actions" style="margin-top:16px">
+          <button onclick="closeModal('modalExportPO')">ยกเลิก</button>
+          <button class="primary" onclick="runExportPOExcel()">📤 Export</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
 
-  exportPOToExcel_Async();
+  // เคลียร์ค่าเริ่มต้น
+  const fromEl = document.getElementById('exportPoDateFrom');
+  const toEl = document.getElementById('exportPoDateTo');
+  if (fromEl) fromEl.value = '';
+  if (toEl) toEl.value = '';
+
+  openModal('modalExportPO');
 }
 
-async function exportPOToExcel_Async() {
+async function runExportPOExcel() {
+  const fromDate = document.getElementById('exportPoDateFrom')?.value;
+  const toDate = document.getElementById('exportPoDateTo')?.value;
+
+  closeModal('modalExportPO');
+
   try {
     const allItems = [];
     const posWithItems = [];
 
+    // 2. ดึงข้อมูล PO ทุกรายการในเดือนที่เลือก
     for (const po of poCache) {
       const { data, error } = await supabase.rpc('get_purchase_order_detail', { p_po_id: po.id });
       if (error) throw error;
 
       const items = (data.items || []).filter(it => it.status !== 'cancelled');
+
+      // 3. กรองตามช่วงวันที่ (ถ้ามีการเลือก)
+      const poReceiveDate = data.header.ref_receive ? String(data.header.ref_receive).slice(0, 10) : '';
+      
+      if (fromDate && poReceiveDate < fromDate) continue;
+      if (toDate && poReceiveDate > toDate) continue;
+
+      if (items.length === 0) continue;
 
       posWithItems.push({
         po: data.header,
@@ -2410,7 +2446,8 @@ async function exportPOToExcel_Async() {
         allItems.push({
           ...it,
           po_no: data.header.po_no,
-          sup_code: data.header.sup_code
+          sup_code: data.header.sup_code,
+          ref_receive: data.header.ref_receive
         });
       });
     }
@@ -2420,15 +2457,27 @@ async function exportPOToExcel_Async() {
       return;
     }
 
+    // 4. จัด Format ตามตัวอย่าง
     const wsData = [];
-
+    
+    // Header
     wsData.push([
-      'PC.', 'SUP.', 'Gradegram', 'Size', 'Gradegram-Size',
-      'Quantity', 'KG. รวม', 'BU', 'Department', 'Price', 'หมายเหตุ', 'เลขที่ PO'
+      'PC.', 'SUP.', 'วันที่รับเข้า', 'เลขที่ PO', 'Gradegram-Size',
+      'Quantity', 'KG. รวม', 'BU', 'Department', 'Price', 'หมายเหตุ'
     ]);
+
+    let totalQty = 0;
+    let totalKg = 0;
 
     posWithItems.forEach((p) => {
       p.items.forEach((it, itemIdx) => {
+        totalQty += Number(it.quantity) || 0;
+        totalKg += Number(it.kg_total) || 0;
+
+        // คำนวณราคาจริง
+        const price = Number(it.price) || 0;
+        
+        // รวมหมายเหตุ
         const custLabel = { normal: '', pump_f: 'ปั้ม F', pump_bt: 'ปั้ม BT', pump_ktp: 'ปั้ม KTP' }[it.customer_roll] || '';
         const qualLabel = { normal: '', nc: 'NC' }[it.quality_b] || '';
         const noteParts = [custLabel, qualLabel, it.note].filter(x => x && x.trim());
@@ -2437,34 +2486,48 @@ async function exportPOToExcel_Async() {
         wsData.push([
           it.pc_code || 'SDPC.01',
           p.po.sup_code || '',
-          it.gradegram,
-          it.size,
+          itemIdx === 0 ? (p.po.ref_receive ? new Date(p.po.ref_receive) : '') : '', // แสดงวันที่เฉพาะบรรทัดแรก
+          itemIdx === 0 ? p.po.po_no : '', // แสดงเลข PO เฉพาะบรรทัดแรก
           it.gradegram_size,
-          it.quantity,
-          Number(it.kg_total || 0),
-          1,
-          '13110',
-          Number(it.price || 0),
-          remarkCombined,
-          itemIdx === 0 ? p.po.po_no : ''
+          Number(it.quantity) || 0,
+          Number(it.kg_total) || 0,
+          1, // BU
+          '13110', // Department
+          price,
+          remarkCombined
         ]);
       });
     });
 
+    // แถวรวม
+    wsData.push([
+      'รวม', '', '', '', '', totalQty, totalKg, '', '', '', ''
+    ]);
+
+    // 5. สร้างไฟล์ Excel
     const ws = XLSX.utils.aoa_to_sheet(wsData);
 
+    // ตั้งค่าความกว้างคอลัมน์
     ws['!cols'] = [
-      { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 6 }, { wch: 16 },
+      { wch: 10 }, { wch: 8 }, { wch: 20 }, { wch: 16 }, { wch: 16 },
       { wch: 10 }, { wch: 12 }, { wch: 5 }, { wch: 12 }, { wch: 10 },
-      { wch: 40 }, { wch: 16 }
+      { wch: 30 }
     ];
 
+    // จัด Format ตัวเลข
     const range = XLSX.utils.decode_range(ws['!ref']);
     for (let R = 1; R <= range.e.r; R++) {
+      // KG
       const kgCell = ws[XLSX.utils.encode_cell({ r: R, c: 6 })];
-      if (kgCell) kgCell.z = '#,##0.00';
+      if (kgCell) kgCell.z = '#,##0';
+      
+      // Price
       const pCell = ws[XLSX.utils.encode_cell({ r: R, c: 9 })];
       if (pCell) pCell.z = '0.00';
+
+      // วันที่
+      const dateCell = ws[XLSX.utils.encode_cell({ r: R, c: 2 })];
+      if (dateCell && dateCell.v) dateCell.z = 'yyyy-mm-dd hh:mm:ss';
     }
 
     const wb = XLSX.utils.book_new();
@@ -2475,6 +2538,7 @@ async function exportPOToExcel_Async() {
 
     alert(`✅ Export ${allItems.length} รายการ จาก ${posWithItems.length} PO สำเร็จ`);
   } catch (e) {
+    console.error('runExportPOExcel:', e);
     alert('❌ ' + e.message);
   }
 }
