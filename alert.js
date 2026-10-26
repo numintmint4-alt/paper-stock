@@ -9,6 +9,7 @@
 //  V.10.15 Fix: applyCalculatedDates() ไม่เซ็ต alertReceiveDate (ปล่อยว่าง)
 //  V.10.16 Fix: renderAlert() แสดงแถบวันที่ + ปุ่ม "+ เพิ่มวัน" แม้ยังไม่มีวันที่
 //  V.10.17 Fix: Auto-load Alert History on init + default date to today
+//  V.10.18 Fix: default alertReceiveDate = today + UI empty state inline
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -220,6 +221,7 @@ async function initAlertTab() {
 
   const today = toISODate(new Date());
 
+  // 🔽 เซ็ตค่าวันที่วิเคราะห์ (ห้ามแก้) 🔽
   const alertDateEl = $('alertDate');
   if (alertDateEl) {
     alertDateEl.value = today;
@@ -228,6 +230,13 @@ async function initAlertTab() {
     alertDateEl.style.background = '#f1f5f9';
     alertDateEl.style.cursor = 'not-allowed';
   }
+
+  // 🔽 V.10.18: ให้ช่อง "วันที่สั่งซื้อ" ดีฟอลต์เป็น "วันปัจจุบัน" 🔽
+  const receiveDateEl = $('alertReceiveDate');
+  if (receiveDateEl && !receiveDateEl.value) {
+    receiveDateEl.value = today; 
+  }
+  // 🔼 จบส่วนที่เพิ่ม 🔼
 
   const displayEl = $('alertDateDisplay');
   if (displayEl) displayEl.textContent = fmtDateThai(today);
@@ -2066,25 +2075,34 @@ async function renderAlert() {
   const snapshotMonth = $('alertSnapshotMonth')?.value;
   const stockDate     = $('alertStockDate')?.value;
   
-  // 🔽 V.10.16: แสดงแถบวันที่ + ปุ่ม "+ เพิ่มวัน" แม้ยังไม่มีวันที่ 🔽
+  // 🔽 V.10.18: ปรับ UI แถบวันที่ + กรอบเหลืองให้อยู่ในกรอบเดียวกัน 🔽
   if (alertReceiveDates.length === 0) {
-    // 1. ใส่แถบวันที่ (ให้มีปุ่ม + เพิ่มวัน)
-    let tabsHtml = `<div id="alertDateTabsBox" class="alert-date-tabs"></div>`;
-    
-    // 2. ใส่ข้อความแจ้งเตือน (จำกัดความสูงไม่ให้เต็มจอ)
-    tabsHtml += `
-      <div class="msg warn" style="font-size:16px;text-align:center;padding:40px 20px; margin-top:20px;">
-        ⚠️ <b>กรุณาเลือกวันที่รับสินค้า</b><br>
-        (กดปุ่ม "+ เพิ่มวัน" ด้านบน เพื่อเริ่มต้น)
+    // 🔽 สร้างแถบวันที่ ที่มีกรอบเหลืองรวมกับปุ่ม "+ เพิ่มวัน" 🔽
+    let html = `
+      <div class="alert-date-tabs" style="display:flex; align-items:center; justify-content:space-between; background:#f8fafc; border:1px solid #e2e8f0; padding:8px; border-radius:6px; margin-bottom:15px; flex-wrap:wrap; gap:8px;">
+        
+        <!-- กรอบสีเหลือง + ข้อความแจ้งเตือน -->
+        <div style="background: #fef3c7; border: 1px solid #fcd34d; color: #92400e; padding: 8px 15px; border-radius: 4px; font-size: 13px; font-weight: 600; display:flex; align-items:center; gap:8px;">
+          ⚠️ กรุณาเลือกวันที่รับสินค้า
+        </div>
+
+        <!-- ปุ่ม + เพิ่มวัน -->
+        <button type="button" class="alert-date-add-btn" onclick="addAlertReceiveDate()" 
+                style="background: #eff6ff; color: #1e40af; border: 1px dashed #3b82f6; padding: 6px 12px; border-radius: 4px; font-size: 13px; cursor: pointer; margin-left:auto;">
+          + เพิ่มวัน
+        </button>
+        
+        <!-- ปุ่มสลับโหมด (ถ้าต้องการให้แสดง) -->
+        <div class="alert-view-toggle-inline" style="display:flex; gap:4px;">
+          <button type="button" class="${alertViewMode === 'flat' ? 'active' : ''}" onclick="setAlertViewMode('flat')">📋 รายการ</button>
+          <button type="button" class="${alertViewMode === 'matrix' ? 'active' : ''}" onclick="setAlertViewMode('matrix')">📊 Matrix</button>
+        </div>
+
       </div>
     `;
     
-    $('alertBody').innerHTML = tabsHtml;
-    
-    // 3. สั่งให้วาดปุ่ม "+ เพิ่มวัน" ขึ้นมาทำงาน
-    renderAlertDateTabs(); 
-    
-    return; // หยุดการทำงาน ไม่ต้องโหลดข้อมูล
+    $('alertBody').innerHTML = html;
+    return; 
   }
   // 🔼 จบเงื่อนไข 🔼
 
