@@ -1955,10 +1955,7 @@ function addAlertReceiveDate() {
 }
 
 function removeAlertReceiveDate(idx) {
-  if (alertReceiveDates.length <= 1) {
-    alert('ต้องมีวันที่รับสินค้าอย่างน้อย 1 วัน');
-    return;
-  }
+  // ✅ ปลดล็อก: ให้ลบวันสุดท้ายได้ เพื่อกลับไปที่ Empty State
   if (!confirm('ลบวันที่นี้? ข้อมูลที่กรอกในวันนี้จะหายไปด้วย')) return;
 
   const dateToRemove = alertReceiveDates[idx];
@@ -1973,7 +1970,9 @@ function removeAlertReceiveDate(idx) {
   alertReceiveDates.splice(idx, 1);
   saveAlertReceiveDates();
   renderAlertDateTabs();
-  renderAlert();
+  
+  // 🔽 สำคัญ: ให้เรียก renderAlert() เพื่ออัปเดตหน้าจอเป็น Empty State ทันที 🔽
+  renderAlert(); 
 }
 
 function onAlertReceiveDateChange(idx, value) {
