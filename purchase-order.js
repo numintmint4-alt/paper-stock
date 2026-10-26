@@ -8,6 +8,7 @@
 //  + V.10.14 Fix: Export Excel ตาม Format ตัวอย่าง + เลือกช่วงวันที่ได้
 //  + V.10.15 Fix: Default date = tomorrow (skip weekend) + Loading
 //  + V.10.16 Fix: Export Excel ด้วย ExcelJS (สีพื้นหลัง + เส้นขอบ)
+//  + V.10.17 Fix: Export Excel แทรกแถว =SUM() ต่อท้ายทุก PO
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -2366,9 +2367,7 @@ function closePOForm() {
 
 // ═══════════════════════════════════════════════════════════════
 //  EXPORT PO TO EXCEL
-//  + V.10.14: ตาม Format ตัวอย่าง + เลือกช่วงวันที่ได้
-//  + V.10.15: Default tomorrow (skip Sat/Sun) + Loading
-//  + V.10.16: ExcelJS (สีพื้นหลัง + เส้นขอบ + blank row + 📌)
+//  + V.10.17: Export Excel ด้วย ExcelJS (มีแถว SUM ต่อท้ายทุก PO)
 // ═══════════════════════════════════════════════════════════════
 
 function exportPOToExcel() {
@@ -2438,7 +2437,7 @@ async function runExportPOExcel() {
 
   closeModal('modalExportPO');
 
-  // 🔽 สร้าง Loading Overlay 🔽
+  // 🔽 Loading Overlay 🔽
   const loadingEl = document.createElement('div');
   loadingEl.id = 'exportLoading';
   loadingEl.style.cssText = 'position:fixed;inset:0;background:rgba(255,255,255,0.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:18px;font-weight:bold;color:#1e40af;';
@@ -2452,7 +2451,7 @@ async function runExportPOExcel() {
   try {
     const posWithItems = [];
 
-    // 1. ดึงข้อมูล PO ทั้งหมด (กรองตามวันที่)
+    // 1. ดึงข้อมูล PO (กรองตามวันที่)
     for (const po of poCache) {
       const { data, error } = await supabase.rpc('get_purchase_order_detail', { p_po_id: po.id });
       if (error) throw error;
@@ -2464,10 +2463,7 @@ async function runExportPOExcel() {
       if (toDate && poReceiveDate > toDate) continue;
       if (items.length === 0) continue;
 
-      posWithItems.push({
-        po: data.header,
-        items: items
-      });
+      posWithItems.push({ po: data.header, items: items });
     }
 
     if (!posWithItems.length) {
@@ -2475,52 +2471,39 @@ async function runExportPOExcel() {
       return;
     }
 
-    // 2. สร้างไฟล์ Excel ด้วย ExcelJS
+    // 2. สร้าง Workbook
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('PO');
 
-    // ตั้งค่าความกว้างคอลัมน์
     worksheet.columns = [
       { width: 10 }, { width: 8 }, { width: 20 }, { width: 16 }, { width: 16 },
       { width: 10 }, { width: 12 }, { width: 5 }, { width: 12 }, { width: 10 }, { width: 30 }
     ];
 
-    // 3. สร้างหัวตาราง (Header Row)
+    // 3. Header Row
     const headerRow = worksheet.addRow([
       'PC.', 'SUP.', 'วันที่รับเข้า', 'เลขที่ PO', 'Gradegram-Size',
       'Quantity', 'KG. รวม', 'BU', 'Department', 'Price', 'หมายเหตุ'
     ]);
-
-    // ตกแต่งหัวตาราง
+    
     headerRow.eachCell((cell) => {
-      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } }; // ตัวอักษรสีขาว หนา
-      cell.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF3B82F6' } // พื้นหลังสีน้ำเงิน
-      };
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF3B82F6' } }; // น้ำเงิน
       cell.alignment = { vertical: 'middle', horizontal: 'center' };
-      cell.border = {
-        top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' }
-      };
+      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
     });
 
-    let totalQty = 0;
-    let totalKg = 0;
+    let grandTotalQty = 0;
+    let grandTotalKg = 0;
+    let currentRowIndex = 2; // แถวที่ 1 คือ Header
 
-    // 4. วนลูปข้อมูล
-    posWithItems.forEach((p, poIdx) => {
-      // 🔽 เพิ่มการเว้นบรรทัดว่างคั่นระหว่าง PO 🔽
-      if (poIdx > 0) {
-        const emptyRow = worksheet.addRow(['', '', '', '', '', '', '', '', '', '', '']);
-        emptyRow.eachCell((cell) => {
-          cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-        });
-      }
+    // 4. วนลูป PO
+    posWithItems.forEach((p) => {
+      const startRow = currentRowIndex;
 
       p.items.forEach((it, itemIdx) => {
-        totalQty += Number(it.quantity) || 0;
-        totalKg += Number(it.kg_total) || 0;
+        grandTotalQty += Number(it.quantity) || 0;
+        grandTotalKg += Number(it.kg_total) || 0;
 
         const price = Number(it.price) || 0;
         const custLabel = { normal: '', pump_f: 'ปั้ม F', pump_bt: 'ปั้ม BT', pump_ktp: 'ปั้ม KTP' }[it.customer_roll] || '';
@@ -2544,41 +2527,52 @@ async function runExportPOExcel() {
           remarkCombined
         ]);
 
-        // ตกแต่งเส้นขอบทุก Cell
+        // เส้นขอบ
         row.eachCell((cell) => {
-          cell.border = {
-            top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' }
-          };
+          cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
         });
 
-        // กำหนด format วันที่เฉพาะบรรทัดแรก
+        // format วันที่
         if (isFirstRow) {
           const dateCell = row.getCell(3);
-          if (dateCell.value) dateCell.numFmt = 'yyyy-mm-dd hh:mm:ss';
-          
-          // ไฮไลท์เลข PO ให้เป็นตัวหนาและสีน้ำเงิน
-          const poCell = row.getCell(4);
-          poCell.font = { bold: true, color: { argb: 'FF1E40AF' } };
+          if (dateCell.value) dateCell.numFmt = 'yyyy-mm-dd hh:mm:ss'; // ตามตัวอย่าง 2026-10-26 00:00:00
         }
         
-        // กำหนด format ราคา
+        // format ราคา
         row.getCell(10).numFmt = '0.00';
+        currentRowIndex++;
       });
+
+      const endRow = currentRowIndex - 1;
+
+      // 🔽 เพิ่มแถว SUM ต่อท้ายแต่ละ PO 🔽
+      const totalRow = worksheet.addRow([
+        '', '', '', '', '', 
+        { formula: `SUM(F${startRow}:F${endRow})` }, 
+        { formula: `SUM(G${startRow}:G${endRow})` }, 
+        '', '', '', ''
+      ]);
+      
+      totalRow.eachCell((cell) => {
+        cell.font = { bold: true };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } }; // สีเทาอ่อน
+        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      });
+      
+      currentRowIndex++; // ขยับไปแถวถัดไป
     });
 
-    // 5. แถวรวม (Total)
-    const totalRow = worksheet.addRow([
-      'รวม', '', '', '', '', totalQty, totalKg, '', '', '', ''
+    // 5. แถวรวมทั้งหมด (Grand Total) - ตามตัวอย่างไฟล์ที่คุณส่งมา
+    const grandTotalRow = worksheet.addRow([
+      'รวม', '', '', '', '', grandTotalQty, grandTotalKg, '', '', '', ''
     ]);
-    totalRow.eachCell((cell) => {
+    grandTotalRow.eachCell((cell) => {
       cell.font = { bold: true };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } }; // พื้นหลังสีเทาอ่อน
-      cell.border = {
-        top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' }
-      };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFCBD5E1' } }; // สีเทาเข้ม
+      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
     });
 
-    // 6. สร้างไฟล์และดาวน์โหลด
+    // 6. ดาวน์โหลด
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = window.URL.createObjectURL(blob);
@@ -2596,7 +2590,6 @@ async function runExportPOExcel() {
     console.error('runExportPOExcel:', e);
     alert('❌ ' + e.message);
   } finally {
-    // 🔽 ลบ Loading ออกเมื่อเสร็จ 🔽
     const el = document.getElementById('exportLoading');
     if (el) el.remove();
   }
