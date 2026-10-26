@@ -5,6 +5,7 @@
 //  V.10.11 Fix: เปลี่ยนช่องวันที่เป็น Text + เพิ่มตัวแปลง DD/MM/YYYY ↔ YYYY-MM-DD
 //  V.10.12 Fix: เปลี่ยนกลับเป็น type="date" + บังคับเลือกเดือนล่าสุดใน loadSnapshotMonths
 //  V.10.13 Fix: Auto-analyze on load + on month change
+//  V.10.14 Fix: Default ไม่มีวันที่รับสินค้า (ว่างไว้) + แจ้งเตือนให้กดเพิ่มวัน
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -1890,52 +1891,39 @@ function saveAlertReceiveDates() {
 
 function addAlertReceiveDate() {
   const analyzedDate = $('alertDate')?.value;
-
   if (!analyzedDate) {
     alert('กรุณาเลือกวันที่วิเคราะห์ก่อน');
     return;
   }
 
-  const analyzedD = _parseLocalDate(analyzedDate);
-  if (!analyzedD) {
-    alert('วันที่วิเคราะห์ไม่ถูกต้อง');
-    return;
+  // 🔽 เริ่มคำนวณหาวันพรุ่งนี้ (ข้ามวันอาทิตย์) 🔽
+  const tomorrow = new Date(analyzedDate);
+  tomorrow.setDate(tomorrow.getDate() + 1); // พรุ่งนี้
+  
+  // ถ้าพรุ่งนี้เป็นวันอาทิตย์ (0) ให้บวกอีก 1 วันเป็นจันทร์
+  if (tomorrow.getDay() === 0) {
+    tomorrow.setDate(tomorrow.getDate() + 1);
   }
+  const defaultNextDate = toISODate(tomorrow);
+  // 🔼 จบการคำนวณ 🔼
 
-  const firstReceiveD = new Date(analyzedD);
-  firstReceiveD.setDate(firstReceiveD.getDate() + 1);
-  while (firstReceiveD.getDay() === 0) firstReceiveD.setDate(firstReceiveD.getDate() + 1);
-
+  // ถ้ายังไม่มีวันที่เลย ให้เพิ่มวันพรุ่งนี้เข้าไปเลย
   if (alertReceiveDates.length === 0) {
-    alertReceiveDates.push(toISODate(firstReceiveD));
+    alertReceiveDates.push(defaultNextDate);
     saveAlertReceiveDates();
     renderAlertDateTabs();
+    renderAlert(); // โหลดตารางทันที
     return;
   }
 
+  // ถ้ามีวันที่อยู่แล้ว ให้หาวันว่างถัดไป (หลังจากวันสุดท้ายที่มี)
   const sorted = [...alertReceiveDates]
     .map(_parseLocalDate)
     .filter(Boolean)
     .sort((a, b) => a - b);
 
   const existing = new Set(alertReceiveDates);
-
-  let cursor = new Date(firstReceiveD);
   const lastD = sorted[sorted.length - 1];
-
-  while (cursor <= lastD) {
-    if (cursor.getDay() !== 0) {
-      const iso = toISODate(cursor);
-      if (!existing.has(iso)) {
-        alertReceiveDates.push(iso);
-        alertReceiveDates.sort((a, b) => _parseLocalDate(a) - _parseLocalDate(b));
-        saveAlertReceiveDates();
-        renderAlertDateTabs();
-        return;
-      }
-    }
-    cursor.setDate(cursor.getDate() + 1);
-  }
 
   const nextD = _nextWorkingDay(lastD);
   while (nextD.getDay() === 0) nextD.setDate(nextD.getDate() + 1);
@@ -1950,6 +1938,7 @@ function addAlertReceiveDate() {
   alertReceiveDates.sort((a, b) => _parseLocalDate(a) - _parseLocalDate(b));
   saveAlertReceiveDates();
   renderAlertDateTabs();
+  renderAlert(); // โหลดตารางใหม่
 }
 
 function removeAlertReceiveDate(idx) {
@@ -1989,7 +1978,7 @@ function switchAlertDate(idx) {
   if (idx < 0 || idx >= alertReceiveDates.length) return;
   alertActiveDateIdx = idx;
   renderAlertDateTabs();
-  renderAlert();
+  renderAlert(); // โหลดตารางใหม่ (ข้อมูลจะถูกดึงจาก LocalStorage ของวันนั้น)
 }
 
 function renderAlertDateTabs() {
@@ -2029,22 +2018,14 @@ function renderAlertDateTabs() {
 function initAlertReceiveDates() {
   alertReceiveDates = loadAlertReceiveDates();
 
+  // ลบวันที่ที่เป็นวันอาทิตย์ออก
   alertReceiveDates = alertReceiveDates.filter(d => {
     const dt = _parseLocalDate(d);
     return dt && dt.getDay() !== 0;
   });
 
-  if (alertReceiveDates.length === 0) {
-    const analyzedDate = $('alertDate')?.value || toISODate(new Date());
-    const analyzedD = _parseLocalDate(analyzedDate);
-
-    const nextD = new Date(analyzedD);
-    nextD.setDate(nextD.getDate() + 1);
-    while (nextD.getDay() === 0) nextD.setDate(nextD.getDate() + 1);
-
-    alertReceiveDates.push(toISODate(nextD));
-    saveAlertReceiveDates();
-  }
+  // 🔽 แก้ไข: ไม่ต้องสร้างวันที่เริ่มต้นอัตโนมัติ ให้เริ่มที่ Array ว่างเลย 🔽
+  // if (alertReceiveDates.length === 0) { ... } <-- ลบส่วนนี้ออก
 
   alertActiveDateIdx = 0;
   renderAlertDateTabs();
@@ -2068,6 +2049,19 @@ function isFSCGrade(gradegram) {
 async function renderAlert() {
   const snapshotMonth = $('alertSnapshotMonth')?.value;
   const stockDate     = $('alertStockDate')?.value;
+  
+  // 🔽 เพิ่มเงื่อนไขตรวจสอบว่ามีวันที่รับสินค้าหรือยัง 🔽
+  if (alertReceiveDates.length === 0) {
+    $('alertBody').innerHTML = `
+      <div class="msg warn" style="font-size:16px;text-align:center;padding:30px">
+        ⚠️ <b>กรุณาเลือกวันที่รับสินค้า</b><br>
+        (กดปุ่ม "+ เพิ่มวัน" ด้านบน เพื่อเริ่มต้น)
+      </div>
+    `;
+    return; // หยุดการทำงาน ไม่ต้องโหลดข้อมูล
+  }
+  // 🔼 จบเงื่อนไข 🔼
+
   const receiveDate   = $('alertReceiveDate')?.value;
 
   if (!snapshotMonth || !stockDate || !receiveDate) {
