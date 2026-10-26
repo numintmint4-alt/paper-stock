@@ -6,6 +6,8 @@
 //  + Add PO Items (Phase 3) + Inline Edit Items (Phase 3E)
 //  + V.10.9 Fix: Lock ปุ่มบันทึกใน _doSaveAllPOs กัน Double Click
 //  + V.10.14 Fix: Export Excel ตาม Format ตัวอย่าง + เลือกช่วงวันที่ได้
+//  + V.10.15 Fix: Default date = tomorrow (skip weekend) + Loading
+//                indicator + blank row between POs + 📌 prefix
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -2365,6 +2367,7 @@ function closePOForm() {
 // ═══════════════════════════════════════════════════════════════
 //  EXPORT PO TO EXCEL
 //  + V.10.14: ตาม Format ตัวอย่าง + เลือกช่วงวันที่ได้
+//  + V.10.15: Default tomorrow (skip Sat/Sun) + Loading + blank row
 // ═══════════════════════════════════════════════════════════════
 
 function exportPOToExcel() {
@@ -2403,11 +2406,27 @@ function exportPOToExcel() {
     document.body.appendChild(modal);
   }
 
-  // เคลียร์ค่าเริ่มต้น
+  // 🔽 ตั้งค่าเริ่มต้นเป็น "วันพรุ่งนี้ (ข้ามเสาร์-อาทิตย์)" 🔽
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1); // บวก 1 วัน
+
+  // ถ้าพรุ่งนี้เป็นวันเสาร์ (6) ให้บวกเพิ่มอีก 2 วัน (เป็นจันทร์)
+  if (tomorrow.getDay() === 6) {
+    tomorrow.setDate(tomorrow.getDate() + 2);
+  } 
+  // ถ้าพรุ่งนี้เป็นวันอาทิตย์ (0) ให้บวกเพิ่มอีก 1 วัน (เป็นจันทร์)
+  else if (tomorrow.getDay() === 0) {
+    tomorrow.setDate(tomorrow.getDate() + 1);
+  }
+
+  // แปลงวันที่เป็นรูปแบบ YYYY-MM-DD
+  const defaultDateISO = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+  
   const fromEl = document.getElementById('exportPoDateFrom');
   const toEl = document.getElementById('exportPoDateTo');
-  if (fromEl) fromEl.value = '';
-  if (toEl) toEl.value = '';
+  if (fromEl) fromEl.value = defaultDateISO;
+  if (toEl) toEl.value = defaultDateISO;
+  // 🔼 จบส่วนที่แก้ไข 🔼
 
   openModal('modalExportPO');
 }
@@ -2417,6 +2436,18 @@ async function runExportPOExcel() {
   const toDate = document.getElementById('exportPoDateTo')?.value;
 
   closeModal('modalExportPO');
+
+  // 🔽 สร้าง Loading Overlay 🔽
+  const loadingEl = document.createElement('div');
+  loadingEl.id = 'exportLoading';
+  loadingEl.style.cssText = 'position:fixed;inset:0;background:rgba(255,255,255,0.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:18px;font-weight:bold;color:#1e40af;';
+  loadingEl.innerHTML = `
+    <div style="border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 16px;"></div>
+    <div>⏳ กำลังสร้างไฟล์ Excel...</div>
+    <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
+  `;
+  document.body.appendChild(loadingEl);
+  // 🔼 จบส่วน Loading 🔼
 
   try {
     const allItems = [];
@@ -2469,7 +2500,12 @@ async function runExportPOExcel() {
     let totalQty = 0;
     let totalKg = 0;
 
-    posWithItems.forEach((p) => {
+    posWithItems.forEach((p, poIdx) => {
+      // 🔽 เพิ่มบรรทัดว่างคั่นระหว่าง PO 🔽
+      if (poIdx > 0) {
+        wsData.push(['', '', '', '', '', '', '', '', '', '', '']); 
+      }
+
       p.items.forEach((it, itemIdx) => {
         totalQty += Number(it.quantity) || 0;
         totalKg += Number(it.kg_total) || 0;
@@ -2483,11 +2519,15 @@ async function runExportPOExcel() {
         const noteParts = [custLabel, qualLabel, it.note].filter(x => x && x.trim());
         const remarkCombined = noteParts.join(',');
 
+        // 🔽 แสดงเลข PO เฉพาะแถวแรก และใส่สัญลักษณ์ 📌 🔽
+        const isFirstRow = itemIdx === 0;
+        const poNoDisplay = isFirstRow ? `📌 ${p.po.po_no}` : '';
+
         wsData.push([
           it.pc_code || 'SDPC.01',
           p.po.sup_code || '',
-          itemIdx === 0 ? (p.po.ref_receive ? new Date(p.po.ref_receive) : '') : '', // แสดงวันที่เฉพาะบรรทัดแรก
-          itemIdx === 0 ? p.po.po_no : '', // แสดงเลข PO เฉพาะบรรทัดแรก
+          isFirstRow ? (p.po.ref_receive ? new Date(p.po.ref_receive) : '') : '',
+          poNoDisplay,
           it.gradegram_size,
           Number(it.quantity) || 0,
           Number(it.kg_total) || 0,
@@ -2540,6 +2580,10 @@ async function runExportPOExcel() {
   } catch (e) {
     console.error('runExportPOExcel:', e);
     alert('❌ ' + e.message);
+  } finally {
+    // 🔽 ลบ Loading ออกเมื่อเสร็จ 🔽
+    const el = document.getElementById('exportLoading');
+    if (el) el.remove();
   }
 }
 
