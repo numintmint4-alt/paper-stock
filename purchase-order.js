@@ -7,7 +7,7 @@
 //  + V.10.9 Fix: Lock ปุ่มบันทึกใน _doSaveAllPOs กัน Double Click
 //  + V.10.14 Fix: Export Excel ตาม Format ตัวอย่าง + เลือกช่วงวันที่ได้
 //  + V.10.15 Fix: Default date = tomorrow (skip weekend) + Loading
-//                indicator + blank row between POs + 📌 prefix
+//  + V.10.16 Fix: Export Excel ด้วย ExcelJS (สีพื้นหลัง + เส้นขอบ)
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -2367,7 +2367,8 @@ function closePOForm() {
 // ═══════════════════════════════════════════════════════════════
 //  EXPORT PO TO EXCEL
 //  + V.10.14: ตาม Format ตัวอย่าง + เลือกช่วงวันที่ได้
-//  + V.10.15: Default tomorrow (skip Sat/Sun) + Loading + blank row
+//  + V.10.15: Default tomorrow (skip Sat/Sun) + Loading
+//  + V.10.16: ExcelJS (สีพื้นหลัง + เส้นขอบ + blank row + 📌)
 // ═══════════════════════════════════════════════════════════════
 
 function exportPOToExcel() {
@@ -2447,136 +2448,150 @@ async function runExportPOExcel() {
     <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
   `;
   document.body.appendChild(loadingEl);
-  // 🔼 จบส่วน Loading 🔼
 
   try {
-    const allItems = [];
     const posWithItems = [];
 
-    // 2. ดึงข้อมูล PO ทุกรายการในเดือนที่เลือก
+    // 1. ดึงข้อมูล PO ทั้งหมด (กรองตามวันที่)
     for (const po of poCache) {
       const { data, error } = await supabase.rpc('get_purchase_order_detail', { p_po_id: po.id });
       if (error) throw error;
 
       const items = (data.items || []).filter(it => it.status !== 'cancelled');
-
-      // 3. กรองตามช่วงวันที่ (ถ้ามีการเลือก)
       const poReceiveDate = data.header.ref_receive ? String(data.header.ref_receive).slice(0, 10) : '';
       
       if (fromDate && poReceiveDate < fromDate) continue;
       if (toDate && poReceiveDate > toDate) continue;
-
       if (items.length === 0) continue;
 
       posWithItems.push({
         po: data.header,
         items: items
       });
-
-      items.forEach(it => {
-        allItems.push({
-          ...it,
-          po_no: data.header.po_no,
-          sup_code: data.header.sup_code,
-          ref_receive: data.header.ref_receive
-        });
-      });
     }
 
-    if (!allItems.length) {
+    if (!posWithItems.length) {
       alert('ไม่มีรายการที่จะ export');
       return;
     }
 
-    // 4. จัด Format ตามตัวอย่าง
-    const wsData = [];
-    
-    // Header
-    wsData.push([
+    // 2. สร้างไฟล์ Excel ด้วย ExcelJS
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('PO');
+
+    // ตั้งค่าความกว้างคอลัมน์
+    worksheet.columns = [
+      { width: 10 }, { width: 8 }, { width: 20 }, { width: 16 }, { width: 16 },
+      { width: 10 }, { width: 12 }, { width: 5 }, { width: 12 }, { width: 10 }, { width: 30 }
+    ];
+
+    // 3. สร้างหัวตาราง (Header Row)
+    const headerRow = worksheet.addRow([
       'PC.', 'SUP.', 'วันที่รับเข้า', 'เลขที่ PO', 'Gradegram-Size',
       'Quantity', 'KG. รวม', 'BU', 'Department', 'Price', 'หมายเหตุ'
     ]);
 
+    // ตกแต่งหัวตาราง
+    headerRow.eachCell((cell) => {
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } }; // ตัวอักษรสีขาว หนา
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF3B82F6' } // พื้นหลังสีน้ำเงิน
+      };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      cell.border = {
+        top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' }
+      };
+    });
+
     let totalQty = 0;
     let totalKg = 0;
 
+    // 4. วนลูปข้อมูล
     posWithItems.forEach((p, poIdx) => {
-      // 🔽 เพิ่มบรรทัดว่างคั่นระหว่าง PO 🔽
+      // 🔽 เพิ่มการเว้นบรรทัดว่างคั่นระหว่าง PO 🔽
       if (poIdx > 0) {
-        wsData.push(['', '', '', '', '', '', '', '', '', '', '']); 
+        const emptyRow = worksheet.addRow(['', '', '', '', '', '', '', '', '', '', '']);
+        emptyRow.eachCell((cell) => {
+          cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+        });
       }
 
       p.items.forEach((it, itemIdx) => {
         totalQty += Number(it.quantity) || 0;
         totalKg += Number(it.kg_total) || 0;
 
-        // คำนวณราคาจริง
         const price = Number(it.price) || 0;
-        
-        // รวมหมายเหตุ
         const custLabel = { normal: '', pump_f: 'ปั้ม F', pump_bt: 'ปั้ม BT', pump_ktp: 'ปั้ม KTP' }[it.customer_roll] || '';
         const qualLabel = { normal: '', nc: 'NC' }[it.quality_b] || '';
         const noteParts = [custLabel, qualLabel, it.note].filter(x => x && x.trim());
         const remarkCombined = noteParts.join(',');
 
-        // 🔽 แสดงเลข PO เฉพาะแถวแรก และใส่สัญลักษณ์ 📌 🔽
         const isFirstRow = itemIdx === 0;
-        const poNoDisplay = isFirstRow ? `📌 ${p.po.po_no}` : '';
 
-        wsData.push([
+        const row = worksheet.addRow([
           it.pc_code || 'SDPC.01',
           p.po.sup_code || '',
-          isFirstRow ? (p.po.ref_receive ? new Date(p.po.ref_receive) : '') : '',
-          poNoDisplay,
+          isFirstRow ? (p.po.ref_receive ? new Date(p.po.ref_receive) : '') : '', 
+          isFirstRow ? p.po.po_no : '', 
           it.gradegram_size,
           Number(it.quantity) || 0,
           Number(it.kg_total) || 0,
-          1, // BU
-          '13110', // Department
+          1,
+          '13110',
           price,
           remarkCombined
         ]);
+
+        // ตกแต่งเส้นขอบทุก Cell
+        row.eachCell((cell) => {
+          cell.border = {
+            top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' }
+          };
+        });
+
+        // กำหนด format วันที่เฉพาะบรรทัดแรก
+        if (isFirstRow) {
+          const dateCell = row.getCell(3);
+          if (dateCell.value) dateCell.numFmt = 'yyyy-mm-dd hh:mm:ss';
+          
+          // ไฮไลท์เลข PO ให้เป็นตัวหนาและสีน้ำเงิน
+          const poCell = row.getCell(4);
+          poCell.font = { bold: true, color: { argb: 'FF1E40AF' } };
+        }
+        
+        // กำหนด format ราคา
+        row.getCell(10).numFmt = '0.00';
       });
     });
 
-    // แถวรวม
-    wsData.push([
+    // 5. แถวรวม (Total)
+    const totalRow = worksheet.addRow([
       'รวม', '', '', '', '', totalQty, totalKg, '', '', '', ''
     ]);
+    totalRow.eachCell((cell) => {
+      cell.font = { bold: true };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } }; // พื้นหลังสีเทาอ่อน
+      cell.border = {
+        top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' }
+      };
+    });
 
-    // 5. สร้างไฟล์ Excel
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
-
-    // ตั้งค่าความกว้างคอลัมน์
-    ws['!cols'] = [
-      { wch: 10 }, { wch: 8 }, { wch: 20 }, { wch: 16 }, { wch: 16 },
-      { wch: 10 }, { wch: 12 }, { wch: 5 }, { wch: 12 }, { wch: 10 },
-      { wch: 30 }
-    ];
-
-    // จัด Format ตัวเลข
-    const range = XLSX.utils.decode_range(ws['!ref']);
-    for (let R = 1; R <= range.e.r; R++) {
-      // KG
-      const kgCell = ws[XLSX.utils.encode_cell({ r: R, c: 6 })];
-      if (kgCell) kgCell.z = '#,##0';
-      
-      // Price
-      const pCell = ws[XLSX.utils.encode_cell({ r: R, c: 9 })];
-      if (pCell) pCell.z = '0.00';
-
-      // วันที่
-      const dateCell = ws[XLSX.utils.encode_cell({ r: R, c: 2 })];
-      if (dateCell && dateCell.v) dateCell.z = 'yyyy-mm-dd hh:mm:ss';
-    }
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'PO');
-
+    // 6. สร้างไฟล์และดาวน์โหลด
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
     const month = poSelectedMonth || new Date().toISOString().slice(0, 7);
-    XLSX.writeFile(wb, `PO_${month}.xlsx`);
+    a.download = `PO_${month}.xlsx`;
+    a.click();
+    
+    window.URL.revokeObjectURL(url);
+    alert(`✅ Export ${posWithItems.length} PO สำเร็จ`);
 
-    alert(`✅ Export ${allItems.length} รายการ จาก ${posWithItems.length} PO สำเร็จ`);
   } catch (e) {
     console.error('runExportPOExcel:', e);
     alert('❌ ' + e.message);
