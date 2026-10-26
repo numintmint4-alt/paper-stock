@@ -7,6 +7,8 @@
 //  V.10.13 Fix: Auto-analyze on load + on month change
 //  V.10.14 Fix: Default ไม่มีวันที่รับสินค้า (ว่างไว้) + แจ้งเตือนให้กดเพิ่มวัน
 //  V.10.15 Fix: applyCalculatedDates() ไม่เซ็ต alertReceiveDate (ปล่อยว่าง)
+//  V.10.16 Fix: renderAlert() แสดงแถบวันที่ + ปุ่ม "+ เพิ่มวัน" แม้ยังไม่มีวันที่
+//  V.10.17 Fix: Auto-load Alert History on init + default date to today
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -245,6 +247,9 @@ async function initAlertTab() {
   await onAlertDateChange();
 
   showAlertHistoryCard();
+
+  // 🔽 V.10.17: โหลดประวัติของวันนี้อัตโนมัติ 🔽
+  await loadAlertHistory();
 
   // 🔽 ลบ Auto-analyze on load ออก 🔽
   // console.log('[Alert] Auto-analyzing on load...');
@@ -2061,14 +2066,24 @@ async function renderAlert() {
   const snapshotMonth = $('alertSnapshotMonth')?.value;
   const stockDate     = $('alertStockDate')?.value;
   
-  // 🔽 เพิ่มเงื่อนไขตรวจสอบว่ามีวันที่รับสินค้าหรือยัง 🔽
+  // 🔽 V.10.16: แสดงแถบวันที่ + ปุ่ม "+ เพิ่มวัน" แม้ยังไม่มีวันที่ 🔽
   if (alertReceiveDates.length === 0) {
-    $('alertBody').innerHTML = `
-      <div class="msg warn" style="font-size:16px;text-align:center;padding:30px">
+    // 1. ใส่แถบวันที่ (ให้มีปุ่ม + เพิ่มวัน)
+    let tabsHtml = `<div id="alertDateTabsBox" class="alert-date-tabs"></div>`;
+    
+    // 2. ใส่ข้อความแจ้งเตือน (จำกัดความสูงไม่ให้เต็มจอ)
+    tabsHtml += `
+      <div class="msg warn" style="font-size:16px;text-align:center;padding:40px 20px; margin-top:20px;">
         ⚠️ <b>กรุณาเลือกวันที่รับสินค้า</b><br>
         (กดปุ่ม "+ เพิ่มวัน" ด้านบน เพื่อเริ่มต้น)
       </div>
     `;
+    
+    $('alertBody').innerHTML = tabsHtml;
+    
+    // 3. สั่งให้วาดปุ่ม "+ เพิ่มวัน" ขึ้นมาทำงาน
+    renderAlertDateTabs(); 
+    
     return; // หยุดการทำงาน ไม่ต้องโหลดข้อมูล
   }
   // 🔼 จบเงื่อนไข 🔼
@@ -2827,11 +2842,16 @@ async function clearUsagePlan() {
 //  ALERT HISTORY
 // ═══════════════════════════════════════════════════════════════
 
+// ✅ V.10.17: บังคับให้เป็นวันที่ปัจจุบันเสมอถ้ายังไม่มีค่า
 function showAlertHistoryCard() {
   const card = $('alertHistoryCard');
   if (card) card.style.display = '';
+  
   const dateEl = $('alertHistoryDate');
-  if (dateEl && !dateEl.value) dateEl.value = toISODate(new Date());
+  // 🔽 บังคับให้เป็นวันที่ปัจจุบันเสมอถ้ายังไม่มีค่า 🔽
+  if (dateEl && !dateEl.value) {
+    dateEl.value = toISODate(new Date());
+  }
 }
 
 function setAlertHistoryMode(mode) {
@@ -2843,8 +2863,15 @@ function setAlertHistoryMode(mode) {
   if (alertHistoryData) renderAlertHistory();
 }
 
+// ✅ V.10.17: ถ้ายังไม่มีวันที่ ให้ใส่วันที่ปัจจุบันเข้าไปก่อน
 async function loadAlertHistory() {
   const dateEl = $('alertHistoryDate');
+  
+  // 🔽 ถ้ายังไม่มีวันที่ ให้ใส่วันที่ปัจจุบันเข้าไปก่อน 🔽
+  if (dateEl && !dateEl.value) {
+    dateEl.value = toISODate(new Date());
+  }
+
   const date = dateEl?.value;
   if (!date) { alert('กรุณาเลือกวันที่'); return; }
 
