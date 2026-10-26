@@ -3,6 +3,7 @@
 //  Fix Date Query + Debug + Auto-Fetch + Excel Export 2 Sheets
 //  V.10.2 Fix: fetchFromPO() → เพิ่ม gram + size เป็น Number
 //  V.10.3 Fix: เปลี่ยนข้อความหัวข้อรายงานเป็น "สรุปรายการสั่งซื้อ"
+//  V.10.4 Fix: เปลี่ยน ID ช่องวันที่เป็น receiveDate (กันซ้ำกับ alert)
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -48,9 +49,13 @@ function getReceiveDateISO() {
 async function initReceiveTab() {
   const dateInput = $('receiveDate');
   if (dateInput && !dateInput.value) dateInput.value = toISODate(new Date());
+  
   await loadReceiveGradeFilter();
-  // Auto-fetch ทันทีที่เข้า Tab
-  await renderReceive();
+  
+  // 🔽 เช็กให้ชัวร์ว่ามีค่าวันที่แล้ว ค่อยเรียก renderReceive 🔽
+  if (dateInput && dateInput.value) {
+    await renderReceive();
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -125,10 +130,12 @@ function updateReceiveGradeLabel() {
     label.textContent = `เลือก ${receiveSelectedGrades.length} เกรด`; label.style.color = '#1e40af';
   }
 }
+
 function selectAllReceiveGrades() {
   receiveSelectedGrades = [...receiveAllGrades];
   renderReceiveGradeList(); updateReceiveGradeLabel();
 }
+
 function clearAllReceiveGrades() {
   receiveSelectedGrades = [];
   renderReceiveGradeList(); updateReceiveGradeLabel();
@@ -176,7 +183,10 @@ async function renderReceive() {
   const remark = $('receiveRemark')?.value || '';
   const mode = $('receiveMode')?.value || 'matrix';
 
-  if (!receiveDate) { alert('กรุณาเลือกวันที่สั่งซื้อ'); return; }
+  if (!receiveDate) {
+    // alert('กรุณาเลือกวันที่สั่งซื้อ'); // 🔽 คอมเมนต์ไว้เพื่อไม่ให้เด้งตอนโหลดหน้า
+    return;
+  }
 
   const dateThai = thaiDateFull(receiveDate);
 
