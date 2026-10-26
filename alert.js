@@ -11,6 +11,7 @@
 //  V.10.17 Fix: Auto-load Alert History on init + default date to today
 //  V.10.18 Fix: default alertReceiveDate = today + UI empty state inline
 //  V.10.19 Fix: ปรับ UI empty state ใน renderAlert() ให้กระชับและถูกต้อง
+//  V.10.20 Fix: ลบ duplicate empty-state ใน onAlertDateChange() ให้ renderAlert() จัดการแทน
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -356,22 +357,12 @@ async function loadAlertSnapshot(analyzedDate) {
   }
 }
 
+// ✅ V.10.20: ลบ duplicate empty-state ออก — ให้ renderAlert() จัดการ UI ทั้งหมด
 async function onAlertDateChange() {
   const analyzedDate = $('alertDate')?.value;
   if (!analyzedDate) return;
 
-  // 🔽 ไม่ต้องโหลด Snapshot หรือ Auto-analyze ทันที 🔽
-  // ให้รอผู้ใช้กด "+ เพิ่มวัน" ก่อน
-  if (alertReceiveDates.length === 0) {
-    $('alertBody').innerHTML = `
-      <div class="msg warn" style="font-size:16px;text-align:center;padding:30px">
-        ⚠️ <b>กรุณาเลือกวันที่รับสินค้า</b><br>
-        (กดปุ่ม "+ เพิ่มวัน" ด้านบน เพื่อเริ่มต้น)
-      </div>
-    `;
-    return;
-  }
-  
+  // 🔽 V.10.20: ไม่ต้องเขียน empty-state ที่นี่ ให้ renderAlert() จัดการแทน 🔽
   // ถ้ามีวันที่แล้ว ค่อยโหลด snapshot / auto-analyze
   $('alertBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
   const snapshot = await loadAlertSnapshot(analyzedDate);
