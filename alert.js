@@ -13,6 +13,7 @@
 //  V.10.19 Fix: ปรับ UI empty state ใน renderAlert() ให้กระชับและถูกต้อง
 //  V.10.20 Fix: ลบ duplicate empty-state ใน onAlertDateChange() ให้ renderAlert() จัดการแทน
 //  V.10.21 Fix: เปลี่ยน Empty State ให้มี Date Picker เลือกวันแรกได้เลย (ไม่มีปุ่ม + เพิ่มวัน)
+//  V.10.22 Fix: ซ่อนปุ่ม "รายการ/Matrix" + ไม่โหลด History อัตโนมัติ
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -260,8 +261,8 @@ async function initAlertTab() {
 
   showAlertHistoryCard();
 
-  // 🔽 V.10.17: โหลดประวัติของวันนี้อัตโนมัติ 🔽
-  await loadAlertHistory();
+  // 🔽 V.10.22: ไม่โหลดประวัติอัตโนมัติแล้ว (ผู้ใช้กดเอง) 🔽
+  // await loadAlertHistory();
 }
 
 // ✅ V.10.15: ไม่เซ็ต alertReceiveDate ที่นี่ (ปล่อยให้ว่างไว้)
@@ -2037,10 +2038,12 @@ function renderAlertDateTabs() {
   html += `<button type="button" class="alert-date-add-btn" onclick="addAlertReceiveDate()">+ เพิ่มวัน</button>`;
   html += '</div>';
 
-  html += '<div class="alert-view-toggle-inline">';
-  html += `<button type="button" class="${alertViewMode === 'flat' ? 'active' : ''}" onclick="setAlertViewMode('flat')">📋 รายการ</button>`;
-  html += `<button type="button" class="${alertViewMode === 'matrix' ? 'active' : ''}" onclick="setAlertViewMode('matrix')">📊 Matrix</button>`;
-  html += '</div>';
+  // 🔽 V.10.22: ซ่อนปุ่ม "รายการ/Matrix" 🔽
+  // html += '<div class="alert-view-toggle-inline">';
+  // html += `<button type="button" class="${alertViewMode === 'flat' ? 'active' : ''}" onclick="setAlertViewMode('flat')">📋 รายการ</button>`;
+  // html += `<button type="button" class="${alertViewMode === 'matrix' ? 'active' : ''}" onclick="setAlertViewMode('matrix')">📊 Matrix</button>`;
+  // html += '</div>';
+  // 🔼 สิ้นสุด 🔼
 
   box.innerHTML = html;
 }
@@ -2054,8 +2057,7 @@ function initAlertReceiveDates() {
     return dt && dt.getDay() !== 0;
   });
 
-  // 🔽 แก้ไข: ไม่ต้องสร้างวันที่เริ่มต้นอัตโนมัติ ให้เริ่มที่ Array ว่างเลย 🔽
-  // if (alertReceiveDates.length === 0) { ... } <-- ลบส่วนนี้ออก
+  // ❌ ไม่สร้างวันที่เริ่มต้นอัตโนมัติ — ต้องเป็น Array ว่างเสมอถ้าไม่มีข้อมูล
 
   alertActiveDateIdx = 0;
   renderAlertDateTabs();
@@ -2098,11 +2100,12 @@ async function renderAlert() {
           </button>
         </div>
         
-        <!-- ปุ่มสลับโหมด -->
+        <!-- 🔽 V.10.22: ซ่อนปุ่มสลับโหมด 🔽
         <div class="alert-view-toggle-inline" style="display:flex; gap:4px; margin-left:auto;">
           <button type="button" class="${alertViewMode === 'flat' ? 'active' : ''}" onclick="setAlertViewMode('flat')">📋 รายการ</button>
           <button type="button" class="${alertViewMode === 'matrix' ? 'active' : ''}" onclick="setAlertViewMode('matrix')">📊 Matrix</button>
         </div>
+        🔼 สิ้นสุด 🔼 -->
 
       </div>
     `;
