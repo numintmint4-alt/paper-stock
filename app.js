@@ -730,8 +730,8 @@ async function renderData() {
     } catch(e) { /* ignore */ }
   }
 
-  const from = $('dtFrom').value;
-  const to   = $('dtTo').value;
+  const from = toISODate($('dtFrom').value);
+  const to   = toISODate($('dtTo').value);
   const valid = $('dtValid').value;
   const batch = $('dtBatch').value;
 
@@ -1219,41 +1219,30 @@ async function delUser(id, username) {
     el.onclick = e => { if (e.target === el) el.classList.remove('show'); };
   });
 
-  // ✅ V.10.27 Fix: บังคับ input type="date" แสดงผลเป็น DD/MM/YYYY
-  document.querySelectorAll('input[type="date"]').forEach(el => {
-    el.setAttribute('lang', 'th-TH');
+  // ✅ Flatpickr: Date Picker ภาษาไทย (DD/MM/YYYY)
+  const dateInputIds = [
+    'alertDate',
+    'alertStockDate',
+    'alertReceiveDate',
+    'stockDate',
+    'receiveDate',
+    'alertHistoryDate'
+  ];
+
+  dateInputIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.setAttribute('type', 'text');
+      el.setAttribute('placeholder', 'วว/ดด/ปปปป');
+
+      flatpickr(el, {
+        locale: "th",
+        dateFormat: "d/m/Y",
+        allowInput: true,
+        disableMobile: true
+      });
+    }
   });
-
-  // ✅ V.10.30 Fix: บังคับฟอร์แมต วัน/เดือน/ปี
-  function setupCustomDateDisplay(inputId, displayId) {
-    const input = document.getElementById(inputId);
-    const display = document.getElementById(displayId);
-    if (!input || !display) return;
-
-    const updateDisplay = () => {
-      if (input.value) {
-        const [y, m, d] = input.value.split('-');
-        display.textContent = `${d}/${m}/${y}`;
-      } else {
-        display.textContent = 'วว/ดด/ปปปป';
-      }
-    };
-
-    input.addEventListener('change', updateDisplay);
-    input.addEventListener('input', updateDisplay);
-    
-    setTimeout(updateDisplay, 100); 
-  }
-
-  setupCustomDateDisplay('stockDate', 'stockDateDisplay');
-  setupCustomDateDisplay('receiveDate', 'receiveDateDisplay');
-  setupCustomDateDisplay('alertDate', 'alertDateDisplay');
-  setupCustomDateDisplay('alertStockDate', 'alertStockDateDisplay');
-  setupCustomDateDisplay('alertReceiveDate', 'alertReceiveDateDisplay');
-  setupCustomDateDisplay('alertHistoryDate', 'alertHistoryDateDisplay');
-  setupCustomDateDisplay('stockImportDate', 'stockImportDateDisplay');
-  setupCustomDateDisplay('dtFrom', 'dtFromDisplay');
-  setupCustomDateDisplay('dtTo', 'dtToDisplay');
 
   initSession();
 })();
