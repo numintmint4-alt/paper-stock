@@ -1,7 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════ */
 /*  STOCK V10.1 — style.css                                        */
 /*  Design Tokens + Components + Print Styles                      */
-/*  V.10.27 Fix: Sticky Overlap + Cell Width + No Truncate         */
+/*  V.10.29 Fix: Header white text + Total row center + Scrollbar  */
+/*  V.10.30 Fix: Custom Date Display (DD/MM/YYYY)                  */
 /* ═══════════════════════════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════════════════════════════ */
@@ -950,8 +951,8 @@ th {
 .alert-view-toggle button.active:hover { background: var(--primary-dark); border-color: var(--primary-dark); }
 
 /* ═══════════════════════════════════════════════════════════════ */
-/*  ALERT MATRIX VIEW (ตารางไขว้) — V.10.27                     */
-/*  Fix: Sticky Overlap + Cell Width + No Truncate                 */
+/*  ALERT MATRIX VIEW (ตารางไขว้) — V.10.28                     */
+/*  Fix: Header white text + Total row center + Scrollbar          */
 /* ═══════════════════════════════════════════════════════════════ */
 
 /* Wrapper หลัก ให้ Scroll ได้ทั้ง X และ Y */
@@ -962,6 +963,26 @@ th {
   border-radius: var(--radius-md);
   margin-top: 10px;
   position: relative;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+/* ✅ ออกแบบ Scrollbar ใหม่ให้สีอ่อนลง */
+.alert-matrix-wrap::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.alert-matrix-wrap::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 8px;
+}
+.alert-matrix-wrap::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 8px;
+  border: 2px solid #f1f5f9;
+}
+.alert-matrix-wrap::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 /* ตาราง — ใช้ separate เพื่อให้ Sticky ทำงานได้ */
@@ -983,7 +1004,7 @@ th {
   line-height: 1.25;
 }
 
-/* ✅ Fix: บังคับความกว้าง cell ปกติ (Size) ให้กว้างพอแสดงตัวเลข */
+/* ✅ บังคับความกว้าง cell ปกติ (Size) ให้กว้างพอแสดงตัวเลข */
 .alert-matrix-new-table th:not(.grade-col-matrix):not(.total-col-matrix),
 .alert-matrix-new-table td:not(.grade-col-matrix):not(.total-col-matrix) {
   min-width: 55px !important;
@@ -1039,19 +1060,21 @@ th {
   letter-spacing: .02em;
 }
 
-/* ✅ Fix: Sticky มุมซ้ายบน (ต้องอยู่เหนือสุด) */
+/* ✅ Fix: Sticky มุมซ้ายบน (ต้องอยู่เหนือสุด) + บังคับสีขาว */
 .alert-matrix-new-table thead .grade-col-matrix {
-  z-index: 20 !important;
   background-color: var(--primary-dark) !important;
-}
-
-/* ✅ Fix: Sticky มุมขวาบน (ต้องอยู่เหนือสุด) */
-.alert-matrix-new-table thead .total-col-matrix {
+  color: #ffffff !important;
   z-index: 20 !important;
-  background-color: var(--primary) !important;
 }
 
-/* ✅ Fix: แถว Total ล่างสุด */
+/* ✅ Fix: Sticky มุมขวาบน (ต้องอยู่เหนือสุด) + บังคับสีขาว */
+.alert-matrix-new-table thead .total-col-matrix {
+  background-color: var(--primary) !important;
+  color: #ffffff !important;
+  z-index: 20 !important;
+}
+
+/* ✅ Fix: แถว Total ล่างสุด (ตัวเลขตรงกลาง) */
 .alert-matrix-new-table tr.total-row-matrix td {
   background: #cbd5e1;
   font-weight: 700;
@@ -1059,6 +1082,12 @@ th {
   padding: 7px 8px;
   color: var(--text);
   min-width: 55px !important;
+}
+
+/* ✅ Fix: Total ล่างซ้าย (คอลัมน์ GRADEGRAMS) ให้อยู่กึ่งกลาง */
+.alert-matrix-new-table tr.total-row-matrix .grade-col-matrix {
+  text-align: center !important;
+  padding-left: 0 !important;
 }
 
 /* Matrix cell */
@@ -1259,3 +1288,33 @@ table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
   .report-foot { display: none !important; }
   .alert-table th, .alert-table td.grade-col { position: static; }
 }
+
+/* ═══════════════════════════════════════════════════════════════ */
+/*  ✅ V.10.30: CUSTOM DATE DISPLAY (DD/MM/YYYY)                   */
+/* ═══════════════════════════════════════════════════════════════ */
+
+/* ซ่อน Format เดิมของ Browser ใน input type="date" */
+input[type="date"]::-webkit-datetime-edit {
+  color: transparent !important;
+}
+input[type="date"]::-webkit-datetime-edit-fields-wrapper {
+  color: transparent !important;
+}
+
+/* แสดงข้อความใหม่ที่เราจัดการทับลงไป */
+.date-custom-wrapper {
+  position: relative;
+  display: inline-block;
+}
+.date-custom-text {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* ✅ สิ้นสุด V.10.30 */
