@@ -3,6 +3,7 @@
 //  V.10.22 Fix: ซ่อนปุ่ม "รายการ/Matrix" + ไม่โหลด History อัตโนมัติ
 //  V.10.23 Fix: บังคับ Empty State ให้ขึ้นก่อนเสมอ
 //  V.10.24 Fix: กลับไปใช้โหมด Matrix เป็นค่าเริ่มต้น (Default)
+//  V.10.25 Fix: (1) Auto-render Matrix on init (2) Fix column width
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -246,6 +247,13 @@ async function initAlertTab() {
   await onAlertDateChange();
 
   showAlertHistoryCard();
+
+  // ✅ V.10.25 Fix: บังคับให้ Render Matrix ทันทีถ้ามีข้อมูลพร้อมแล้ว
+  if (alertReceiveDates.length > 0 && window._alertFullCache && window._alertFullCache.length > 0) {
+    if (alertViewMode === 'matrix') {
+      applyAlertFiltersAndRender();
+    }
+  }
 }
 
 function applyCalculatedDates(analyzedDate) {
@@ -1344,13 +1352,18 @@ function renderAlertMatrixView(rows) {
       if (hasOrder && allHaveSup) orderCls = 'has-order';
       else if (hasQtyNoSup)        orderCls = 'order-incomplete';
 
+      // ✅ V.10.25 Fix: ปัดเศษเพื่อไม่ให้ความยาวเกิน
+      const displayValue = Number(Number(a).toFixed(2));
+      const valueText = displayValue > 0 ? '+' + displayValue : displayValue;
+
       html += `<td class="matrix-cell ${cellCls} ${orderCls}"
                     onclick="openAlertMatrixCell('${esc(grade)}', ${size})">
-                 <div class="matrix-value">${a > 0 ? '+' + Number(a).toFixed(2) : Number(a).toFixed(2)}${cartIcon}</div>
+                 <div class="matrix-value">${valueText}${cartIcon}</div>
                </td>`;
     });
 
-    html += `<td class="total-col-matrix">${rowTotal > 0 ? '+' + rowTotal.toFixed(2) : rowTotal.toFixed(2)}</td>`;
+    const rowDisplay = Number(Number(rowTotal).toFixed(2));
+    html += `<td class="total-col-matrix">${rowDisplay > 0 ? '+' + rowDisplay : rowDisplay}</td>`;
     html += '</tr>';
   });
 
@@ -1362,10 +1375,12 @@ function renderAlertMatrixView(rows) {
       const r = dataMap[`${grade}|${size}`];
       if (r) colTotal += Number(r.alert) || 0;
     });
-    html += `<td>${colTotal > 0 ? '+' + colTotal.toFixed(2) : colTotal.toFixed(2)}</td>`;
+    const colDisplay = Number(Number(colTotal).toFixed(2));
+    html += `<td>${colDisplay > 0 ? '+' + colDisplay : colDisplay}</td>`;
   });
   const grandTotal = rows.reduce((s, r) => s + (Number(r.alert) || 0), 0);
-  html += `<td class="total-col-matrix">${grandTotal > 0 ? '+' + grandTotal.toFixed(2) : grandTotal.toFixed(2)}</td>`;
+  const grandDisplay = Number(Number(grandTotal).toFixed(2));
+  html += `<td class="total-col-matrix">${grandDisplay > 0 ? '+' + grandDisplay : grandDisplay}</td>`;
   html += '</tr>';
 
   html += '</tbody></table>';
@@ -1988,13 +2003,6 @@ function renderAlertDateTabs() {
   html += `<button type="button" class="alert-date-add-btn" onclick="addAlertReceiveDate()">+ เพิ่มวัน</button>`;
   html += '</div>';
 
-  // 🔽 V.10.22: ซ่อนปุ่ม "รายการ/Matrix" 🔽
-  // html += '<div class="alert-view-toggle-inline">';
-  // html += `<button type="button" class="${alertViewMode === 'flat' ? 'active' : ''}" onclick="setAlertViewMode('flat')">📋 รายการ</button>`;
-  // html += `<button type="button" class="${alertViewMode === 'matrix' ? 'active' : ''}" onclick="setAlertViewMode('matrix')">📊 Matrix</button>`;
-  // html += '</div>';
-  // 🔼 สิ้นสุด 🔼
-
   box.innerHTML = html;
 }
 
@@ -2005,8 +2013,6 @@ function initAlertReceiveDates() {
     const dt = _parseLocalDate(d);
     return dt && dt.getDay() !== 0;
   });
-
-  // ❌ ไม่สร้างวันที่เริ่มต้นอัตโนมัติ — Array ว่างถ้าไม่มีข้อมูล
 
   alertActiveDateIdx = 0;
   renderAlertDateTabs();
@@ -2024,7 +2030,7 @@ function isFSCGrade(gradegram) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  RENDER ALERT (Main) — V.10.24 บังคับแสดงผลเป็น Matrix
+//  RENDER ALERT (Main)
 // ═══════════════════════════════════════════════════════════════
 
 async function renderAlert() {
@@ -2152,7 +2158,7 @@ async function renderAlert() {
     renderAllAlertFilters();
     renderAlertDateTabs();
 
-    // 🔽 V.10.24: เรียกตัว render หลักเพื่อให้เช็คโหมด (Matrix/Flat) 🔽
+    // ✅ เรียกตัว render หลักเพื่อให้เช็คโหมด (Matrix/Flat)
     applyAlertFiltersAndRender();
 
     if (hasPOEdited()) {
