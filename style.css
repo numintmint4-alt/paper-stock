@@ -2,6 +2,7 @@
 /*  STOCK V10.1 — style.css                                        */
 /*  Design Tokens + Components + Print Styles                      */
 /*  V.10.25 Fix: (2) Column width & (3) Sticky Header / Scroll     */
+/*  V.10.26 Fix: บังคับความกว้าง Grade/Total + min-width cell      */
 /* ═══════════════════════════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════════════════════════════ */
@@ -950,8 +951,8 @@ th {
 .alert-view-toggle button.active:hover { background: var(--primary-dark); border-color: var(--primary-dark); }
 
 /* ═══════════════════════════════════════════════════════════════ */
-/*  ALERT MATRIX VIEW (ตารางไขว้) — แก้ไข V.10.25                */
-/*  Fix (2): บังคับความกว้าง + Fix (3): Sticky Header/Column      */
+/*  ALERT MATRIX VIEW (ตารางไขว้) — V.10.26                     */
+/*  Fix (2): Grade/Total width + Fix (3): min-width cell ปกติ    */
 /* ═══════════════════════════════════════════════════════════════ */
 
 /* Wrapper หลัก ให้ Scroll ได้ทั้ง X และ Y */
@@ -983,7 +984,7 @@ th {
   line-height: 1.25;
 }
 
-/* ✅ V.10.25 Fix (2): บังคับความกว้างของทุกช่องให้เท่ากันเป๊ะ */
+/* ✅ Fix (2): บังคับความกว้างของ cell ปกติ */
 .alert-matrix-new-table th:not(.grade-col-matrix):not(.total-col-matrix),
 .alert-matrix-new-table td:not(.grade-col-matrix):not(.total-col-matrix) {
   width: 50px !important;
@@ -994,11 +995,34 @@ th {
   white-space: nowrap;
 }
 
-/* ยกเว้นคอลัมน์ Grade และ TOTAL */
-.alert-matrix-new-table .grade-col-matrix,
+/* ✅ Fix (2): บังคับความกว้างคอลัมน์ GRADEGRAMS */
+.alert-matrix-new-table .grade-col-matrix {
+  background: var(--surface-soft);
+  font-weight: 700;
+  text-align: left;
+  padding-left: 12px;
+  position: sticky;
+  left: 0;
+  z-index: 11;
+  min-width: 110px !important;
+  width: 110px !important;
+  max-width: 110px !important;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+/* ✅ Fix (2): บังคับความกว้างคอลัมน์ TOTAL */
 .alert-matrix-new-table .total-col-matrix {
-  width: auto !important;
-  max-width: none !important;
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  font-weight: 700;
+  position: sticky;
+  right: 0;
+  z-index: 10;
+  min-width: 85px !important;
+  width: 85px !important;
+  max-width: 85px !important;
+  white-space: nowrap;
 }
 
 /* Sticky Header (แถวบนสุด) */
@@ -1009,46 +1033,22 @@ th {
   padding: 7px 6px;
   position: sticky;
   top: 0;
-  z-index: 10; /* ✅ สูงกว่าปกติ */
+  z-index: 10;
   text-transform: uppercase;
   letter-spacing: .02em;
-}
-
-/* Sticky คอลัมน์ซ้าย (GRADEGRAMS) */
-.alert-matrix-new-table .grade-col-matrix {
-  background: var(--surface-soft);
-  font-weight: 700;
-  text-align: left;
-  padding-left: 8px;
-  position: sticky;
-  left: 0;
-  z-index: 11; /* ✅ สูงกว่า Header ปกติ แต่ต่ำกว่า Header มุมซ้าย */
-  min-width: 80px;
-  color: var(--text);
 }
 
 /* Sticky มุมซ้ายบน (ทั้งคอลัมน์แรกและแถวแรก) */
 .alert-matrix-new-table thead .grade-col-matrix {
   background: var(--primary-dark);
   color: #fff;
-  z-index: 12; /* ✅ สูงสุด เพื่อไม่ให้ทับกัน */
-}
-
-/* Sticky คอลัมน์ขวา (TOTAL) */
-.alert-matrix-new-table .total-col-matrix {
-  background: var(--primary-soft);
-  color: var(--primary-dark);
-  font-weight: 700;
-  position: sticky;
-  right: 0;
-  z-index: 10;
-  min-width: 70px;
+  z-index: 12;
 }
 
 .alert-matrix-new-table thead .total-col-matrix {
   background: var(--primary);
   color: #fff;
-  z-index: 12; /* ✅ สูงสุดที่มุมขวาบน */
+  z-index: 12;
 }
 
 /* แถว Total ล่างสุด */
@@ -1060,11 +1060,16 @@ th {
   color: var(--text);
 }
 
+/* ✅ Fix (3): เพิ่ม min-width ให้ cell ปกติ ป้องกันตัวเลขโดนตัด */
+.alert-matrix-new-table td:not(.grade-col-matrix):not(.total-col-matrix) {
+  min-width: 48px !important;
+  text-align: center;
+}
+
 /* Matrix cell */
 .alert-matrix-new-table .matrix-cell {
   cursor: pointer;
   transition: background-color .15s ease;
-  min-width: 52px;
   padding: 5px 4px;
   position: relative;
 }
