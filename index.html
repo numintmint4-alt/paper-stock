@@ -8,6 +8,12 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<!-- ✅ Flatpickr CSS & JS (สำหรับ Date Picker) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/th.js"></script>
+
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -179,12 +185,7 @@
         </div>
 
         <div class="filters no-print">
-          <label>📅 วันที่ Stock
-            <div class="date-custom-wrapper">
-              <input type="date" id="stockDate" class="hide-native-date">
-              <span id="stockDateDisplay" class="date-custom-text">วว/ดด/ปปปป</span>
-            </div>
-          </label>
+          <label>📅 วันที่ Stock <input type="date" id="stockDate"></label>
 
           <label class="grade-filter-wrap">
             Gradegrams
@@ -278,12 +279,7 @@
         </div>
 
         <div class="filters no-print" id="receiveFilterBox">
-          <label>📅 วันที่รับเข้า
-            <div class="date-custom-wrapper">
-              <input type="date" id="receiveDate" class="hide-native-date">
-              <span id="receiveDateDisplay" class="date-custom-text">วว/ดด/ปปปป</span>
-            </div>
-          </label>
+          <label>📅 วันที่รับเข้า <input type="date" id="receiveDate"></label>
 
           <label class="grade-filter-wrap">
             Gradegrams
@@ -360,26 +356,11 @@
         </div>
 
         <div class="filters no-print">
-          <label>📅 วันที่วิเคราะห์
-            <div class="date-custom-wrapper">
-              <input type="date" id="alertDate" class="hide-native-date" onchange="onAlertDateChange()">
-              <span id="alertDateDisplay" class="date-custom-text">วว/ดด/ปปปป</span>
-            </div>
-          </label>
+          <label>📅 วันที่วิเคราะห์ <input type="date" id="alertDate" onchange="onAlertDateChange()"></label>
 
-          <label>📅 Stock วันที่
-            <div class="date-custom-wrapper">
-              <input type="date" id="alertStockDate" class="hide-native-date">
-              <span id="alertStockDateDisplay" class="date-custom-text">วว/ดด/ปปปป</span>
-            </div>
-          </label>
+          <label>📅 Stock วันที่ <input type="date" id="alertStockDate"></label>
 
-          <label>📅 Receive วันที่
-            <div class="date-custom-wrapper">
-              <input type="date" id="alertReceiveDate" class="hide-native-date">
-              <span id="alertReceiveDateDisplay" class="date-custom-text">วว/ดด/ปปปป</span>
-            </div>
-          </label>
+          <label>📅 Receive วันที่ <input type="date" id="alertReceiveDate"></label>
 
           <label>📅 Stock Level เดือน
             <input type="month" id="alertSnapshotMonth">
@@ -408,10 +389,7 @@
             <h3>📜 Alert History (ย้อนหลัง)</h3>
             <div class="alert-history-controls">
               <label>📅 วันที่:</label>
-              <div class="date-custom-wrapper">
-                <input type="date" id="alertHistoryDate" class="hide-native-date">
-                <span id="alertHistoryDateDisplay" class="date-custom-text">วว/ดด/ปปปป</span>
-              </div>
+              <input type="date" id="alertHistoryDate">
               <div class="alert-history-toggle" id="alertHistoryToggle">
                 <button data-mode="matrix" onclick="setAlertHistoryMode('matrix')" class="active">📊 Matrix</button>
                 <button data-mode="flat" onclick="setAlertHistoryMode('flat')">📋 รายการ</button>
@@ -458,18 +436,8 @@
         <h2>Data — ทุกคอลัมน์จาก Excel</h2>
         <p class="hint">แสดงข้อมูลดิบทั้งหมดจากตาราง <b>usage_records_raw</b> · แถวสีแดง = แถวที่ไม่ผ่านการตรวจสอบ</p>
         <div class="filters">
-          <label>จาก
-            <div class="date-custom-wrapper">
-              <input type="date" id="dtFrom" class="hide-native-date">
-              <span id="dtFromDisplay" class="date-custom-text">วว/ดด/ปปปป</span>
-            </div>
-          </label>
-          <label>ถึง
-            <div class="date-custom-wrapper">
-              <input type="date" id="dtTo" class="hide-native-date">
-              <span id="dtToDisplay" class="date-custom-text">วว/ดด/ปปปป</span>
-            </div>
-          </label>
+          <label>จาก <input type="date" id="dtFrom"></label>
+          <label>ถึง <input type="date" id="dtTo"></label>
           <label>สถานะ
             <select id="dtValid">
               <option value="">ทั้งหมด</option>
@@ -646,12 +614,7 @@
     <h3>📥 Import Stock คงเหลือ</h3>
     <div id="stockImportError"></div>
     <div class="form-grid" style="grid-template-columns:1fr">
-      <label>วันที่ Stock คงเหลือ
-        <div class="date-custom-wrapper">
-          <input type="date" id="stockImportDate" class="hide-native-date">
-          <span id="stockImportDateDisplay" class="date-custom-text">วว/ดด/ปปปป</span>
-        </div>
-      </label>
+      <label>วันที่ Stock คงเหลือ <input type="date" id="stockImportDate"></label>
     </div>
     <div class="hint">ค่าเริ่มต้น = เมื่อวาน (Stock คงเหลือจากการใช้งานเมื่อวาน)</div>
     <div class="form-actions">
