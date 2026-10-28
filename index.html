@@ -3,23 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ระบบ Stock ม้วนกระดาษ V.10.1</title>
+<title>ระบบ Stock ม้วนกระดาษ V6</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<!-- ═══════════════════════════════════════════════════════════════ -->
-<!-- LOGIN -->
-<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- ==================== LOGIN ==================== -->
 <div id="loginScreen" class="login-wrap">
   <div class="login-card">
     <h1>📦 ระบบ Stock ม้วนกระดาษ</h1>
-    <p>กรุณาเข้าสู่ระบบ (V.10.1)</p>
+    <p>กรุณาเข้าสู่ระบบ (V6)</p>
     <label>ชื่อผู้ใช้<input id="loginUser" autocomplete="username" placeholder="เช่น sukanya"></label>
     <label>รหัสผ่าน<input id="loginPass" type="password" autocomplete="current-password" placeholder="••••••"></label>
     <button id="loginBtn">เข้าสู่ระบบ</button>
@@ -27,16 +24,14 @@
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════════ -->
-<!-- APP -->
-<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- ==================== APP ==================== -->
 <div id="app" class="hidden">
   <nav class="nav">
     <strong>📦 Stock ม้วนกระดาษ</strong>
     <button data-tab="matrix" class="active">Stock Level</button>
     <button data-tab="stock">Stock</button>
-    <button data-tab="receive">Purchase Summary</button>
-    <button data-tab="alert">Stock Alert</button>
+    <button data-tab="receive">Receive</button>
+    <button data-tab="alert">Alert</button>
     <button data-tab="purchase-order">Purchase Order</button>
     <button data-tab="data">Data</button>
     <button data-tab="settings">⚙ ตั้งค่า</button>
@@ -47,56 +42,38 @@
 
   <div class="container">
 
-    <!-- ═══════════════════════════════════════════════════════════ -->
-    <!-- TAB 1: STOCK LEVEL (Matrix) -->
-    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- ========== TAB 1: STOCK LEVEL (Matrix) ========== -->
     <div id="tab-matrix">
       <div class="card">
         <div class="report-head">
           <div></div>
-          <div class="report-title" id="reportTitle">
-            <span id="reportTitleMain">
-              ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ<br>
-              ประจำเดือน 
-            </span>
-            <select id="titleMonth" onchange="updateReportTitle()" class="title-select">
-              <option value="1">มกราคม</option><option value="2">กุมภาพันธ์</option>
-              <option value="3">มีนาคม</option><option value="4">เมษายน</option>
-              <option value="5">พฤษภาคม</option><option value="6">มิถุนายน</option>
-              <option value="7">กรกฎาคม</option><option value="8">สิงหาคม</option>
-              <option value="9">กันยายน</option><option value="10">ตุลาคม</option>
-              <option value="11">พฤศจิกายน</option><option value="12">ธันวาคม</option>
-            </select>
-            <select id="titleYear" onchange="updateReportTitle()" class="title-select">
-              <option value="2565">2565</option><option value="2566">2566</option>
-              <option value="2567">2567</option><option value="2568">2568</option>
-              <option value="2569">2569</option><option value="2570">2570</option>
-              <option value="2571">2571</option><option value="2572">2572</option>
-              <option value="2573">2573</option><option value="2574">2574</option>
-              <option value="2575">2575</option><option value="2576">2576</option>
-              <option value="2577">2577</option><option value="2578">2578</option>
-              <option value="2579">2579</option><option value="2580">2580</option>
-              <option value="2581">2581</option><option value="2582">2582</option>
-              <option value="2583">2583</option><option value="2584">2584</option>
-              <option value="2585">2585</option>
-            </select>
-          </div>
+          <div class="report-title" id="reportTitle">ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ<br>ประจำเดือน <select id="titleMonth" onchange="updateReportTitle()" class="title-select"><option value="1">มกราคม</option><option value="2">กุมภาพันธ์</option><option value="3">มีนาคม</option><option value="4">เมษายน</option><option value="5">พฤษภาคม</option><option value="6">มิถุนายน</option><option value="7">กรกฎาคม</option><option value="8">สิงหาคม</option><option value="9">กันยายน</option><option value="10">ตุลาคม</option><option value="11">พฤศจิกายน</option><option value="12">ธันวาคม</option></select> <select id="titleYear" onchange="updateReportTitle()" class="title-select"><option value="2565">2565</option><option value="2566">2566</option><option value="2567">2567</option><option value="2568">2568</option><option value="2569">2569</option><option value="2570">2570</option><option value="2571">2571</option><option value="2572">2572</option><option value="2573">2573</option><option value="2574">2574</option><option value="2575">2575</option><option value="2576">2576</option><option value="2577">2577</option><option value="2578">2578</option><option value="2579">2579</option><option value="2580">2580</option><option value="2581">2581</option><option value="2582">2582</option><option value="2583">2583</option><option value="2584">2584</option><option value="2585">2585</option></select></div>
           <div class="report-doc">FQ-จซ-06-04-04 rev.01</div>
         </div>
 
         <div class="filters no-print">
           <label>ปี
             <select id="filterYear" onchange="onYearChange()" style="width:100px">
-              <option value="2565">2565</option><option value="2566">2566</option>
-              <option value="2567">2567</option><option value="2568">2568</option>
-              <option value="2569">2569</option><option value="2570">2570</option>
-              <option value="2571">2571</option><option value="2572">2572</option>
-              <option value="2573">2573</option><option value="2574">2574</option>
-              <option value="2575">2575</option><option value="2576">2576</option>
-              <option value="2577">2577</option><option value="2578">2578</option>
-              <option value="2579">2579</option><option value="2580">2580</option>
-              <option value="2581">2581</option><option value="2582">2582</option>
-              <option value="2583">2583</option><option value="2584">2584</option>
+              <option value="2565">2565</option>
+              <option value="2566">2566</option>
+              <option value="2567">2567</option>
+              <option value="2568">2568</option>
+              <option value="2569">2569</option>
+              <option value="2570">2570</option>
+              <option value="2571">2571</option>
+              <option value="2572">2572</option>
+              <option value="2573">2573</option>
+              <option value="2574">2574</option>
+              <option value="2575">2575</option>
+              <option value="2576">2576</option>
+              <option value="2577">2577</option>
+              <option value="2578">2578</option>
+              <option value="2579">2579</option>
+              <option value="2580">2580</option>
+              <option value="2581">2581</option>
+              <option value="2582">2582</option>
+              <option value="2583">2583</option>
+              <option value="2584">2584</option>
               <option value="2585">2585</option>
             </select>
           </label>
@@ -191,9 +168,7 @@
       </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════════════════════ -->
-    <!-- TAB 2: STOCK คงเหลือ -->
-    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- ========== TAB 2: STOCK คงเหลือ ========== -->
     <div id="tab-stock" class="hidden">
       <div class="card">
         <div class="report-head">
@@ -204,7 +179,12 @@
         </div>
 
         <div class="filters no-print">
-          <label>📅 วันที่ Stock <input type="date" id="stockDate"></label>
+          <label>📅 วันที่ Stock
+            <div class="date-custom-wrapper">
+              <input type="date" id="stockDate" class="hide-native-date">
+              <span id="stockDateDisplay" class="date-custom-text">วว/ดด/ปปปป</span>
+            </div>
+          </label>
 
           <label class="grade-filter-wrap">
             Gradegrams
@@ -287,20 +267,23 @@
       </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════════════════════ -->
-    <!-- TAB 3: RECEIVE (Purchase Summary) -->
-    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- ========== TAB 4: RECEIVE (Roll Receive) ========== -->
     <div id="tab-receive" class="hidden">
       <div class="card">
         <div class="report-head">
           <div></div>
           <div class="report-title" id="receiveReportTitle">
-            สรุปรายการสั่งซื้อม้วนกระดาษ<br>ประจำวันที่
+            รายการรับม้วนกระดาษเข้าคลัง<br>ประจำวันที่
           </div>
         </div>
 
         <div class="filters no-print" id="receiveFilterBox">
-          <label>📅 วันที่สั่งซื้อ <input type="date" id="receiveDate"></label>
+          <label>📅 วันที่รับเข้า
+            <div class="date-custom-wrapper">
+              <input type="date" id="receiveDate" class="hide-native-date">
+              <span id="receiveDateDisplay" class="date-custom-text">วว/ดด/ปปปป</span>
+            </div>
+          </label>
 
           <label class="grade-filter-wrap">
             Gradegrams
@@ -366,29 +349,42 @@
       </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════════════════════ -->
-    <!-- TAB 4: ALERT (Stock Alert) -->
-    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- ========== TAB 5: ALERT ========== -->
     <div id="tab-alert" class="hidden">
       <div class="card">
         <div class="report-head">
           <div></div>
           <div class="report-title" id="alertReportTitle">
-            🚨 แจ้งเตือนสั่งซื้อ (Stock Alert)<br>ประจำวันที่
+            🚨 แจ้งเตือนสั่งซื้อ (Roll Alert)<br>ประจำวันที่
           </div>
         </div>
 
         <div class="filters no-print">
           <label>📅 วันที่วิเคราะห์
-            <input type="date" id="alertDate" readonly
-                   style="pointer-events:none;background:#f1f5f9;cursor:not-allowed">
+            <div class="date-custom-wrapper">
+              <input type="date" id="alertDate" class="hide-native-date" onchange="onAlertDateChange()">
+              <span id="alertDateDisplay" class="date-custom-text">วว/ดด/ปปปป</span>
+            </div>
           </label>
 
-          <label>📅 Stock วันที่ <input type="date" id="alertStockDate"></label>
-          <label>📅 วันที่สั่งซื้อ <input type="date" id="alertReceiveDate"></label>
-          
-          <!-- ✅ เพิ่ม onchange="renderAlert()" เพื่อให้วิเคราะห์อัตโนมัติเมื่อเปลี่ยนเดือน -->
-          <label>📅 Stock Level เดือน <input type="month" id="alertSnapshotMonth" onchange="renderAlert()"></label>
+          <label>📅 Stock วันที่
+            <div class="date-custom-wrapper">
+              <input type="date" id="alertStockDate" class="hide-native-date">
+              <span id="alertStockDateDisplay" class="date-custom-text">วว/ดด/ปปปป</span>
+            </div>
+          </label>
+
+          <label>📅 Receive วันที่
+            <div class="date-custom-wrapper">
+              <input type="date" id="alertReceiveDate" class="hide-native-date">
+              <span id="alertReceiveDateDisplay" class="date-custom-text">วว/ดด/ปปปป</span>
+            </div>
+          </label>
+
+          <label>📅 Stock Level เดือน
+            <input type="month" id="alertSnapshotMonth">
+          </label>
+
           <label><input type="checkbox" id="alertIncludeCustomer"> รวมม้วนลูกค้า</label>
 
           <label>📊 Usage Plan
@@ -399,47 +395,45 @@
 
           <button class="primary" onclick="renderAlert()">🔍 วิเคราะห์</button>
           <button class="primary" onclick="openUsagePlanImport()">📥 Import Usage Plan</button>
+          <button onclick="window.print()">🖨 พิมพ์</button>
         </div>
 
         <div id="alertLockBanner" class="alert-lock-banner hidden"></div>
 
         <div id="alertBody"></div>
 
-        <!-- ═══════════════════════════════════════════════════════ -->
-        <!-- Alert History Card (ไม่ซ้ำ ID) -->
-        <!-- ═══════════════════════════════════════════════════════ -->
-        <div class="alert-history-card" id="alertHistoryCard">
+        <!-- Alert History Card -->
+        <div class="alert-history-card no-print" id="alertHistoryCard">
           <div class="alert-history-head">
-            <h3>🧮 คำนวณ Alert ตามวันที่วิเคราะห์</h3>
+            <h3>📜 Alert History (ย้อนหลัง)</h3>
             <div class="alert-history-controls">
-              <label>📅 วันที่วิเคราะห์:</label>
-              <input type="date" id="alertHistoryDate">
-              <button type="button" class="primary" onclick="loadAlertHistory()">🔍 ดู</button>
-              <div class="alert-history-toggle" id="alertHistoryToggle">
-                <button type="button" class="active" data-mode="matrix" onclick="setAlertHistoryMode('matrix')">📊 Matrix</button>
-                <button type="button" data-mode="flat" onclick="setAlertHistoryMode('flat')">📋 รายการ</button>
+              <label>📅 วันที่:</label>
+              <div class="date-custom-wrapper">
+                <input type="date" id="alertHistoryDate" class="hide-native-date">
+                <span id="alertHistoryDateDisplay" class="date-custom-text">วว/ดด/ปปปป</span>
               </div>
+              <div class="alert-history-toggle" id="alertHistoryToggle">
+                <button data-mode="matrix" onclick="setAlertHistoryMode('matrix')" class="active">📊 Matrix</button>
+                <button data-mode="flat" onclick="setAlertHistoryMode('flat')">📋 รายการ</button>
+              </div>
+              <button class="primary" onclick="loadAlertHistory()">🔍 ดู</button>
             </div>
           </div>
-
-          <div id="alertHistoryBody" class="alert-history-body">
-            <p style="text-align:center;color:#94a3b8;padding:30px">เลือกวันที่แล้วกด "ดู"</p>
+          <div class="alert-history-body" id="alertHistoryBody">
+            <p style="text-align:center;color:#94a3b8;padding:30px">กดปุ่ม "ดู" เพื่อโหลดข้อมูล</p>
           </div>
-
-          <div class="alert-history-note">⚠️ โหมดดูอย่างเดียว — ไม่ผูกกับการสั่งซื้อ</div>
         </div>
       </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════════════════════ -->
-    <!-- TAB 5: PURCHASE ORDER -->
-    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- ========== TAB 5.5: PURCHASE ORDER ========== -->
     <div id="tab-purchase-order" class="hidden">
       <div class="card">
         <div class="report-head">
           <div></div>
           <div class="report-title" id="poReportTitle">
-            🧾 Purchase Order<br>รายการสั่งซื้อ
+            🧾 Purchase Order<br>
+            รายการสั่งซื้อ
           </div>
         </div>
 
@@ -449,6 +443,7 @@
           </label>
 
           <button class="primary" onclick="openCreatePOModal()">➕ สร้าง PO ใหม่</button>
+
           <button onclick="exportPOToExcel()">📤 Export Excel</button>
           <button onclick="window.print()">🖨 พิมพ์</button>
         </div>
@@ -457,16 +452,24 @@
       </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════════════════════ -->
-    <!-- TAB 6: DATA -->
-    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- ========== TAB 6: DATA ========== -->
     <div id="tab-data" class="hidden">
       <div class="card">
         <h2>Data — ทุกคอลัมน์จาก Excel</h2>
         <p class="hint">แสดงข้อมูลดิบทั้งหมดจากตาราง <b>usage_records_raw</b> · แถวสีแดง = แถวที่ไม่ผ่านการตรวจสอบ</p>
         <div class="filters">
-          <label>จาก <input type="date" id="dtFrom"></label>
-          <label>ถึง <input type="date" id="dtTo"></label>
+          <label>จาก
+            <div class="date-custom-wrapper">
+              <input type="date" id="dtFrom" class="hide-native-date">
+              <span id="dtFromDisplay" class="date-custom-text">วว/ดด/ปปปป</span>
+            </div>
+          </label>
+          <label>ถึง
+            <div class="date-custom-wrapper">
+              <input type="date" id="dtTo" class="hide-native-date">
+              <span id="dtToDisplay" class="date-custom-text">วว/ดด/ปปปป</span>
+            </div>
+          </label>
           <label>สถานะ
             <select id="dtValid">
               <option value="">ทั้งหมด</option>
@@ -484,15 +487,12 @@
       </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════════════════════ -->
-    <!-- TAB 7: SETTINGS -->
-    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- ========== TAB 7: SETTINGS ========== -->
     <div id="tab-settings" class="hidden">
       <div class="card">
         <h2>⚙ ตั้งค่า</h2>
         <p class="hint">กดหัวข้อเพื่อเปิด/ปิด</p>
 
-        <!-- Master Data -->
         <div class="acc-item">
           <div class="acc-head" onclick="toggleAcc(this, 'accMaster')">
             <span>📋 Master Data — Gradegrams / Gram / Size</span>
@@ -514,7 +514,6 @@
           </div>
         </div>
 
-        <!-- Roll Paper Use -->
         <div class="acc-item">
           <div class="acc-head" onclick="toggleAcc(this, 'accRolluse')">
             <span>📥 Roll Paper Use — Import & ตรวจสอบข้อมูล</span>
@@ -534,7 +533,6 @@
           </div>
         </div>
 
-        <!-- Archive -->
         <div class="acc-item">
           <div class="acc-head" onclick="toggleAcc(this, 'accArchive')">
             <span>📦 Archive ข้อมูลเก่า (เก่ากว่า 2 ปี)</span>
@@ -552,7 +550,6 @@
           </div>
         </div>
 
-        <!-- Price Master -->
         <div class="acc-item">
           <div class="acc-head" onclick="toggleAcc(this, 'accPriceMaster')">
             <span>💰 Master ราคา (Price Master)</span>
@@ -583,7 +580,6 @@
           </div>
         </div>
 
-        <!-- Users -->
         <div class="acc-item" id="accUsersWrap">
           <div class="acc-head" onclick="toggleAcc(this, 'accUsers')">
             <span>👥 ผู้ใช้</span>
@@ -605,11 +601,8 @@
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════════ -->
-<!-- MODALS -->
-<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- ==================== MODALS ==================== -->
 
-<!-- Modal: Master -->
 <div class="modal-bg" id="modalMaster">
   <div class="modal" style="max-width:600px">
     <h3 id="masterFormTitle">เพิ่ม Master Data</h3>
@@ -628,7 +621,6 @@
   </div>
 </div>
 
-<!-- Modal: Drill -->
 <div class="modal-bg" id="modalDrill">
   <div class="modal">
     <div class="modal-head">
@@ -639,7 +631,6 @@
   </div>
 </div>
 
-<!-- Modal: Stock Detail -->
 <div class="modal-bg" id="modalStockDetail">
   <div class="modal modal-stock-detail">
     <div class="modal-head">
@@ -650,13 +641,17 @@
   </div>
 </div>
 
-<!-- Modal: Stock Import -->
 <div class="modal-bg" id="modalStockImport">
   <div class="modal" style="max-width:480px">
     <h3>📥 Import Stock คงเหลือ</h3>
     <div id="stockImportError"></div>
     <div class="form-grid" style="grid-template-columns:1fr">
-      <label>วันที่ Stock คงเหลือ <input type="date" id="stockImportDate"></label>
+      <label>วันที่ Stock คงเหลือ
+        <div class="date-custom-wrapper">
+          <input type="date" id="stockImportDate" class="hide-native-date">
+          <span id="stockImportDateDisplay" class="date-custom-text">วว/ดด/ปปปป</span>
+        </div>
+      </label>
     </div>
     <div class="hint">ค่าเริ่มต้น = เมื่อวาน (Stock คงเหลือจากการใช้งานเมื่อวาน)</div>
     <div class="form-actions">
@@ -666,7 +661,6 @@
   </div>
 </div>
 
-<!-- Modal: Receive Detail -->
 <div class="modal-bg" id="modalReceiveDetail">
   <div class="modal" style="max-width:1000px">
     <div class="modal-head">
@@ -677,7 +671,6 @@
   </div>
 </div>
 
-<!-- Modal: PO Form -->
 <div class="modal-bg" id="modalPOForm">
   <div class="modal" style="max-width:1400px">
     <div class="modal-head">
@@ -688,7 +681,6 @@
   </div>
 </div>
 
-<!-- Modal: PO Detail -->
 <div class="modal-bg" id="modalPODetail">
   <div class="modal" style="max-width:1200px">
     <div class="modal-head">
@@ -699,7 +691,6 @@
   </div>
 </div>
 
-<!-- Modal: Alert Detail -->
 <div class="modal-bg" id="modalAlertDetail">
   <div class="modal" style="max-width:1000px">
     <div class="modal-head">
@@ -710,18 +701,22 @@
   </div>
 </div>
 
-<!-- Modal: Alert Matrix Cell Detail + ฟอร์มสั่งซื้อ -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- ✅ Modal: Alert Matrix Cell Detail + ฟอร์มสั่งซื้อ -->
+<!-- ═══════════════════════════════════════════════════════════ -->
 <div id="modalAlertMatrixCell" class="modal-bg">
   <div class="modal" style="max-width: 560px;">
     <div class="modal-head">
       <h3 id="alertMatrixCellTitle">📊 รายละเอียด</h3>
       <button onclick="closeModal('modalAlertMatrixCell')">ปิด</button>
     </div>
-    <div id="alertMatrixCellBody"></div>
+
+    <div id="alertMatrixCellBody">
+      <!-- เนื้อหา (การ์ดสรุป + ฟอร์ม) จะถูก render โดย JS -->
+    </div>
   </div>
 </div>
 
-<!-- Modal: Snapshot -->
 <div class="modal-bg" id="modalSnapshot">
   <div class="modal snapshot-modal" style="max-width:1100px">
     <div class="modal-head">
@@ -735,7 +730,6 @@
   </div>
 </div>
 
-<!-- Modal: User -->
 <div class="modal-bg" id="modalUser">
   <div class="modal" style="max-width:520px">
     <h3 id="userFormTitle">เพิ่มผู้ใช้ใหม่</h3>
@@ -753,7 +747,6 @@
   </div>
 </div>
 
-<!-- Modal: Price Master -->
 <div class="modal-bg" id="modalPM">
   <div class="modal" style="max-width:600px">
     <h3 id="pmFormTitle">แก้ไขราคา</h3>
@@ -775,7 +768,6 @@
   </div>
 </div>
 
-<!-- Modal: Delete Month -->
 <div class="modal-bg" id="modalDeleteMonth">
   <div class="modal" style="max-width:560px">
     <h3>🗑 ลบ Usage ตามเดือน</h3>
@@ -796,7 +788,6 @@
   </div>
 </div>
 
-<!-- Modal: Alert PO Detail -->
 <div class="modal-bg" id="modalAlertPODetail">
   <div class="modal" style="max-width:900px">
     <div class="modal-head">
@@ -811,7 +802,7 @@
   </div>
 </div>
 
-<!-- Modal: Add PO Items -->
+<!-- ==================== MODAL ADD PO ITEMS ==================== -->
 <div class="modal-bg" id="modalAddPOItems">
   <div class="modal" style="max-width:1200px">
     <div class="modal-head">
@@ -855,7 +846,7 @@
   </div>
 </div>
 
-<!-- Modal: Usage Plan Import -->
+<!-- ==================== MODAL USAGE PLAN IMPORT ==================== -->
 <div class="modal-bg" id="modalUsagePlanImport">
   <div class="modal" style="max-width:560px">
     <div class="modal-head">
@@ -872,7 +863,7 @@
   </div>
 </div>
 
-<!-- Modal: Verify Password -->
+<!-- ==================== MODAL VERIFY PASSWORD ==================== -->
 <div class="modal-bg" id="modalVerifyPassword">
   <div class="modal" style="max-width:520px">
     <div class="modal-head">
@@ -881,6 +872,7 @@
     </div>
 
     <div id="verifyPasswordMessage" class="msg info" style="margin-bottom:14px"></div>
+
     <input type="hidden" id="verifyPasswordUsername">
 
     <div class="form-grid" style="grid-template-columns:1fr">
@@ -901,9 +893,6 @@
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════════ -->
-<!-- SCRIPTS -->
-<!-- ═══════════════════════════════════════════════════════════════ -->
 <script src="app.js"></script>
 <script src="stock-level.js"></script>
 <script src="stock.js"></script>
