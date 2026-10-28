@@ -1,7 +1,8 @@
 // ═══════════════════════════════════════════════════════════════
 //  STOCK V10.1 — alert.js
 //  V.10.22 Fix: ซ่อนปุ่ม "รายการ/Matrix" + ไม่โหลด History อัตโนมัติ
-//  V.10.23 Fix: บังคับ Empty State ให้ขึ้นก่อนเสมอ + default view = flat
+//  V.10.23 Fix: บังคับ Empty State ให้ขึ้นก่อนเสมอ
+//  V.10.24 Fix: กลับไปใช้โหมด Matrix เป็นค่าเริ่มต้น (Default)
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -13,7 +14,7 @@ let alertAllGrades = [];
 let alertCache = [];
 let alertSupplierCache = [];
 
-let alertViewMode = 'flat';   // 🔽 V.10.23: เปลี่ยน default เป็น flat 🔽
+let alertViewMode = 'matrix';   // 🔽 V.10.24: กลับมาเป็น Matrix เป็นค่าเริ่มต้น 🔽
 
 let alertSelectedSizes = [];
 let alertAllSizes = [];
@@ -245,9 +246,6 @@ async function initAlertTab() {
   await onAlertDateChange();
 
   showAlertHistoryCard();
-
-  // 🔽 V.10.22: ไม่โหลดประวัติอัตโนมัติ 🔽
-  // await loadAlertHistory();
 }
 
 function applyCalculatedDates(analyzedDate) {
@@ -434,9 +432,10 @@ function renderAlertFromCache() {
 
   let html = `<div id="alertDateTabsBox" class="alert-date-tabs"></div>`;
 
-  html += '<div class="report-wrap alert-scroll"><table class="alert-flat-table"><thead><tr>';
+  html += '<div class="report-wrap alert-scroll" style="display:none;"><table class="alert-flat-table"><thead><tr>';
   html += buildAlertTableHead();
   html += '</tr></thead><tbody></tbody></table></div>';
+  
   html += buildAlertFoot();
 
   $('alertBody').innerHTML = html;
@@ -2025,7 +2024,7 @@ function isFSCGrade(gradegram) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  RENDER ALERT (Main) — V.10.23 บังคับ Empty State ก่อนเสมอ
+//  RENDER ALERT (Main) — V.10.24 บังคับแสดงผลเป็น Matrix
 // ═══════════════════════════════════════════════════════════════
 
 async function renderAlert() {
@@ -2153,6 +2152,7 @@ async function renderAlert() {
     renderAllAlertFilters();
     renderAlertDateTabs();
 
+    // 🔽 V.10.24: เรียกตัว render หลักเพื่อให้เช็คโหมด (Matrix/Flat) 🔽
     applyAlertFiltersAndRender();
 
     if (hasPOEdited()) {
