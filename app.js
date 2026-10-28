@@ -578,10 +578,10 @@ async function saveMaster() {
   closeModal('modalMaster');
   await loadMaster();
   await loadGradeFilter();
-  if (typeof loadSizeFilter === 'function') await loadSizeFilter();          // ✅ เพิ่ม
-  if (typeof loadStockGradeFilter === 'function') await loadStockGradeFilter();  // ✅ เพิ่ม
-  if (typeof loadReceiveGradeFilter === 'function') await loadReceiveGradeFilter(); // ✅ เพิ่ม
-  if (typeof loadAlertGradeFilter === 'function') await loadAlertGradeFilter();     // ✅ เพิ่ม
+  if (typeof loadSizeFilter === 'function') await loadSizeFilter();
+  if (typeof loadStockGradeFilter === 'function') await loadStockGradeFilter();
+  if (typeof loadReceiveGradeFilter === 'function') await loadReceiveGradeFilter();
+  if (typeof loadAlertGradeFilter === 'function') await loadAlertGradeFilter();
   renderMaster();
 }
 async function delMaster(id) {
@@ -663,10 +663,10 @@ function importMaster(ev) {
 
       await loadMaster();
       await loadGradeFilter();
-      if (typeof loadSizeFilter === 'function') await loadSizeFilter();          // ✅ เพิ่ม
-      if (typeof loadStockGradeFilter === 'function') await loadStockGradeFilter();  // ✅ เพิ่ม
-      if (typeof loadReceiveGradeFilter === 'function') await loadReceiveGradeFilter(); // ✅ เพิ่ม
-      if (typeof loadAlertGradeFilter === 'function') await loadAlertGradeFilter();     // ✅ เพิ่ม
+      if (typeof loadSizeFilter === 'function') await loadSizeFilter();
+      if (typeof loadStockGradeFilter === 'function') await loadStockGradeFilter();
+      if (typeof loadReceiveGradeFilter === 'function') await loadReceiveGradeFilter();
+      if (typeof loadAlertGradeFilter === 'function') await loadAlertGradeFilter();
       renderMaster();
     } catch (ex) {
       hideProgress('masterProgress');
@@ -1223,6 +1223,37 @@ async function delUser(id, username) {
   document.querySelectorAll('input[type="date"]').forEach(el => {
     el.setAttribute('lang', 'th-TH');
   });
+
+  // ✅ V.10.30 Fix: บังคับฟอร์แมต วัน/เดือน/ปี
+  function setupCustomDateDisplay(inputId, displayId) {
+    const input = document.getElementById(inputId);
+    const display = document.getElementById(displayId);
+    if (!input || !display) return;
+
+    const updateDisplay = () => {
+      if (input.value) {
+        const [y, m, d] = input.value.split('-');
+        display.textContent = `${d}/${m}/${y}`;
+      } else {
+        display.textContent = 'วว/ดด/ปปปป';
+      }
+    };
+
+    input.addEventListener('change', updateDisplay);
+    input.addEventListener('input', updateDisplay);
+    
+    setTimeout(updateDisplay, 100); 
+  }
+
+  setupCustomDateDisplay('stockDate', 'stockDateDisplay');
+  setupCustomDateDisplay('receiveDate', 'receiveDateDisplay');
+  setupCustomDateDisplay('alertDate', 'alertDateDisplay');
+  setupCustomDateDisplay('alertStockDate', 'alertStockDateDisplay');
+  setupCustomDateDisplay('alertReceiveDate', 'alertReceiveDateDisplay');
+  setupCustomDateDisplay('alertHistoryDate', 'alertHistoryDateDisplay');
+  setupCustomDateDisplay('stockImportDate', 'stockImportDateDisplay');
+  setupCustomDateDisplay('dtFrom', 'dtFromDisplay');
+  setupCustomDateDisplay('dtTo', 'dtToDisplay');
 
   initSession();
 })();
