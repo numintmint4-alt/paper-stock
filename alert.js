@@ -4,6 +4,7 @@
 //  V.10.23 Fix: บังคับ Empty State ให้ขึ้นก่อนเสมอ
 //  V.10.24 Fix: กลับไปใช้โหมด Matrix เป็นค่าเริ่มต้น (Default)
 //  V.10.25 Fix: (1) Auto-render Matrix on init (2) Fix column width
+//  V.10.26 Fix: Modal ย้อนหลังแสดงทศนิยม 2 ตำแหน่ง
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -15,7 +16,7 @@ let alertAllGrades = [];
 let alertCache = [];
 let alertSupplierCache = [];
 
-let alertViewMode = 'matrix';   // 🔽 V.10.24: กลับมาเป็น Matrix เป็นค่าเริ่มต้น 🔽
+let alertViewMode = 'matrix';
 
 let alertSelectedSizes = [];
 let alertAllSizes = [];
@@ -248,7 +249,6 @@ async function initAlertTab() {
 
   showAlertHistoryCard();
 
-  // ✅ V.10.25 Fix: บังคับให้ Render Matrix ทันทีถ้ามีข้อมูลพร้อมแล้ว
   if (alertReceiveDates.length > 0 && window._alertFullCache && window._alertFullCache.length > 0) {
     if (alertViewMode === 'matrix') {
       applyAlertFiltersAndRender();
@@ -1352,7 +1352,6 @@ function renderAlertMatrixView(rows) {
       if (hasOrder && allHaveSup) orderCls = 'has-order';
       else if (hasQtyNoSup)        orderCls = 'order-incomplete';
 
-      // ✅ V.10.25 Fix: ปัดเศษเพื่อไม่ให้ความยาวเกิน
       const displayValue = Number(Number(a).toFixed(2));
       const valueText = displayValue > 0 ? '+' + displayValue : displayValue;
 
@@ -2037,7 +2036,6 @@ async function renderAlert() {
   const snapshotMonth = $('alertSnapshotMonth')?.value;
   const stockDate     = $('alertStockDate')?.value;
 
-  // 🔽 V.10.21 / V.10.23: Empty State ต้องขึ้นก่อนเสมอ 🔽
   if (alertReceiveDates.length === 0) {
     const html = `
       <div class="alert-date-tabs" style="display:flex; align-items:center; justify-content:space-between; background:#f8fafc; border:1px solid #e2e8f0; padding:8px; border-radius:6px; margin-bottom:15px; flex-wrap:wrap; gap:8px;">
@@ -2057,7 +2055,7 @@ async function renderAlert() {
       </div>
     `;
     $('alertBody').innerHTML = html;
-    return; // 🔽 สำคัญมาก: ต้องมี return 🔽
+    return;
   }
 
   const receiveDate = $('alertReceiveDate')?.value;
@@ -2158,7 +2156,6 @@ async function renderAlert() {
     renderAllAlertFilters();
     renderAlertDateTabs();
 
-    // ✅ เรียกตัว render หลักเพื่อให้เช็คโหมด (Matrix/Flat)
     applyAlertFiltersAndRender();
 
     if (hasPOEdited()) {
@@ -3039,7 +3036,7 @@ function openAlertHistoryCell(gradegram, size) {
         </div>
       </div>
       <div class="matrix-alert-big ${alertCls}">
-        Alert: ${a > 0 ? '+' + a : a} ม้วน
+        Alert: ${a > 0 ? '+' + Number(a).toFixed(2) : Number(a).toFixed(2)} ม้วน
       </div>
     </div>
 
