@@ -5,6 +5,7 @@
 //  V.10.24 Fix: กลับไปใช้โหมด Matrix เป็นค่าเริ่มต้น (Default)
 //  V.10.25 Fix: (1) Auto-render Matrix on init (2) Fix column width
 //  V.10.26 Fix: Modal ย้อนหลังแสดงทศนิยม 2 ตำแหน่ง
+//  V.10.27 Fix: Auto-load Alert History on init
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -249,10 +250,20 @@ async function initAlertTab() {
 
   showAlertHistoryCard();
 
+  // ✅ V.10.25 Fix: บังคับให้ Render Matrix ทันทีถ้ามีข้อมูลพร้อมแล้ว
   if (alertReceiveDates.length > 0 && window._alertFullCache && window._alertFullCache.length > 0) {
     if (alertViewMode === 'matrix') {
       applyAlertFiltersAndRender();
     }
+  }
+
+  // ✅ V.10.27 Fix: Auto-load Alert History
+  const historyDateEl = $('alertHistoryDate');
+  if (historyDateEl && !historyDateEl.value) {
+    historyDateEl.value = today;
+  }
+  if (typeof loadAlertHistory === 'function') {
+    loadAlertHistory();
   }
 }
 
