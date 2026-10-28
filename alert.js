@@ -1,19 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 //  STOCK V10.1 — alert.js
-//  V.10.9 Fix: Matrix formatting (toFixed(2)) & Dedupe
-//  V.10.10 Fix: เปลี่ยนหัวข้อ Alert เป็น "Stock Alert"
-//  V.10.11 Fix: เปลี่ยนช่องวันที่เป็น Text + เพิ่มตัวแปลง DD/MM/YYYY ↔ YYYY-MM-DD
-//  V.10.12 Fix: เปลี่ยนกลับเป็น type="date" + บังคับเลือกเดือนล่าสุดใน loadSnapshotMonths
-//  V.10.13 Fix: Auto-analyze on load + on month change
-//  V.10.14 Fix: Default ไม่มีวันที่รับสินค้า (ว่างไว้) + แจ้งเตือนให้กดเพิ่มวัน
-//  V.10.15 Fix: applyCalculatedDates() ไม่เซ็ต alertReceiveDate (ปล่อยว่าง)
-//  V.10.16 Fix: renderAlert() แสดงแถบวันที่ + ปุ่ม "+ เพิ่มวัน" แม้ยังไม่มีวันที่
-//  V.10.17 Fix: Auto-load Alert History on init + default date to today
-//  V.10.18 Fix: default alertReceiveDate = today + UI empty state inline
-//  V.10.19 Fix: ปรับ UI empty state ใน renderAlert() ให้กระชับและถูกต้อง
-//  V.10.20 Fix: ลบ duplicate empty-state ใน onAlertDateChange() ให้ renderAlert() จัดการแทน
-//  V.10.21 Fix: เปลี่ยน Empty State ให้มี Date Picker เลือกวันแรกได้เลย (ไม่มีปุ่ม + เพิ่มวัน)
 //  V.10.22 Fix: ซ่อนปุ่ม "รายการ/Matrix" + ไม่โหลด History อัตโนมัติ
+//  V.10.23 Fix: บังคับ Empty State ให้ขึ้นก่อนเสมอ + default view = flat
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -25,7 +13,7 @@ let alertAllGrades = [];
 let alertCache = [];
 let alertSupplierCache = [];
 
-let alertViewMode = 'matrix';
+let alertViewMode = 'flat';   // 🔽 V.10.23: เปลี่ยน default เป็น flat 🔽
 
 let alertSelectedSizes = [];
 let alertAllSizes = [];
@@ -105,7 +93,7 @@ const ALERT_PO_FLAG_KEY = 'stockv8_alert_po_created';
 const ALERT_RECEIVE_DATES_KEY = 'stockv8_alert_receive_dates';
 
 // ═══════════════════════════════════════════════════════════════
-//  DATE CONVERSION HELPERS (DD/MM/YYYY ↔ YYYY-MM-DD)
+//  DATE CONVERSION HELPERS
 // ═══════════════════════════════════════════════════════════════
 
 function toThaiDateStr(isoDate) {
@@ -225,7 +213,6 @@ async function initAlertTab() {
 
   const today = toISODate(new Date());
 
-  // 🔽 เซ็ตค่าวันที่วิเคราะห์ (ห้ามแก้) 🔽
   const alertDateEl = $('alertDate');
   if (alertDateEl) {
     alertDateEl.value = today;
@@ -235,12 +222,10 @@ async function initAlertTab() {
     alertDateEl.style.cursor = 'not-allowed';
   }
 
-  // 🔽 V.10.18: ให้ช่อง "วันที่สั่งซื้อ" ดีฟอลต์เป็น "วันปัจจุบัน" 🔽
   const receiveDateEl = $('alertReceiveDate');
   if (receiveDateEl && !receiveDateEl.value) {
     receiveDateEl.value = today; 
   }
-  // 🔼 จบส่วนที่เพิ่ม 🔼
 
   const displayEl = $('alertDateDisplay');
   if (displayEl) displayEl.textContent = fmtDateThai(today);
@@ -261,40 +246,33 @@ async function initAlertTab() {
 
   showAlertHistoryCard();
 
-  // 🔽 V.10.22: ไม่โหลดประวัติอัตโนมัติแล้ว (ผู้ใช้กดเอง) 🔽
+  // 🔽 V.10.22: ไม่โหลดประวัติอัตโนมัติ 🔽
   // await loadAlertHistory();
 }
 
-// ✅ V.10.15: ไม่เซ็ต alertReceiveDate ที่นี่ (ปล่อยให้ว่างไว้)
 function applyCalculatedDates(analyzedDate) {
   if (!analyzedDate) return;
-
   const stockDate = calcStockDate(analyzedDate);
-
   if ($('alertStockDate')) $('alertStockDate').value = stockDate;
-  // ❌ ไม่ต้องเซ็ต alertReceiveDate ที่นี่ (ปล่อยให้ว่างไว้)
 }
 
 function attachAlertDateListener() {
   const el = $('alertDate');
   if (!el) return;
-
   el.readOnly = true;
   el.style.pointerEvents = 'none';
   el.style.background = '#f1f5f9';
   el.style.cursor = 'not-allowed';
-
   if (el.dataset.listenerAttached === '1') return;
   el.dataset.listenerAttached = '1';
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  ALERT HISTORY
+//  ALERT HISTORY (save / load)
 // ═══════════════════════════════════════════════════════════════
 
 async function saveAlertSnapshot(receiveDates) {
   const analyzedDate = $('alertDate')?.value;
-
   if (!analyzedDate) {
     console.warn('saveAlertSnapshot: no analyzed_date');
     return { ok: false, error: 'ไม่มีวันที่วิเคราะห์' };
@@ -343,14 +321,12 @@ async function saveAlertSnapshot(receiveDates) {
 
 async function loadAlertSnapshot(analyzedDate) {
   if (!analyzedDate) return null;
-
   try {
     const { data, error } = await supabase
       .from('alert_history')
       .select('*')
       .eq('analyzed_date', analyzedDate)
       .maybeSingle();
-
     if (error) throw error;
     return data || null;
   } catch (e) {
@@ -359,13 +335,10 @@ async function loadAlertSnapshot(analyzedDate) {
   }
 }
 
-// ✅ V.10.20: ลบ duplicate empty-state ออก — ให้ renderAlert() จัดการ UI ทั้งหมด
 async function onAlertDateChange() {
   const analyzedDate = $('alertDate')?.value;
   if (!analyzedDate) return;
 
-  // 🔽 V.10.20: ไม่ต้องเขียน empty-state ที่นี่ ให้ renderAlert() จัดการแทน 🔽
-  // ถ้ามีวันที่แล้ว ค่อยโหลด snapshot / auto-analyze
   $('alertBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
   const snapshot = await loadAlertSnapshot(analyzedDate);
   
@@ -393,7 +366,6 @@ function setAlertLocked(locked, analyzedDate) {
       lockBanner.innerHTML = `🔒 ข้อมูลวันที่ <b>${fmtDateThai(analyzedDate)}</b> — ข้ามวันแล้ว ดูได้อย่างเดียว`;
       lockBanner.classList.remove('hidden');
     }
-
     if (body) body.classList.add('alert-locked');
 
     ['alertStockDate', 'alertReceiveDate', 'alertSnapshotMonth', 'alertIncludeCustomer'].forEach(id => {
@@ -558,7 +530,7 @@ async function loadSnapshotMonths() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  FILTERS (GRADE / SIZE / ALERT / ORDER / SUP / STOCK / RECEIVE / USAGE)
+//  FILTERS
 // ═══════════════════════════════════════════════════════════════
 
 // ─── GRADE ──────────────────────────────────────────────────────
@@ -1265,7 +1237,6 @@ function onAlertItemInput(gradegram, size, idx, field, value, el) {
   }
 
   items[idx][field] = value;
-
   saveAlertItems(gradegram, size, items);
 
   if (el) {
@@ -1288,7 +1259,6 @@ function addFlatRow(gradegram, size) {
     alert('⚠️ เพิ่มได้สูงสุด 5 รายการต่อ cell');
     return;
   }
-
   items.push({ qty: '', sup: '', customer_roll: 'normal', quality_b: 'normal', note: '' });
   saveAlertItems(gradegram, size, items);
   applyAlertFiltersAndRender();
@@ -1400,7 +1370,6 @@ function renderAlertMatrixView(rows) {
   html += '</tr>';
 
   html += '</tbody></table>';
-
   matrixWrap.innerHTML = html;
 }
 
@@ -1490,9 +1459,7 @@ function renderMatrixOrderForm(gradegram, size, items) {
   if (!items || !items.length) {
     items = [{ qty: '', sup: '', customer_roll: 'normal', quality_b: 'normal', note: '' }];
   }
-
   const rowsHtml = items.map((it, idx) => renderMatrixOrderRow(idx, it)).join('');
-
   return `
     <div class="matrix-order-form" id="matrixOrderForm"
          data-gradegram="${esc(gradegram)}" data-size="${size}">
@@ -1503,11 +1470,9 @@ function renderMatrixOrderForm(gradegram, size, items) {
           ➕ เพิ่มรายการ
         </button>
       </div>
-
       <div id="matrixOrderRows" class="matrix-order-rows">
         ${rowsHtml}
       </div>
-
       <div class="form-actions">
         <button type="button" onclick="closeModal('modalAlertMatrixCell')">ยกเลิก</button>
         <button type="button" class="primary"
@@ -1904,19 +1869,14 @@ function saveAlertReceiveDates() {
   localStorage.setItem(ALERT_RECEIVE_DATES_KEY, JSON.stringify(alertReceiveDates));
 }
 
-// 🔽 ฟังก์ชันใหม่: สำหรับเซ็ตวันที่แรกจาก Empty State 🔽
 function setFirstAlertDate(dateValue) {
   if (!dateValue) {
     alert('กรุณาเลือกวันที่');
     return;
   }
-  
-  // เซ็ตวันที่แรก
   alertReceiveDates = [dateValue];
   alertActiveDateIdx = 0;
   saveAlertReceiveDates();
-  
-  // รีเฟรชหน้าจอ
   renderAlertDateTabs();
   renderAlert();
 }
@@ -1928,27 +1888,21 @@ function addAlertReceiveDate() {
     return;
   }
 
-  // 🔽 เริ่มคำนวณหาวันพรุ่งนี้ (ข้ามวันอาทิตย์) 🔽
   const tomorrow = new Date(analyzedDate);
-  tomorrow.setDate(tomorrow.getDate() + 1); // พรุ่งนี้
-  
-  // ถ้าพรุ่งนี้เป็นวันอาทิตย์ (0) ให้บวกอีก 1 วันเป็นจันทร์
+  tomorrow.setDate(tomorrow.getDate() + 1);
   if (tomorrow.getDay() === 0) {
     tomorrow.setDate(tomorrow.getDate() + 1);
   }
   const defaultNextDate = toISODate(tomorrow);
-  // 🔼 จบการคำนวณ 🔼
 
-  // ถ้ายังไม่มีวันที่เลย ให้เพิ่มวันพรุ่งนี้เข้าไปเลย
   if (alertReceiveDates.length === 0) {
     alertReceiveDates.push(defaultNextDate);
     saveAlertReceiveDates();
     renderAlertDateTabs();
-    renderAlert(); // โหลดตารางทันที
+    renderAlert();
     return;
   }
 
-  // ถ้ามีวันที่อยู่แล้ว ให้หาวันว่างถัดไป (หลังจากวันสุดท้ายที่มี)
   const sorted = [...alertReceiveDates]
     .map(_parseLocalDate)
     .filter(Boolean)
@@ -1970,11 +1924,10 @@ function addAlertReceiveDate() {
   alertReceiveDates.sort((a, b) => _parseLocalDate(a) - _parseLocalDate(b));
   saveAlertReceiveDates();
   renderAlertDateTabs();
-  renderAlert(); // โหลดตารางใหม่
+  renderAlert();
 }
 
 function removeAlertReceiveDate(idx) {
-  // ✅ ปลดล็อก: ให้ลบวันสุดท้ายได้ เพื่อกลับไปที่ Empty State
   if (!confirm('ลบวันที่นี้? ข้อมูลที่กรอกในวันนี้จะหายไปด้วย')) return;
 
   const dateToRemove = alertReceiveDates[idx];
@@ -1989,9 +1942,7 @@ function removeAlertReceiveDate(idx) {
   alertReceiveDates.splice(idx, 1);
   saveAlertReceiveDates();
   renderAlertDateTabs();
-  
-  // 🔽 สำคัญ: ให้เรียก renderAlert() เพื่ออัปเดตหน้าจอเป็น Empty State ทันที 🔽
-  renderAlert(); 
+  renderAlert();
 }
 
 function onAlertReceiveDateChange(idx, value) {
@@ -2009,7 +1960,7 @@ function switchAlertDate(idx) {
   if (idx < 0 || idx >= alertReceiveDates.length) return;
   alertActiveDateIdx = idx;
   renderAlertDateTabs();
-  renderAlert(); // โหลดตารางใหม่ (ข้อมูลจะถูกดึงจาก LocalStorage ของวันนั้น)
+  renderAlert();
 }
 
 function renderAlertDateTabs() {
@@ -2051,13 +2002,12 @@ function renderAlertDateTabs() {
 function initAlertReceiveDates() {
   alertReceiveDates = loadAlertReceiveDates();
 
-  // ลบวันที่ที่เป็นวันอาทิตย์ออก
   alertReceiveDates = alertReceiveDates.filter(d => {
     const dt = _parseLocalDate(d);
     return dt && dt.getDay() !== 0;
   });
 
-  // ❌ ไม่สร้างวันที่เริ่มต้นอัตโนมัติ — ต้องเป็น Array ว่างเสมอถ้าไม่มีข้อมูล
+  // ❌ ไม่สร้างวันที่เริ่มต้นอัตโนมัติ — Array ว่างถ้าไม่มีข้อมูล
 
   alertActiveDateIdx = 0;
   renderAlertDateTabs();
@@ -2075,47 +2025,37 @@ function isFSCGrade(gradegram) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  RENDER ALERT (Main)
+//  RENDER ALERT (Main) — V.10.23 บังคับ Empty State ก่อนเสมอ
 // ═══════════════════════════════════════════════════════════════
 
 async function renderAlert() {
   const snapshotMonth = $('alertSnapshotMonth')?.value;
   const stockDate     = $('alertStockDate')?.value;
-  
-  // 🔽 V.10.21: ปรับ Empty State ให้มี Date Picker เลือกวันแรกได้เลย 🔽
+
+  // 🔽 V.10.21 / V.10.23: Empty State ต้องขึ้นก่อนเสมอ 🔽
   if (alertReceiveDates.length === 0) {
-    let html = `
+    const html = `
       <div class="alert-date-tabs" style="display:flex; align-items:center; justify-content:space-between; background:#f8fafc; border:1px solid #e2e8f0; padding:8px; border-radius:6px; margin-bottom:15px; flex-wrap:wrap; gap:8px;">
-        
-        <!-- กรอบสีเหลือง + ช่องเลือกวันที่ + ปุ่มตกลง -->
+
         <div style="background: #fef3c7; border: 1px solid #fcd34d; color: #92400e; padding: 6px 12px; border-radius: 4px; font-size: 13px; font-weight: 600; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
           <span>⚠️ กรุณาเลือกวันที่รับสินค้า:</span>
-          
-          <input type="date" id="firstReceiveDateInput" 
+
+          <input type="date" id="firstReceiveDateInput"
                  style="padding: 4px 8px; border: 1px solid #d97706; border-radius: 4px; font-family: inherit; font-size: 13px; color: #333; outline: none;">
-          
-          <button type="button" onclick="setFirstAlertDate(document.getElementById('firstReceiveDateInput').value)" 
+
+          <button type="button" onclick="setFirstAlertDate(document.getElementById('firstReceiveDateInput').value)"
                   style="background: #d97706; color: white; border: none; padding: 4px 12px; border-radius: 4px; font-size: 13px; cursor: pointer; font-weight: bold; transition: background 0.2s;">
             ตกลง
           </button>
         </div>
-        
-        <!-- 🔽 V.10.22: ซ่อนปุ่มสลับโหมด 🔽
-        <div class="alert-view-toggle-inline" style="display:flex; gap:4px; margin-left:auto;">
-          <button type="button" class="${alertViewMode === 'flat' ? 'active' : ''}" onclick="setAlertViewMode('flat')">📋 รายการ</button>
-          <button type="button" class="${alertViewMode === 'matrix' ? 'active' : ''}" onclick="setAlertViewMode('matrix')">📊 Matrix</button>
-        </div>
-        🔼 สิ้นสุด 🔼 -->
 
       </div>
     `;
-    
     $('alertBody').innerHTML = html;
-    return;
+    return; // 🔽 สำคัญมาก: ต้องมี return 🔽
   }
-  // 🔼 จบเงื่อนไข 🔼
 
-  const receiveDate   = $('alertReceiveDate')?.value;
+  const receiveDate = $('alertReceiveDate')?.value;
 
   if (!snapshotMonth || !stockDate || !receiveDate) {
     console.warn('[Alert] ข้ามการวิเคราะห์: ข้อมูลไม่ครบ');
@@ -2487,7 +2427,6 @@ function confirmCreatePO() {
   }
 
   const analyzedDate = toISODate(new Date());
-
   const uniqueDates = [...new Set(alertReceiveDates)].filter(Boolean);
 
   sessionStorage.setItem('alert_to_po', JSON.stringify({
@@ -2869,13 +2808,11 @@ async function clearUsagePlan() {
 //  ALERT HISTORY
 // ═══════════════════════════════════════════════════════════════
 
-// ✅ V.10.17: บังคับให้เป็นวันที่ปัจจุบันเสมอถ้ายังไม่มีค่า
 function showAlertHistoryCard() {
   const card = $('alertHistoryCard');
   if (card) card.style.display = '';
   
   const dateEl = $('alertHistoryDate');
-  // 🔽 บังคับให้เป็นวันที่ปัจจุบันเสมอถ้ายังไม่มีค่า 🔽
   if (dateEl && !dateEl.value) {
     dateEl.value = toISODate(new Date());
   }
@@ -2890,11 +2827,8 @@ function setAlertHistoryMode(mode) {
   if (alertHistoryData) renderAlertHistory();
 }
 
-// ✅ V.10.17: ถ้ายังไม่มีวันที่ ให้ใส่วันที่ปัจจุบันเข้าไปก่อน
 async function loadAlertHistory() {
   const dateEl = $('alertHistoryDate');
-  
-  // 🔽 ถ้ายังไม่มีวันที่ ให้ใส่วันที่ปัจจุบันเข้าไปก่อน 🔽
   if (dateEl && !dateEl.value) {
     dateEl.value = toISODate(new Date());
   }
@@ -3181,7 +3115,6 @@ function exportAlert() {
 function buildAlertTableHead() {
   let html = '';
 
-  // Gradegrams
   html += `<th class="th-with-filter">
     <div class="th-filter-wrap" id="alertGradeFilterBox">
       <button type="button" class="th-filter-btn" id="alertGradeFilterBtn">
@@ -3198,7 +3131,6 @@ function buildAlertTableHead() {
     </div>
   </th>`;
 
-  // Size
   html += `<th class="th-with-filter">
     <div class="th-filter-wrap" id="alertSizeFilterBox">
       <button type="button" class="th-filter-btn" id="alertSizeFilterBtn">
@@ -3217,7 +3149,6 @@ function buildAlertTableHead() {
 
   html += '<th>Stock Level</th>';
 
-  // Stock
   html += `<th class="th-with-filter">
     <div class="th-filter-wrap" id="alertStockFilterBox">
       <button type="button" class="th-filter-btn" id="alertStockFilterBtn">
@@ -3234,7 +3165,6 @@ function buildAlertTableHead() {
     </div>
   </th>`;
 
-  // Receive
   html += `<th class="th-with-filter">
     <div class="th-filter-wrap" id="alertReceiveFilterBox">
       <button type="button" class="th-filter-btn" id="alertReceiveFilterBtn">
@@ -3251,7 +3181,6 @@ function buildAlertTableHead() {
     </div>
   </th>`;
 
-  // Usage Plan
   html += `<th class="th-with-filter">
     <div class="th-filter-wrap" id="alertUsageFilterBox">
       <button type="button" class="th-filter-btn" id="alertUsageFilterBtn">
@@ -3268,7 +3197,6 @@ function buildAlertTableHead() {
     </div>
   </th>`;
 
-  // Alert
   html += `<th class="th-with-filter">
     <div class="th-filter-wrap" id="alertFilterBox">
       <button type="button" class="th-filter-btn" id="alertFilterBtn">
@@ -3287,7 +3215,6 @@ function buildAlertTableHead() {
 
   html += '<th>สถานะ</th>';
 
-  // Order
   html += `<th class="th-with-filter">
     <div class="th-filter-wrap" id="alertOrderFilterBox">
       <button type="button" class="th-filter-btn" id="alertOrderFilterBtn">
@@ -3304,7 +3231,6 @@ function buildAlertTableHead() {
     </div>
   </th>`;
 
-  // Sup
   html += `<th class="th-with-filter">
     <div class="th-filter-wrap" id="alertSupFilterBox">
       <button type="button" class="th-filter-btn" id="alertSupFilterBtn">
