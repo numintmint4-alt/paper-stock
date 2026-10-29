@@ -1,8 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
 //  STOCK V10.1 — stock.js
-//  เพิ่ม: multi-select Customer/Location/Status + waiting status
-//  + แก้: tooltip, total ล่าง, คลิก cell, ส่ง gradegram เต็ม
-//  + แก้: default date = เมื่อวาน (ถ้าเป็นอาทิตย์ → เสาร์)
+//  V.10.26 Fix: เปลี่ยนมาใช้ Flatpickr (getISODateFromInput) ทั้งหมด
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -56,14 +54,18 @@ function showSuccessModal(message) {
 // ═══════════════════════════════════════════════════════════════
 
 async function initStockTab() {
-  const dateInput = $('stockDate');
-  if (dateInput && !dateInput.value) {
-    const target = new Date();
-    target.setDate(target.getDate() - 1);
-    // ถ้าเป็นวันอาทิตย์ (0) → ย้อนไปวันเสาร์
-    if (target.getDay() === 0) target.setDate(target.getDate() - 1);
-    dateInput.value = toISODate(target);
+  const target = new Date();
+  target.setDate(target.getDate() - 1);
+  if (target.getDay() === 0) target.setDate(target.getDate() - 1);
+  const defaultDate = toISODate(target);
+
+  if (flatpickrInstances['stockDate']) {
+    flatpickrInstances['stockDate'].setDate(defaultDate, false);
+  } else {
+    const dateInput = $('stockDate');
+    if (dateInput && !dateInput.value) dateInput.value = defaultDate;
   }
+  
   await loadStockGradeFilter();
   await loadStockCustomers();
   await loadStockLocs();
@@ -373,7 +375,7 @@ function clearAllStockStatuses() {
 // ═══════════════════════════════════════════════════════════════
 
 async function renderStockMatrix() {
-  const stockDate = $('stockDate')?.value;
+  const stockDate = getISODateFromInput('stockDate'); // 🔽 แก้ตรงนี้
   if (!stockDate) { alert('กรุณาเลือกวันที่ Stock'); return; }
 
   const dateThai = thaiDateFull(stockDate);
@@ -539,7 +541,7 @@ async function renderStockMatrix() {
 // ═══════════════════════════════════════════════════════════════
 
 async function openStockDetail(gradegram, size) {
-  const stockDate = $('stockDate')?.value;
+  const stockDate = getISODateFromInput('stockDate'); // 🔽 แก้ตรงนี้
   if (!stockDate) return;
 
   $('stockDetailTitle').innerHTML = `
@@ -640,7 +642,14 @@ function openStockImportModal() {
   target.setDate(target.getDate() - 1);
   // ถ้าเป็นวันอาทิตย์ (0) → ย้อนไปวันเสาร์
   if (target.getDay() === 0) target.setDate(target.getDate() - 1);
-  $('stockImportDate').value = toISODate(target);
+  const defaultDate = toISODate(target);
+  
+  if (flatpickrInstances['stockImportDate']) {
+    flatpickrInstances['stockImportDate'].setDate(defaultDate, false);
+  } else {
+    $('stockImportDate').value = defaultDate;
+  }
+  
   $('stockImportError').innerHTML = '';
   openModal('modalStockImport');
 }
@@ -650,7 +659,7 @@ function importStock(ev) {
   if (!f) return;
   closeModal('modalStockImport');
 
-  const stockDate = $('stockImportDate')?.value;
+  const stockDate = getISODateFromInput('stockImportDate'); // 🔽 แก้ตรงนี้
   if (!stockDate) { alert('กรุณาเลือกวันที่'); ev.target.value = ''; return; }
 
   const reader = new FileReader();
@@ -703,7 +712,13 @@ function importStock(ev) {
       hideProgress('stockProgress');
       showSuccessModal(`Import Stock สำเร็จ ${data.inserted} แถว · วันที่ ${stockDate}`);
 
-      $('stockDate').value = stockDate;
+      // อัปเดตหน้า Matrix หลัง Import เสร็จ
+      if (flatpickrInstances['stockDate']) {
+        flatpickrInstances['stockDate'].setDate(stockDate, false);
+      } else {
+        $('stockDate').value = stockDate;
+      }
+      
       await loadStockCustomers();
       await loadStockLocs();
       await renderStockMatrix();
