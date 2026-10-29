@@ -3,17 +3,9 @@
 //  V.10.27 Fix: เปลี่ยนมาใช้ Flatpickr (getISODateFromInput) ทั้งหมด
 // ═══════════════════════════════════════════════════════════════
 
-// ═══════════════════════════════════════════════════════════════
-//  STATE
-// ═══════════════════════════════════════════════════════════════
-
 let receiveSelectedGrades = [];
 let receiveAllGrades = [];
 let receiveCache = [];
-
-// ═══════════════════════════════════════════════════════════════
-//  HELPERS
-// ═══════════════════════════════════════════════════════════════
 
 function fmtKg(n) {
   const num = Number(n) || 0;
@@ -32,33 +24,24 @@ function fmtDateThai(d) {
   return `${dd}/${mm}/${yyyy}`;
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  INIT
-// ═══════════════════════════════════════════════════════════════
-
 async function initReceiveTab() {
-  const today = toISODate(new Date());
+  // 🔽 ดึงวันปัจจุบัน (Local) แบบเป๊ะๆ
+  const today = getTodayISO();
   
-  // ตั้งค่าเริ่มต้นผ่าน Flatpickr
   if (flatpickrInstances['receiveDate']) {
     flatpickrInstances['receiveDate'].setDate(today, false);
   } else {
     const dateInput = $('receiveDate');
-    if (dateInput && !dateInput.value) dateInput.value = today;
+    if (dateInput) dateInput.value = today;
   }
   
   await loadReceiveGradeFilter();
   
-  // เรียก render หลังจากตั้งค่า date เรียบร้อย
   const receiveDate = getISODateFromInput('receiveDate');
   if (receiveDate) {
     await renderReceive();
   }
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  GRADE FILTER
-// ═══════════════════════════════════════════════════════════════
 
 async function loadReceiveGradeFilter() {
   receiveAllGrades = [...new Set(
@@ -139,10 +122,6 @@ function clearAllReceiveGrades() {
   renderReceiveGradeList(); updateReceiveGradeLabel();
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  SUPPLIER SUMMARY
-// ═══════════════════════════════════════════════════════════════
-
 function renderSupplierSummary(rows, dateThai) {
   const supplierSummary = {};
   rows.forEach(r => {
@@ -170,10 +149,6 @@ function renderSupplierSummary(rows, dateThai) {
   return html;
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  RENDER RECEIVE
-// ═══════════════════════════════════════════════════════════════
-
 async function renderReceive() {
   const receiveDate = getISODateFromInput('receiveDate');
   const supplier = $('receiveSupplier')?.value || '';
@@ -182,23 +157,19 @@ async function renderReceive() {
   const mode = $('receiveMode')?.value || 'matrix';
 
   if (!receiveDate) {
-    // alert('กรุณาเลือกวันที่สั่งซื้อ'); // 🔽 คอมเมนต์ไว้เพื่อไม่ให้เด้งตอนโหลดหน้า
     return;
   }
 
   const dateThai = thaiDateFull(receiveDate);
 
-  // 🔽 แก้ไขหัวข้อรายงาน 🔽
   $('receiveReportTitle').innerHTML = `
     สรุปรายการสั่งซื้อม้วนกระดาษ<br>
     ประจำวันที่ ${dateThai}
   `;
-  // 🔼 จบส่วนที่แก้ไข 🔼
 
   $('receiveBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
 
   try {
-    // Step 1: เช็คว่ามีข้อมูลใน po_receive ของวันนี้ไหม
     const { count: existCount, error: countErr } = await supabase
       .from('po_receive')
       .select('*', { count: 'exact', head: true })
@@ -206,7 +177,6 @@ async function renderReceive() {
 
     if (countErr) throw countErr;
 
-    // Step 2: ถ้าไม่มี → auto-fetch จาก PO
     if (!existCount || existCount === 0) {
       const fetchResult = await fetchFromPO(receiveDate, { silent: true });
       if (!fetchResult.ok) {
@@ -218,7 +188,6 @@ async function renderReceive() {
       }
     }
 
-    // Step 3: Query ปกติ
     const normalizedGrades = receiveSelectedGrades.map(g => normalizeGrade(g));
 
     const { data, error } = await supabase.rpc('get_receive_list', {
@@ -248,15 +217,10 @@ async function renderReceive() {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  FETCH FROM PO
-// ═══════════════════════════════════════════════════════════════
-
 async function fetchFromPO(receiveDate, opts = {}) {
   const { silent = false } = opts;
 
   try {
-    // Step 1: ใช้ .eq() เพราะ DB เป็น date
     const { data: pos, error: poErr } = await supabase
       .from('purchase_orders')
       .select('id, po_no, sup_code, ref_receive, status')
@@ -269,7 +233,6 @@ async function fetchFromPO(receiveDate, opts = {}) {
       return { ok: false, reason: 'no_po' };
     }
 
-    // Step 2: ลบ po_receive ของวันนั้นทั้งหมด (replace by date)
     const { error: delErr } = await supabase
       .from('po_receive')
       .delete()
@@ -277,7 +240,6 @@ async function fetchFromPO(receiveDate, opts = {}) {
 
     if (delErr) throw delErr;
 
-    // Step 3: ดึง items ของทุก PO
     const payload = [];
     for (const po of pos) {
       const { data: detail, error: detailErr } = await supabase.rpc('get_purchase_order_detail', { p_po_id: po.id });
@@ -308,7 +270,6 @@ async function fetchFromPO(receiveDate, opts = {}) {
       return { ok: false, reason: 'no_po' };
     }
 
-    // Step 4: Insert ผ่าน RPC เดิม
     const { data: importResult, error: importErr } = await supabase.rpc('import_po_receive', {
       rows: payload,
       p_po_date: receiveDate
@@ -330,7 +291,6 @@ async function fetchFromPO(receiveDate, opts = {}) {
   }
 }
 
-// ปุ่ม "รีเฟรชจาก PO" — manual refresh
 async function refreshFromPO() {
   const receiveDate = getISODateFromInput('receiveDate');
   if (!receiveDate) { alert('กรุณาเลือกวันที่สั่งซื้อ'); return; }
@@ -356,10 +316,6 @@ async function refreshFromPO() {
 
   await renderReceive();
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  MATRIX
-// ═══════════════════════════════════════════════════════════════
 
 function renderReceiveMatrix(rows, dateThai, supHtml = '') {
   const rowSet = new Map(); const colSet = new Set();
@@ -424,10 +380,6 @@ function renderReceiveMatrix(rows, dateThai, supHtml = '') {
   $('receiveBody').innerHTML = supHtml + html;
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  LIST
-// ═══════════════════════════════════════════════════════════════
-
 function renderReceiveList(rows, dateThai, supHtml = '') {
   let html = '<div class="data-scroll"><table class="data-table"><thead><tr>';
   html += '<th>#</th><th>PO No.</th><th>Supplier</th><th>Gradegrams</th>';
@@ -466,10 +418,6 @@ function renderReceiveList(rows, dateThai, supHtml = '') {
   </div>`;
   $('receiveBody').innerHTML = supHtml + html;
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  RECEIVE DETAIL
-// ═══════════════════════════════════════════════════════════════
 
 async function openReceiveDetail(gradegram, size, dateThai) {
   const receiveDate = getISODateFromInput('receiveDate');
@@ -529,10 +477,6 @@ async function openReceiveDetail(gradegram, size, dateThai) {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  EXPORT RECEIVE TO EXCEL (2 Sheets)
-// ═══════════════════════════════════════════════════════════════
-
 function exportReceive() {
   if (!receiveCache || !receiveCache.length) {
     alert('ไม่มีข้อมูลให้ Export');
@@ -550,7 +494,6 @@ function exportReceive() {
 
   const wb = XLSX.utils.book_new();
 
-  // Sheet 1: สรุป Supplier
   const supRows = [['Supplier', 'จำนวน (ม้วน)', 'KG รวม']];
   let totalQty = 0, totalKg = 0;
   Object.keys(supMap).sort().forEach(sup => {
@@ -568,7 +511,6 @@ function exportReceive() {
   }
   XLSX.utils.book_append_sheet(wb, wsSup, 'สรุป Supplier');
 
-  // Sheet 2: รายการทั้งหมด
   const listRows = [[
     '#', 'PO No.', 'Supplier', 'Gradegrams', 'Size',
     'Quantity', 'ราคา', 'หมายเหตุ', 'FSC', 'ม้วนลูกค้า'
