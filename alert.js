@@ -1,12 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
 //  STOCK V10.1 — alert.js
-//  V.10.22 Fix: ซ่อนปุ่ม "รายการ/Matrix" + ไม่โหลด History อัตโนมัติ
-//  V.10.23 Fix: บังคับ Empty State ให้ขึ้นก่อนเสมอ
-//  V.10.24 Fix: กลับไปใช้โหมด Matrix เป็นค่าเริ่มต้น (Default)
-//  V.10.25 Fix: (1) Auto-render Matrix on init (2) Fix column width
-//  V.10.26 Fix: Modal ย้อนหลังแสดงทศนิยม 2 ตำแหน่ง
-//  V.10.27 Fix: Auto-load Alert History on init
-//  V.10.31 Fix: Flatpickr — ใช้ toISODate() ทุกจุดที่ดึงค่าวันที่
+//  V.10.25 Fix: เปลี่ยนมาใช้ Flatpickr (getISODateFromInput) ทั้งหมด
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -18,7 +12,7 @@ let alertAllGrades = [];
 let alertCache = [];
 let alertSupplierCache = [];
 
-let alertViewMode = 'matrix';
+let alertViewMode = 'matrix'; // บังคับเป็น Matrix
 
 let alertSelectedSizes = [];
 let alertAllSizes = [];
@@ -98,53 +92,7 @@ const ALERT_PO_FLAG_KEY = 'stockv8_alert_po_created';
 const ALERT_RECEIVE_DATES_KEY = 'stockv8_alert_receive_dates';
 
 // ═══════════════════════════════════════════════════════════════
-//  DATE HELPERS (ใช้ toISODate จาก app.js)
-// ═══════════════════════════════════════════════════════════════
-
-function getAlertDateISO() {
-  // alertDate ถูก set จากระบบ (readonly) — ควรเป็น ISO อยู่แล้ว
-  return toISODate($('alertDate')?.value || '');
-}
-
-function getAlertStockDateISO() {
-  // Flatpickr คืน "31/10/2026" — ต้องแปลงเป็น "2026-10-31"
-  return toISODate($('alertStockDate')?.value || '');
-}
-
-function getAlertReceiveDateISO() {
-  return toISODate($('alertReceiveDate')?.value || '');
-}
-
-function getAlertHistoryDateISO() {
-  return toISODate($('alertHistoryDate')?.value || '');
-}
-
-function getAlertSnapshotMonth() {
-  // type="month" → YYYY-MM อยู่แล้ว
-  return $('alertSnapshotMonth')?.value || '';
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  LOCALSTORAGE KEY (ISO Date)
-// ═══════════════════════════════════════════════════════════════
-
-function getAlertLSKeyByDate(isoDate) {
-  if (!isoDate) {
-    const activeDate = alertReceiveDates[alertActiveDateIdx];
-    if (!activeDate) return `${ALERT_LS_KEY_PREFIX}default`;
-    return `${ALERT_LS_KEY_PREFIX}${activeDate}`;
-  }
-  return `${ALERT_LS_KEY_PREFIX}${isoDate}`;
-}
-
-function getAlertLSKey(dateIdx = alertActiveDateIdx) {
-  const activeDate = alertReceiveDates[dateIdx];
-  if (!activeDate) return `${ALERT_LS_KEY_PREFIX}default`;
-  return `${ALERT_LS_KEY_PREFIX}${activeDate}`;
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  DATE HELPERS (Local)
+//  DATE HELPERS
 // ═══════════════════════════════════════════════════════════════
 
 function _parseLocalDate(iso) {
@@ -166,16 +114,6 @@ function calcStockDate(analyzedDate) {
   d.setDate(d.getDate() - 1);
   if (d.getDay() === 0) d.setDate(d.getDate() - 1);
   return toISODate(d);
-}
-
-function calcReceiveDate(analyzedDate) {
-  return analyzedDate || '';
-}
-
-function calcSnapshotMonth(analyzedDate) {
-  if (!analyzedDate) return '';
-  const d = new Date(analyzedDate);
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
 }
 
 function fmtDateThai(d) {
@@ -215,70 +153,69 @@ function cleanOldAlertKeys() {
 
 async function initAlertTab() {
   cleanOldAlertKeys();
-
   const today = toISODate(new Date());
+  const currentMonthStr = today.slice(0, 7); // YYYY-MM
 
   // alertDate: ตั้งเป็นวันนี้ (readOnly)
+  if (flatpickrInstances['alertDate']) {
+    flatpickrInstances['alertDate'].setDate(today, false);
+  }
   const alertDateEl = $('alertDate');
   if (alertDateEl) {
-    alertDateEl.value = today;
     alertDateEl.readOnly = true;
     alertDateEl.style.pointerEvents = 'none';
     alertDateEl.style.background = '#f1f5f9';
     alertDateEl.style.cursor = 'not-allowed';
   }
 
-  // alertReceiveDate: ถ้าว่างให้ตั้งเป็นวันนี้ (ISO)
-  const receiveDateEl = $('alertReceiveDate');
-  if (receiveDateEl && !receiveDateEl.value) {
-    receiveDateEl.value = today;
-    if (receiveDateEl._flatpickr) receiveDateEl._flatpickr.setDate(today, false);
+  // alertReceiveDate: ตั้งเป็นวันนี้
+  if (flatpickrInstances['alertReceiveDate']) {
+    flatpickrInstances['alertReceiveDate'].setDate(today, false);
   }
 
-  const displayEl = $('alertDateDisplay');
-  if (displayEl) displayEl.textContent = fmtDateThai(today);
+  // alertStockDate: ตั้งเป็นเมื่อวาน
+  const stockDate = calcStockDate(today);
+  if (flatpickrInstances['alertStockDate']) {
+    flatpickrInstances['alertStockDate'].setDate(stockDate, false);
+  }
+
+  // 🔽 บังคับ Stock Level เดือน เป็นเดือนปัจจุบัน 🔽
+  const monthInput = $('alertSnapshotMonth');
+  if (monthInput) monthInput.value = currentMonthStr;
 
   applyCalculatedDates(today);
   attachAlertDateListener();
 
   await loadAlertSuppliers();
-  await loadSnapshotMonths();
+  await loadSnapshotMonths(); 
+  
+  // 🔽 บังคับซ้ำอีกรอบ เผื่อ loadSnapshotMonths ไปเปลี่ยนค่า 🔽
+  if (monthInput) monthInput.value = currentMonthStr;
+
   await loadAlertGradeFilter();
   loadAlertFilter();
   initAlertReceiveDates();
-
   await loadUsagePlanRanges();
   renderUsageRangeDropdown();
-
   await onAlertDateChange();
-
   showAlertHistoryCard();
 
-  // ✅ V.10.25 Fix: บังคับให้ Render Matrix ทันทีถ้ามีข้อมูลพร้อมแล้ว
   if (alertReceiveDates.length > 0 && window._alertFullCache && window._alertFullCache.length > 0) {
-    if (alertViewMode === 'matrix') {
-      applyAlertFiltersAndRender();
-    }
+    if (alertViewMode === 'matrix') applyAlertFiltersAndRender();
   }
 
-  // ✅ V.10.27 Fix: Auto-load Alert History
-  const historyDateEl = $('alertHistoryDate');
-  if (historyDateEl && !historyDateEl.value) {
-    historyDateEl.value = today;
-    if (historyDateEl._flatpickr) historyDateEl._flatpickr.setDate(today, false);
+  // 🔽 Alert History Date 🔽
+  if (flatpickrInstances['alertHistoryDate']) {
+    flatpickrInstances['alertHistoryDate'].setDate(today, false);
   }
-  if (typeof loadAlertHistory === 'function') {
-    loadAlertHistory();
-  }
+  if (typeof loadAlertHistory === 'function') loadAlertHistory();
 }
 
 function applyCalculatedDates(analyzedDate) {
   if (!analyzedDate) return;
   const stockDate = calcStockDate(analyzedDate);
-  const stockDateEl = $('alertStockDate');
-  if (stockDateEl) {
-    stockDateEl.value = stockDate;
-    if (stockDateEl._flatpickr) stockDateEl._flatpickr.setDate(stockDate, false);
+  if (flatpickrInstances['alertStockDate']) {
+    flatpickrInstances['alertStockDate'].setDate(stockDate, false);
   }
 }
 
@@ -298,11 +235,8 @@ function attachAlertDateListener() {
 // ═══════════════════════════════════════════════════════════════
 
 async function saveAlertSnapshot(receiveDates) {
-  const analyzedDate = getAlertDateISO();
-  if (!analyzedDate) {
-    console.warn('saveAlertSnapshot: no analyzed_date');
-    return { ok: false, error: 'ไม่มีวันที่วิเคราะห์' };
-  }
+  const analyzedDate = getISODateFromInput('alertDate');
+  if (!analyzedDate) return { ok: false, error: 'ไม่มีวันที่วิเคราะห์' };
 
   try {
     const summary = {
@@ -320,9 +254,9 @@ async function saveAlertSnapshot(receiveDates) {
 
     const payload = {
       analyzed_date:  analyzedDate,
-      snapshot_month: getAlertSnapshotMonth() || null,
-      stock_date:     getAlertStockDateISO() || null,
-      receive_date:   getAlertReceiveDateISO() || null,
+      snapshot_month: $('alertSnapshotMonth')?.value || null,
+      stock_date:     getISODateFromInput('alertStockDate') || null,
+      receive_date:   getISODateFromInput('alertReceiveDate') || null,
       receive_dates:  receiveDates || [...alertReceiveDates],
       summary_json:   summary,
       result_json:    alertCache,
@@ -362,7 +296,7 @@ async function loadAlertSnapshot(analyzedDate) {
 }
 
 async function onAlertDateChange() {
-  const analyzedDate = getAlertDateISO();
+  const analyzedDate = getISODateFromInput('alertDate');
   if (!analyzedDate) return;
 
   $('alertBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
@@ -429,21 +363,12 @@ function setAlertLocked(locked, analyzedDate) {
 async function applyAlertSnapshot(snapshot) {
   try {
     if (snapshot.snapshot_month) $('alertSnapshotMonth').value = snapshot.snapshot_month;
-
-    // stockDate/receiveDate: set เป็น ISO (Flatpickr จะแปลงแสดงเป็น DD/MM/YYYY เอง)
-    if (snapshot.stock_date) {
-      const el = $('alertStockDate');
-      if (el) {
-        el.value = snapshot.stock_date;
-        if (el._flatpickr) el._flatpickr.setDate(snapshot.stock_date, false);
-      }
+    
+    if (snapshot.stock_date && flatpickrInstances['alertStockDate']) {
+      flatpickrInstances['alertStockDate'].setDate(snapshot.stock_date, false);
     }
-    if (snapshot.receive_date) {
-      const el = $('alertReceiveDate');
-      if (el) {
-        el.value = snapshot.receive_date;
-        if (el._flatpickr) el._flatpickr.setDate(snapshot.receive_date, false);
-      }
+    if (snapshot.receive_date && flatpickrInstances['alertReceiveDate']) {
+      flatpickrInstances['alertReceiveDate'].setDate(snapshot.receive_date, false);
     }
 
     if (snapshot.receive_dates && Array.isArray(snapshot.receive_dates)) {
@@ -477,7 +402,6 @@ function renderAlertFromCache() {
   html += '<div class="report-wrap alert-scroll" style="display:none;"><table class="alert-flat-table"><thead><tr>';
   html += buildAlertTableHead();
   html += '</tr></thead><tbody></tbody></table></div>';
-  
   html += buildAlertFoot();
 
   $('alertBody').innerHTML = html;
@@ -563,7 +487,7 @@ async function loadSnapshotMonths() {
     const months = [...set].sort().reverse();
 
     if ($('alertSnapshotMonth') && months.length > 0) {
-      $('alertSnapshotMonth').value = months[0];
+      // ไม่ต้องเซ็ตค่าตรงนี้แล้ว เพราะ initAlertTab บังคับเดือนปัจจุบันไปแล้ว
     }
   } catch (e) {
     console.warn('loadSnapshotMonths:', e);
@@ -1034,13 +958,8 @@ function applyAlertFiltersAndRender() {
 
   let result = [...window._alertFullCache];
 
-  if (alertSelectedGrades.length > 0) {
-    result = result.filter(r => alertSelectedGrades.includes(r.gradegram));
-  }
-
-  if (alertSelectedSizes.length > 0) {
-    result = result.filter(r => alertSelectedSizes.includes(Number(r.size)));
-  }
+  if (alertSelectedGrades.length > 0) result = result.filter(r => alertSelectedGrades.includes(r.gradegram));
+  if (alertSelectedSizes.length > 0) result = result.filter(r => alertSelectedSizes.includes(Number(r.size)));
 
   if (!alertSelectedFilters.includes('all') && alertSelectedFilters.length > 0) {
     result = result.filter(r => {
@@ -1094,9 +1013,7 @@ function applyAlertFiltersAndRender() {
   if (alertSelectedSupFilters.length > 0) {
     result = result.filter(r => {
       const items = getAlertItems(r.gradegram, r.size);
-      if (!items.length) {
-        return alertSelectedSupFilters.includes('__NONE__');
-      }
+      if (!items.length) return alertSelectedSupFilters.includes('__NONE__');
       return items.some(it => {
         const sup = it.sup || '';
         if (!sup && alertSelectedSupFilters.includes('__NONE__')) return true;
@@ -1115,26 +1032,12 @@ function applyAlertFiltersAndRender() {
 
 function renderAlertTableBody(rows) {
   renderAlertDateTabs();
-
   const fullCache = window._alertFullCache || [];
   if (fullCache.length > 0) {
-    const sizes = [...new Set(
-      fullCache.map(r => Number(r.size)).filter(n => !isNaN(n) && n > 0)
-    )].sort((a, b) => a - b);
-    if (sizes.length > 0) {
-      alertAllSizes = sizes;
-      renderAlertSizeList();
-      updateAlertSizeLabel();
-    }
-
-    const grades = [...new Set(
-      fullCache.map(r => r.gradegram).filter(Boolean)
-    )].sort();
-    if (grades.length > 0) {
-      alertAllGrades = grades;
-      renderAlertGradeList();
-      updateAlertGradeLabel();
-    }
+    const sizes = [...new Set(fullCache.map(r => Number(r.size)).filter(n => !isNaN(n) && n > 0))].sort((a, b) => a - b);
+    if (sizes.length > 0) { alertAllSizes = sizes; renderAlertSizeList(); updateAlertSizeLabel(); }
+    const grades = [...new Set(fullCache.map(r => r.gradegram).filter(Boolean))].sort();
+    if (grades.length > 0) { alertAllGrades = grades; renderAlertGradeList(); updateAlertGradeLabel(); }
   }
 
   const container = document.getElementById('alertBody');
@@ -1142,7 +1045,6 @@ function renderAlertTableBody(rows) {
 
   const flatWrap = container.querySelector('.report-wrap.alert-scroll');
   const matrixWrapOld = document.getElementById('alertMatrixWrap');
-
   if (flatWrap) flatWrap.style.display = 'none';
   if (matrixWrapOld) matrixWrapOld.style.display = 'none';
 
@@ -1323,11 +1225,8 @@ function renderAlertMatrixView(rows) {
     matrixWrap.className = 'alert-matrix-wrap';
 
     const reportFoot = container.querySelector('.report-foot');
-    if (reportFoot) {
-      container.insertBefore(matrixWrap, reportFoot);
-    } else {
-      container.appendChild(matrixWrap);
-    }
+    if (reportFoot) container.insertBefore(matrixWrap, reportFoot);
+    else container.appendChild(matrixWrap);
   } else {
     matrixWrap.style.display = '';
   }
@@ -1339,65 +1238,45 @@ function renderAlertMatrixView(rows) {
 
   const grades = [...new Set(rows.map(r => r.gradegram))].sort();
   const sizes  = [...new Set(rows.map(r => Number(r.size)))].sort((a, b) => a - b);
-
   const dataMap = {};
   rows.forEach(r => { dataMap[`${r.gradegram}|${r.size}`] = r; });
 
   let html = '<table class="alert-matrix-new-table"><thead><tr>';
   html += '<th class="grade-col-matrix">GRADEGRAMS</th>';
   sizes.forEach(s => { html += `<th>${s}</th>`; });
-  html += '<th class="total-col-matrix">TOTAL</th>';
-  html += '</tr></thead><tbody>';
+  html += '<th class="total-col-matrix">TOTAL</th></tr></thead><tbody>';
 
   grades.forEach(grade => {
     html += '<tr>';
     html += `<td class="grade-col-matrix">${esc(grade)}</td>`;
-
     let rowTotal = 0;
-
     sizes.forEach(size => {
       const r = dataMap[`${grade}|${size}`];
       if (!r) { html += '<td class="empty-cell">-</td>'; return; }
-
       const a = Number(r.alert) || 0;
       rowTotal += a;
-
       let cellCls = '';
-      if (a < 0)        cellCls = 'matrix-red';
+      if (a < 0) cellCls = 'matrix-red';
       else if (a === 0) cellCls = 'matrix-yellow';
-      else              cellCls = 'matrix-green';
+      else cellCls = 'matrix-green';
 
       const totalQty = getAlertQtyTotal(grade, size);
       const hasOrder = totalQty > 0;
-
       const items = getAlertItems(grade, size);
       const allHaveSup = items.length > 0 && items.every(it => it.sup && String(it.sup).trim());
       const hasQtyNoSup = hasOrder && !allHaveSup;
 
-      const cartIcon = hasOrder
-        ? `<svg class="matrix-cart-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-             <circle cx="9" cy="21" r="1"/>
-             <circle cx="20" cy="21" r="1"/>
-             <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
-           </svg>`
-        : '';
+      const cartIcon = hasOrder ? `<svg class="matrix-cart-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>` : '';
 
       let orderCls = '';
       if (hasOrder && allHaveSup) orderCls = 'has-order';
-      else if (hasQtyNoSup)        orderCls = 'order-incomplete';
+      else if (hasQtyNoSup) orderCls = 'order-incomplete';
 
-      const displayValue = Number(Number(a).toFixed(2));
-      const valueText = displayValue > 0 ? '+' + displayValue : displayValue;
-
-      html += `<td class="matrix-cell ${cellCls} ${orderCls}"
-                    onclick="openAlertMatrixCell('${esc(grade)}', ${size})">
-                 <div class="matrix-value">${valueText}${cartIcon}</div>
+      html += `<td class="matrix-cell ${cellCls} ${orderCls}" onclick="openAlertMatrixCell('${esc(grade)}', ${size})">
+                 <div class="matrix-value">${a > 0 ? '+' + Number(a).toFixed(2) : Number(a).toFixed(2)}${cartIcon}</div>
                </td>`;
     });
-
-    const rowDisplay = Number(Number(rowTotal).toFixed(2));
-    html += `<td class="total-col-matrix">${rowDisplay > 0 ? '+' + rowDisplay : rowDisplay}</td>`;
-    html += '</tr>';
+    html += `<td class="total-col-matrix">${rowTotal > 0 ? '+' + rowTotal.toFixed(2) : rowTotal.toFixed(2)}</td></tr>`;
   });
 
   html += '<tr class="total-row-matrix">';
@@ -1408,15 +1287,11 @@ function renderAlertMatrixView(rows) {
       const r = dataMap[`${grade}|${size}`];
       if (r) colTotal += Number(r.alert) || 0;
     });
-    const colDisplay = Number(Number(colTotal).toFixed(2));
-    html += `<td>${colDisplay > 0 ? '+' + colDisplay : colDisplay}</td>`;
+    html += `<td>${colTotal > 0 ? '+' + colTotal.toFixed(2) : colTotal.toFixed(2)}</td>`;
   });
   const grandTotal = rows.reduce((s, r) => s + (Number(r.alert) || 0), 0);
-  const grandDisplay = Number(Number(grandTotal).toFixed(2));
-  html += `<td class="total-col-matrix">${grandDisplay > 0 ? '+' + grandDisplay : grandDisplay}</td>`;
-  html += '</tr>';
-
-  html += '</tbody></table>';
+  html += `<td class="total-col-matrix">${grandTotal > 0 ? '+' + grandTotal.toFixed(2) : grandTotal.toFixed(2)}</td>`;
+  html += '</tr></tbody></table>';
   matrixWrap.innerHTML = html;
 }
 
@@ -1929,7 +1804,7 @@ function setFirstAlertDate(dateValue) {
 }
 
 function addAlertReceiveDate() {
-  const analyzedDate = getAlertDateISO();
+  const analyzedDate = getISODateFromInput('alertDate');
   if (!analyzedDate) {
     alert('กรุณาเลือกวันที่วิเคราะห์ก่อน');
     return;
@@ -2047,6 +1922,8 @@ function initAlertReceiveDates() {
     return dt && dt.getDay() !== 0;
   });
 
+  // ❌ ไม่สร้างวันที่เริ่มต้นอัตโนมัติ — Array ว่างถ้าไม่มีข้อมูล
+
   alertActiveDateIdx = 0;
   renderAlertDateTabs();
 }
@@ -2063,13 +1940,14 @@ function isFSCGrade(gradegram) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  RENDER ALERT (Main)
+//  RENDER ALERT (Main) — V.10.24 บังคับแสดงผลเป็น Matrix
 // ═══════════════════════════════════════════════════════════════
 
 async function renderAlert() {
-  const snapshotMonth = getAlertSnapshotMonth();
-  const stockDate     = getAlertStockDateISO();
+  const snapshotMonth = $('alertSnapshotMonth')?.value;
+  const stockDate     = getISODateFromInput('alertStockDate');
 
+  // 🔽 V.10.21 / V.10.23: Empty State ต้องขึ้นก่อนเสมอ 🔽
   if (alertReceiveDates.length === 0) {
     const html = `
       <div class="alert-date-tabs" style="display:flex; align-items:center; justify-content:space-between; background:#f8fafc; border:1px solid #e2e8f0; padding:8px; border-radius:6px; margin-bottom:15px; flex-wrap:wrap; gap:8px;">
@@ -2089,10 +1967,10 @@ async function renderAlert() {
       </div>
     `;
     $('alertBody').innerHTML = html;
-    return;
+    return; // 🔽 สำคัญมาก: ต้องมี return 🔽
   }
 
-  const receiveDate = getAlertReceiveDateISO();
+  const receiveDate = getISODateFromInput('alertReceiveDate');
 
   if (!snapshotMonth || !stockDate || !receiveDate) {
     console.warn('[Alert] ข้ามการวิเคราะห์: ข้อมูลไม่ครบ');
@@ -2190,6 +2068,7 @@ async function renderAlert() {
     renderAllAlertFilters();
     renderAlertDateTabs();
 
+    // 🔽 V.10.24: เรียกตัว render หลักเพื่อให้เช็คโหมด (Matrix/Flat) 🔽
     applyAlertFiltersAndRender();
 
     if (hasPOEdited()) {
@@ -2463,16 +2342,16 @@ function confirmCreatePO() {
     return;
   }
 
-  const analyzedDate = toISODate(new Date());
+  const analyzedDate = getISODateFromInput('alertDate') || toISODate(new Date());
   const uniqueDates = [...new Set(alertReceiveDates)].filter(Boolean);
 
   sessionStorage.setItem('alert_to_po', JSON.stringify({
     items: _pendingPOItems,
     analyzed_date: analyzedDate,
     receive_dates: uniqueDates,
-    ref_snapshot: getAlertSnapshotMonth(),
-    ref_stock: getAlertStockDateISO(),
-    ref_receive: getAlertReceiveDateISO()
+    ref_snapshot: $('alertSnapshotMonth')?.value,
+    ref_stock: getISODateFromInput('alertStockDate'),
+    ref_receive: getISODateFromInput('alertReceiveDate')
   }));
 
   markAlertPOCreated(`ref_${Date.now()}`);
@@ -2496,9 +2375,9 @@ function confirmCreatePO() {
 // ═══════════════════════════════════════════════════════════════
 
 async function openAlertDetail(gradegram, size) {
-  const snapshotMonth = getAlertSnapshotMonth();
-  const stockDate     = getAlertStockDateISO();
-  const receiveDate   = getAlertReceiveDateISO();
+  const snapshotMonth = $('alertSnapshotMonth')?.value;
+  const stockDate     = getISODateFromInput('alertStockDate');
+  const receiveDate   = getISODateFromInput('alertReceiveDate');
   const { grade } = parseGradegram(gradegram);
 
   $('alertDetailTitle').innerHTML = `📊 ${esc(gradegram)} · Size ${size}`;
@@ -2851,9 +2730,7 @@ function showAlertHistoryCard() {
   
   const dateEl = $('alertHistoryDate');
   if (dateEl && !dateEl.value) {
-    const today = toISODate(new Date());
-    dateEl.value = today;
-    if (dateEl._flatpickr) dateEl._flatpickr.setDate(today, false);
+    dateEl.value = toISODate(new Date());
   }
 }
 
@@ -2869,12 +2746,10 @@ function setAlertHistoryMode(mode) {
 async function loadAlertHistory() {
   const dateEl = $('alertHistoryDate');
   if (dateEl && !dateEl.value) {
-    const today = toISODate(new Date());
-    dateEl.value = today;
-    if (dateEl._flatpickr) dateEl._flatpickr.setDate(today, false);
+    dateEl.value = toISODate(new Date());
   }
 
-  const date = getAlertHistoryDateISO();
+  const date = getISODateFromInput('alertHistoryDate');
   if (!date) { alert('กรุณาเลือกวันที่'); return; }
 
   const body = $('alertHistoryBody');
@@ -3074,7 +2949,7 @@ function openAlertHistoryCell(gradegram, size) {
         </div>
       </div>
       <div class="matrix-alert-big ${alertCls}">
-        Alert: ${a > 0 ? '+' + Number(a).toFixed(2) : Number(a).toFixed(2)} ม้วน
+        Alert: ${a > 0 ? '+' + a : a} ม้วน
       </div>
     </div>
 
