@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK V10.1 — receive.js — V.12
-//  V.12 Fix: ใช้ flatpickrInstances จาก Global + safety checks
+//  STOCK V10.1 — receive.js — V.13.2 (No Default Date)
+//  Fix: initReceiveTab ไม่ setDate อัตโนมัติ — ผู้ใช้ต้องเลือกวันเอง
 // ═══════════════════════════════════════════════════════════════
 
 let receiveSelectedGrades = [];
@@ -25,24 +25,9 @@ function fmtDateThai(d) {
 }
 
 async function initReceiveTab() {
-  // 🔽 ดึงวันปัจจุบัน (Local) แบบเป๊ะๆ
-  const today = getTodayISO();
-  
-  // 🔽 แก้ตรงนี้: บังคับเขียนค่าลง Input ดิบๆ ก่อน 🔽
-  const dateInput = $('receiveDate');
-  if (dateInput) dateInput.value = today;
-  
-  // แล้วค่อยสั่งให้ Flatpickr อัปเดตตาม
-  if (flatpickrInstances['receiveDate']) {
-    flatpickrInstances['receiveDate'].setDate(today, true); 
-  }
-  
+  // 🔽 ลบการคำนวณ defaultDate และ setDate ออกให้หมด 🔽
   await loadReceiveGradeFilter();
-  
-  const receiveDate = getISODateFromInput('receiveDate');
-  if (receiveDate) {
-    await renderReceive();
-  }
+  // await renderReceive(); // 🔽 คอมเมนต์ไว้ก่อน 🔽
 }
 
 async function loadReceiveGradeFilter() {
