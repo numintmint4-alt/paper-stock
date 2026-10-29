@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
 //  STOCK V10.1 — alert.js
-//  V.10.27 Fix: เปลี่ยน firstReceiveDateInput เป็น Flatpickr (lazy init)
+//  V.10.28 Fix: firstReceiveDateInput → Flatpickr (lazy init)
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -127,6 +127,7 @@ function fmtDateThai(d) {
 
 // ═══════════════════════════════════════════════════════════════
 //  LAZY INIT: firstReceiveDateInput Flatpickr
+//  (element นี้เกิดแบบ dynamic ใน renderAlert() Empty State)
 // ═══════════════════════════════════════════════════════════════
 
 function initFirstReceiveDatePicker() {
@@ -1957,14 +1958,14 @@ function isFSCGrade(gradegram) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  RENDER ALERT (Main) — V.10.27
+//  RENDER ALERT (Main) — V.10.28
 // ═══════════════════════════════════════════════════════════════
 
 async function renderAlert() {
   const snapshotMonth = $('alertSnapshotMonth')?.value;
   const stockDate     = getISODateFromInput('alertStockDate');
 
-  // 🔽 V.10.27: Empty State — Flatpickr for firstReceiveDateInput 🔽
+  // 🔽 V.10.28: Empty State — Flatpickr for firstReceiveDateInput 🔽
   if (alertReceiveDates.length === 0) {
     const html = `
       <div class="alert-date-tabs" style="display:flex; align-items:center; justify-content:space-between; background:#f8fafc; border:1px solid #e2e8f0; padding:8px; border-radius:6px; margin-bottom:15px; flex-wrap:wrap; gap:8px;">
@@ -1972,9 +1973,12 @@ async function renderAlert() {
         <div style="background: #fef3c7; border: 1px solid #fcd34d; color: #92400e; padding: 6px 12px; border-radius: 4px; font-size: 13px; font-weight: 600; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
           <span>⚠️ กรุณาเลือกวันที่รับสินค้า:</span>
 
-          <input type="text" id="firstReceiveDateInput" placeholder="วว/ดด/ปปปป"
-                 style="padding: 4px 8px; border: 1px solid #d97706; border-radius: 4px; font-family: inherit; font-size: 13px; color: #333; outline: none;">
+          <!-- 🔽 เปลี่ยนเป็น type="text" + Flatpickr 🔽 -->
+          <input type="text" id="firstReceiveDateInput"
+                 placeholder="วว/ดด/ปปปป"
+                 style="padding: 4px 8px; border: 1px solid #d97706; border-radius: 4px; font-family: inherit; font-size: 13px; color: #333; outline: none; width: 120px;">
 
+          <!-- 🔽 ใช้ getISODateFromInput ใน onclick 🔽 -->
           <button type="button" onclick="setFirstAlertDate(getISODateFromInput('firstReceiveDateInput'))"
                   style="background: #d97706; color: white; border: none; padding: 4px 12px; border-radius: 4px; font-size: 13px; cursor: pointer; font-weight: bold; transition: background 0.2s;">
             ตกลง
@@ -1984,7 +1988,12 @@ async function renderAlert() {
       </div>
     `;
     $('alertBody').innerHTML = html;
-    initFirstReceiveDatePicker();   // 👈 lazy init Flatpickr
+
+    // 🔽 สร้าง Flatpickr ให้ช่องนี้ทันที (lazy init) 🔽
+    setTimeout(() => {
+      initFirstReceiveDatePicker();
+    }, 50);
+
     return;
   }
 
