@@ -42,7 +42,7 @@
     <button data-tab="receive">Receive</button>
     <button data-tab="alert">Alert</button>
     <button data-tab="purchase-order">Purchase Order</button>
-    <button data-tab="summary">Summary</button> <!-- 🔽 เพิ่มปุ่ม Summary -->
+    <button data-tab="summary">Summary</button>
     <button data-tab="data">Data</button>
     <button data-tab="settings">⚙ ตั้งค่า</button>
     <span class="spacer"></span>
@@ -189,7 +189,9 @@
         </div>
 
         <div class="filters no-print">
-          <label>📅 วันที่ Stock <input type="date" id="stockDate"></label>
+          <label>📅 วันที่ Stock
+            <input type="date" id="stockDate" name="no_autofill_stock" autocomplete="new-password" readonly>
+          </label>
 
           <label class="grade-filter-wrap">
             Gradegrams
@@ -283,7 +285,9 @@
         </div>
 
         <div class="filters no-print" id="receiveFilterBox">
-          <label>📅 วันที่รับเข้า <input type="date" id="receiveDate"></label>
+          <label>📅 วันที่รับเข้า
+            <input type="date" id="receiveDate" name="no_autofill_receive" autocomplete="new-password" readonly>
+          </label>
 
           <label class="grade-filter-wrap">
             Gradegrams
@@ -360,11 +364,17 @@
         </div>
 
         <div class="filters no-print">
-          <label>📅 วันที่วิเคราะห์ <input type="date" id="alertDate" onchange="onAlertDateChange()"></label>
+          <label>📅 วันที่วิเคราะห์
+            <input type="date" id="alertDate" name="no_autofill_alert" autocomplete="new-password" readonly onchange="onAlertDateChange()">
+          </label>
 
-          <label>📅 Stock วันที่ <input type="date" id="alertStockDate"></label>
+          <label>📅 Stock วันที่
+            <input type="date" id="alertStockDate" name="no_autofill_alert_stock" autocomplete="new-password" readonly>
+          </label>
 
-          <label>📅 Receive วันที่ <input type="date" id="alertReceiveDate"></label>
+          <label>📅 Receive วันที่
+            <input type="date" id="alertReceiveDate" name="no_autofill_alert_receive" autocomplete="new-password" readonly>
+          </label>
 
           <label>📅 Stock Level เดือน
             <input type="month" id="alertSnapshotMonth">
@@ -393,7 +403,7 @@
             <h3>📜 Alert History (ย้อนหลัง)</h3>
             <div class="alert-history-controls">
               <label>📅 วันที่:</label>
-              <input type="date" id="alertHistoryDate">
+              <input type="date" id="alertHistoryDate" name="no_autofill_alert_hist" autocomplete="new-password" readonly>
               <div class="alert-history-toggle" id="alertHistoryToggle">
                 <button data-mode="matrix" onclick="setAlertHistoryMode('matrix')" class="active">📊 Matrix</button>
                 <button data-mode="flat" onclick="setAlertHistoryMode('flat')">📋 รายการ</button>
@@ -434,7 +444,7 @@
       </div>
     </div>
 
-    <!-- ========== TAB 5.6: SUMMARY (เพิ่มใหม่) ========== -->
+    <!-- ========== TAB 5.6: SUMMARY ========== -->
     <div id="tab-summary" class="hidden">
       <div class="card">
         <div class="report-head">
@@ -445,7 +455,9 @@
         </div>
 
         <div class="filters no-print" id="summaryFilterBox">
-          <label>📅 วันที่รับเข้า <input type="date" id="summaryDate"></label>
+          <label>📅 วันที่รับเข้า
+            <input type="date" id="summaryDate" name="no_autofill_summary" autocomplete="new-password" readonly>
+          </label>
 
           <label class="grade-filter-wrap">
             Gradegrams
@@ -504,8 +516,8 @@
         <h2>Data — ทุกคอลัมน์จาก Excel</h2>
         <p class="hint">แสดงข้อมูลดิบทั้งหมดจากตาราง <b>usage_records_raw</b> · แถวสีแดง = แถวที่ไม่ผ่านการตรวจสอบ</p>
         <div class="filters">
-          <label>จาก <input type="date" id="dtFrom"></label>
-          <label>ถึง <input type="date" id="dtTo"></label>
+          <label>จาก <input type="date" id="dtFrom" name="no_autofill_dt_from" autocomplete="new-password" readonly></label>
+          <label>ถึง <input type="date" id="dtTo" name="no_autofill_dt_to" autocomplete="new-password" readonly></label>
           <label>สถานะ
             <select id="dtValid">
               <option value="">ทั้งหมด</option>
@@ -682,7 +694,9 @@
     <h3>📥 Import Stock คงเหลือ</h3>
     <div id="stockImportError"></div>
     <div class="form-grid" style="grid-template-columns:1fr">
-      <label>วันที่ Stock คงเหลือ <input type="date" id="stockImportDate"></label>
+      <label>วันที่ Stock คงเหลือ
+        <input type="date" id="stockImportDate" name="no_autofill_stock_import" autocomplete="new-password" readonly>
+      </label>
     </div>
     <div class="hint">ค่าเริ่มต้น = เมื่อวาน (Stock คงเหลือจากการใช้งานเมื่อวาน)</div>
     <div class="form-actions">
@@ -925,7 +939,7 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════ -->
-<!-- ✅ Modal: Summary Detail (เพิ่มใหม่) -->
+<!-- ✅ Modal: Summary Detail -->
 <!-- ═══════════════════════════════════════════════════════════ -->
 <div class="modal-bg" id="modalSummaryDetail">
   <div class="modal" style="max-width:1000px">
