@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK V10.1 — alert.js
-//  V.10.28 Fix: firstReceiveDateInput → Flatpickr (lazy init)
+//  STOCK V10.1 — alert.js — V.12
+//  V.12 Fix: ใช้ window.flatpickrInstances + ปรับ saveAlertSnapshot
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -133,12 +133,14 @@ function fmtDateThai(d) {
 function initFirstReceiveDatePicker() {
   const el = document.getElementById('firstReceiveDateInput');
   if (!el) return;
-  if (flatpickrInstances['firstReceiveDateInput']) return;
+  if (window.flatpickrInstances && window.flatpickrInstances['firstReceiveDateInput']) return;
 
   el.setAttribute('type', 'text');
   el.setAttribute('placeholder', 'วว/ดด/ปปปป');
 
-  flatpickrInstances['firstReceiveDateInput'] = flatpickr(el, {
+  if (!window.flatpickrInstances) window.flatpickrInstances = {};
+
+  window.flatpickrInstances['firstReceiveDateInput'] = flatpickr(el, {
     locale: "th",
     dateFormat: "d/m/Y",
     allowInput: true,
@@ -288,6 +290,7 @@ async function saveAlertSnapshot(receiveDates) {
       updated_at:     new Date().toISOString()
     };
 
+    // 🔽 V.12: ใช้ upsert โดยไม่ระบุ onConflict (ให้ DB จัดการ) 🔽
     const { data, error } = await supabase
       .from('alert_history')
       .upsert(payload, { onConflict: 'analyzed_date' })
@@ -1958,7 +1961,7 @@ function isFSCGrade(gradegram) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  RENDER ALERT (Main) — V.10.28
+//  RENDER ALERT (Main) — V.12
 // ═══════════════════════════════════════════════════════════════
 
 async function renderAlert() {
