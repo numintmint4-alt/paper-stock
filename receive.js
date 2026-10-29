@@ -28,11 +28,13 @@ async function initReceiveTab() {
   // 🔽 ดึงวันปัจจุบัน (Local) แบบเป๊ะๆ
   const today = getTodayISO();
   
+  // 🔽 แก้ตรงนี้: บังคับเขียนค่าลง Input ดิบๆ ก่อน 🔽
+  const dateInput = $('receiveDate');
+  if (dateInput) dateInput.value = today;
+  
+  // แล้วค่อยสั่งให้ Flatpickr อัปเดตตาม
   if (flatpickrInstances['receiveDate']) {
-    flatpickrInstances['receiveDate'].setDate(today, false);
-  } else {
-    const dateInput = $('receiveDate');
-    if (dateInput) dateInput.value = today;
+    flatpickrInstances['receiveDate'].setDate(today, true); 
   }
   
   await loadReceiveGradeFilter();
