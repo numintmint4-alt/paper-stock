@@ -1,6 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK V10.1 — receive.js — V.13.2 (No Default Date)
-//  Fix: initReceiveTab ไม่ setDate อัตโนมัติ — ผู้ใช้ต้องเลือกวันเอง
+//  STOCK V10.1 — receive.js — V.13.4 (Default Date: วันนี้)
 // ═══════════════════════════════════════════════════════════════
 
 let receiveSelectedGrades = [];
@@ -25,9 +24,20 @@ function fmtDateThai(d) {
 }
 
 async function initReceiveTab() {
-  // 🔽 ลบการคำนวณ defaultDate และ setDate ออกให้หมด 🔽
+  const today = getTodayISO();
+  
+  // 🔽 ตั้งค่าเริ่มต้นเป็น "วันนี้" 🔽
+  const dateInput = $('receiveDate');
+  if (dateInput) dateInput.value = today;
+  
+  if (window.flatpickrInstances['receiveDate']) {
+    window.flatpickrInstances['receiveDate'].setDate(today, true); 
+  }
+  
   await loadReceiveGradeFilter();
-  // await renderReceive(); // 🔽 คอมเมนต์ไว้ก่อน 🔽
+  
+  // 🔽 สั่งโหลดข้อมูลทันที 🔽
+  await renderReceive();
 }
 
 async function loadReceiveGradeFilter() {
