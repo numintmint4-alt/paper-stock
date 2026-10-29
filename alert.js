@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK V10.1 — alert.js — V.13.3 (No Default Date + No Override)
-//  Fix: initAlertTab ไม่ setDate, applyAlertSnapshot ไม่ setDate
+//  STOCK V10.1 — alert.js — V.13.4 (Default Date: ตามเงื่อนไข)
+//  Fix: ตั้งค่าเริ่มต้นอัตโนมัติ + ไม่ให้ Snapshot เขียนทับวันที่
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -172,30 +172,45 @@ function cleanOldAlertKeys() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  INIT — V.13.3 (ไม่ setDate อัตโนมัติ)
+//  INIT — V.13.4 (Default Date ตามเงื่อนไข)
 // ═══════════════════════════════════════════════════════════════
 
 async function initAlertTab() {
   cleanOldAlertKeys();
+  
+  // 🔽 1. คำนวณวันที่ตามเงื่อนไข 🔽
   const today = getTodayISO();
-  const currentMonthStr = today.slice(0, 7);
+  const currentMonthStr = today.slice(0, 7); 
+  
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (yesterday.getDay() === 0) yesterday.setDate(yesterday.getDate() - 1);
+  const stockDate = yesterday.toISOString().split('T')[0];
 
-  // 🔽 เอาแค่ทำให้ alertDate อ่านได้อย่างเดียว แต่ไม่ต้องใส่ค่า 🔽
+  // 🔽 2. ใส่ค่าเริ่มต้นให้ช่อง Input 🔽
   const alertDateEl = $('alertDate');
   if (alertDateEl) {
+    alertDateEl.value = today;
     alertDateEl.readOnly = true;
     alertDateEl.style.pointerEvents = 'none';
     alertDateEl.style.background = '#f1f5f9';
     alertDateEl.style.cursor = 'not-allowed';
   }
 
-  // (ข้ามส่วนการ setDate alertDate, alertStockDate, alertReceiveDate ทั้งหมด)
+  // 🔽 3. สั่ง Flatpickr อัปเดตค่าตามเงื่อนไข 🔽
+  if (window.flatpickrInstances['alertDate']) {
+    window.flatpickrInstances['alertDate'].setDate(today, true);
+  }
+  if (window.flatpickrInstances['alertStockDate']) {
+    window.flatpickrInstances['alertStockDate'].setDate(stockDate, true);
+  }
+  if (window.flatpickrInstances['alertReceiveDate']) {
+    window.flatpickrInstances['alertReceiveDate'].setDate(today, true);
+  }
 
   const monthInput = $('alertSnapshotMonth');
   if (monthInput) monthInput.value = currentMonthStr;
 
-  // 🔽 ลบ applyCalculatedDates(today) ออกแล้ว เพื่อไม่ให้เขียนทับ alertStockDate 🔽
-  
   attachAlertDateListener();
 
   await loadAlertSuppliers();
@@ -208,7 +223,10 @@ async function initAlertTab() {
   initAlertReceiveDates();
   await loadUsagePlanRanges();
   renderUsageRangeDropdown();
-  // await onAlertDateChange(); // 🔽 คอมเมนต์อันนี้ไว้ก่อน ถ้ายังไม่ได้เลือกวัน 🔽
+  
+  // 🔽 4. วิเคราะห์ข้อมูลทันทีเมื่อเปิดหน้า 🔽
+  await onAlertDateChange(); 
+  
   showAlertHistoryCard();
 
   if (alertReceiveDates.length > 0 && window._alertFullCache && window._alertFullCache.length > 0) {
@@ -371,7 +389,7 @@ async function applyAlertSnapshot(snapshot) {
   try {
     if (snapshot.snapshot_month) $('alertSnapshotMonth').value = snapshot.snapshot_month;
     
-    // 🔽 ลบ setDate ของ alertStockDate และ alertReceiveDate ออกแล้ว 🔽
+    // 🔽 ไม่มี setDate ของ alertStockDate และ alertReceiveDate ตรงนี้แล้ว 🔽
 
     if (snapshot.receive_dates && Array.isArray(snapshot.receive_dates)) {
       alertReceiveDates = [...snapshot.receive_dates];
