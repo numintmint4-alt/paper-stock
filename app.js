@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK ม้วนกระดาษ V6 — app.js (Core) — V.12
+//  STOCK ม้วนกระดาษ V6 — app.js (Core) — V.12.1
 //  V.12 Fix: ย้าย flatpickrInstances ไปไว้ Global Scope
+//  V.12.1 Fix: บังคับ defaultDate: "today" ให้ทุก Date Input
 // ═══════════════════════════════════════════════════════════════
 const SUPABASE_URL      = 'https://gwwgycbqzdjlijsuxahx.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_rMoUE6tUsQZHnJu2ULDxFg_4NAiw6wg';
@@ -32,10 +33,12 @@ function getISODateFromInput(inputId) {
   const el = document.getElementById(inputId);
   if (!el) return '';
 
+  // 🔽 V.12.1: เช็ค Instance ของ Flatpickr ก่อน 🔽
   if (flatpickrInstances[inputId] && flatpickrInstances[inputId].selectedDates.length > 0) {
     return toISODate(flatpickrInstances[inputId].selectedDates[0]);
   }
 
+  // 🔽 ถ้าไม่มีใน Flatpickr ให้ดึงจาก value ของ Input 🔽
   return toISODate(el.value);
 }
 
@@ -358,7 +361,7 @@ $('logoutBtn').onclick = async () => {
 };
 
 // ================= TABS =================
-const TAB_LIST = ['matrix','stock','receive','alert','purchase-order','data','settings', 'summary']; // 🔽 เพิ่ม 'summary'
+const TAB_LIST = ['matrix','stock','receive','alert','purchase-order','data','settings', 'summary']; 
 
 document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
   btn.onclick = () => {
@@ -371,7 +374,7 @@ document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
     if (t === 'receive' && typeof initReceiveTab === 'function') initReceiveTab();
     if (t === 'alert' && typeof initAlertTab === 'function') initAlertTab();
     if (t === 'purchase-order' && typeof initPurchaseOrderTab === 'function') initPurchaseOrderTab();
-    if (t === 'summary' && typeof initSummaryTab === 'function') initSummaryTab(); // 🔽 เพิ่ม summary
+    if (t === 'summary' && typeof initSummaryTab === 'function') initSummaryTab(); 
     if (t === 'data') renderData();
   };
 });
@@ -1265,12 +1268,13 @@ async function delUser(id, username) {
       el.setAttribute('type', 'text');
       el.setAttribute('placeholder', 'วว/ดด/ปปปป');
 
-      // 🔽 ใช้ flatpickrInstances ที่เป็น Global Scope 🔽
+      // 🔽 V.12.1: เพิ่ม defaultDate: "today" เพื่อบังคับให้เป็นวันปัจจุบัน 🔽
       flatpickrInstances[id] = flatpickr(el, {
         locale: "th",
         dateFormat: "d/m/Y",
         allowInput: true,
-        disableMobile: true
+        disableMobile: true,
+        defaultDate: "today" // 🔽 บังคับให้เป็นวันปัจจุบัน
       });
     }
   });
