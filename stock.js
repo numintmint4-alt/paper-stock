@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK V10.1 — stock.js — V.12
-//  V.12 Fix: ใช้ flatpickrInstances จาก Global + openStockDetail safety
+//  STOCK V10.1 — stock.js — V.13.2 (No Default Date)
+//  Fix: initStockTab ไม่ setDate อัตโนมัติ — ผู้ใช้ต้องเลือกวันเอง
 // ═══════════════════════════════════════════════════════════════
 
 let stockSelectedGrades = [];
@@ -42,28 +42,12 @@ function showSuccessModal(message) {
 }
 
 async function initStockTab() {
-  // 🔽 ดึงวันปัจจุบัน (Local) แล้วถอยหลัง 1 วัน
-  const todayStr = getTodayISO();
-  const target = new Date(todayStr);
-  target.setDate(target.getDate() - 1);
-  if (target.getDay() === 0) target.setDate(target.getDate() - 1); // ถ้าเป็นอาทิตย์ให้ถอยไปเสาร์
-  
-  const defaultDate = `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}-${String(target.getDate()).padStart(2, '0')}`;
-
-  // 🔽 แก้ตรงนี้: บังคับเขียนค่าลง Input ดิบๆ ก่อน 🔽
-  const dateInput = $('stockDate');
-  if (dateInput) dateInput.value = defaultDate;
-  
-  // แล้วค่อยสั่งให้ Flatpickr อัปเดตตาม (true = กระตุ้น onChange)
-  if (flatpickrInstances['stockDate']) {
-    flatpickrInstances['stockDate'].setDate(defaultDate, true); 
-  }
-  
+  // 🔽 ลบการคำนวณ defaultDate และ setDate ออกให้หมด 🔽
   await loadStockGradeFilter();
   await loadStockCustomers();
   await loadStockLocs();
   loadStockStatusFilter();
-  await renderStockMatrix();
+  // await renderStockMatrix(); // 🔽 คอมเมนต์ไว้ก่อนเพื่อไม่ให้โหลดข้อมูลทั้งที่ยังไม่มีวันที่ 🔽
 }
 
 function _attachDropdown(btnId, dropdownId, boxId, docKey) {
