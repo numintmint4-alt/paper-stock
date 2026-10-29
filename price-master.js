@@ -1,10 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK V10.1 — price-master.js
+//  STOCK V10.1 — price-master.js — V.12
 //  Master ราคา (Price Master) — ราคาต่อ Gradegram รายเดือน
 //  + Auto-copy จากเดือนก่อนหน้า (ลบปุ่ม Sync ออก)
 //  + ปุ่ม "เพิ่มราคาใหม่" (Add Mode)
 //  + Pre-fill ราคาจากเดือนก่อนหน้า
 //  + ปุ่ม "Copy จากเดือนก่อน" (forceRecopy)
+//  V.12 Fix: ลบ showMsg ที่ซ้ำซ้อน + ใช้ esc() ครอบข้อความ
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -18,13 +19,6 @@ let pmEditingId = null;
 // ═══════════════════════════════════════════════════════════════
 //  HELPERS
 // ═══════════════════════════════════════════════════════════════
-
-function showMsg(elId, text, type = 'ok') {
-  const el = $(elId);
-  if (!el) return;
-  el.innerHTML = `<div class="msg ${type}">${esc(text)}</div>`;
-  setTimeout(() => { el.innerHTML = ''; }, 3000);
-}
 
 function getPrevMonth(ym) {
   if (!ym) return ym;
@@ -107,10 +101,10 @@ async function autoCopyFromPrevMonth() {
 
     // 4) Reload
     await loadPriceMasterList();
-    showMsg('pmMsg', `✅ Copy ราคาจากเดือน ${prevMonth} อัตโนมัติ (${newRows.length} รายการ)`, 'ok');
+    showMsg('pmMsg', `✅ Copy ราคาจากเดือน ${esc(prevMonth)} อัตโนมัติ (${newRows.length} รายการ)`, 'ok');
   } catch (e) {
     console.warn('autoCopyFromPrevMonth:', e);
-    showMsg('pmMsg', 'Auto-copy ล้มเหลว: ' + e.message, 'err');
+    showMsg('pmMsg', `Auto-copy ล้มเหลว: ${esc(e.message)}`, 'err');
   }
 }
 
@@ -146,9 +140,9 @@ async function forceRecopy() {
     await autoCopyFromPrevMonth();
     renderPMList();
 
-    showMsg('pmMsg', `✅ Re-copy จาก ${prevMonth} สำเร็จ`, 'ok');
+    showMsg('pmMsg', `✅ Re-copy จาก ${esc(prevMonth)} สำเร็จ`, 'ok');
   } catch (e) {
-    showMsg('pmMsg', 'Re-copy ล้มเหลว: ' + e.message, 'err');
+    showMsg('pmMsg', `Re-copy ล้มเหลว: ${esc(e.message)}`, 'err');
   }
 }
 
@@ -168,7 +162,7 @@ async function loadPriceMasterList() {
   } catch (e) {
     console.warn('loadPriceMasterList:', e);
     pmCache = [];
-    $('pmMsg').innerHTML = `<div class="msg err">โหลดไม่สำเร็จ: ${esc(e.message)}</div>`;
+    showMsg('pmMsg', `โหลดไม่สำเร็จ: ${esc(e.message)}`, 'err');
   }
 }
 
@@ -411,7 +405,7 @@ async function savePMForm() {
       closeModal('modalPM');
       await loadPriceMasterList();
       renderPMList();
-      showMsg('pmMsg', `✅ แก้ไขราคา ${gradegram} สำเร็จ`, 'ok');
+      showMsg('pmMsg', `✅ แก้ไขราคา ${esc(gradegram)} สำเร็จ`, 'ok');
     } else {
       // ADD MODE
       payload.gradegram = gradegram;
@@ -426,7 +420,7 @@ async function savePMForm() {
       closeModal('modalPM');
       await loadPriceMasterList();
       renderPMList();
-      showMsg('pmMsg', `✅ เพิ่มราคา ${gradegram} สำเร็จ`, 'ok');
+      showMsg('pmMsg', `✅ เพิ่มราคา ${esc(gradegram)} สำเร็จ`, 'ok');
     }
   } catch (e) {
     $('pmFormError').innerHTML = `<div class="msg err">${esc(e.message)}</div>`;
@@ -454,7 +448,7 @@ async function deletePM(id) {
     renderPMList();
     showMsg('pmMsg', '✅ ลบสำเร็จ', 'ok');
   } catch (e) {
-    $('pmMsg').innerHTML = `<div class="msg err">ลบไม่สำเร็จ: ${esc(e.message)}</div>`;
+    showMsg('pmMsg', `ลบไม่สำเร็จ: ${esc(e.message)}`, 'err');
   }
 }
 
@@ -497,7 +491,7 @@ async function importPriceMaster(event) {
     const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
 
     if (!rows.length) {
-      $('pmMsg').innerHTML = '<div class="msg err">ไม่มีข้อมูลในไฟล์</div>';
+      showMsg('pmMsg', 'ไม่มีข้อมูลในไฟล์', 'err');
       return;
     }
 
@@ -513,7 +507,7 @@ async function importPriceMaster(event) {
     })).filter(p => p.gradegram && p.month);
 
     if (!payloads.length) {
-      $('pmMsg').innerHTML = '<div class="msg err">ไม่มีแถวที่ valid (ต้องมี Gradegram + Month)</div>';
+      showMsg('pmMsg', 'ไม่มีแถวที่ valid (ต้องมี Gradegram + Month)', 'err');
       return;
     }
 
@@ -525,10 +519,9 @@ async function importPriceMaster(event) {
     await loadPriceMasterList();
     renderPMList();
 
-    $('pmMsg').innerHTML = `<div class="msg ok">✅ Import สำเร็จ ${payloads.length} รายการ</div>`;
-    setTimeout(() => { const el = $('pmMsg'); if (el) el.innerHTML = ''; }, 3000);
+    showMsg('pmMsg', `✅ Import สำเร็จ ${payloads.length} รายการ`, 'ok');
   } catch (e) {
-    $('pmMsg').innerHTML = `<div class="msg err">Import ล้มเหลว: ${esc(e.message)}</div>`;
+    showMsg('pmMsg', `Import ล้มเหลว: ${esc(e.message)}`, 'err');
   } finally {
     event.target.value = '';
   }
