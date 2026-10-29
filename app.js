@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK ม้วนกระดาษ V6 — app.js (Core) — V.13.0 (Final Fix)
+//  STOCK ม้วนกระดาษ V6 — app.js (Core) — V.13.1 (No Default Date)
 // ═══════════════════════════════════════════════════════════════
 const SUPABASE_URL      = 'https://gwwgycbqzdjlijsuxahx.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_rMoUE6tUsQZHnJu2ULDxFg_4NAiw6wg';
@@ -1215,7 +1215,7 @@ async function delUser(id, username) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  INIT
+//  INIT  — V.13.1: ลบ defaultDate + setDate ออกแล้ว
 // ═══════════════════════════════════════════════════════════════
 
 (function init() {
@@ -1242,25 +1242,18 @@ async function delUser(id, username) {
     'firstReceiveDateInput'
   ];
 
-  const todayStr = getTodayISO();
-
   dateInputIds.forEach(id => {
     const el = document.getElementById(id);
     if (el) {
       el.setAttribute('type', 'text');
       el.setAttribute('placeholder', 'วว/ดด/ปปปป');
-
+      // 🔽 ไม่ต้องใส่ defaultDate แล้ว 🔽
       flatpickrInstances[id] = flatpickr(el, {
         locale: "th",
         dateFormat: "d/m/Y",
         allowInput: true,
-        disableMobile: true,
-        defaultDate: todayStr
+        disableMobile: true
       });
-
-      if (flatpickrInstances[id]) {
-        flatpickrInstances[id].setDate(todayStr, false);
-      }
     }
   });
 
