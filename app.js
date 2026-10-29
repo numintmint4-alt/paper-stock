@@ -1,11 +1,9 @@
 // ═══════════════════════════════════════════════════════════════
 //  STOCK ม้วนกระดาษ V6 — app.js (Core)
-//  ⚙️ แก้ 3 ค่าด้านล่างก่อนใช้งาน
 // ═══════════════════════════════════════════════════════════════
 const SUPABASE_URL      = 'https://gwwgycbqzdjlijsuxahx.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_rMoUE6tUsQZHnJu2ULDxFg_4NAiw6wg';
 const EDGE_FUNCTION_URL = 'https://gwwgycbqzdjlijsuxahx.supabase.co/functions/v1/admin-users';
-// ═══════════════════════════════════════════════════════════════
 
 if (SUPABASE_URL.includes('xxxxx')) {
   document.body.innerHTML = '<div style="padding:40px;font-family:sans-serif;color:#dc2626;background:#fee2e2;border-radius:8px;max-width:600px;margin:40px auto"><h2>⚠️ ยังไม่ได้ตั้งค่า</h2><p>กรุณาแก้ 3 ค่าด้านบนสุดของ app.js</p></div>';
@@ -37,6 +35,12 @@ function getISODateFromInput(inputId) {
   }
 
   return toISODate(el.value);
+}
+
+// 🔽 เพิ่มฟังก์ชันนี้เพื่อดึงวันที่ปัจจุบันแบบ Local Time (แก้บั๊ก Timezone)
+function getTodayISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 // ================= V6: Normalize Grade =================
