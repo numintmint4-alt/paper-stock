@@ -42,6 +42,7 @@
     <button data-tab="receive">Receive</button>
     <button data-tab="alert">Alert</button>
     <button data-tab="purchase-order">Purchase Order</button>
+    <button data-tab="summary">Summary</button> <!-- 🔽 เพิ่มปุ่ม Summary -->
     <button data-tab="data">Data</button>
     <button data-tab="settings">⚙ ตั้งค่า</button>
     <span class="spacer"></span>
@@ -430,6 +431,70 @@
         </div>
 
         <div id="poListBody"></div>
+      </div>
+    </div>
+
+    <!-- ========== TAB 5.6: SUMMARY (เพิ่มใหม่) ========== -->
+    <div id="tab-summary" class="hidden">
+      <div class="card">
+        <div class="report-head">
+          <div></div>
+          <div class="report-title" id="summaryReportTitle">
+            ตารางสรุปรายการสั่งเข้า<br>ประจำวันที่
+          </div>
+        </div>
+
+        <div class="filters no-print" id="summaryFilterBox">
+          <label>📅 วันที่รับเข้า <input type="date" id="summaryDate"></label>
+
+          <label class="grade-filter-wrap">
+            Gradegrams
+            <div class="grade-filter-box" id="summaryGradeFilterBox">
+              <button type="button" class="grade-filter-btn" id="summaryGradeFilterBtn">
+                <span id="summaryGradeFilterLabel">ทั้งหมด</span>
+                <span class="arrow">▼</span>
+              </button>
+              <div class="grade-dropdown hidden" id="summaryGradeDropdown">
+                <div class="grade-actions">
+                  <button type="button" onclick="selectAllSummaryGrades()">✓ เลือกทั้งหมด</button>
+                  <button type="button" onclick="clearAllSummaryGrades()">✗ ล้างทั้งหมด</button>
+                </div>
+                <div class="grade-list" id="summaryGradeList"></div>
+              </div>
+            </div>
+          </label>
+
+          <label>FSC
+            <select id="summaryFsc">
+              <option value="all">ทั้งหมด</option>
+              <option value="fsc">FSC (มี F)</option>
+              <option value="non_fsc">Non-FSC</option>
+            </select>
+          </label>
+
+          <label>หมายเหตุ
+            <select id="summaryRemark">
+              <option value="">ทั้งหมด</option>
+              <option value="ปั้ม F">ปั้ม F</option>
+              <option value="ปั้ม BT">ปั้ม BT</option>
+              <option value="ปั้ม KTP">ปั้ม KTP</option>
+              <option value="NC">NC</option>
+            </select>
+          </label>
+
+          <label>โหมด
+            <select id="summaryMode">
+              <option value="qty">จำนวน</option>
+              <option value="kg">KG รวม</option>
+              <option value="both">จำนวน + KG</option>
+            </select>
+          </label>
+
+          <button class="primary" onclick="renderSummary()">🔍 ค้นหา</button>
+          <button onclick="window.print()">🖨 พิมพ์ (A4 แนวนอน)</button>
+        </div>
+
+        <div id="summaryBody"></div>
       </div>
     </div>
 
@@ -856,6 +921,19 @@
       <button onclick="closeModal('modalVerifyPassword'); window._verifyOnConfirm=null;">ยกเลิก</button>
       <button class="primary" id="verifyPasswordConfirmBtn" onclick="confirmVerifyPassword()">✅ ยืนยัน</button>
     </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- ✅ Modal: Summary Detail (เพิ่มใหม่) -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="modal-bg" id="modalSummaryDetail">
+  <div class="modal" style="max-width:1000px">
+    <div class="modal-head">
+      <h3 id="summaryDetailTitle">รายละเอียด Summary</h3>
+      <button onclick="closeModal('modalSummaryDetail')">ปิด</button>
+    </div>
+    <div id="summaryDetailBody"></div>
   </div>
 </div>
 
