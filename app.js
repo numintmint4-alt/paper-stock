@@ -1,7 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK ม้วนกระดาษ V6 — app.js (Core) — V.12.1
-//  V.12 Fix: ย้าย flatpickrInstances ไปไว้ Global Scope
-//  V.12.1 Fix: บังคับ defaultDate: "today" ให้ทุก Date Input
+//  STOCK ม้วนกระดาษ V6 — app.js (Core) — V.12.2
+//  V.12.2 Fix: บังคับ setDate("today") ทันทีหลังสร้าง Flatpickr
 // ═══════════════════════════════════════════════════════════════
 const SUPABASE_URL      = 'https://gwwgycbqzdjlijsuxahx.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_rMoUE6tUsQZHnJu2ULDxFg_4NAiw6wg';
@@ -22,7 +21,6 @@ let masterCache = [];
 let dataCache = [];
 let matrixRange = { from: '', to: '' };
 
-// 🔽 V.12: ประกาศ flatpickrInstances เป็น Global Scope 🔽
 const flatpickrInstances = {};
 
 // ═══════════════════════════════════════════════════════════════
@@ -33,12 +31,10 @@ function getISODateFromInput(inputId) {
   const el = document.getElementById(inputId);
   if (!el) return '';
 
-  // 🔽 V.12.1: เช็ค Instance ของ Flatpickr ก่อน 🔽
   if (flatpickrInstances[inputId] && flatpickrInstances[inputId].selectedDates.length > 0) {
     return toISODate(flatpickrInstances[inputId].selectedDates[0]);
   }
 
-  // 🔽 ถ้าไม่มีใน Flatpickr ให้ดึงจาก value ของ Input 🔽
   return toISODate(el.value);
 }
 
@@ -1247,7 +1243,6 @@ async function delUser(id, username) {
     el.onclick = e => { if (e.target === el) el.classList.remove('show'); };
   });
 
-  // 🔽 รายชื่อ ID ทั้งหมดที่ต้องเป็น Flatpickr 🔽
   const dateInputIds = [
     'alertDate',
     'alertStockDate',
@@ -1262,20 +1257,27 @@ async function delUser(id, username) {
     'firstReceiveDateInput'
   ];
 
+  const todayStr = getTodayISO(); // 🔽 ดึงวันปัจจุบัน
+
   dateInputIds.forEach(id => {
     const el = document.getElementById(id);
     if (el) {
       el.setAttribute('type', 'text');
       el.setAttribute('placeholder', 'วว/ดด/ปปปป');
 
-      // 🔽 V.12.1: เพิ่ม defaultDate: "today" เพื่อบังคับให้เป็นวันปัจจุบัน 🔽
+      // 🔽 V.12.2: สร้าง Flatpickr 🔽
       flatpickrInstances[id] = flatpickr(el, {
         locale: "th",
         dateFormat: "d/m/Y",
         allowInput: true,
         disableMobile: true,
-        defaultDate: "today" // 🔽 บังคับให้เป็นวันปัจจุบัน
+        defaultDate: todayStr // 🔽 บังคับ Default เป็นวันปัจจุบัน
       });
+
+      // 🔽 V.12.2: บังคับ Set Date ซ้ำอีกครั้งทันทีหลังสร้าง (กันเหนียว) 🔽
+      if (flatpickrInstances[id]) {
+        flatpickrInstances[id].setDate(todayStr, false);
+      }
     }
   });
 
