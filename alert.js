@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK V10.1 — alert.js — V.13.2 (No Default Date)
-//  Fix: initAlertTab ไม่ setDate อัตโนมัติ — ผู้ใช้ต้องเลือกวันเอง
+//  STOCK V10.1 — alert.js — V.13.3 (No Default Date + No Override)
+//  Fix: initAlertTab ไม่ setDate, applyAlertSnapshot ไม่ setDate
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -172,7 +172,7 @@ function cleanOldAlertKeys() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  INIT — V.13.2 (ไม่ setDate อัตโนมัติ)
+//  INIT — V.13.3 (ไม่ setDate อัตโนมัติ)
 // ═══════════════════════════════════════════════════════════════
 
 async function initAlertTab() {
@@ -194,7 +194,8 @@ async function initAlertTab() {
   const monthInput = $('alertSnapshotMonth');
   if (monthInput) monthInput.value = currentMonthStr;
 
-  applyCalculatedDates(today); // อันนี้ปล่อยไว้ได้
+  // 🔽 ลบ applyCalculatedDates(today) ออกแล้ว เพื่อไม่ให้เขียนทับ alertStockDate 🔽
+  
   attachAlertDateListener();
 
   await loadAlertSuppliers();
@@ -370,12 +371,7 @@ async function applyAlertSnapshot(snapshot) {
   try {
     if (snapshot.snapshot_month) $('alertSnapshotMonth').value = snapshot.snapshot_month;
     
-    if (snapshot.stock_date && flatpickrInstances['alertStockDate']) {
-      flatpickrInstances['alertStockDate'].setDate(snapshot.stock_date, false);
-    }
-    if (snapshot.receive_date && flatpickrInstances['alertReceiveDate']) {
-      flatpickrInstances['alertReceiveDate'].setDate(snapshot.receive_date, false);
-    }
+    // 🔽 ลบ setDate ของ alertStockDate และ alertReceiveDate ออกแล้ว 🔽
 
     if (snapshot.receive_dates && Array.isArray(snapshot.receive_dates)) {
       alertReceiveDates = [...snapshot.receive_dates];
