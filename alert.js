@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 //  STOCK V10.1 — alert.js — V.12
 //  V.12 Fix: ใช้ window.flatpickrInstances + ปรับ saveAlertSnapshot
+//  V.13 Fix: initAlertTab บังคับวันที่ซ้ำ (500ms + 1500ms double-check)
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -173,15 +174,17 @@ function cleanOldAlertKeys() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  INIT
+//  INIT — V.13 (บังคับวันที่ซ้ำ 500ms + double-check 1500ms)
 // ═══════════════════════════════════════════════════════════════
 
 async function initAlertTab() {
   cleanOldAlertKeys();
-  const today = getTodayISO();
-  const currentMonthStr = today.slice(0, 7); // YYYY-MM
+  const today = getTodayISO();                       // "YYYY-MM-DD"
+  const currentMonthStr = today.slice(0, 7);         // "YYYY-MM"
 
-  // 🔽 แก้ตรงนี้: เขียนค่าลง Input ดิบๆ ก่อน 🔽
+  // ═══════════════════════════════════════════════════════════
+  // STEP 1: บังคับ DOM input ทันที (ก่อน Flatpickr ทุกตัว)
+  // ═══════════════════════════════════════════════════════════
   const alertDateEl = $('alertDate');
   if (alertDateEl) {
     alertDateEl.value = today;
@@ -190,29 +193,34 @@ async function initAlertTab() {
     alertDateEl.style.background = '#f1f5f9';
     alertDateEl.style.cursor = 'not-allowed';
   }
-
-  if (flatpickrInstances['alertDate']) {
-    flatpickrInstances['alertDate'].setDate(today, true);
-  }
-
-  if (flatpickrInstances['alertReceiveDate']) {
-    flatpickrInstances['alertReceiveDate'].setDate(today, true);
-  }
-
-  const stockDate = calcStockDate(today);
-  if (flatpickrInstances['alertStockDate']) {
-    flatpickrInstances['alertStockDate'].setDate(stockDate, true);
-  }
+  console.log('[Alert] 🔧 initAlertTab → forced alertDate =', today);
 
   const monthInput = $('alertSnapshotMonth');
   if (monthInput) monthInput.value = currentMonthStr;
 
+  // ═══════════════════════════════════════════════════════════
+  // STEP 2: อัปเดต Flatpickr (ถ้ามี)
+  // ═══════════════════════════════════════════════════════════
+  if (window.flatpickrInstances?.['alertDate']) {
+    window.flatpickrInstances['alertDate'].setDate(today, true);
+  }
+  if (window.flatpickrInstances?.['alertReceiveDate']) {
+    window.flatpickrInstances['alertReceiveDate'].setDate(today, true);
+  }
+  const stockDate = calcStockDate(today);
+  if (window.flatpickrInstances?.['alertStockDate']) {
+    window.flatpickrInstances['alertStockDate'].setDate(stockDate, true);
+  }
+
   applyCalculatedDates(today);
   attachAlertDateListener();
 
+  // ═══════════════════════════════════════════════════════════
+  // STEP 3: โหลดข้อมูลทั้งหมด
+  // ═══════════════════════════════════════════════════════════
   await loadAlertSuppliers();
-  await loadSnapshotMonths(); 
-  
+  await loadSnapshotMonths();
+
   if (monthInput) monthInput.value = currentMonthStr;
 
   await loadAlertGradeFilter();
@@ -227,10 +235,50 @@ async function initAlertTab() {
     if (alertViewMode === 'matrix') applyAlertFiltersAndRender();
   }
 
-  if (flatpickrInstances['alertHistoryDate']) {
-    flatpickrInstances['alertHistoryDate'].setDate(today, true);
+  if (window.flatpickrInstances?.['alertHistoryDate']) {
+    window.flatpickrInstances['alertHistoryDate'].setDate(today, true);
   }
   if (typeof loadAlertHistory === 'function') loadAlertHistory();
+
+  // ═══════════════════════════════════════════════════════════
+  // STEP 4: setTimeout 500ms — เขียนทับซ้ำ (ตามที่คุณส่งมา)
+  // ═══════════════════════════════════════════════════════════
+  setTimeout(() => {
+    if (window.flatpickrInstances?.['alertDate']) {
+      window.flatpickrInstances['alertDate'].setDate(today, true);
+    }
+    if (window.flatpickrInstances?.['alertReceiveDate']) {
+      window.flatpickrInstances['alertReceiveDate'].setDate(today, true);
+    }
+    if (window.flatpickrInstances?.['alertStockDate']) {
+      window.flatpickrInstances['alertStockDate'].setDate(stockDate, true);
+    }
+    const dateInput = $('alertDate');
+    if (dateInput) dateInput.value = today;
+    console.log('[Alert] 🔧 +500ms → re-forced alertDate =', today);
+  }, 500);
+
+  // ═══════════════════════════════════════════════════════════
+  // STEP 5: setTimeout 1500ms — double-check (กัน RPC ช้า)
+  // ═══════════════════════════════════════════════════════════
+  setTimeout(() => {
+    const el = $('alertDate');
+    const fp = window.flatpickrInstances?.['alertDate'];
+    const currentVal = el?.value;
+
+    if (currentVal !== today) {
+      console.warn(
+        `[Alert] ⚠️ +1500ms → alertDate ถูกเขียนทับ!`,
+        `\n  expected: ${today}`,
+        `\n  actual  : ${currentVal}`,
+        `\n  → บังคับเขียนทับใหม่`
+      );
+      if (el) el.value = today;
+      if (fp) fp.setDate(today, true);
+    } else {
+      console.log('[Alert] ✅ +1500ms → alertDate ยังถูกต้อง =', today);
+    }
+  }, 1500);
 }
 
 function applyCalculatedDates(analyzedDate) {
@@ -1972,12 +2020,10 @@ async function renderAlert() {
         <div style="background: #fef3c7; border: 1px solid #fcd34d; color: #92400e; padding: 6px 12px; border-radius: 4px; font-size: 13px; font-weight: 600; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
           <span>⚠️ กรุณาเลือกวันที่รับสินค้า:</span>
 
-          <!-- 🔽 เปลี่ยนเป็น type="text" + Flatpickr 🔽 -->
           <input type="text" id="firstReceiveDateInput"
                  placeholder="วว/ดด/ปปปป"
                  style="padding: 4px 8px; border: 1px solid #d97706; border-radius: 4px; font-family: inherit; font-size: 13px; color: #333; outline: none; width: 120px;">
 
-          <!-- 🔽 ใช้ getISODateFromInput ใน onclick 🔽 -->
           <button type="button" onclick="setFirstAlertDate(getISODateFromInput('firstReceiveDateInput'))"
                   style="background: #d97706; color: white; border: none; padding: 4px 12px; border-radius: 4px; font-size: 13px; cursor: pointer; font-weight: bold; transition: background 0.2s;">
             ตกลง
@@ -1988,7 +2034,6 @@ async function renderAlert() {
     `;
     $('alertBody').innerHTML = html;
 
-    // 🔽 สร้าง Flatpickr ให้ช่องนี้ทันที (lazy init) 🔽
     setTimeout(() => {
       initFirstReceiveDatePicker();
     }, 50);
