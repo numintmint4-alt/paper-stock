@@ -178,33 +178,32 @@ function cleanOldAlertKeys() {
 
 async function initAlertTab() {
   cleanOldAlertKeys();
-  const today = toISODate(new Date());
+  const today = getTodayISO();
   const currentMonthStr = today.slice(0, 7); // YYYY-MM
 
-  // alertDate: ตั้งเป็นวันนี้ (readOnly)
-  if (flatpickrInstances['alertDate']) {
-    flatpickrInstances['alertDate'].setDate(today, false);
-  }
+  // 🔽 แก้ตรงนี้: เขียนค่าลง Input ดิบๆ ก่อน 🔽
   const alertDateEl = $('alertDate');
   if (alertDateEl) {
+    alertDateEl.value = today;
     alertDateEl.readOnly = true;
     alertDateEl.style.pointerEvents = 'none';
     alertDateEl.style.background = '#f1f5f9';
     alertDateEl.style.cursor = 'not-allowed';
   }
 
-  // alertReceiveDate: ตั้งเป็นวันนี้
-  if (flatpickrInstances['alertReceiveDate']) {
-    flatpickrInstances['alertReceiveDate'].setDate(today, false);
+  if (flatpickrInstances['alertDate']) {
+    flatpickrInstances['alertDate'].setDate(today, true);
   }
 
-  // alertStockDate: ตั้งเป็นเมื่อวาน
+  if (flatpickrInstances['alertReceiveDate']) {
+    flatpickrInstances['alertReceiveDate'].setDate(today, true);
+  }
+
   const stockDate = calcStockDate(today);
   if (flatpickrInstances['alertStockDate']) {
-    flatpickrInstances['alertStockDate'].setDate(stockDate, false);
+    flatpickrInstances['alertStockDate'].setDate(stockDate, true);
   }
 
-  // 🔽 บังคับ Stock Level เดือน เป็นเดือนปัจจุบัน 🔽
   const monthInput = $('alertSnapshotMonth');
   if (monthInput) monthInput.value = currentMonthStr;
 
@@ -214,7 +213,6 @@ async function initAlertTab() {
   await loadAlertSuppliers();
   await loadSnapshotMonths(); 
   
-  // 🔽 บังคับซ้ำอีกรอบ เผื่อ loadSnapshotMonths ไปเปลี่ยนค่า 🔽
   if (monthInput) monthInput.value = currentMonthStr;
 
   await loadAlertGradeFilter();
@@ -229,9 +227,8 @@ async function initAlertTab() {
     if (alertViewMode === 'matrix') applyAlertFiltersAndRender();
   }
 
-  // 🔽 Alert History Date 🔽
   if (flatpickrInstances['alertHistoryDate']) {
-    flatpickrInstances['alertHistoryDate'].setDate(today, false);
+    flatpickrInstances['alertHistoryDate'].setDate(today, true);
   }
   if (typeof loadAlertHistory === 'function') loadAlertHistory();
 }
@@ -290,7 +287,6 @@ async function saveAlertSnapshot(receiveDates) {
       updated_at:     new Date().toISOString()
     };
 
-    // 🔽 V.12: ใช้ upsert โดยไม่ระบุ onConflict (ให้ DB จัดการ) 🔽
     const { data, error } = await supabase
       .from('alert_history')
       .upsert(payload, { onConflict: 'analyzed_date' })
