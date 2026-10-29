@@ -1,5 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
 //  STOCK V10.1 — summary.js
+//  V.10.28 Fix: เปลี่ยนมาใช้ Flatpickr (getISODateFromInput) ทั้งหมด
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -15,8 +16,16 @@ let summaryCache = [];
 // ═══════════════════════════════════════════════════════════════
 
 async function initSummaryTab() {
-  const dateInput = $('summaryDate');
-  if (dateInput && !dateInput.value) dateInput.value = toISODate(new Date());
+  const today = toISODate(new Date());
+  
+  // ตั้งค่าเริ่มต้นผ่าน Flatpickr
+  if (flatpickrInstances['summaryDate']) {
+    flatpickrInstances['summaryDate'].setDate(today, false);
+  } else {
+    const dateInput = $('summaryDate');
+    if (dateInput && !dateInput.value) dateInput.value = today;
+  }
+  
   await loadSummaryGradeFilter();
   await renderSummary();
 }
@@ -36,6 +45,10 @@ async function loadSummaryGradeFilter() {
   const dropdown = $('summaryGradeDropdown');
   const box = $('summaryGradeFilterBox');
   if (!btn || !dropdown || !box) return;
+
+  // ป้องกัน Event ซ้ำ
+  if (btn.dataset.listenerAttached === '1') return;
+  btn.dataset.listenerAttached = '1';
 
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -104,7 +117,7 @@ function clearAllSummaryGrades() {
 // ═══════════════════════════════════════════════════════════════
 
 async function renderSummary() {
-  const summaryDate = $('summaryDate')?.value;
+  const summaryDate = getISODateFromInput('summaryDate');
   const fsc = $('summaryFsc')?.value || 'all';
   const remark = $('summaryRemark')?.value || '';
   const mode = $('summaryMode')?.value || 'qty';
@@ -248,11 +261,10 @@ async function renderSummary() {
 
 // ═══════════════════════════════════════════════════════════════
 //  SUMMARY DETAIL
-//  V.10 Fix: ใช้ parseGradegram() ดึง grade ที่ถูกต้อง
 // ═══════════════════════════════════════════════════════════════
 
 async function openSummaryDetail(gradegram, size, dateThai) {
-  const summaryDate = $('summaryDate')?.value;
+  const summaryDate = getISODateFromInput('summaryDate');
   if (!summaryDate) return;
 
   const { grade } = parseGradegram(gradegram);
