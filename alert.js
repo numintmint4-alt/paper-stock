@@ -1,7 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK V10.1 — alert.js — V.12
-//  V.12 Fix: ใช้ window.flatpickrInstances + ปรับ saveAlertSnapshot
-//  V.13 Fix: initAlertTab บังคับวันที่ซ้ำ (500ms + 1500ms double-check)
+//  STOCK V10.1 — alert.js — V.13.2 (No Default Date)
+//  Fix: initAlertTab ไม่ setDate อัตโนมัติ — ผู้ใช้ต้องเลือกวันเอง
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -128,7 +127,6 @@ function fmtDateThai(d) {
 
 // ═══════════════════════════════════════════════════════════════
 //  LAZY INIT: firstReceiveDateInput Flatpickr
-//  (element นี้เกิดแบบ dynamic ใน renderAlert() Empty State)
 // ═══════════════════════════════════════════════════════════════
 
 function initFirstReceiveDatePicker() {
@@ -174,53 +172,34 @@ function cleanOldAlertKeys() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  INIT — V.13 (บังคับวันที่ซ้ำ 500ms + double-check 1500ms)
+//  INIT — V.13.2 (ไม่ setDate อัตโนมัติ)
 // ═══════════════════════════════════════════════════════════════
 
 async function initAlertTab() {
   cleanOldAlertKeys();
-  const today = getTodayISO();                       // "YYYY-MM-DD"
-  const currentMonthStr = today.slice(0, 7);         // "YYYY-MM"
+  const today = getTodayISO();
+  const currentMonthStr = today.slice(0, 7);
 
-  // ═══════════════════════════════════════════════════════════
-  // STEP 1: บังคับ DOM input ทันที (ก่อน Flatpickr ทุกตัว)
-  // ═══════════════════════════════════════════════════════════
+  // 🔽 เอาแค่ทำให้ alertDate อ่านได้อย่างเดียว แต่ไม่ต้องใส่ค่า 🔽
   const alertDateEl = $('alertDate');
   if (alertDateEl) {
-    alertDateEl.value = today;
     alertDateEl.readOnly = true;
     alertDateEl.style.pointerEvents = 'none';
     alertDateEl.style.background = '#f1f5f9';
     alertDateEl.style.cursor = 'not-allowed';
   }
-  console.log('[Alert] 🔧 initAlertTab → forced alertDate =', today);
+
+  // (ข้ามส่วนการ setDate alertDate, alertStockDate, alertReceiveDate ทั้งหมด)
 
   const monthInput = $('alertSnapshotMonth');
   if (monthInput) monthInput.value = currentMonthStr;
 
-  // ═══════════════════════════════════════════════════════════
-  // STEP 2: อัปเดต Flatpickr (ถ้ามี)
-  // ═══════════════════════════════════════════════════════════
-  if (window.flatpickrInstances?.['alertDate']) {
-    window.flatpickrInstances['alertDate'].setDate(today, true);
-  }
-  if (window.flatpickrInstances?.['alertReceiveDate']) {
-    window.flatpickrInstances['alertReceiveDate'].setDate(today, true);
-  }
-  const stockDate = calcStockDate(today);
-  if (window.flatpickrInstances?.['alertStockDate']) {
-    window.flatpickrInstances['alertStockDate'].setDate(stockDate, true);
-  }
-
-  applyCalculatedDates(today);
+  applyCalculatedDates(today); // อันนี้ปล่อยไว้ได้
   attachAlertDateListener();
 
-  // ═══════════════════════════════════════════════════════════
-  // STEP 3: โหลดข้อมูลทั้งหมด
-  // ═══════════════════════════════════════════════════════════
   await loadAlertSuppliers();
-  await loadSnapshotMonths();
-
+  await loadSnapshotMonths(); 
+  
   if (monthInput) monthInput.value = currentMonthStr;
 
   await loadAlertGradeFilter();
@@ -228,57 +207,14 @@ async function initAlertTab() {
   initAlertReceiveDates();
   await loadUsagePlanRanges();
   renderUsageRangeDropdown();
-  await onAlertDateChange();
+  // await onAlertDateChange(); // 🔽 คอมเมนต์อันนี้ไว้ก่อน ถ้ายังไม่ได้เลือกวัน 🔽
   showAlertHistoryCard();
 
   if (alertReceiveDates.length > 0 && window._alertFullCache && window._alertFullCache.length > 0) {
     if (alertViewMode === 'matrix') applyAlertFiltersAndRender();
   }
 
-  if (window.flatpickrInstances?.['alertHistoryDate']) {
-    window.flatpickrInstances['alertHistoryDate'].setDate(today, true);
-  }
   if (typeof loadAlertHistory === 'function') loadAlertHistory();
-
-  // ═══════════════════════════════════════════════════════════
-  // STEP 4: setTimeout 500ms — เขียนทับซ้ำ (ตามที่คุณส่งมา)
-  // ═══════════════════════════════════════════════════════════
-  setTimeout(() => {
-    if (window.flatpickrInstances?.['alertDate']) {
-      window.flatpickrInstances['alertDate'].setDate(today, true);
-    }
-    if (window.flatpickrInstances?.['alertReceiveDate']) {
-      window.flatpickrInstances['alertReceiveDate'].setDate(today, true);
-    }
-    if (window.flatpickrInstances?.['alertStockDate']) {
-      window.flatpickrInstances['alertStockDate'].setDate(stockDate, true);
-    }
-    const dateInput = $('alertDate');
-    if (dateInput) dateInput.value = today;
-    console.log('[Alert] 🔧 +500ms → re-forced alertDate =', today);
-  }, 500);
-
-  // ═══════════════════════════════════════════════════════════
-  // STEP 5: setTimeout 1500ms — double-check (กัน RPC ช้า)
-  // ═══════════════════════════════════════════════════════════
-  setTimeout(() => {
-    const el = $('alertDate');
-    const fp = window.flatpickrInstances?.['alertDate'];
-    const currentVal = el?.value;
-
-    if (currentVal !== today) {
-      console.warn(
-        `[Alert] ⚠️ +1500ms → alertDate ถูกเขียนทับ!`,
-        `\n  expected: ${today}`,
-        `\n  actual  : ${currentVal}`,
-        `\n  → บังคับเขียนทับใหม่`
-      );
-      if (el) el.value = today;
-      if (fp) fp.setDate(today, true);
-    } else {
-      console.log('[Alert] ✅ +1500ms → alertDate ยังถูกต้อง =', today);
-    }
-  }, 1500);
 }
 
 function applyCalculatedDates(analyzedDate) {
@@ -2005,14 +1941,14 @@ function isFSCGrade(gradegram) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  RENDER ALERT (Main) — V.12
+//  RENDER ALERT (Main)
 // ═══════════════════════════════════════════════════════════════
 
 async function renderAlert() {
   const snapshotMonth = $('alertSnapshotMonth')?.value;
   const stockDate     = getISODateFromInput('alertStockDate');
 
-  // 🔽 V.10.28: Empty State — Flatpickr for firstReceiveDateInput 🔽
+  // 🔽 Empty State — Flatpickr for firstReceiveDateInput 🔽
   if (alertReceiveDates.length === 0) {
     const html = `
       <div class="alert-date-tabs" style="display:flex; align-items:center; justify-content:space-between; background:#f8fafc; border:1px solid #e2e8f0; padding:8px; border-radius:6px; margin-bottom:15px; flex-wrap:wrap; gap:8px;">
