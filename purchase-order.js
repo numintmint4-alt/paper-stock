@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK V10.1 — purchase-order.js
-//  V.10.29 Fix: เปลี่ยนมาใช้ Flatpickr (getISODateFromInput) ในส่วน Export
+//  STOCK V10.1 — purchase-order.js — V.12
+//  V.12 Fix: getMonthFromDate safety + null check in saveCreatePO
 // ═══════════════════════════════════════════════════════════════
 
 let poCache = [];
@@ -56,9 +56,16 @@ function fmtDateTH(d) {
 }
 
 function getMonthFromDate(dateStr) {
-  if (!dateStr) return poSelectedMonth;
+  if (!dateStr) {
+    // Fallback: use current month if no date provided
+    const now = new Date();
+    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+  }
   const s = String(dateStr).slice(0, 7);
-  return s || poSelectedMonth;
+  return s || (() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+  })();
 }
 
 async function initPurchaseOrderTab() {
@@ -1157,6 +1164,11 @@ function renderPOFormTable() {
   const savedScrollTop = scrollWrap ? scrollWrap.scrollTop : 0;
 
   const header = _editPOHeader;
+  if (!header) {
+    container.innerHTML = '<p style="text-align:center;color:#94a3b8">ไม่มีข้อมูล</p>';
+    return;
+  }
+
   const activeRows = _editItemsRows.filter(r => !r.removed);
   const totalCount = activeRows.length;
   const remaining = 15 - totalCount;
