@@ -1,6 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK ม้วนกระดาษ V6 — app.js (Core) — V.12.2
-//  V.12.2 Fix: บังคับ setDate("today") ทันทีหลังสร้าง Flatpickr
+//  STOCK ม้วนกระดาษ V6 — app.js (Core) — V.13.0 (Final Fix)
 // ═══════════════════════════════════════════════════════════════
 const SUPABASE_URL      = 'https://gwwgycbqzdjlijsuxahx.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_rMoUE6tUsQZHnJu2ULDxFg_4NAiw6wg';
@@ -21,24 +20,26 @@ let masterCache = [];
 let dataCache = [];
 let matrixRange = { from: '', to: '' };
 
-const flatpickrInstances = {};
+// 🔽 ประกาศ Global ทันที 🔽
+window.flatpickrInstances = {};
 
 // ═══════════════════════════════════════════════════════════════
-//  UNIVERSAL DATE HELPERS (สำหรับ Flatpickr)
+//  UNIVERSAL DATE HELPERS
 // ═══════════════════════════════════════════════════════════════
 
 function getISODateFromInput(inputId) {
   const el = document.getElementById(inputId);
   if (!el) return '';
 
-  if (flatpickrInstances[inputId] && flatpickrInstances[inputId].selectedDates.length > 0) {
-    return toISODate(flatpickrInstances[inputId].selectedDates[0]);
+  // ถ้ามี Flatpickr ให้ดึงจาก Flatpickr ก่อน
+  if (window.flatpickrInstances[inputId] && window.flatpickrInstances[inputId].selectedDates.length > 0) {
+    return toISODate(window.flatpickrInstances[inputId].selectedDates[0]);
   }
 
+  // ถ้าไม่มี ให้ดึงจาก Value ของ Input
   return toISODate(el.value);
 }
 
-// 🔽 ดึงวันที่ปัจจุบันแบบ Local Time (แก้บั๊ก Timezone)
 function getTodayISO() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -98,26 +99,10 @@ function currentMonthStr() {
   const d = new Date();
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;
 }
-function reportMonthRange(reportMonthStr, monthsBack = 3) {
-  if (!reportMonthStr) return { from: '', to: '' };
-  const [y, m] = reportMonthStr.split('-').map(Number);
-  const toDate = new Date(y, m - 1, 0);
-  let fromM = m - monthsBack + 1, fromY = y;
-  while (fromM <= 0) { fromM += 12; fromY -= 1; }
-  return {
-    from: `${fromY}-${pad(fromM)}-01`,
-    to:   `${toDate.getFullYear()}-${pad(toDate.getMonth()+1)}-${pad(toDate.getDate())}`
-  };
-}
 function thaiMonthTitle(monthStr) {
   if (!monthStr) return '(ทั้งหมด)';
   const [y, m] = monthStr.split('-').map(Number);
   return `เดือน ${THAI_MONTHS[m-1]} ${y + 543}`;
-}
-function thaiMonthShort(monthStr) {
-  if (!monthStr) return '-';
-  const [y, m] = monthStr.split('-').map(Number);
-  return `${THAI_MONTHS_SHORT[m-1]} ${String(y+543).slice(-2)}`;
 }
 function thaiDateFull(dateStr) {
   if (!dateStr) return '-';
@@ -1257,7 +1242,7 @@ async function delUser(id, username) {
     'firstReceiveDateInput'
   ];
 
-  const todayStr = getTodayISO(); // 🔽 ดึงวันปัจจุบัน
+  const todayStr = getTodayISO();
 
   dateInputIds.forEach(id => {
     const el = document.getElementById(id);
@@ -1265,16 +1250,14 @@ async function delUser(id, username) {
       el.setAttribute('type', 'text');
       el.setAttribute('placeholder', 'วว/ดด/ปปปป');
 
-      // 🔽 V.12.2: สร้าง Flatpickr 🔽
       flatpickrInstances[id] = flatpickr(el, {
         locale: "th",
         dateFormat: "d/m/Y",
         allowInput: true,
         disableMobile: true,
-        defaultDate: todayStr // 🔽 บังคับ Default เป็นวันปัจจุบัน
+        defaultDate: todayStr
       });
 
-      // 🔽 V.12.2: บังคับ Set Date ซ้ำอีกครั้งทันทีหลังสร้าง (กันเหนียว) 🔽
       if (flatpickrInstances[id]) {
         flatpickrInstances[id].setDate(todayStr, false);
       }
