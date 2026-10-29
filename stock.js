@@ -3,10 +3,6 @@
 //  V.10.26 Fix: เปลี่ยนมาใช้ Flatpickr (getISODateFromInput) ทั้งหมด
 // ═══════════════════════════════════════════════════════════════
 
-// ═══════════════════════════════════════════════════════════════
-//  STATE
-// ═══════════════════════════════════════════════════════════════
-
 let stockSelectedGrades = [];
 let stockAllGrades = [];
 
@@ -27,10 +23,6 @@ const STOCK_STATUS_LABELS = {
 
 let stockCache = [];
 
-// ═══════════════════════════════════════════════════════════════
-//  SUCCESS MODAL
-// ═══════════════════════════════════════════════════════════════
-
 function showSuccessModal(message) {
   let modal = document.getElementById('successModal');
   if (!modal) {
@@ -49,21 +41,20 @@ function showSuccessModal(message) {
   modal.classList.add('show');
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  INIT
-// ═══════════════════════════════════════════════════════════════
-
 async function initStockTab() {
-  const target = new Date();
+  // 🔽 ดึงวันปัจจุบัน (Local) แล้วถอยหลัง 1 วัน
+  const todayStr = getTodayISO();
+  const target = new Date(todayStr);
   target.setDate(target.getDate() - 1);
-  if (target.getDay() === 0) target.setDate(target.getDate() - 1);
-  const defaultDate = toISODate(target);
+  if (target.getDay() === 0) target.setDate(target.getDate() - 1); // ถ้าเป็นอาทิตย์ให้ถอยไปเสาร์
+  
+  const defaultDate = `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}-${String(target.getDate()).padStart(2, '0')}`;
 
   if (flatpickrInstances['stockDate']) {
     flatpickrInstances['stockDate'].setDate(defaultDate, false);
   } else {
     const dateInput = $('stockDate');
-    if (dateInput && !dateInput.value) dateInput.value = defaultDate;
+    if (dateInput) dateInput.value = defaultDate;
   }
   
   await loadStockGradeFilter();
@@ -72,10 +63,6 @@ async function initStockTab() {
   loadStockStatusFilter();
   await renderStockMatrix();
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  GENERIC MULTI-SELECT HELPERS
-// ═══════════════════════════════════════════════════════════════
 
 function _attachDropdown(btnId, dropdownId, boxId, docKey) {
   const btn = $(btnId);
@@ -101,10 +88,6 @@ function _attachDropdown(btnId, dropdownId, boxId, docKey) {
     document.addEventListener('click', window['_' + docKey + 'DocClick']);
   }
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  GRADE FILTER
-// ═══════════════════════════════════════════════════════════════
 
 async function loadStockGradeFilter() {
   stockAllGrades = [...new Set(
@@ -165,10 +148,6 @@ function clearAllStockGrades() {
   stockSelectedGrades = [];
   renderStockGradeList(); updateStockGradeLabel();
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  CUSTOMER FILTER
-// ═══════════════════════════════════════════════════════════════
 
 async function loadStockCustomers() {
   try {
@@ -239,10 +218,6 @@ function clearAllStockCustomers() {
   renderStockCustomerList(); updateStockCustomerLabel();
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  LOCATION FILTER
-// ═══════════════════════════════════════════════════════════════
-
 async function loadStockLocs() {
   try {
     const { data, error } = await supabase
@@ -312,10 +287,6 @@ function clearAllStockLocs() {
   renderStockLocList(); updateStockLocLabel();
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  STATUS FILTER (full / scrap / waiting)
-// ═══════════════════════════════════════════════════════════════
-
 function loadStockStatusFilter() {
   renderStockStatusList();
   updateStockStatusLabel();
@@ -370,12 +341,8 @@ function clearAllStockStatuses() {
   renderStockStatusList(); updateStockStatusLabel();
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  RENDER STOCK MATRIX
-// ═══════════════════════════════════════════════════════════════
-
 async function renderStockMatrix() {
-  const stockDate = getISODateFromInput('stockDate'); // 🔽 แก้ตรงนี้
+  const stockDate = getISODateFromInput('stockDate');
   if (!stockDate) { alert('กรุณาเลือกวันที่ Stock'); return; }
 
   const dateThai = thaiDateFull(stockDate);
@@ -456,7 +423,6 @@ async function renderStockMatrix() {
     const rowKeys = [...rowSet.keys()].sort();
     const colKeys = [...colSet].sort((a, b) => a - b);
 
-    // Helper: สร้าง text ของ cell ปกติ (เต็ม+เศษ·รอกรอ)
     function buildCellText(v) {
       const parts = [];
       if (v.full > 0)    parts.push(`${v.full}`);
@@ -466,7 +432,6 @@ async function renderStockMatrix() {
       return parts.join('').replace(/^\+/, '');
     }
 
-    // Helper: สร้าง text ของ Total (ผลรวมล้วน)
     function buildTotalText(v) {
       const total = (v.full || 0) + (v.scrap || 0) + (v.waiting || 0);
       return total > 0 ? `${total}` : '';
@@ -513,7 +478,6 @@ async function renderStockMatrix() {
     html += `<td class="total-col">${buildTotalText(grand)}</td>`;
     html += '</tr></tbody></table></div>';
 
-    // สรุปยอดรวมแต่ละสถานะ
     const totalFull    = grand.full;
     const totalScrap   = grand.scrap;
     const totalWaiting = grand.waiting;
@@ -536,12 +500,8 @@ async function renderStockMatrix() {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  STOCK DETAIL MODAL
-// ═══════════════════════════════════════════════════════════════
-
 async function openStockDetail(gradegram, size) {
-  const stockDate = getISODateFromInput('stockDate'); // 🔽 แก้ตรงนี้
+  const stockDate = getISODateFromInput('stockDate');
   if (!stockDate) return;
 
   $('stockDetailTitle').innerHTML = `
@@ -564,10 +524,6 @@ async function openStockDetail(gradegram, size) {
     });
     if (error) throw error;
 
-    console.log('🔍 RPC raw data:', data);
-    console.log('🔍 type:', typeof data, '| isArray:', Array.isArray(data), '| length:', data?.length);
-
-    // รองรับทั้ง array ตรงๆ และ object ที่มี .data ซ้อน
     let rows = [];
     if (Array.isArray(data)) {
       rows = data;
@@ -581,8 +537,6 @@ async function openStockDetail(gradegram, size) {
       $('stockDetailBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">ไม่พบรายละเอียด</p>';
       return;
     }
-
-    console.log('🔍 first row:', rows[0]);
 
     const fullCount    = rows.filter(r => r.roll_status === 'full').length;
     const scrapCount   = rows.filter(r => r.roll_status === 'scrap').length;
@@ -633,16 +587,13 @@ async function openStockDetail(gradegram, size) {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  IMPORT STOCK
-// ═══════════════════════════════════════════════════════════════
-
 function openStockImportModal() {
-  const target = new Date();
+  // 🔽 ดึงวันปัจจุบัน (Local) แล้วถอยหลัง 1 วัน
+  const todayStr = getTodayISO();
+  const target = new Date(todayStr);
   target.setDate(target.getDate() - 1);
-  // ถ้าเป็นวันอาทิตย์ (0) → ย้อนไปวันเสาร์
   if (target.getDay() === 0) target.setDate(target.getDate() - 1);
-  const defaultDate = toISODate(target);
+  const defaultDate = `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}-${String(target.getDate()).padStart(2, '0')}`;
   
   if (flatpickrInstances['stockImportDate']) {
     flatpickrInstances['stockImportDate'].setDate(defaultDate, false);
@@ -659,7 +610,7 @@ function importStock(ev) {
   if (!f) return;
   closeModal('modalStockImport');
 
-  const stockDate = getISODateFromInput('stockImportDate'); // 🔽 แก้ตรงนี้
+  const stockDate = getISODateFromInput('stockImportDate');
   if (!stockDate) { alert('กรุณาเลือกวันที่'); ev.target.value = ''; return; }
 
   const reader = new FileReader();
@@ -712,7 +663,6 @@ function importStock(ev) {
       hideProgress('stockProgress');
       showSuccessModal(`Import Stock สำเร็จ ${data.inserted} แถว · วันที่ ${stockDate}`);
 
-      // อัปเดตหน้า Matrix หลัง Import เสร็จ
       if (flatpickrInstances['stockDate']) {
         flatpickrInstances['stockDate'].setDate(stockDate, false);
       } else {
