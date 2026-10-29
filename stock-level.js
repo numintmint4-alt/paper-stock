@@ -1,14 +1,8 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK V10.1 — stock-level.js (FULL)
+//  STOCK V10.1 — stock-level.js (FULL) — V.12
 //  Month Filter + Customer Filter + Gradegrams Filter + Size Filter
 //  + Matrix + Snapshot
-//  + Matrix: format ตาม mode (full → floor, actual → toFixed(2))
-//  V.10.6 Fix:
-//    - loadMonthFilter()       → default เดือน/ปีปัจจุบัน + 3 เดือนย้อนหลัง (ไม่ sync title)
-//    - getCurrentTitle()       → ยึด Dropdown เท่านั้น
-//    - saveStockLevelSnapshot()→ months = titleMonthYM (เดือนบนหัวตารางเท่านั้น)
-//    - viewSnapshot()          → monthsDisplay แปลงทุกเดือนเป็นชื่อไทย
-//    - updateReportTitle()     → เขียนแค่ <span id="reportTitleMain">
+//  V.12 Fix: loadMonthFilter safety + saveStockLevelSnapshot fallback
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -69,9 +63,6 @@ function loadMonthFilter() {
   renderMonthList();
   updateMonthLabel();
   attachMonthFilterListeners();
-
-  // ❌ ลบโค้ดส่วนที่ Sync titleMonth ตาม selectedMonths ออก
-  // เพื่อให้หัวตารางเป็นเดือนปัจจุบัน (ตามข้อ 1) และไม่ไปทับกับ Filter
 }
 
 function attachMonthFilterListeners() {
@@ -607,7 +598,7 @@ async function saveStockLevelSnapshot() {
     finalTitle = `${title}/${n}`;
   }
 
-  // 🔽 แก้ไขส่วนการหาค่า titleMonthYM 🔽
+  // 🔽 V.12: แก้ไขส่วนการหาค่า titleMonthYM 🔽
   // ดึงค่าจากหัวตาราง (titleMonth/titleYear) เป็นหลัก
   const mEl = $('titleMonth');
   const yEl = $('titleYear');
