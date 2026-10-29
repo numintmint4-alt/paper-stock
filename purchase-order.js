@@ -3,39 +3,26 @@
 //  V.10.29 Fix: เปลี่ยนมาใช้ Flatpickr (getISODateFromInput) ในส่วน Export
 // ═══════════════════════════════════════════════════════════════
 
-// ═══════════════════════════════════════════════════════════════
-//  STATE
-// ═══════════════════════════════════════════════════════════════
-
 let poCache = [];
 let poSuppliers = [];
-let poSuppliersFull = [];   // เก็บ {code, name} สำหรับ dropdown
+let poSuppliersFull = [];   
 let poPriceMaster = [];
 let poSelectedMonth = '';
 let poEditingId = null;
 
-// Filter state
 let poFilterPONo = '';
 let poFilterDateFrom = '';
 let poFilterDateTo = '';
 let poFilterSup = [];
 let poFilterStatus = [];
 
-// Edit state
 let _editItemsRows = [];
 let _editPOHeader = null;
 let _editHeaderDirty = false;
-let _editOriginalOrder = [];   // เก็บลำดับ id เดิม เพื่อเทียบว่า seq เปลี่ยนไหม
+let _editOriginalOrder = [];   
 
-// Drag & Drop
 let _poItemsSortable = null;
-
-// Add items modal
 let _addItemsRows = [];
-
-// ═══════════════════════════════════════════════════════════════
-//  HELPERS
-// ═══════════════════════════════════════════════════════════════
 
 function getStdWeight(gradegram, size) {
   const match = String(gradegram).match(/^([A-Z]+F?)(\d+)$/);
@@ -74,10 +61,6 @@ function getMonthFromDate(dateStr) {
   return s || poSelectedMonth;
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  INIT
-// ═══════════════════════════════════════════════════════════════
-
 async function initPurchaseOrderTab() {
   const today = new Date();
   if (!poSelectedMonth) {
@@ -101,10 +84,6 @@ async function initPurchaseOrderTab() {
     }
   }
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  SUPPLIERS
-// ═══════════════════════════════════════════════════════════════
 
 async function loadPOSuppliers() {
   try {
@@ -130,10 +109,6 @@ async function loadPOSuppliers() {
     poSuppliers = poSuppliersFull.map(s => s.code);
   }
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  PRICE MASTER
-// ═══════════════════════════════════════════════════════════════
 
 async function loadPriceMasterForMonth(month) {
   try {
@@ -178,10 +153,6 @@ function getPriceFromMaster(gradegram, customerRoll, qualityB) {
   return Number(base.toFixed(2));
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  RENDER PO LIST
-// ═══════════════════════════════════════════════════════════════
-
 async function renderPOList() {
   const listEl = $('poListBody');
   if (!listEl) return;
@@ -203,7 +174,6 @@ async function renderPOList() {
 
     let html = '<div class="data-scroll po-list-scroll"><table class="data-table po-list-table"><thead><tr>';
 
-    // PO No.
     html += `<th class="th-with-filter">
       <div class="th-filter-wrap po-filter-stack">
         <span class="po-filter-label">PO No.</span>
@@ -213,7 +183,6 @@ async function renderPOList() {
       </div>
     </th>`;
 
-    // วันที่ออก
     html += `<th class="th-with-filter">
       <div class="th-filter-wrap po-filter-stack">
         <span class="po-filter-label">วันที่ออก</span>
@@ -223,7 +192,6 @@ async function renderPOList() {
       </div>
     </th>`;
 
-    // วันที่รับ
     html += `<th class="th-with-filter">
       <div class="th-filter-wrap po-filter-stack">
         <span class="po-filter-label">วันที่รับ</span>
@@ -233,7 +201,6 @@ async function renderPOList() {
       </div>
     </th>`;
 
-    // Sup.
     const supList = [...new Set(poCache.map(p => p.sup_code))].sort();
     html += `<th class="th-with-filter">
       <div class="th-filter-wrap" id="poFilterSupBox">
@@ -254,7 +221,6 @@ async function renderPOList() {
     html += '<th style="text-align:right">จำนวน</th>';
     html += '<th style="text-align:right">KG รวม</th>';
 
-    // สถานะ
     html += `<th class="th-with-filter">
       <div class="th-filter-wrap" id="poFilterStatusBox">
         <button type="button" class="th-filter-btn" id="poFilterStatusBtn">
@@ -324,10 +290,6 @@ function renderPOListRows(rows) {
   });
   tbody.innerHTML = html;
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  PO FILTERS
-// ═══════════════════════════════════════════════════════════════
 
 function onPOFilterChange() {
   const ponoEl = $('poFilterPONoInput');
@@ -502,10 +464,6 @@ function _attachPOFilterDropdown(btnId, dropdownId, boxId, docKey) {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  CREATE PO MODAL (จากหน้า List)
-// ═══════════════════════════════════════════════════════════════
-
 async function openCreatePOModal() {
   try {
     const today = new Date();
@@ -526,7 +484,7 @@ async function openCreatePOModal() {
 
     await loadPriceMasterForMonth(poSelectedMonth);
 
-    const todayISO = toISODate(today);
+    const todayISO = getTodayISO(); // 🔽 ใช้ getTodayISO()
     const emptyHeader = {
       id: null,
       po_no: nextPoNo || '',
@@ -560,10 +518,6 @@ async function openCreatePOModal() {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  OPEN PO FORM
-// ═══════════════════════════════════════════════════════════════
-
 async function openPOForm(poId) {
   poEditingId = poId || null;
   window._isCreateMode = false;
@@ -588,10 +542,6 @@ async function openPOForm(poId) {
     renderPOFormContent(null, []);
   }
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  OPEN PO FORM WITH VERIFY
-// ═══════════════════════════════════════════════════════════════
 
 async function openPOFormWithVerify(poId) {
   const po = poCache.find(p => p.id === poId);
@@ -662,10 +612,6 @@ async function verifyAndOpen(po, password, note) {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  MARK PO AS SAVED
-// ═══════════════════════════════════════════════════════════════
-
 async function markPOSaved(poId) {
   const po = poCache.find(p => p.id === poId);
   if (!po) return;
@@ -689,10 +635,6 @@ async function markPOSaved(poId) {
     alert('❌ ' + e.message);
   }
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  VERIFY PASSWORD MODAL
-// ═══════════════════════════════════════════════════════════════
 
 function openVerifyModal({ username, title, message, onConfirm }) {
   $('verifyPasswordTitle').textContent = title || '🔒 ยืนยันรหัสผ่าน';
@@ -750,10 +692,6 @@ async function confirmVerifyPassword() {
   btn.textContent = '✅ ยืนยัน';
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  OPEN PO FORM FROM ALERT
-// ═══════════════════════════════════════════════════════════════
-
 async function openPOFormFromAlert(alertData) {
   poEditingId = null;
   window._isCreateMode = false;
@@ -790,10 +728,6 @@ async function openPOFormFromAlert(alertData) {
   renderMultiPOForm(pos, alertData);
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  AUTO GROUP PO
-// ═══════════════════════════════════════════════════════════════
-
 function autoGroupPOItems(items) {
   const supOrder = { EKP: 1, MKP: 2, SCK: 3 };
 
@@ -804,12 +738,11 @@ function autoGroupPOItems(items) {
     return match[1].includes('F');
   }
 
-  // 🔽 เพิ่ม Dedupe ป้องกันข้อมูลซ้ำหลุดเข้ามา
   const seen = new Set();
   const uniqueItems = [];
   items.forEach(it => {
     const key = `${it.gradegram}|${Number(it.size)}|${it.customer_roll || 'normal'}|${it.quality_b || 'normal'}|${it.note || ''}`;
-    if (seen.has(key)) return; // ข้ามถ้าซ้ำ
+    if (seen.has(key)) return;
     seen.add(key);
     uniqueItems.push(it);
   });
@@ -852,12 +785,8 @@ function autoGroupPOItems(items) {
   return pos;
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  RENDER MULTI PO FORM
-// ═══════════════════════════════════════════════════════════════
-
 function renderMultiPOForm(posList, alertData) {
-  const analyzedDate = alertData.analyzed_date || toISODate(new Date());
+  const analyzedDate = alertData.analyzed_date || getTodayISO(); // 🔽 ใช้ getTodayISO()
 
   let html = '';
 
@@ -941,10 +870,6 @@ function renderMultiPOForm(posList, alertData) {
 
   $('poFormBody').innerHTML = html;
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  SAVE ALL POs
-// ═══════════════════════════════════════════════════════════════
 
 async function saveAllPOs(btnEl) {
   const posList = window._pendingPOs || [];
@@ -1069,7 +994,7 @@ async function _doSaveAllPOs(posList, alertData, btnEl) {
 
     const header = {
       po_no: poNo,
-      po_date: alertData.analyzed_date || toISODate(new Date()),
+      po_date: alertData.analyzed_date || getTodayISO(),
       sup_code: po.sup_code,
       status: 'draft',
       ref_snapshot: alertData.ref_snapshot,
@@ -1113,10 +1038,6 @@ async function _doSaveAllPOs(posList, alertData, btnEl) {
   window._pendingAlertData = null;
   window._isCreateMode = false;
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  DRAG & DROP
-// ═══════════════════════════════════════════════════════════════
 
 function initPOItemsSortable() {
   const tbody = document.getElementById('poItemsTbody');
@@ -1196,10 +1117,6 @@ function isOrderChanged() {
   return currentOrder.some((id, idx) => id !== _editOriginalOrder[idx]);
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  RENDER PO FORM (EDIT)
-// ═══════════════════════════════════════════════════════════════
-
 function renderPOFormContent(header, items) {
   if (!header) {
     $('poFormBody').innerHTML = '<p style="text-align:center;color:#94a3b8">ไม่มีข้อมูล</p>';
@@ -1231,10 +1148,6 @@ function renderPOFormContent(header, items) {
 
   renderPOFormTable();
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  RENDER PO FORM TABLE
-// ═══════════════════════════════════════════════════════════════
 
 function renderPOFormTable() {
   const container = $('poFormBody');
@@ -1432,10 +1345,6 @@ function renderPOFormTable() {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  SAVE FORM INLINE
-// ═══════════════════════════════════════════════════════════════
-
 async function savePOFormInline(btnEl) {
   const isCreate = window._isCreateMode === true;
   if (isCreate) {
@@ -1445,15 +1354,10 @@ async function savePOFormInline(btnEl) {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  CREATE PO (INSERT)
-// ═══════════════════════════════════════════════════════════════
-
 async function saveCreatePO(btnEl) {
   const header = _editPOHeader;
   const activeRows = _editItemsRows.filter(r => !r.removed);
 
-  // Validation
   if (!header.sup_code) {
     alert('⚠️ กรุณาเลือกผู้ขาย');
     return;
@@ -1545,7 +1449,7 @@ async function saveCreatePO(btnEl) {
 
     const newHeader = {
       po_no: poNo,
-      po_date: header.po_date || toISODate(new Date()),
+      po_date: header.po_date || getTodayISO(),
       sup_code: header.sup_code,
       status: 'draft',
       ref_snapshot: header.ref_snapshot || null,
@@ -1583,10 +1487,6 @@ async function saveCreatePO(btnEl) {
     }
   }
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  EDIT HEADER
-// ═══════════════════════════════════════════════════════════════
 
 function onEditHeaderChange(field, value) {
   if (!_editPOHeader) return;
@@ -1661,10 +1561,6 @@ async function saveEditPOHeader() {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  RE-PRICE
-// ═══════════════════════════════════════════════════════════════
-
 async function repricePO() {
   if (!_editItemsRows || !_editItemsRows.length) {
     alert('ไม่มีรายการใน PO');
@@ -1728,10 +1624,6 @@ async function repricePO() {
 
   alert(msg);
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  ADD / REMOVE EDIT ROW
-// ═══════════════════════════════════════════════════════════════
 
 function addEditRow() {
   const activeCount = _editItemsRows.filter(r => !r.removed).length;
@@ -1820,10 +1712,6 @@ async function removeEditRow(uid) {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  SAVE EDIT ITEMS
-// ═══════════════════════════════════════════════════════════════
-
 async function saveEditPOItems(btnEl) {
   if (!poEditingId) {
     alert('ไม่พบ PO ที่กำลังแก้ไข');
@@ -1832,7 +1720,6 @@ async function saveEditPOItems(btnEl) {
 
   const activeRows = _editItemsRows.filter(r => !r.removed);
 
-  // Validation
   for (const row of activeRows) {
     if (row.isNew) {
       if (!row.gradegram || !row.size || !row.quantity) {
@@ -1891,7 +1778,6 @@ async function saveEditPOItems(btnEl) {
 
   let errorMsg = '';
 
-  // 1. อัปเดต items ที่แก้ไข
   for (const row of updatedOld) {
     try {
       const payload = {
@@ -1914,7 +1800,6 @@ async function saveEditPOItems(btnEl) {
     }
   }
 
-  // 2. เพิ่ม items ใหม่
   if (newRows.length) {
     try {
       const itemsPayload = newRows.map(r => {
@@ -1956,7 +1841,6 @@ async function saveEditPOItems(btnEl) {
     }
   }
 
-  // 3. บันทึกลำดับใหม่ (Reorder)
   if (orderChanged) {
     try {
       const orderedIds = _editItemsRows
@@ -1978,7 +1862,6 @@ async function saveEditPOItems(btnEl) {
     }
   }
 
-  // 4. อัปเดต Header
   if (headerChanged) {
     const headerResult = await saveEditPOHeader();
     if (!headerResult.ok) {
@@ -2002,7 +1885,6 @@ async function saveEditPOItems(btnEl) {
     alert(`✅ บันทึกสำเร็จ (${summary.join(' · ')})`);
   }
 
-  // รีเฟรช
   try {
     const { data: detail } = await supabase.rpc('get_purchase_order_detail', { p_po_id: poEditingId });
     if (detail) {
@@ -2016,10 +1898,6 @@ async function saveEditPOItems(btnEl) {
 
   await renderPOList();
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  EDIT ITEM (single field — legacy)
-// ═══════════════════════════════════════════════════════════════
 
 async function onPOItemEdit(itemId, field, value) {
   try {
@@ -2063,10 +1941,6 @@ async function cancelPOItem(itemId) {
     alert('❌ ' + e.message);
   }
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  PO DETAIL
-// ═══════════════════════════════════════════════════════════════
 
 async function openPODetail(poId) {
   $('poDetailTitle').textContent = '📄 รายละเอียด PO';
@@ -2148,10 +2022,6 @@ async function openPODetail(poId) {
     $('poDetailBody').innerHTML = `<div class="msg err">${esc(e.message)}</div>`;
   }
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  DELETED PO HISTORY
-// ═══════════════════════════════════════════════════════════════
 
 async function openDeletedPOList() {
   $('poDetailTitle').textContent = '📜 ประวัติ PO ที่ถูกลบ';
@@ -2278,10 +2148,6 @@ async function openDeletedPODetail(poId) {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  DELETE PO
-// ═══════════════════════════════════════════════════════════════
-
 async function deletePO(poId) {
   const po = poCache.find(p => p.id === poId);
   if (!po) return;
@@ -2313,10 +2179,6 @@ async function deletePO(poId) {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  MONTH CHANGE
-// ═══════════════════════════════════════════════════════════════
-
 async function onPOMonthChange() {
   const monthEl = $('poMonth');
   if (!monthEl) return;
@@ -2324,10 +2186,6 @@ async function onPOMonthChange() {
   await loadPriceMaster();
   await renderPOList();
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  CANCEL / CLOSE FORM
-// ═══════════════════════════════════════════════════════════════
 
 function cancelPOForm() {
   closeModal('modalPOForm');
@@ -2357,19 +2215,12 @@ function closePOForm() {
   renderPOList();
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  EXPORT PO TO EXCEL
-//  + V.10.17: Export Excel ด้วย ExcelJS (มีแถว SUM ต่อท้ายทุก PO)
-//  + V.10.29 Fix: ใช้ Flatpickr ในการจัดการวันที่เริ่มต้น
-// ═══════════════════════════════════════════════════════════════
-
 function exportPOToExcel() {
   if (!poCache || !poCache.length) {
     alert('ไม่มีข้อมูล PO');
     return;
   }
 
-  // 🔽 1. สร้าง Modal เลือกวันที่ (ถ้ายังไม่มีใน HTML)
   let modal = document.getElementById('modalExportPO');
   if (!modal) {
     modal = document.createElement('div');
@@ -2400,22 +2251,19 @@ function exportPOToExcel() {
   }
 
   // 🔽 ตั้งค่าเริ่มต้นเป็น "วันพรุ่งนี้ (ข้ามเสาร์-อาทิตย์)" 🔽
-  const tomorrow = new Date();
+  const todayStr = getTodayISO();
+  const tomorrow = new Date(todayStr);
   tomorrow.setDate(tomorrow.getDate() + 1); // บวก 1 วัน
 
-  // ถ้าพรุ่งนี้เป็นวันเสาร์ (6) ให้บวกเพิ่มอีก 2 วัน (เป็นจันทร์)
   if (tomorrow.getDay() === 6) {
     tomorrow.setDate(tomorrow.getDate() + 2);
   } 
-  // ถ้าพรุ่งนี้เป็นวันอาทิตย์ (0) ให้บวกเพิ่มอีก 1 วัน (เป็นจันทร์)
   else if (tomorrow.getDay() === 0) {
     tomorrow.setDate(tomorrow.getDate() + 1);
   }
 
-  // แปลงวันที่เป็นรูปแบบ YYYY-MM-DD
   const defaultDateISO = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
   
-  // 🔽 V.10.29: ใช้ Flatpickr บังคับวันที่ 🔽
   if (flatpickrInstances['exportPoDateFrom']) {
     flatpickrInstances['exportPoDateFrom'].setDate(defaultDateISO, false);
   } else {
@@ -2429,18 +2277,16 @@ function exportPOToExcel() {
     const toEl = document.getElementById('exportPoDateTo');
     if (toEl) toEl.value = defaultDateISO;
   }
-  // 🔼 จบส่วนที่แก้ไข 🔼
 
   openModal('modalExportPO');
 }
 
 async function runExportPOExcel() {
-  const fromDate = getISODateFromInput('exportPoDateFrom'); // 🔽 แก้ตรงนี้
-  const toDate = getISODateFromInput('exportPoDateTo');     // 🔽 แก้ตรงนี้
+  const fromDate = getISODateFromInput('exportPoDateFrom'); 
+  const toDate = getISODateFromInput('exportPoDateTo');     
 
   closeModal('modalExportPO');
 
-  // 🔽 Loading Overlay 🔽
   const loadingEl = document.createElement('div');
   loadingEl.id = 'exportLoading';
   loadingEl.style.cssText = 'position:fixed;inset:0;background:rgba(255,255,255,0.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:18px;font-weight:bold;color:#1e40af;';
@@ -2454,7 +2300,6 @@ async function runExportPOExcel() {
   try {
     const posWithItems = [];
 
-    // 1. ดึงข้อมูล PO (กรองตามวันที่)
     for (const po of poCache) {
       const { data, error } = await supabase.rpc('get_purchase_order_detail', { p_po_id: po.id });
       if (error) throw error;
@@ -2474,7 +2319,6 @@ async function runExportPOExcel() {
       return;
     }
 
-    // 2. สร้าง Workbook
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('PO');
 
@@ -2483,7 +2327,6 @@ async function runExportPOExcel() {
       { width: 10 }, { width: 12 }, { width: 5 }, { width: 12 }, { width: 10 }, { width: 30 }
     ];
 
-    // 3. Header Row
     const headerRow = worksheet.addRow([
       'PC.', 'SUP.', 'วันที่รับเข้า', 'เลขที่ PO', 'Gradegram-Size',
       'Quantity', 'KG. รวม', 'BU', 'Department', 'Price', 'หมายเหตุ'
@@ -2491,16 +2334,15 @@ async function runExportPOExcel() {
     
     headerRow.eachCell((cell) => {
       cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF3B82F6' } }; // น้ำเงิน
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF3B82F6' } }; 
       cell.alignment = { vertical: 'middle', horizontal: 'center' };
       cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
     });
 
     let grandTotalQty = 0;
     let grandTotalKg = 0;
-    let currentRowIndex = 2; // แถวที่ 1 คือ Header
+    let currentRowIndex = 2; 
 
-    // 4. วนลูป PO
     posWithItems.forEach((p) => {
       const startRow = currentRowIndex;
 
@@ -2530,25 +2372,21 @@ async function runExportPOExcel() {
           remarkCombined
         ]);
 
-        // เส้นขอบ
         row.eachCell((cell) => {
           cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
         });
 
-        // format วันที่
         if (isFirstRow) {
           const dateCell = row.getCell(3);
-          if (dateCell.value) dateCell.numFmt = 'yyyy-mm-dd hh:mm:ss'; // ตามตัวอย่าง 2026-10-26 00:00:00
+          if (dateCell.value) dateCell.numFmt = 'yyyy-mm-dd hh:mm:ss';
         }
         
-        // format ราคา
         row.getCell(10).numFmt = '0.00';
         currentRowIndex++;
       });
 
       const endRow = currentRowIndex - 1;
 
-      // 🔽 เพิ่มแถว SUM ต่อท้ายแต่ละ PO 🔽
       const totalRow = worksheet.addRow([
         '', '', '', '', '', 
         { formula: `SUM(F${startRow}:F${endRow})` }, 
@@ -2558,24 +2396,22 @@ async function runExportPOExcel() {
       
       totalRow.eachCell((cell) => {
         cell.font = { bold: true };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } }; // สีเทาอ่อน
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } }; 
         cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
       });
       
-      currentRowIndex++; // ขยับไปแถวถัดไป
+      currentRowIndex++; 
     });
 
-    // 5. แถวรวมทั้งหมด (Grand Total) - ตามตัวอย่างไฟล์ที่คุณส่งมา
     const grandTotalRow = worksheet.addRow([
       'รวม', '', '', '', '', grandTotalQty, grandTotalKg, '', '', '', ''
     ]);
     grandTotalRow.eachCell((cell) => {
       cell.font = { bold: true };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFCBD5E1' } }; // สีเทาเข้ม
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFCBD5E1' } }; 
       cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
     });
 
-    // 6. ดาวน์โหลด
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = window.URL.createObjectURL(blob);
@@ -2597,10 +2433,6 @@ async function runExportPOExcel() {
     if (el) el.remove();
   }
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  ADD PO ITEMS (Phase 3)
-// ═══════════════════════════════════════════════════════════════
 
 async function openAddPOItemsModal() {
   if (!poEditingId) {
