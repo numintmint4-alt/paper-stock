@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
 //  STOCK V10.1 — alert.js
-//  V.10.25 Fix: เปลี่ยนมาใช้ Flatpickr (getISODateFromInput) ทั้งหมด
+//  V.10.27 Fix: เปลี่ยน firstReceiveDateInput เป็น Flatpickr (lazy init)
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -123,6 +123,28 @@ function fmtDateThai(d) {
   const mm = String(dObj.getMonth() + 1).padStart(2, '0');
   const yyyy = dObj.getFullYear() + 543;
   return `${dd}/${mm}/${yyyy}`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  LAZY INIT: firstReceiveDateInput Flatpickr
+// ═══════════════════════════════════════════════════════════════
+
+function initFirstReceiveDatePicker() {
+  const el = document.getElementById('firstReceiveDateInput');
+  if (!el) return;
+  if (flatpickrInstances['firstReceiveDateInput']) return;
+
+  el.setAttribute('type', 'text');
+  el.setAttribute('placeholder', 'วว/ดด/ปปปป');
+
+  flatpickrInstances['firstReceiveDateInput'] = flatpickr(el, {
+    locale: "th",
+    dateFormat: "d/m/Y",
+    allowInput: true,
+    disableMobile: true
+  });
+
+  console.log('[Alert] ✅ initFirstReceiveDatePicker() ready');
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1397,8 +1419,7 @@ function renderMatrixOrderForm(gradegram, size, items) {
       </div>
       <div class="form-actions">
         <button type="button" onclick="closeModal('modalAlertMatrixCell')">ยกเลิก</button>
-        <button type="button" class="primary"
-                onclick="saveMatrixOrder('${esc(gradegram)}', ${size})">
+        <button type="button" class="primary" onclick="saveMatrixOrder('${esc(gradegram)}', ${size})">
           💾 บันทึก
         </button>
       </div>
@@ -1423,16 +1444,13 @@ function renderMatrixOrderRow(idx, it) {
     <div class="matrix-order-row" data-row-idx="${idx}">
       <div class="matrix-order-row-head">
         <span class="row-label">รายการที่ ${idx + 1}</span>
-        <button type="button" class="row-remove-btn"
-                onclick="removeMatrixOrderRow(this)" title="ลบรายการนี้">✕</button>
+        <button type="button" class="row-remove-btn" onclick="removeMatrixOrderRow(this)" title="ลบรายการนี้">✕</button>
       </div>
 
       <div class="form-row">
         <div class="form-field">
           <label>จำนวนม้วน *</label>
-          <input type="number" class="qty-input matrix-row-qty"
-                 min="1" step="1" placeholder="0"
-                 value="${it.qty || ''}">
+          <input type="number" class="qty-input matrix-row-qty" min="1" step="1" placeholder="0" value="${it.qty || ''}">
         </div>
         <div class="form-field">
           <label>Sup.</label>
@@ -1457,8 +1475,7 @@ function renderMatrixOrderRow(idx, it) {
       <div class="form-row full">
         <div class="form-field">
           <label>หมายเหตุ</label>
-          <input type="text" class="matrix-row-note"
-                 placeholder="-" value="${esc(it.note || '')}">
+          <input type="text" class="matrix-row-note" placeholder="-" value="${esc(it.note || '')}">
         </div>
       </div>
     </div>
@@ -1940,14 +1957,14 @@ function isFSCGrade(gradegram) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  RENDER ALERT (Main) — V.10.24 บังคับแสดงผลเป็น Matrix
+//  RENDER ALERT (Main) — V.10.27
 // ═══════════════════════════════════════════════════════════════
 
 async function renderAlert() {
   const snapshotMonth = $('alertSnapshotMonth')?.value;
   const stockDate     = getISODateFromInput('alertStockDate');
 
-  // 🔽 V.10.21 / V.10.23: Empty State ต้องขึ้นก่อนเสมอ 🔽
+  // 🔽 V.10.27: Empty State — Flatpickr for firstReceiveDateInput 🔽
   if (alertReceiveDates.length === 0) {
     const html = `
       <div class="alert-date-tabs" style="display:flex; align-items:center; justify-content:space-between; background:#f8fafc; border:1px solid #e2e8f0; padding:8px; border-radius:6px; margin-bottom:15px; flex-wrap:wrap; gap:8px;">
@@ -1955,10 +1972,10 @@ async function renderAlert() {
         <div style="background: #fef3c7; border: 1px solid #fcd34d; color: #92400e; padding: 6px 12px; border-radius: 4px; font-size: 13px; font-weight: 600; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
           <span>⚠️ กรุณาเลือกวันที่รับสินค้า:</span>
 
-          <input type="date" id="firstReceiveDateInput"
+          <input type="text" id="firstReceiveDateInput" placeholder="วว/ดด/ปปปป"
                  style="padding: 4px 8px; border: 1px solid #d97706; border-radius: 4px; font-family: inherit; font-size: 13px; color: #333; outline: none;">
 
-          <button type="button" onclick="setFirstAlertDate(document.getElementById('firstReceiveDateInput').value)"
+          <button type="button" onclick="setFirstAlertDate(getISODateFromInput('firstReceiveDateInput'))"
                   style="background: #d97706; color: white; border: none; padding: 4px 12px; border-radius: 4px; font-size: 13px; cursor: pointer; font-weight: bold; transition: background 0.2s;">
             ตกลง
           </button>
@@ -1967,7 +1984,8 @@ async function renderAlert() {
       </div>
     `;
     $('alertBody').innerHTML = html;
-    return; // 🔽 สำคัญมาก: ต้องมี return 🔽
+    initFirstReceiveDatePicker();   // 👈 lazy init Flatpickr
+    return;
   }
 
   const receiveDate = getISODateFromInput('alertReceiveDate');
@@ -2068,7 +2086,6 @@ async function renderAlert() {
     renderAllAlertFilters();
     renderAlertDateTabs();
 
-    // 🔽 V.10.24: เรียกตัว render หลักเพื่อให้เช็คโหมด (Matrix/Flat) 🔽
     applyAlertFiltersAndRender();
 
     if (hasPOEdited()) {
