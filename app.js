@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
 //  STOCK ม้วนกระดาษ V6 — app.js (Core)
-//  V.10.27 Fix: เพิ่ม 'firstReceiveDateInput' ใน dateInputIds
+//  V.10.27 Fix: เพิ่ม 'firstReceiveDateInput' ใน dateInputIds + flatpickrInstances
 // ═══════════════════════════════════════════════════════════════
 const SUPABASE_URL      = 'https://gwwgycbqzdjlijsuxahx.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_rMoUE6tUsQZHnJu2ULDxFg_4NAiw6wg';
@@ -1228,7 +1228,10 @@ async function delUser(id, username) {
   } catch (e) { showMsg('usersMsg', 'ผิดพลาด: ' + e.message, 'err'); }
 }
 
-// ================= INIT =================
+// ═══════════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════════
+
 (function init() {
   const now = new Date();
   if ($('titleMonth')) $('titleMonth').value = now.getMonth() + 1;
@@ -1239,7 +1242,7 @@ async function delUser(id, username) {
     el.onclick = e => { if (e.target === el) el.classList.remove('show'); };
   });
 
-  // ✅ Flatpickr: Date Picker ภาษาไทย (DD/MM/YYYY)
+  // 🔽 รายชื่อ ID ทั้งหมดที่ต้องเป็น Flatpickr 🔽
   const dateInputIds = [
     'alertDate',
     'alertStockDate',
@@ -1248,10 +1251,10 @@ async function delUser(id, username) {
     'stockDate',
     'receiveDate',
     'summaryDate',
+    'stockImportDate',
     'exportPoDateFrom',
     'exportPoDateTo',
-    'stockImportDate',
-    'firstReceiveDateInput'   // 👈 เพิ่ม: element นี้เกิดใน alert.js (lazy init จัดการอีกที)
+    'firstReceiveDateInput'
   ];
 
   dateInputIds.forEach(id => {
@@ -1260,6 +1263,7 @@ async function delUser(id, username) {
       el.setAttribute('type', 'text');
       el.setAttribute('placeholder', 'วว/ดด/ปปปป');
 
+      // 🔽 สำคัญมาก: ต้องเก็บค่า Instance ลงในตัวแปร 🔽
       flatpickrInstances[id] = flatpickr(el, {
         locale: "th",
         dateFormat: "d/m/Y",
