@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK V10.1 — stock.js
-//  V.10.26 Fix: เปลี่ยนมาใช้ Flatpickr (getISODateFromInput) ทั้งหมด
+//  STOCK V10.1 — stock.js — V.12
+//  V.12 Fix: ใช้ flatpickrInstances จาก Global + openStockDetail safety
 // ═══════════════════════════════════════════════════════════════
 
 let stockSelectedGrades = [];
