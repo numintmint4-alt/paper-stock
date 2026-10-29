@@ -3,36 +3,24 @@
 //  V.10.28 Fix: เปลี่ยนมาใช้ Flatpickr (getISODateFromInput) ทั้งหมด
 // ═══════════════════════════════════════════════════════════════
 
-// ═══════════════════════════════════════════════════════════════
-//  STATE
-// ═══════════════════════════════════════════════════════════════
-
 let summarySelectedGrades = [];
 let summaryAllGrades = [];
 let summaryCache = [];
 
-// ═══════════════════════════════════════════════════════════════
-//  INIT
-// ═══════════════════════════════════════════════════════════════
-
 async function initSummaryTab() {
-  const today = toISODate(new Date());
+  // 🔽 ดึงวันปัจจุบัน (Local) แบบเป๊ะๆ
+  const today = getTodayISO();
   
-  // ตั้งค่าเริ่มต้นผ่าน Flatpickr
   if (flatpickrInstances['summaryDate']) {
     flatpickrInstances['summaryDate'].setDate(today, false);
   } else {
     const dateInput = $('summaryDate');
-    if (dateInput && !dateInput.value) dateInput.value = today;
+    if (dateInput) dateInput.value = today;
   }
   
   await loadSummaryGradeFilter();
   await renderSummary();
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  GRADE FILTER
-// ═══════════════════════════════════════════════════════════════
 
 async function loadSummaryGradeFilter() {
   summaryAllGrades = [...new Set(
@@ -46,7 +34,6 @@ async function loadSummaryGradeFilter() {
   const box = $('summaryGradeFilterBox');
   if (!btn || !dropdown || !box) return;
 
-  // ป้องกัน Event ซ้ำ
   if (btn.dataset.listenerAttached === '1') return;
   btn.dataset.listenerAttached = '1';
 
@@ -112,10 +99,6 @@ function clearAllSummaryGrades() {
   renderSummaryGradeList(); updateSummaryGradeLabel();
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  RENDER SUMMARY
-// ═══════════════════════════════════════════════════════════════
-
 async function renderSummary() {
   const summaryDate = getISODateFromInput('summaryDate');
   const fsc = $('summaryFsc')?.value || 'all';
@@ -138,7 +121,6 @@ async function renderSummary() {
   $('summaryBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
 
   try {
-    // normalize grade
     const normalizedGrades = summarySelectedGrades.map(g => normalizeGrade(g));
 
     const { data, error } = await supabase.rpc('get_receive_list', {
@@ -158,7 +140,6 @@ async function renderSummary() {
       return;
     }
 
-    // สรุป Supplier
     const supplierSummary = {};
     rows.forEach(r => {
       const sup = r.supplier || '(ไม่ระบุ)';
@@ -183,7 +164,6 @@ async function renderSummary() {
       <td style="text-align:right">${totalSupKg.toFixed(0)}</td></tr>`;
     supHtml += '</tbody></table></div>';
 
-    // Matrix
     const rowSet = new Map(); const colSet = new Set();
     const cells = {}; const rowTotals = {}; const colTotals = {};
     let grandQty = 0, grandKg = 0;
@@ -258,10 +238,6 @@ async function renderSummary() {
     $('summaryBody').innerHTML = `<div class="msg err">เกิดข้อผิดพลาด: ${esc(err.message)}</div>`;
   }
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  SUMMARY DETAIL
-// ═══════════════════════════════════════════════════════════════
 
 async function openSummaryDetail(gradegram, size, dateThai) {
   const summaryDate = getISODateFromInput('summaryDate');
