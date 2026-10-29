@@ -1,6 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK V10.1 — stock.js — V.13.2 (No Default Date)
-//  Fix: initStockTab ไม่ setDate อัตโนมัติ — ผู้ใช้ต้องเลือกวันเอง
+//  STOCK V10.1 — stock.js — V.13.4 (Default Date: เมื่อวาน)
 // ═══════════════════════════════════════════════════════════════
 
 let stockSelectedGrades = [];
@@ -42,12 +41,27 @@ function showSuccessModal(message) {
 }
 
 async function initStockTab() {
-  // 🔽 ลบการคำนวณ defaultDate และ setDate ออกให้หมด 🔽
+  // 🔽 คำนวณหา "เมื่อวาน" (ข้ามวันอาทิตย์) 🔽
+  const todayStr = getTodayISO();
+  const target = new Date(todayStr);
+  target.setDate(target.getDate() - 1);
+  if (target.getDay() === 0) target.setDate(target.getDate() - 1); 
+  
+  const defaultDate = `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}-${String(target.getDate()).padStart(2, '0')}`;
+
+  // 🔽 บังคับเขียนค่าลง Input และ Flatpickr 🔽
+  const dateInput = $('stockDate');
+  if (dateInput) dateInput.value = defaultDate; 
+  
+  if (window.flatpickrInstances['stockDate']) {
+    window.flatpickrInstances['stockDate'].setDate(defaultDate, true); 
+  }
+  
   await loadStockGradeFilter();
   await loadStockCustomers();
   await loadStockLocs();
   loadStockStatusFilter();
-  // await renderStockMatrix(); // 🔽 คอมเมนต์ไว้ก่อนเพื่อไม่ให้โหลดข้อมูลทั้งที่ยังไม่มีวันที่ 🔽
+  await renderStockMatrix();
 }
 
 function _attachDropdown(btnId, dropdownId, boxId, docKey) {
