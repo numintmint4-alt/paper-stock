@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK V10.1 — summary.js
-//  V.10.28 Fix: เปลี่ยนมาใช้ Flatpickr (getISODateFromInput) ทั้งหมด
+//  STOCK V10.1 — summary.js — V.12
+//  V.12 Fix: ใช้ flatpickrInstances จาก Global + safety checks
 // ═══════════════════════════════════════════════════════════════
 
 let summarySelectedGrades = [];
