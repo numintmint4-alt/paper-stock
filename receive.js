@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK V10.1 — receive.js
-//  V.10.27 Fix: เปลี่ยนมาใช้ Flatpickr (getISODateFromInput) ทั้งหมด
+//  STOCK V10.1 — receive.js — V.12
+//  V.12 Fix: ใช้ flatpickrInstances จาก Global + safety checks
 // ═══════════════════════════════════════════════════════════════
 
 let receiveSelectedGrades = [];
