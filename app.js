@@ -22,6 +22,23 @@ let masterCache = [];
 let dataCache = [];
 let matrixRange = { from: '', to: '' };
 
+// ═══════════════════════════════════════════════════════════════
+//  UNIVERSAL DATE HELPERS (สำหรับ Flatpickr)
+// ═══════════════════════════════════════════════════════════════
+
+const flatpickrInstances = {};
+
+function getISODateFromInput(inputId) {
+  const el = document.getElementById(inputId);
+  if (!el) return '';
+
+  if (flatpickrInstances[inputId] && flatpickrInstances[inputId].selectedDates.length > 0) {
+    return toISODate(flatpickrInstances[inputId].selectedDates[0]);
+  }
+
+  return toISODate(el.value);
+}
+
 // ================= V6: Normalize Grade =================
 function normalizeGrade(g) {
   if (!g) return '';
@@ -361,11 +378,10 @@ async function loadMaster(onProgress = null) {
   return masterCache;
 }
 
-// ✅ แก้จุดที่ 2: refreshAll() — await loadSizeFilter()
 async function refreshAll() {
   await loadMaster();
   if (typeof loadGradeFilter === 'function') await loadGradeFilter();
-  if (typeof loadSizeFilter === 'function') await loadSizeFilter();      // ✅ await
+  if (typeof loadSizeFilter === 'function') await loadSizeFilter();
   if (typeof loadMonthFilter === 'function') loadMonthFilter();
   if (typeof loadStockGradeFilter === 'function') await loadStockGradeFilter();
   if (typeof loadReceiveGradeFilter === 'function') await loadReceiveGradeFilter();
@@ -375,7 +391,7 @@ async function refreshAll() {
   renderMatrix();
 }
 
-// ================= V6: MATRIX GRADE FILTER (grade+gram) =================
+// ================= V6: MATRIX GRADE FILTER =================
 let selectedGrades = [];
 let allGradesList = [];
 
@@ -558,7 +574,6 @@ function openMasterForm(row) {
 }
 function editMaster(id) { openMasterForm(masterCache.find(r => r.id === id)); }
 
-// ✅ แก้จุดที่ 3: saveMaster() — rebuild filter ทุกตัวหลัง loadMaster()
 async function saveMaster() {
   const grade = $('fGrade').value.trim();
   const gram = Number($('fGram').value);
@@ -1224,9 +1239,13 @@ async function delUser(id, username) {
     'alertDate',
     'alertStockDate',
     'alertReceiveDate',
+    'alertHistoryDate',
     'stockDate',
     'receiveDate',
-    'alertHistoryDate'
+    'summaryDate',
+    'exportPoDateFrom',
+    'exportPoDateTo',
+    'stockImportDate'
   ];
 
   dateInputIds.forEach(id => {
@@ -1235,7 +1254,7 @@ async function delUser(id, username) {
       el.setAttribute('type', 'text');
       el.setAttribute('placeholder', 'วว/ดด/ปปปป');
 
-      flatpickr(el, {
+      flatpickrInstances[id] = flatpickr(el, {
         locale: "th",
         dateFormat: "d/m/Y",
         allowInput: true,
