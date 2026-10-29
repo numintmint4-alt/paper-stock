@@ -1,9 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
 //  STOCK V10.1 — receive.js
-//  Fix Date Query + Debug + Auto-Fetch + Excel Export 2 Sheets
-//  V.10.2 Fix: fetchFromPO() → เพิ่ม gram + size เป็น Number
-//  V.10.3 Fix: เปลี่ยนข้อความหัวข้อรายงานเป็น "สรุปรายการสั่งซื้อ"
-//  V.10.4 Fix: เปลี่ยน ID ช่องวันที่เป็น receiveDate (กันซ้ำกับ alert)
+//  V.10.27 Fix: เปลี่ยนมาใช้ Flatpickr (getISODateFromInput) ทั้งหมด
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -35,25 +32,26 @@ function fmtDateThai(d) {
   return `${dd}/${mm}/${yyyy}`;
 }
 
-// ดึงวันที่จาก input → normalize เป็น 'yyyy-mm-dd' เสมอ
-function getReceiveDateISO() {
-  const raw = $('receiveDate')?.value;
-  if (!raw) return '';
-  return String(raw).slice(0, 10);
-}
-
 // ═══════════════════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════════════════
 
 async function initReceiveTab() {
-  const dateInput = $('receiveDate');
-  if (dateInput && !dateInput.value) dateInput.value = toISODate(new Date());
+  const today = toISODate(new Date());
+  
+  // ตั้งค่าเริ่มต้นผ่าน Flatpickr
+  if (flatpickrInstances['receiveDate']) {
+    flatpickrInstances['receiveDate'].setDate(today, false);
+  } else {
+    const dateInput = $('receiveDate');
+    if (dateInput && !dateInput.value) dateInput.value = today;
+  }
   
   await loadReceiveGradeFilter();
   
-  // 🔽 เช็กให้ชัวร์ว่ามีค่าวันที่แล้ว ค่อยเรียก renderReceive 🔽
-  if (dateInput && dateInput.value) {
+  // เรียก render หลังจากตั้งค่า date เรียบร้อย
+  const receiveDate = getISODateFromInput('receiveDate');
+  if (receiveDate) {
     await renderReceive();
   }
 }
@@ -177,7 +175,7 @@ function renderSupplierSummary(rows, dateThai) {
 // ═══════════════════════════════════════════════════════════════
 
 async function renderReceive() {
-  const receiveDate = getReceiveDateISO();
+  const receiveDate = getISODateFromInput('receiveDate');
   const supplier = $('receiveSupplier')?.value || '';
   const fsc = $('receiveFsc')?.value || 'all';
   const remark = $('receiveRemark')?.value || '';
@@ -252,7 +250,6 @@ async function renderReceive() {
 
 // ═══════════════════════════════════════════════════════════════
 //  FETCH FROM PO
-//  V.10.2 Fix: เพิ่ม gram + แปลง size เป็น Number
 // ═══════════════════════════════════════════════════════════════
 
 async function fetchFromPO(receiveDate, opts = {}) {
@@ -294,8 +291,8 @@ async function fetchFromPO(receiveDate, opts = {}) {
           pc_code:     it.pc_code || 'SDPC.01',
           supplier:    po.sup_code,
           grade:       it.gradegram,
-          gram:        it.gram || '',           // 👈 V.10.2 Fix: เพิ่ม gram
-          size:        Number(it.size),          // 👈 V.10.2 Fix: บังคับเป็น Number
+          gram:        it.gram || '',
+          size:        Number(it.size),
           quantity:    Number(it.quantity) || 0,
           kg_total:    Number(it.kg_total) || 0,
           bu:          Number(it.bu) || 1,
@@ -335,7 +332,7 @@ async function fetchFromPO(receiveDate, opts = {}) {
 
 // ปุ่ม "รีเฟรชจาก PO" — manual refresh
 async function refreshFromPO() {
-  const receiveDate = getReceiveDateISO();
+  const receiveDate = getISODateFromInput('receiveDate');
   if (!receiveDate) { alert('กรุณาเลือกวันที่สั่งซื้อ'); return; }
 
   const dateThai = thaiDateFull(receiveDate);
@@ -475,7 +472,7 @@ function renderReceiveList(rows, dateThai, supHtml = '') {
 // ═══════════════════════════════════════════════════════════════
 
 async function openReceiveDetail(gradegram, size, dateThai) {
-  const receiveDate = getReceiveDateISO();
+  const receiveDate = getISODateFromInput('receiveDate');
   if (!receiveDate) return;
 
   const { grade } = parseGradegram(gradegram);
@@ -541,7 +538,7 @@ function exportReceive() {
     alert('ไม่มีข้อมูลให้ Export');
     return;
   }
-  const receiveDate = getReceiveDateISO();
+  const receiveDate = getISODateFromInput('receiveDate');
 
   const supMap = {};
   receiveCache.forEach(r => {
