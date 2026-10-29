@@ -1,14 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
 //  STOCK V10.1 — purchase-order.js
-//  Purchase Order Management (List + Form + Auto-Split + Export)
-//  + Date Split + Verify Password + Mark Saved + Deleted History
-//  + Column Filters (PO No. / วันที่ออก / วันที่รับ / Sup. / สถานะ)
-//  + Add PO Items (Phase 3) + Inline Edit Items (Phase 3E)
-//  + V.10.9 Fix: Lock ปุ่มบันทึกใน _doSaveAllPOs กัน Double Click
-//  + V.10.14 Fix: Export Excel ตาม Format ตัวอย่าง + เลือกช่วงวันที่ได้
-//  + V.10.15 Fix: Default date = tomorrow (skip weekend) + Loading
-//  + V.10.16 Fix: Export Excel ด้วย ExcelJS (สีพื้นหลัง + เส้นขอบ)
-//  + V.10.17 Fix: Export Excel แทรกแถว =SUM() ต่อท้ายทุก PO
+//  V.10.29 Fix: เปลี่ยนมาใช้ Flatpickr (getISODateFromInput) ในส่วน Export
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -2368,6 +2360,7 @@ function closePOForm() {
 // ═══════════════════════════════════════════════════════════════
 //  EXPORT PO TO EXCEL
 //  + V.10.17: Export Excel ด้วย ExcelJS (มีแถว SUM ต่อท้ายทุก PO)
+//  + V.10.29 Fix: ใช้ Flatpickr ในการจัดการวันที่เริ่มต้น
 // ═══════════════════════════════════════════════════════════════
 
 function exportPOToExcel() {
@@ -2422,18 +2415,28 @@ function exportPOToExcel() {
   // แปลงวันที่เป็นรูปแบบ YYYY-MM-DD
   const defaultDateISO = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
   
-  const fromEl = document.getElementById('exportPoDateFrom');
-  const toEl = document.getElementById('exportPoDateTo');
-  if (fromEl) fromEl.value = defaultDateISO;
-  if (toEl) toEl.value = defaultDateISO;
+  // 🔽 V.10.29: ใช้ Flatpickr บังคับวันที่ 🔽
+  if (flatpickrInstances['exportPoDateFrom']) {
+    flatpickrInstances['exportPoDateFrom'].setDate(defaultDateISO, false);
+  } else {
+    const fromEl = document.getElementById('exportPoDateFrom');
+    if (fromEl) fromEl.value = defaultDateISO;
+  }
+  
+  if (flatpickrInstances['exportPoDateTo']) {
+    flatpickrInstances['exportPoDateTo'].setDate(defaultDateISO, false);
+  } else {
+    const toEl = document.getElementById('exportPoDateTo');
+    if (toEl) toEl.value = defaultDateISO;
+  }
   // 🔼 จบส่วนที่แก้ไข 🔼
 
   openModal('modalExportPO');
 }
 
 async function runExportPOExcel() {
-  const fromDate = document.getElementById('exportPoDateFrom')?.value;
-  const toDate = document.getElementById('exportPoDateTo')?.value;
+  const fromDate = getISODateFromInput('exportPoDateFrom'); // 🔽 แก้ตรงนี้
+  const toDate = getISODateFromInput('exportPoDateTo');     // 🔽 แก้ตรงนี้
 
   closeModal('modalExportPO');
 
