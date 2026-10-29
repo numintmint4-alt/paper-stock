@@ -50,11 +50,13 @@ async function initStockTab() {
   
   const defaultDate = `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}-${String(target.getDate()).padStart(2, '0')}`;
 
+  // 🔽 แก้ตรงนี้: บังคับเขียนค่าลง Input ดิบๆ ก่อน 🔽
+  const dateInput = $('stockDate');
+  if (dateInput) dateInput.value = defaultDate;
+  
+  // แล้วค่อยสั่งให้ Flatpickr อัปเดตตาม (true = กระตุ้น onChange)
   if (flatpickrInstances['stockDate']) {
-    flatpickrInstances['stockDate'].setDate(defaultDate, false);
-  } else {
-    const dateInput = $('stockDate');
-    if (dateInput) dateInput.value = defaultDate;
+    flatpickrInstances['stockDate'].setDate(defaultDate, true); 
   }
   
   await loadStockGradeFilter();
