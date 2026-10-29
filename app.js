@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK ม้วนกระดาษ V6 — app.js (Core) — V.13.1 (No Default Date)
+//  STOCK ม้วนกระดาษ V6 — app.js (Core) — V.13.3 (No Autofill)
 // ═══════════════════════════════════════════════════════════════
 const SUPABASE_URL      = 'https://gwwgycbqzdjlijsuxahx.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_rMoUE6tUsQZHnJu2ULDxFg_4NAiw6wg';
@@ -1215,7 +1215,7 @@ async function delUser(id, username) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  INIT  — V.13.1: ลบ defaultDate + setDate ออกแล้ว
+//  INIT  — V.13.3: ปิด Autofill (autocomplete + readonly + value='')
 // ═══════════════════════════════════════════════════════════════
 
 (function init() {
@@ -1245,15 +1245,29 @@ async function delUser(id, username) {
   dateInputIds.forEach(id => {
     const el = document.getElementById(id);
     if (el) {
+      // 🔽 1. เปลี่ยน type เป็น text และปิด Autofill 🔽
       el.setAttribute('type', 'text');
       el.setAttribute('placeholder', 'วว/ดด/ปปปป');
-      // 🔽 ไม่ต้องใส่ defaultDate แล้ว 🔽
+      el.setAttribute('autocomplete', 'new-password'); // ทริคหลอก Browser ว่าเป็นช่องรหัสผ่าน
+      el.setAttribute('aria-autocomplete', 'none');
+      el.setAttribute('readonly', true); // ป้องกันการพิมพ์เอง (บังคับให้เลือกจากปฏิทิน)
+
+      // 🔽 2. ล้างค่าที่ค้างอยู่ในช่องทิ้งก่อนสร้าง Flatpickr 🔽
+      el.value = '';
+
+      // 🔽 3. สร้าง Flatpickr 🔽
       flatpickrInstances[id] = flatpickr(el, {
         locale: "th",
         dateFormat: "d/m/Y",
-        allowInput: true,
-        disableMobile: true
+        allowInput: false, // ห้ามพิมพ์เอง ให้คลิกเลือกจากปฏิทินอย่างเดียว
+        disableMobile: true,
+        // ไม่ต้องใส่ defaultDate เพื่อให้มันว่างเปล่า
       });
+
+      // 🔽 4. เอา readonly ออกหลังจาก Flatpickr สร้างเสร็จ (เพื่อให้คลิกเปิดปฏิทินได้) 🔽
+      setTimeout(() => {
+        if (el) el.removeAttribute('readonly');
+      }, 100);
     }
   });
 
