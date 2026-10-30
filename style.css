@@ -744,3 +744,102 @@ table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
   .report-foot { display: none !important; }
   .alert-table th, .alert-table td.grade-col { position: static; }
 }
+/* ================= FORECAST STYLES ================= */
+.glass-panel {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+
+.filter-section {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    align-items: flex-end;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.filter-group label {
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: #555;
+}
+
+.sub-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 15px;
+    overflow-x: auto;
+}
+
+.sub-tab {
+    padding: 8px 16px;
+    background: #f0f0f0;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.sub-tab.active {
+    background: #0056b3;
+    color: white;
+    border-color: #0056b3;
+}
+
+.table-responsive {
+    overflow-x: auto;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.forecast-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.forecast-table th, .forecast-table td {
+    border: 1px solid #e0e0e0;
+    padding: 8px;
+    text-align: center;
+}
+
+.forecast-table thead th {
+    background: #f8f9fa;
+    font-weight: 700;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+/* สีพื้นหลังตามกลุ่ม Grade (ตัวอย่าง) */
+.forecast-table tbody tr[data-group="CA"] td:nth-child(1) { background-color: #e3f2fd; }
+.forecast-table tbody tr[data-group="KA"] td:nth-child(1) { background-color: #fce4ec; }
+.forecast-table tbody tr[data-group="KI"] td:nth-child(1) { background-color: #e8f5e9; }
+
+/* ช่องที่ให้กรอกข้อมูล */
+.forecast-input {
+    width: 60px;
+    padding: 4px;
+    text-align: right;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #fffff0; /* สีเหลืองอ่อนเพื่อบอกว่าแก้ไขได้ */
+}
+
+/* ไฮไลท์ตัวเลขสำคัญ */
+.text-blue { color: #0033cc; font-weight: bold; }
+.text-red { color: #d32f2f; font-weight: bold; }
+.text-bold { font-weight: bold; }
