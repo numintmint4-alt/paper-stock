@@ -1,14 +1,15 @@
 // ==========================================
-// forecast.js - จัดการ Tab Production Forecast & Usage Pivot
+// forecast.js - จัดการ Tab Production Forecast & Usage Pivot & Snapshot
 // ==========================================
 
 const fcState = {
-    currentGradeGroup: 'KA', // Default Tab
-    forecastData: [],        
-    masterData: [],          
+    currentGradeGroup: 'CA',
+    masterData: [],
 };
 
-// เรียกใช้เมื่อกด Tab Forecast
+// ==========================================
+// 1. ส่วนของหน้า Forecast
+// ==========================================
 async function initForecastTab() {
     const tbody = document.getElementById('forecast-tbody');
     if (tbody) tbody.innerHTML = '<tr><td colspan="22" style="text-align:center;">กำลังโหลดข้อมูล...</td></tr>';
@@ -56,9 +57,7 @@ function renderGradeTabs() {
     container.innerHTML = '';
     groups.forEach(group => {
         const btn = document.createElement('button');
-        // ใช้คลาสของระบบเดิมเพื่อให้ดูเข้ากัน
-        btn.className = `btn-tab ${fcState.currentGradeGroup === group ? 'active' : ''}`;
-        btn.style = `padding:8px 16px; border-radius:6px; border:1px solid #cbd5e1; cursor:pointer; font-weight:bold; ${fcState.currentGradeGroup === group ? 'background:#3b82f6; color:white;' : 'background:white; color:#1e293b;'}`;
+        btn.className = `sub-tab ${fcState.currentGradeGroup === group ? 'active' : ''}`;
         btn.innerText = group;
         btn.onclick = () => {
             fcState.currentGradeGroup = group;
@@ -86,25 +85,32 @@ async function loadForecastMatrix() {
     const monthYear = monthInput.value;
 
     try {
-        // 1. ดึง Stock (อ้างอิงตามโครงสร้างเดิมของคุณ)
+        // 1. ดึง Stock ณ วันที่เลือก
         const { data: stockRaw } = await supabase.from('stock_balance').select('grade, size, rolls').eq('stock_date', selectedDate);
         const stockData = {};
         (stockRaw || []).forEach(item => {
             stockData[`${item.grade}-${item.size}`] = (stockData[`${item.grade}-${item.size}`] || 0) + Number(item.rolls || 0);
         });
 
-        // 2. ดึง Forecast ที่เคยเซฟ
+        // 2. ดึง Forecast ที่เคยเซฟไว้
         const { data: savedForecast } = await supabase.from('forecast_data').select('*').eq('month_year', monthYear);
+        
+        // 3. ดึง Forecast ของเดือนก่อนหน้า
         const { data: prevData } = await supabase.from('forecast_data').select('*').eq('month_year', prevMonth);
 
-        // 3. ดึง Usage จาก RPC (ที่แก้ใหม่)
-        let usageData = [];
+        // 4. ดึง Usage Snapshot (ยอดใช้จริงที่เคย Save ไว้)
+        //    - เดือน M1, M2, M3 (ดึงของทุกคน 'ALL' หรือผู้ใช้ต้องเลือกในหน้า Pivot ก่อนบันทึก)
+        let usageSnapshots = [];
         if (m1 && m2 && m3) {
-            const { data: rpcData } = await supabase.rpc('get_general_usage_matrix', { p_month_1: m1, p_month_2: m2, p_month_3: m3 });
-            usageData = rpcData || [];
+            const { data: snaps } = await supabase
+                .from('usage_snapshots')
+                .select('*')
+                .in('snapshot_month', [m1, m2, m3])
+                .eq('customer_filter', 'ALL'); // สมมติว่าดึงยอดรวมทุกคนมาโชว์
+            usageSnapshots = snaps || [];
         }
 
-        // 4. กรอง Master ตาม Tab
+        // 5. กรอง Master Data ตาม Tab
         const filteredMaster = fcState.masterData.filter(m => String(m.grade || '').startsWith(fcState.currentGradeGroup));
         tbody.innerHTML = '';
 
@@ -119,38 +125,54 @@ async function loadForecastMatrix() {
             const saved = (savedForecast || []).find(f => f.grade === m.grade && Number(f.width) === Number(m.size)) || {};
             const prev = (prevData || []).find(p => p.grade === m.grade && Number(p.width) === Number(m.size)) || {};
             
-            // Match Usage ด้วย item_code
-            const usage = usageData.find(u => u.item_code === m.item_code) || { m1_rolls: 0, m2_rolls: 0, m3_rolls: 0 };
+            // ค้นหายอด Usage จาก Snapshot
+            const snapM1 = usageSnapshots.find(s => s.snapshot_month === m1 && s.grade === m.grade && Number(s.width) === Number(m.size));
+            const snapM2 = usageSnapshots.find(s => s.snapshot_month === m2 && s.grade === m.grade && Number(s.width) === Number(m.size));
+            const snapM3 = usageSnapshots.find(s => s.snapshot_month === m3 && s.grade === m.grade && Number(s.width) === Number(m.size));
 
-            const m1_val = Number(usage.m1_rolls);
-            const m2_val = Number(usage.m2_rolls);
-            const m3_val = Number(usage.m3_rolls);
-            const avg3 = (m1_val + m2_val + m3_val) / 3;
+            // ถ้าไม่มีข้อมูล ให้เป็น null เพื่อให้แสดงช่องว่าง (ตามที่คุณต้องการ)
+            const m1_val = snapM1 ? Number(snapM1.total_rolls) : null;
+            const m2_val = snapM2 ? Number(snapM2.total_rolls) : null;
+            const m3_val = snapM3 ? Number(snapM3.total_rolls) : null;
+            
+            // คำนวณ Avg 3 Mths (ถ้ามีข้อมูล)
+            let avg3 = 0;
+            let validMonths = 0;
+            if (m1_val !== null) { avg3 += m1_val; validMonths++; }
+            if (m2_val !== null) { avg3 += m2_val; validMonths++; }
+            if (m3_val !== null) { avg3 += m3_val; validMonths++; }
+            avg3 = validMonths > 0 ? (avg3 / validMonths) : 0;
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${m.grade}</td>
                 <td>${m.size}</td>
-                <td>${m1_val.toFixed(2)}</td>
-                <td>${m2_val.toFixed(2)}</td>
-                <td>${m3_val.toFixed(2)}</td>
-                <td style="background:#f0f8ff;">${avg3.toFixed(2)}</td>
-                <td><input type="number" class="fc-input" data-field="forecast_nen" value="${saved.forecast_nen || 0}"></td>
-                <td><input type="number" class="fc-input" data-field="forecast_nea" value="${saved.forecast_nea || 0}"></td>
-                <td><input type="number" class="fc-input" data-field="forecast_thaifood" value="${saved.forecast_thaifood || 0}"></td>
-                <td><input type="number" class="fc-input" data-field="forecast_ktp" value="${saved.forecast_ktp || 0}"></td>
-                <td class="actual-cell" style="background:#e6f2ff;">0.00</td>
-                <td style="color:#003366; font-weight:bold;">0.00</td>
-                <td>${stockQty}</td>
-                <td><input type="number" class="fc-input" data-field="reserve_qty" value="${saved.reserve_qty || 0}"></td>
+                <td class="col-m1">${m1_val !== null ? m1_val.toFixed(2) : ''}</td>
+                <td class="col-m2">${m2_val !== null ? m2_val.toFixed(2) : ''}</td>
+                <td class="col-m3">${m3_val !== null ? m3_val.toFixed(2) : ''}</td>
+                <td class="col-avg">${validMonths > 0 ? avg3.toFixed(2) : ''}</td>
+                
+                <td><input type="number" class="fc-input" data-field="forecast_nen" value="${saved.forecast_nen || 0}" placeholder="0"></td>
+                <td><input type="number" class="fc-input" data-field="forecast_nea" value="${saved.forecast_nea || 0}" placeholder="0"></td>
+                <td><input type="number" class="fc-input" data-field="forecast_thaifood" value="${saved.forecast_thaifood || 0}" placeholder="0"></td>
+                <td><input type="number" class="fc-input" data-field="forecast_ktp" value="${saved.forecast_ktp || 0}" placeholder="0"></td>
+                
+                <td class="actual-cell" style="background:#e6f2ff; font-weight:bold;">0.00</td>
+                <td class="col-prev-actual">0.00</td>
+                
+                <td class="col-stock">${stockQty}</td>
+                <td><input type="number" class="fc-input" data-field="reserve_qty" value="${saved.reserve_qty || 0}" placeholder="0"></td>
+                
                 <td class="roll-snd-cell" style="background:#f5f5f5;">0.00</td>
                 <td class="est-use-cell" style="background:#f5f5f5;">0.00</td>
                 <td>0</td>
                 <td>0</td>
+                
                 <td class="order-calc-cell" style="background:#e6ffe6;">0.00</td>
-                <td class="order-round-cell" style="background:#ccffcc; font-weight:bold;">0</td>
-                <td><input type="number" class="fc-input" data-field="adjust_qty" value="${saved.adjust_qty || 0}"></td>
-                <td><input type="text" class="fc-input" data-field="note" value="${(saved.note || '').replace(/"/g, '&quot;')}"></td>
+                <td class="col-order-round">0</td>
+                
+                <td><input type="number" class="fc-input" data-field="adjust_qty" value="${saved.adjust_qty || 0}" placeholder="0"></td>
+                <td><input type="text" class="fc-input" data-field="note" value="${(saved.note || '').replace(/"/g, '&quot;')}" placeholder="" style="width:100px; text-align:left;"></td>
             `;
 
             tr.dataset.grade = m.grade;
@@ -185,28 +207,23 @@ function recalculateRow(tr, stockQty, prev) {
     const reserve = getVal('reserve_qty');
     const adjust = getVal('adjust_qty');
 
-    // ใช้จริง (Actual) = Avg + Forecast
     const actual = avg3 + fNen + fNea + fThai + fKtp;
-    
-    // ใช้จริง (ก่อนหน้า) = Forecast ก่อนหน้า
     const prevActual = prev ? (Number(prev.forecast_nen||0) + Number(prev.forecast_nea||0) + Number(prev.forecast_thaifood||0) + Number(prev.forecast_ktp||0)) : 0;
-
     const rollSND = stockQty + reserve;
     const estUse = actual + prevActual - rollSND;
     
-    const stockLevel = 0; // ดึงจาก Snapshot (Mockup ไว้ก่อน)
+    const stockLevel = 0; // สมมติ
     const stockLevel50 = stockLevel / 2;
     
     const orderCalc = estUse + stockLevel50 + adjust;
     const orderRound = Math.ceil(orderCalc);
 
-    // อัปเดตลงตาราง
     tr.querySelector('.actual-cell').innerText = actual.toFixed(2);
-    tr.children[11].innerText = prevActual.toFixed(2); // ใช้จริง (ก่อนหน้า)
+    tr.querySelector('.col-prev-actual').innerText = prevActual.toFixed(2);
     tr.querySelector('.roll-snd-cell').innerText = rollSND.toFixed(2);
     tr.querySelector('.est-use-cell').innerText = estUse.toFixed(2);
     tr.querySelector('.order-calc-cell').innerText = orderCalc.toFixed(2);
-    tr.querySelector('.order-round-cell').innerText = orderRound;
+    tr.querySelector('.col-order-round').innerText = orderRound;
 }
 
 async function saveForecastData() {
@@ -251,107 +268,54 @@ async function saveForecastData() {
 }
 
 // ==========================================
-// ระบบ Usage Pivot
+// 2. ส่วนของหน้า Usage Pivot & Snapshot
 // ==========================================
-
 async function initUsagePivotTab() {
     const monthInput = document.getElementById('pivot-month');
     if (monthInput && !monthInput.value) {
         monthInput.value = new Date().toISOString().slice(0, 7);
     }
-}
 
-// ✅ ฟังก์ชัน Import ที่แก้ไขแล้ว (แก้ปัญหา customer_code)
-async function handleUsageImport(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-        try {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, { type: 'array' });
-            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-            const rows = XLSX.utils.sheet_to_json(firstSheet);
-
-            showToast(`กำลังประมวลผล ${rows.length} แถว...`, 'info');
-
-            // สร้าง Batch ID สำหรับการ Import ครั้งนี้
-            const batchId = crypto.randomUUID();
-
-            const importData = rows.map(row => {
-                // ดึงข้อมูลจาก Excel
-                const rawDate = row['prod_date'] || row['doc_date'] || row['Date']; 
-                const rawWidth = row['Size'] || row['size'] || row['Width'];
-                const rawKgs = row['kgs'] || row['used_kgs'] || row['Kgs'];
-                const rawGrade = row['grade'] || row['Grade'];
-                
-                // ดึงชื่อลูกค้า (ใช้ฟิลด์ roll_for_customer ให้ตรงกับ DB เดิม)
-                const customer = row['customer_code'] || row['Customer'] || row['customer_name'] || '';
-
-                const width = parseFloat(rawWidth) || 0;
-                const kgs = parseFloat(rawKgs) || 0;
-                const grade = normalizeGrade(rawGrade || ''); // ใช้ normalizeGrade จาก app.js
-                
-                // หา item_code จาก masterData
-                const item = fcState.masterData.find(m => m.grade === grade && Number(m.size) === width);
-                
-                return {
-                    usage_date: toISODate(rawDate),       // วันที่ตัดสต็อก
-                    doc_date: toISODate(rawDate),         // วันที่เอกสาร
-                    grade: grade,                         // เกรด
-                    width: width,                         // ขนาด
-                    used_kgs: kgs,                        // น้ำหนักที่ใช้
-                    kgs: kgs,
-                    roll_for_customer: customer,          // ✅ ลูกค้า (แก้จาก customer_code แล้ว)
-                    item_code: item ? item.item_code : '',// Item code
-                    is_valid: true,                       // สถานะถูกต้อง
-                    import_batch_id: batchId,             // รหัส Batch
-                    created_by: currentUser.id            // ผู้ Import
-                };
-            });
-
-            // กรองแถวที่ข้อมูลสำคัญไม่ครบออก
-            const validImportData = importData.filter(d => d.usage_date && d.grade && d.width > 0);
-
-            if (validImportData.length === 0) {
-                return showToast('ไม่พบข้อมูลที่ถูกต้องในไฟล์ (ตรวจสอบคอลัมน์ prod_date, Size, grade)', 'warn');
-            }
-
-            // บันทึกลง Database
-            const { error } = await supabase.from('usage_records_raw').insert(validImportData);
-            
-            if (error) {
-                console.error(error);
-                showToast('Import ล้มเหลว: ' + error.message, 'err');
-            } else {
-                showToast(`Import สำเร็จ ${validImportData.length} รายการ`, 'ok');
-                document.getElementById('pivot-file-upload').value = ''; 
-                // ถ้าต้องการให้โหลด Pivot ใหม่ทันทีหลัง Import ให้เปิดบรรทัดล่างนี้
-                // loadUsagePivot();
-            }
-        } catch (err) {
-            console.error(err);
-            showToast('เกิดข้อผิดพลาดในการอ่านไฟล์: ' + err.message, 'err');
-        }
-    };
-    reader.readAsArrayBuffer(file);
+    // โหลดรายชื่อลูกค้าเข้าตัวกรอง (Mockup รอเชื่อมกับ Database ถ้ามี)
+    const customerSelect = document.getElementById('pivot-customer');
+    if (customerSelect && customerSelect.options.length <= 1) {
+        // ดึงรายชื่อลูกค้าจาก usage_records_raw (ดึงเฉพาะที่ไม่ซ้ำ)
+        const { data } = await supabase.from('usage_records_raw').select('roll_for_customer').limit(1000);
+        const uniqueCustomers = [...new Set((data || []).map(d => d.roll_for_customer).filter(Boolean))];
+        
+        uniqueCustomers.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c;
+            opt.innerText = c;
+            customerSelect.appendChild(opt);
+        });
+    }
 }
 
 async function loadUsagePivot() {
     const month = document.getElementById('pivot-month').value;
+    const customerFilter = document.getElementById('pivot-customer').value; // 'ALL' หรือชื่อลูกค้า
+    
     if (!month) return showToast('กรุณาเลือกเดือน', 'warn');
 
     const tbody = document.getElementById('pivot-tbody');
     const thead = document.getElementById('pivot-thead');
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;">กำลังโหลด...</td></tr>';
 
-    const { data, error } = await supabase
+    // ดึงข้อมูลจาก usage_records_raw
+    let query = supabase
         .from('usage_records_raw')
-        .select('grade, width, used_kgs')
+        .select('grade, width, used_kgs, roll_for_customer')
         .eq('is_valid', true)
         .gte('usage_date', `${month}-01`)
         .lte('usage_date', `${month}-31`);
+
+    // ถ้าไม่ได้เลือก 'ทั้งหมด' ให้กรองตามลูกค้า
+    if (customerFilter !== 'ALL') {
+        query = query.eq('roll_for_customer', customerFilter);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
         tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:red;">Error: ${error.message}</td></tr>`;
@@ -366,7 +330,7 @@ async function loadUsagePivot() {
         if (!pivotData[row.grade]) pivotData[row.grade] = { total: 0 };
         if (!pivotData[row.grade][row.width]) pivotData[row.grade][row.width] = 0;
         
-        // คำนวณเป็นม้วน
+        // คำนวณเป็นม้วน (สมมติ 500 kg = 1 ม้วน หรือดึง std_weight_kg มาหาร)
         const rolls = Number(row.used_kgs) / 500; 
         pivotData[row.grade][row.width] += rolls;
         pivotData[row.grade].total += rolls;
@@ -387,10 +351,68 @@ async function loadUsagePivot() {
             const row = pivotData[grade];
             bodyHtml += `<tr><td><strong>${grade}</strong></td>`;
             sortedWidths.forEach(w => {
-                bodyHtml += `<td>${(row[w] || 0).toFixed(2)}</td>`;
+                // ถ้าไม่มียอดใช้ ให้เว้นว่างไว้
+                const val = row[w] || 0;
+                bodyHtml += `<td>${val > 0 ? val.toFixed(2) : ''}</td>`;
             });
             bodyHtml += `<td style="background:#e6f2ff; font-weight:bold;">${row.total.toFixed(2)}</td></tr>`;
         });
     }
     tbody.innerHTML = bodyHtml;
+
+    // เก็บข้อมูล Pivot ไว้ใน State เผื่อใช้ตอน Save Snapshot
+    fcState.pivotData = pivotData;
+    fcState.pivotWidths = sortedWidths;
+    fcState.pivotMonth = month;
+    fcState.pivotCustomer = customerFilter;
+}
+
+// ฟังก์ชันบันทึก Snapshot
+async function saveUsageSnapshot() {
+    if (!fcState.pivotData || !fcState.pivotMonth) {
+        return showToast('กรุณากด Load Pivot เพื่อดึงข้อมูลก่อนบันทึก', 'warn');
+    }
+
+    const month = fcState.pivotMonth;
+    const customerFilter = fcState.pivotCustomer;
+    const pivotData = fcState.pivotData;
+
+    const payloads = [];
+    Object.keys(pivotData).forEach(grade => {
+        const row = pivotData[grade];
+        fcState.pivotWidths.forEach(width => {
+            const rolls = row[width] || 0;
+            // บันทึกเฉพาะที่มีข้อมูล (หรือจะบันทึก 0 ไปด้วยก็ได้)
+            if (rolls > 0) {
+                payloads.push({
+                    snapshot_month: month,
+                    customer_filter: customerFilter,
+                    grade: grade,
+                    width: Number(width),
+                    total_rolls: rolls
+                });
+            }
+        });
+    });
+
+    if (payloads.length === 0) {
+        return showToast('ไม่มีข้อมูลให้บันทึก Snapshot', 'warn');
+    }
+
+    showToast('กำลังบันทึก Snapshot...', 'info');
+
+    // ลบข้อมูลเดิมของเดือน+ลูกค้านี้ทิ้งก่อน แล้วค่อย Insert ใหม่
+    await supabase.from('usage_snapshots')
+        .delete()
+        .eq('snapshot_month', month)
+        .eq('customer_filter', customerFilter);
+
+    const { error } = await supabase.from('usage_snapshots').insert(payloads);
+
+    if (error) {
+        console.error(error);
+        showToast('บันทึก Snapshot ไม่สำเร็จ: ' + error.message, 'err');
+    } else {
+        showToast(`บันทึก Snapshot สำเร็จ (${payloads.length} รายการ)`, 'ok');
+    }
 }
