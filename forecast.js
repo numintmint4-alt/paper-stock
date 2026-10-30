@@ -1,14 +1,16 @@
 // ==========================================
-// forecast.js - จัดการ Tab Production Forecast
+// forecast.js - จัดการ Tab Production Forecast (V2 - Safe & Correct)
 // ==========================================
 
 const fcState = {
-    currentGradeGroup: 'CA', // Default Tab
-    masterData: [],          // เก็บ Master Grade/Width/Weight
+    currentGradeGroup: 'CA',
+    masterData: [],
 };
 
-// เรียกใช้เมื่อกด Tab Forecast
 async function initForecastTab() {
+    const tbody = document.getElementById('forecast-tbody');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="22" style="text-align:center;">กำลังโหลดข้อมูล...</td></tr>';
+
     await loadForecastMasterData();
     initForecastDatePickers();
     renderGradeTabs();
@@ -19,35 +21,53 @@ function initForecastDatePickers() {
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1);
-    
-    // ตั้งค่าเริ่มต้น Date Picker
-    if (!document.getElementById('fc-stock-date')._flatpickr) {
-        flatpickr("#fc-stock-date", {
-            dateFormat: "Y-m-d",
-            defaultDate: yesterday,
-            onChange: () => loadForecastMatrix()
-        });
+
+    const dateInput = document.getElementById('fc-stock-date');
+    const monthInput = document.getElementById('fc-month');
+
+    if (dateInput) {
+        // ลงทะเบียนกับ flatpickrInstances กลางของ app.js เพื่อให้ getISODateFromInput ใช้งานได้
+        if (!window.flatpickrInstances) window.flatpickrInstances = {};
+        if (!dateInput._flatpickr) {
+            window.flatpickrInstances['fc-stock-date'] = flatpickr(dateInput, {
+                locale: 'th',
+                dateFormat: 'Y-m-d',
+                defaultDate: yesterday,
+                allowInput: false,
+                disableMobile: true,
+                onChange: () => loadForecastMatrix()
+            });
+        } else if (!dateInput.value) {
+            // ถ้ามี instance แล้วแต่ยังไม่มีค่า ให้ใส่เมื่อวาน
+            dateInput._flatpickr.setDate(yesterday, false);
+        }
     }
 
-    // ตั้งค่า Month Pickers
-    const currentMonth = today.toISOString().slice(0, 7); // YYYY-MM
-    document.getElementById('fc-month').value = currentMonth;
+    if (monthInput && !monthInput.value) {
+        monthInput.value = today.toISOString().slice(0, 7);
+    }
 }
 
-// ดึง Master Data (Grade, Size, Weight)
 async function loadForecastMasterData() {
-    const { data, error } = await supabase
-        .from('paper_specs')
-        .select('grade, size, std_weight');
-        
-    if (error) return showToast('Error loading master data', 'error');
-    fcState.masterData = data;
+    try {
+        // ✅ แก้ std_weight → std_weight_kg (ชื่อคอลัมน์จริงใน paper_specs)
+        const { data, error } = await supabase
+            .from('paper_specs')
+            .select('grade, size, std_weight_kg');
+
+        if (error) throw error;
+        fcState.masterData = data || [];
+    } catch (err) {
+        console.error('Error loading master data:', err);
+        showToast('ไม่สามารถโหลด Master Data ได้', 'err');
+    }
 }
 
-// สร้าง Tabs ย่อย CA, KA, KI, KK, KW, FSC
 function renderGradeTabs() {
     const groups = ['CA', 'KA', 'KI', 'KK', 'KW', 'FSC'];
     const container = document.getElementById('fc-grade-tabs');
+    if (!container) return;
+
     container.innerHTML = '';
 
     groups.forEach(group => {
@@ -56,130 +76,148 @@ function renderGradeTabs() {
         btn.innerText = group;
         btn.onclick = () => {
             fcState.currentGradeGroup = group;
-            renderGradeTabs(); // Re-render เพื่อเปลี่ยนสี Active
-            loadForecastMatrix(); // โหลดข้อมูลใหม่ตาม Tab
+            renderGradeTabs();
+            loadForecastMatrix();
         };
         container.appendChild(btn);
     });
 }
 
-// ดึงข้อมูล Matrix และคำนวณ
 async function loadForecastMatrix() {
     const tbody = document.getElementById('forecast-tbody');
     if (!tbody) return;
+
     tbody.innerHTML = '<tr><td colspan="22" style="text-align:center;">Loading...</td></tr>';
 
-    const selectedDate = document.getElementById('fc-stock-date').value;
-    const monthYear = document.getElementById('fc-month').value;
-    
+    const dateInput = document.getElementById('fc-stock-date');
+    const monthInput = document.getElementById('fc-month');
+    if (!dateInput || !monthInput) return;
+
+    // ✅ ใช้ helper กลางถ้ามี ไม่งั้น fallback
+    const selectedDate = (typeof getISODateFromInput === 'function')
+        ? getISODateFromInput('fc-stock-date')
+        : dateInput.value;
+    const monthYear = monthInput.value;
+
+    if (!selectedDate || !monthYear) {
+        tbody.innerHTML = '<tr><td colspan="22" style="text-align:center;color:#dc2626;">กรุณาเลือกวันที่ Stock และเดือน Forecast</td></tr>';
+        return;
+    }
+
     try {
-        // 1. ดึงข้อมูล Stock ณ วันที่เลือก
-        const { data: stockRaw } = await supabase
-            .from('stock_balance') 
+        // 1) ดึง Stock
+        const { data: stockRaw, error: stockErr } = await supabase
+            .from('stock_balance')
             .select('grade, size, rolls')
             .eq('stock_date', selectedDate);
 
+        if (stockErr) console.warn('Stock error:', stockErr);
+
         const stockData = {};
-        stockRaw?.forEach(item => {
+        (stockRaw || []).forEach(item => {
             const key = `${item.grade}-${item.size}`;
-            stockData[key] = (stockData[key] || 0) + item.rolls;
+            stockData[key] = (stockData[key] || 0) + Number(item.rolls || 0);
         });
 
-        // 2. ดึงข้อมูลที่เคย Save ไว้
-        const { data: savedForecast } = await supabase
+        // 2) ดึง Forecast ที่เคยเซฟ
+        const { data: savedForecast, error: fcErr } = await supabase
             .from('forecast_data')
             .select('*')
             .eq('month_year', monthYear);
 
-        // 3. กรอง Master ตาม Tab ที่เลือก (เช่น KA)
-        const filteredMaster = fcState.masterData.filter(m => 
-            m.grade.startsWith(fcState.currentGradeGroup)
+        if (fcErr) console.warn('Forecast load error:', fcErr);
+
+        // 3) กรอง Master ตาม Tab
+        const filteredMaster = fcState.masterData.filter(m =>
+            String(m.grade || '').startsWith(fcState.currentGradeGroup)
         );
 
         tbody.innerHTML = '';
-        
+
+        if (filteredMaster.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="22" style="text-align:center; color:gray;">ไม่พบข้อมูลใน Master (ตรวจสอบตาราง paper_specs)</td></tr>';
+            return;
+        }
+
         filteredMaster.forEach(m => {
             const stockKey = `${m.grade}-${m.size}`;
-            const stockQty = stockData[stockKey] || 0; 
-            const saved = savedForecast?.find(f => f.grade === m.grade && f.width === m.size) || {};
+            const stockQty = stockData[stockKey] || 0;
+            const saved = (savedForecast || []).find(f => f.grade === m.grade && Number(f.width) === Number(m.size)) || {};
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${m.grade}</td>
                 <td>${m.size}</td>
-                <td>0.00</td> <!-- M1 (Mock) -->
-                <td>0.00</td> <!-- M2 (Mock) -->
-                <td>0.00</td> <!-- M3 (Mock) -->
-                <td>0.00</td> <!-- Avg (Mock) -->
+                <td>0.00</td>
+                <td>0.00</td>
+                <td>0.00</td>
+                <td>0.00</td>
                 <td><input type="number" class="fc-input" data-field="forecast_nen" value="${saved.forecast_nen || 0}"></td>
                 <td><input type="number" class="fc-input" data-field="forecast_nea" value="${saved.forecast_nea || 0}"></td>
                 <td><input type="number" class="fc-input" data-field="forecast_thaifood" value="${saved.forecast_thaifood || 0}"></td>
                 <td><input type="number" class="fc-input" data-field="forecast_ktp" value="${saved.forecast_ktp || 0}"></td>
-                <td>0.00</td> <!-- Actual (Mock) -->
-                <td>0.00</td> <!-- Prev Actual (Mock) -->
-                <td style="background:#f0f8ff; font-weight:bold;">${stockQty}</td> <!-- Stock จริง! -->
+                <td>0.00</td>
+                <td>0.00</td>
+                <td style="background:#f0f8ff; font-weight:bold;">${stockQty}</td>
                 <td><input type="number" class="fc-input" data-field="reserve_qty" value="${saved.reserve_qty || 0}"></td>
-                <td>0.00</td> <!-- Roll S&D -->
-                <td>0.00</td> <!-- Est Use -->
-                <td>0.00</td> <!-- Stock Level -->
-                <td>0.00</td> <!-- Stock Level 50% -->
-                <td>0.00</td> <!-- Order Calc -->
-                <td>0.00</td> <!-- Order RoundUp -->
+                <td>0.00</td>
+                <td>0.00</td>
+                <td>0.00</td>
+                <td>0.00</td>
+                <td>0.00</td>
+                <td>0.00</td>
                 <td><input type="number" class="fc-input" data-field="adjust_qty" value="${saved.adjust_qty || 0}"></td>
-                <td><input type="text" class="fc-input" data-field="note" value="${saved.note || ''}"></td>
+                <td><input type="text" class="fc-input" data-field="note" value="${(saved.note || '').replace(/"/g, '&quot;')}"></td>
             `;
 
             tr.dataset.grade = m.grade;
             tr.dataset.width = m.size;
 
-            // Event Listener เมื่อแก้ไขช่อง Input
             tr.querySelectorAll('.fc-input').forEach(input => {
                 input.addEventListener('change', () => recalculateRow(tr, stockQty));
             });
 
+            // คำนวณครั้งแรกให้ค่าตรง
             tbody.appendChild(tr);
+            recalculateRow(tr, stockQty);
         });
 
     } catch (err) {
-        console.error(err);
-        showToast('Error loading matrix', 'error');
+        console.error('Matrix Error:', err);
+        tbody.innerHTML = '<tr><td colspan="22" style="text-align:center; color:red;">เกิดข้อผิดพลาดในการโหลดข้อมูล (ดู Console)</td></tr>';
     }
 }
 
-// คำนวณใหม่เฉพาะแถวเมื่อมีการแก้ไข
 function recalculateRow(tr, stockQty) {
     const getVal = (field) => {
         const input = tr.querySelector(`.fc-input[data-field="${field}"]`);
         return input ? Number(input.value || 0) : 0;
     };
 
-    const fNen = getVal('forecast_nen');
-    const fNea = getVal('forecast_nea');
+    const fNen  = getVal('forecast_nen');
+    const fNea  = getVal('forecast_nea');
     const fThai = getVal('forecast_thaifood');
-    const fKtp = getVal('forecast_ktp');
+    const fKtp  = getVal('forecast_ktp');
     const reserve = getVal('reserve_qty');
-    const adjust = getVal('adjust_qty');
+    const adjust  = getVal('adjust_qty');
 
-    // --- สูตรคำนวณ (คุณสามารถปรับแต่งได้) ---
-    const actual = fNen + fNea + fThai + fKtp;
-    const rollSND = stockQty + reserve;
-    const estUse = actual - rollSND; // ตัวอย่างการคำนวณ
-    const orderCalc = estUse + adjust;
-    const orderRoundUp = Math.ceil(orderCalc);
+    const actual     = fNen + fNea + fThai + fKtp;
+    const rollSND    = stockQty + reserve;
+    const estUse     = actual - rollSND;
+    const orderCalc  = estUse + adjust;
+    const orderRound = Math.ceil(orderCalc);
 
-    // อัปเดตค่าในช่องที่คำนวณ (Index ของ td)
     const tds = tr.querySelectorAll('td');
-    tds[10].innerText = actual.toFixed(2);       // ใช้จริง (Actual)
-    tds[14].innerText = rollSND;                 // Roll S&D คงเหลือ
-    tds[15].innerText = estUse.toFixed(2);       // คาดการณ์ว่าจะต้องใช้
-    tds[18].innerText = orderCalc.toFixed(2);    // ยอดที่ต้องสั่งซื้อ (คำนวณ)
-    tds[19].innerText = orderRoundUp;            // ยอดที่ต้องสั่งซื้อ (ROUNDUP)
+    if (tds[10]) tds[10].innerText = actual.toFixed(2);
+    if (tds[14]) tds[14].innerText = rollSND;
+    if (tds[15]) tds[15].innerText = estUse.toFixed(2);
+    if (tds[18]) tds[18].innerText = orderCalc.toFixed(2);
+    if (tds[19]) tds[19].innerText = orderRound;
 }
 
-// บันทึกข้อมูลลง Database
 async function saveForecastData() {
-    const monthYear = document.getElementById('fc-month').value;
-    if (!monthYear) return showToast('กรุณาเลือกเดือน Forecast', 'warning');
+    const monthYear = document.getElementById('fc-month')?.value;
+    if (!monthYear) return showToast('กรุณาเลือกเดือน Forecast', 'warn');
 
     const rows = document.querySelectorAll('#forecast-tbody tr');
     const payloads = [];
@@ -187,10 +225,12 @@ async function saveForecastData() {
     rows.forEach(tr => {
         const grade = tr.dataset.grade;
         const width = tr.dataset.width;
-        
+        if (!grade || !width) return;
+
         const getVal = (field) => {
             const input = tr.querySelector(`.fc-input[data-field="${field}"]`);
-            return input ? (input.type === 'number' ? Number(input.value || 0) : input.value) : '';
+            if (!input) return field === 'note' ? '' : 0;
+            return input.type === 'number' ? Number(input.value || 0) : input.value;
         };
 
         payloads.push({
@@ -207,14 +247,16 @@ async function saveForecastData() {
         });
     });
 
+    if (!payloads.length) return showToast('ไม่มีข้อมูลให้บันทึก', 'warn');
+
     const { error } = await supabase
         .from('forecast_data')
         .upsert(payloads, { onConflict: 'month_year,grade,width' });
 
     if (error) {
         console.error(error);
-        showToast('บันทึกข้อมูลไม่สำเร็จ', 'error');
+        showToast('บันทึกข้อมูลไม่สำเร็จ: ' + error.message, 'err');
     } else {
-        showToast('บันทึกข้อมูล Forecast สำเร็จ', 'success');
+        showToast('บันทึกข้อมูล Forecast สำเร็จ', 'ok');
     }
 }
