@@ -145,12 +145,12 @@ th { background: var(--surface-soft); color: var(--text); font: 700 12px inherit
 /* ✅ ปรับ report-title ให้ใหญ่และหนาขึ้น */
 .report-title { 
   text-align: center; 
-  font-size: 26px;             /* ✅ เพิ่มจาก 21px เป็น 26px */
+  font-size: 23px;             /* ✅ เพิ่มจาก 21px เป็น 26px */
   font-weight: 800;            /* ✅ เพิ่มจาก 700 เป็น 800 */
   line-height: 1.4; 
   color: var(--text); 
   justify-self: center; 
-  letter-spacing: -0.5px;      /* ✅ ทำให้ตัวอักษรดูแน่นขึ้น */
+  letter-spacing: -0.3px;      /* ✅ ทำให้ตัวอักษรดูแน่นขึ้น */
 }
 .report-subtitle { text-align: center; font-size: 13px; color: var(--text-muted); font-weight: 400; margin-top: 6px; }
 .report-doc { font-size: 12px; color: var(--text-muted); white-space: nowrap; font-weight: 600; justify-self: end; }
