@@ -261,44 +261,78 @@ async function initUsagePivotTab() {
     }
 }
 
+// ✅ ฟังก์ชัน Import ที่แก้ไขแล้ว (แก้ปัญหา customer_code)
 async function handleUsageImport(event) {
     const file = event.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onload = async (e) => {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(firstSheet);
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(firstSheet);
 
-        const importData = rows.map(row => {
-            const width = parseFloat(row['Size']); 
-            const kgs = parseFloat(row['kgs']) || 0;
-            // หา item_code จาก masterData ถ้ามี
-            const grade = normalizeGrade(row['grade']);
-            const item = fcState.masterData.find(m => m.grade === grade && Number(m.size) === width);
+            showToast(`กำลังประมวลผล ${rows.length} แถว...`, 'info');
+
+            // สร้าง Batch ID สำหรับการ Import ครั้งนี้
+            const batchId = crypto.randomUUID();
+
+            const importData = rows.map(row => {
+                // ดึงข้อมูลจาก Excel
+                const rawDate = row['prod_date'] || row['doc_date'] || row['Date']; 
+                const rawWidth = row['Size'] || row['size'] || row['Width'];
+                const rawKgs = row['kgs'] || row['used_kgs'] || row['Kgs'];
+                const rawGrade = row['grade'] || row['Grade'];
+                
+                // ดึงชื่อลูกค้า (ใช้ฟิลด์ roll_for_customer ให้ตรงกับ DB เดิม)
+                const customer = row['customer_code'] || row['Customer'] || row['customer_name'] || '';
+
+                const width = parseFloat(rawWidth) || 0;
+                const kgs = parseFloat(rawKgs) || 0;
+                const grade = normalizeGrade(rawGrade || ''); // ใช้ normalizeGrade จาก app.js
+                
+                // หา item_code จาก masterData
+                const item = fcState.masterData.find(m => m.grade === grade && Number(m.size) === width);
+                
+                return {
+                    usage_date: toISODate(rawDate),       // วันที่ตัดสต็อก
+                    doc_date: toISODate(rawDate),         // วันที่เอกสาร
+                    grade: grade,                         // เกรด
+                    width: width,                         // ขนาด
+                    used_kgs: kgs,                        // น้ำหนักที่ใช้
+                    kgs: kgs,
+                    roll_for_customer: customer,          // ✅ ลูกค้า (แก้จาก customer_code แล้ว)
+                    item_code: item ? item.item_code : '',// Item code
+                    is_valid: true,                       // สถานะถูกต้อง
+                    import_batch_id: batchId,             // รหัส Batch
+                    created_by: currentUser.id            // ผู้ Import
+                };
+            });
+
+            // กรองแถวที่ข้อมูลสำคัญไม่ครบออก
+            const validImportData = importData.filter(d => d.usage_date && d.grade && d.width > 0);
+
+            if (validImportData.length === 0) {
+                return showToast('ไม่พบข้อมูลที่ถูกต้องในไฟล์ (ตรวจสอบคอลัมน์ prod_date, Size, grade)', 'warn');
+            }
+
+            // บันทึกลง Database
+            const { error } = await supabase.from('usage_records_raw').insert(validImportData);
             
-            return {
-                prod_date: toISODate(row['prod_date']), 
-                customer_code: row['customer_code'],
-                customer_name: row['customer_name'],
-                grade: grade,
-                width: width,
-                kgs: kgs,
-                rolls: kgs / 500, // สมมติ 500 kg = 1 ม้วน
-                item_code: item ? item.item_code : '',
-                is_valid: true
-            };
-        });
-
-        const { error } = await supabase.from('usage_records_raw').insert(importData);
-        
-        if (error) {
-            showToast('Import ล้มเหลว: ' + error.message, 'err');
-        } else {
-            showToast(`Import สำเร็จ ${importData.length} รายการ`, 'ok');
-            document.getElementById('pivot-file-upload').value = ''; 
+            if (error) {
+                console.error(error);
+                showToast('Import ล้มเหลว: ' + error.message, 'err');
+            } else {
+                showToast(`Import สำเร็จ ${validImportData.length} รายการ`, 'ok');
+                document.getElementById('pivot-file-upload').value = ''; 
+                // ถ้าต้องการให้โหลด Pivot ใหม่ทันทีหลัง Import ให้เปิดบรรทัดล่างนี้
+                // loadUsagePivot();
+            }
+        } catch (err) {
+            console.error(err);
+            showToast('เกิดข้อผิดพลาดในการอ่านไฟล์: ' + err.message, 'err');
         }
     };
     reader.readAsArrayBuffer(file);
