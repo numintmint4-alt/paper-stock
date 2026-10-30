@@ -421,9 +421,14 @@ async function loadUsagePivot() {
     const selectedCustomers = getSelectedPivotCustomers();
     const tbody = document.getElementById('pivot-tbody');
     const thead = document.getElementById('pivot-thead');
+    const historyList = document.getElementById('snapshot-history-list'); // 🔽 อ้างอิงกล่องประวัติด้านล่าง
+    
     if (!tbody || !thead) return;
 
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;">กำลังโหลด...</td></tr>';
+    
+    // 🔽 ล้างข้อความแจ้งเตือนเก่าในกล่องประวัติก่อนเริ่มโหลดใหม่
+    if (historyList) historyList.innerHTML = ''; 
 
     const [y, mo] = month.split('-').map(Number);
     const firstDay = `${month}-01`;
@@ -453,12 +458,12 @@ async function loadUsagePivot() {
             if (!pivotData[row.grade]) pivotData[row.grade] = { total: 0 };
             if (!pivotData[row.grade][row.width]) pivotData[row.grade][row.width] = 0;
 
-            // 🔽 1. ประกอบร่าง Item Code จากข้อมูลที่ Import (เช่น KA125 + "-" + 80)
+            // 🔽 ประกอบ Item Code
             const rowGrade = String(row.grade || '').trim().toUpperCase();
             const rowSize  = Number(row.width);
             const rowItemCode = `${rowGrade}-${rowSize}`;
 
-            // 🔽 2. ค้นหาใน Master Data โดยใช้ item_code ในการจับคู่
+            // 🔽 หาใน Master
             const masterItem = fcState.masterData.find(m => 
                 String(m.item_code || '').trim().toUpperCase() === rowItemCode
             );
@@ -467,10 +472,9 @@ async function loadUsagePivot() {
             let rolls = 0;
 
             if (!masterItem || !masterItem.std_weight_kg || Number(masterItem.std_weight_kg) <= 0) {
-                missingMasterSet.add(rowItemCode); // เก็บ Item code ที่หาไม่เจอ
+                missingMasterSet.add(rowItemCode); 
                 rolls = null; 
             } else {
-                // ✅ เจอแล้ว! เอาค่า KG มาหาร Std Weight
                 rolls = kgs / Number(masterItem.std_weight_kg);
             }
 
@@ -480,10 +484,19 @@ async function loadUsagePivot() {
             }
         });
 
-        if (missingMasterSet.size > 0) {
-            const list = Array.from(missingMasterSet).slice(0, 5).join(', ');
-            const more = missingMasterSet.size > 5 ? ' และอื่นๆ' : '';
-            showToast(`❌ ไม่พบ Item Code ใน Master: ${list}${more} กรุณาไป Up Master ที่หน้าตั้งค่าก่อน`, 'err', 8000);
+        // 🔽 แสดงแจ้งเตือนค้างไว้ที่ด้านล่าง (ในกล่องประวัติ)
+        if (missingMasterSet.size > 0 && historyList) {
+            const listHtml = Array.from(missingMasterSet).map(code => `<li style="margin-bottom:4px;">👉 <b>${code}</b></li>`).join('');
+            
+            historyList.innerHTML = `
+                <div class="msg err" style="margin-bottom: 16px; border-left: 4px solid #dc2626; background: #fee2e2; color: #991b1b; padding: 12px; border-radius: 4px;">
+                    <h4 style="margin: 0 0 8px 0;">❌ พบรายการที่ไม่มีใน Master Data (ไม่สามารถคำนวณได้)</h4>
+                    <p style="margin: 0 0 8px 0; font-size: 14px;">กรุณาไป Up Master ที่หน้า <b>"ตั้งค่า > Master Data"</b> สำหรับ Item Code เหล่านี้:</p>
+                    <ul style="margin: 0; padding-left: 20px; font-size: 14px; max-height: 150px; overflow-y: auto;">
+                        ${listHtml}
+                    </ul>
+                </div>
+            `;
         }
 
         const sortedWidths = Array.from(allWidths).sort((a, b) => a - b);
@@ -513,10 +526,6 @@ async function loadUsagePivot() {
         fcState.pivotWidths   = sortedWidths;
         fcState.pivotMonth    = month;
         fcState.pivotCustomer = selectedCustomers.length === 0 ? 'ALL' : selectedCustomers.join(',');
-
-        if (missingMasterSet.size === 0) {
-            showToast(`โหลด Pivot สำเร็จ (${Object.keys(pivotData).length} grade)`, 'ok');
-        }
 
     } catch (err) {
         console.error(err);
