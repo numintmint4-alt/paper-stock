@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK V10.1 — alert.js — V.13.4 (Default Date: ตามเงื่อนไข)
-//  Fix: ตั้งค่าเริ่มต้นอัตโนมัติ + ไม่ให้ Snapshot เขียนทับวันที่
+//  STOCK V10.1 — alert.js — V.13.5 (Default Date: ตามเงื่อนไข)
+//  Fix: setDate(..., false) ไม่ trigger onChange + ใช้ toISODate helper
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -172,7 +172,7 @@ function cleanOldAlertKeys() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  INIT — V.13.4 (Default Date ตามเงื่อนไข)
+//  INIT — V.13.5 (Default Date ตามเงื่อนไข · setDate false)
 // ═══════════════════════════════════════════════════════════════
 
 async function initAlertTab() {
@@ -182,10 +182,10 @@ async function initAlertTab() {
   const today = getTodayISO();
   const currentMonthStr = today.slice(0, 7); 
   
-  const yesterday = new Date(today);
+  const yesterday = new Date(today + 'T00:00:00');
   yesterday.setDate(yesterday.getDate() - 1);
   if (yesterday.getDay() === 0) yesterday.setDate(yesterday.getDate() - 1);
-  const stockDate = yesterday.toISOString().split('T')[0];
+  const stockDate = toISODate(yesterday);
 
   // 🔽 2. ใส่ค่าเริ่มต้นให้ช่อง Input 🔽
   const alertDateEl = $('alertDate');
@@ -197,19 +197,26 @@ async function initAlertTab() {
     alertDateEl.style.cursor = 'not-allowed';
   }
 
-  // 🔽 3. สั่ง Flatpickr อัปเดตค่าตามเงื่อนไข 🔽
-  if (window.flatpickrInstances['alertDate']) {
-    window.flatpickrInstances['alertDate'].setDate(today, true);
+  // 🔽 3. สั่ง Flatpickr อัปเดตค่า (setDate false = ไม่ trigger onChange) 🔽
+  if (window.flatpickrInstances && window.flatpickrInstances['alertDate']) {
+    window.flatpickrInstances['alertDate'].setDate(today, false);
   }
-  if (window.flatpickrInstances['alertStockDate']) {
-    window.flatpickrInstances['alertStockDate'].setDate(stockDate, true);
+  if (window.flatpickrInstances && window.flatpickrInstances['alertStockDate']) {
+    window.flatpickrInstances['alertStockDate'].setDate(stockDate, false);
   }
-  if (window.flatpickrInstances['alertReceiveDate']) {
-    window.flatpickrInstances['alertReceiveDate'].setDate(today, true);
+  if (window.flatpickrInstances && window.flatpickrInstances['alertReceiveDate']) {
+    window.flatpickrInstances['alertReceiveDate'].setDate(today, false);
   }
 
   const monthInput = $('alertSnapshotMonth');
   if (monthInput) monthInput.value = currentMonthStr;
+
+  // 🕵️ DEBUG — ลบได้ทีหลัง
+  console.log('[initAlertTab] today       =', today);
+  console.log('[initAlertTab] stockDate   =', stockDate);
+  console.log('[initAlertTab] alertDate   =', window.flatpickrInstances?.['alertDate']?.input?.value);
+  console.log('[initAlertTab] alertStock  =', window.flatpickrInstances?.['alertStockDate']?.input?.value);
+  console.log('[initAlertTab] alertRecv   =', window.flatpickrInstances?.['alertReceiveDate']?.input?.value);
 
   attachAlertDateListener();
 
@@ -239,8 +246,8 @@ async function initAlertTab() {
 function applyCalculatedDates(analyzedDate) {
   if (!analyzedDate) return;
   const stockDate = calcStockDate(analyzedDate);
-  if (flatpickrInstances['alertStockDate']) {
-    flatpickrInstances['alertStockDate'].setDate(stockDate, false);
+  if (window.flatpickrInstances && window.flatpickrInstances['alertStockDate']) {
+    window.flatpickrInstances['alertStockDate'].setDate(stockDate, false);
   }
 }
 
@@ -389,7 +396,14 @@ async function applyAlertSnapshot(snapshot) {
   try {
     if (snapshot.snapshot_month) $('alertSnapshotMonth').value = snapshot.snapshot_month;
     
-    // 🔽 ไม่มี setDate ของ alertStockDate และ alertReceiveDate ตรงนี้แล้ว 🔽
+    // 🔽 ไม่ setDate ของ alertStockDate และ alertReceiveDate ตรงนี้ (ตาม requirement) 🔽
+    // ช่อง Stock/Receive จะคงค่า default จาก initAlertTab (เมื่อวาน/วันนี้)
+
+    // 🕵️ DEBUG — ลบได้ทีหลัง
+    console.log('[applyAlertSnapshot] stock_date    =', snapshot.stock_date);
+    console.log('[applyAlertSnapshot] receive_date  =', snapshot.receive_date);
+    console.log('[applyAlertSnapshot] stockInput    =', window.flatpickrInstances?.['alertStockDate']?.input?.value);
+    console.log('[applyAlertSnapshot] receiveInput  =', window.flatpickrInstances?.['alertReceiveDate']?.input?.value);
 
     if (snapshot.receive_dates && Array.isArray(snapshot.receive_dates)) {
       alertReceiveDates = [...snapshot.receive_dates];
