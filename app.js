@@ -342,7 +342,7 @@ $('logoutBtn').onclick = async () => {
 };
 
 // ================= TABS =================
-const TAB_LIST = ['matrix','stock','receive','alert','purchase-order','data','settings', 'summary']; 
+const TAB_LIST = ['matrix','stock','receive','alert','purchase-order','data','settings','summary','forecast','usage-pivot'];
 
 document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
   btn.onclick = () => {
