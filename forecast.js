@@ -416,3 +416,85 @@ async function saveUsageSnapshot() {
         showToast(`บันทึก Snapshot สำเร็จ (${payloads.length} รายการ)`, 'ok');
     }
 }
+// ==========================================
+// ฟังก์ชันสำหรับ Import Excel ในหน้า Usage Pivot
+// ==========================================
+async function handleUsageImport(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            showToast('กำลังอ่านไฟล์ Excel...', 'info');
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(firstSheet);
+
+            if (rows.length === 0) {
+                return showToast('ไม่พบข้อมูลในไฟล์ Excel', 'warn');
+            }
+
+            const batchId = crypto.randomUUID();
+            const importData = rows.map(row => {
+                // ดึงข้อมูลจาก Column ใน Excel
+                const rawDate = row['prod_date'] || row['doc_date'] || row['Date']; 
+                const rawWidth = row['Size'] || row['size'] || row['Width'];
+                const rawKgs = row['kgs'] || row['used_kgs'] || row['Kgs'];
+                const rawGrade = row['grade'] || row['Grade'];
+                
+                // ใช้คอลัมน์ customer_code หรือชื่อลูกค้า
+                const customer = row['customer_code'] || row['Customer'] || row['customer_name'] || '';
+
+                const width = parseFloat(rawWidth) || 0;
+                const kgs = parseFloat(rawKgs) || 0;
+                const grade = typeof normalizeGrade === 'function' ? normalizeGrade(rawGrade || '') : String(rawGrade).toUpperCase();
+                
+                // หา item_code จาก masterData ที่โหลดไว้
+                const item = fcState.masterData.find(m => m.grade === grade && Number(m.size) === width);
+                
+                return {
+                    usage_date: typeof toISODate === 'function' ? toISODate(rawDate) : rawDate, 
+                    doc_date: typeof toISODate === 'function' ? toISODate(rawDate) : rawDate,
+                    grade: grade,                         
+                    width: width,                         
+                    used_kgs: kgs,                        
+                    kgs: kgs,
+                    roll_for_customer: customer,          
+                    item_code: item ? item.item_code : '', 
+                    is_valid: true,                       
+                    import_batch_id: batchId,             
+                    created_by: currentUser.id            
+                };
+            });
+
+            // กรองแถวที่ข้อมูลสำคัญไม่ครบออก
+            const validImportData = importData.filter(d => d.usage_date && d.grade && d.width > 0);
+
+            if (validImportData.length === 0) {
+                return showToast('ไม่พบข้อมูลที่ถูกต้อง (ตรวจสอบหัวคอลัมน์ prod_date, Size, grade)', 'warn');
+            }
+
+            showToast(`กำลังบันทึก ${validImportData.length} รายการ...`, 'info');
+
+            // บันทึกลง Database
+            const { error } = await supabase.from('usage_records_raw').insert(validImportData);
+            
+            if (error) {
+                console.error(error);
+                showToast('Import ล้มเหลว: ' + error.message, 'err');
+            } else {
+                showToast(`Import สำเร็จ ${validImportData.length} รายการ`, 'ok');
+                // รีเซ็ตช่องเลือกไฟล์
+                document.getElementById('pivot-file-upload').value = ''; 
+                // โหลด Pivot ใหม่ให้อัตโนมัติ
+                loadUsagePivot();
+            }
+        } catch (err) {
+            console.error(err);
+            showToast('เกิดข้อผิดพลาด: ' + err.message, 'err');
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
