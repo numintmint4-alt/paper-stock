@@ -334,10 +334,10 @@ async function initUsagePivotTab() {
     if (fcState.pivotCustomers.length > 0) return;   // โหลดแล้วไม่ต้องซ้ำ
 
     try {
-        const { data } = await supabase
-            .from('usage_records_raw')
-            .select('roll_for_customer')
-            .limit(5000);
+        // 🔽 ใช้ fetchAllRows ดึงข้อมูลทั้งหมดแบบไม่มีวันขาด
+        const data = await fetchAllRows(() =>
+            supabase.from('usage_records_raw').select('roll_for_customer')
+        );
 
         const unique = [...new Set((data || [])
             .map(d => (d.roll_for_customer || '').trim())
@@ -430,70 +430,74 @@ async function loadUsagePivot() {
     const firstDay = `${month}-01`;
     const lastDay  = new Date(y, mo, 0).toISOString().slice(0, 10);
 
-    let query = supabase
-        .from('usage_records_raw')
-        .select('grade, width, used_kgs, roll_for_customer')
-        .eq('is_valid', true)
-        .gte('usage_date', firstDay)
-        .lte('usage_date', lastDay);
+    try {
+        // 🔽 ใช้ fetchAllRows ดึงข้อมูลให้ครบ (แก้ปัญหา Size หาย)
+        const data = await fetchAllRows(() => {
+            let q = supabase
+                .from('usage_records_raw')
+                .select('grade, width, used_kgs, roll_for_customer')
+                .eq('is_valid', true)
+                .gte('usage_date', firstDay)
+                .lte('usage_date', lastDay);
 
-    if (selectedCustomers.length > 0) {
-        query = query.in('roll_for_customer', selectedCustomers);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-        console.error(error);
-        tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:red;">Error: ${escHtml(error.message)}</td></tr>`;
-        return showToast('Error loading pivot', 'err');
-    }
-
-    const pivotData = {};
-    const allWidths = new Set();
-
-    (data || []).forEach(row => {
-        allWidths.add(row.width);
-        if (!pivotData[row.grade]) pivotData[row.grade] = { total: 0 };
-        if (!pivotData[row.grade][row.width]) pivotData[row.grade][row.width] = 0;
-
-        const rolls = Number(row.used_kgs) / 500;
-        pivotData[row.grade][row.width] += rolls;
-        pivotData[row.grade].total     += rolls;
-    });
-
-    const sortedWidths = Array.from(allWidths).sort((a, b) => a - b);
-
-    // ===== Header =====
-    let headerHtml = '<tr><th>Grade</th>';
-    sortedWidths.forEach(w => headerHtml += `<th>${w}</th>`);
-    headerHtml += '<th>Grand Total</th></tr>';
-    thead.innerHTML = headerHtml;
-
-    // ===== Body =====
-    let bodyHtml = '';
-    if (Object.keys(pivotData).length === 0) {
-        bodyHtml = `<tr><td colspan="${sortedWidths.length + 2}" style="text-align:center;">ไม่มีข้อมูลในเดือนนี้</td></tr>`;
-    } else {
-        Object.keys(pivotData).sort().forEach(grade => {
-            const row = pivotData[grade];
-            bodyHtml += `<tr><td><strong>${escHtml(grade)}</strong></td>`;
-            sortedWidths.forEach(w => {
-                const val = row[w] || 0;
-                bodyHtml += `<td>${val > 0 ? val.toFixed(2) : ''}</td>`;
-            });
-            bodyHtml += `<td style="background:#e6f2ff;font-weight:bold;">${row.total.toFixed(2)}</td></tr>`;
+            // ถ้ามีการเลือก Dropdown ลูกค้า ให้กรอง
+            if (selectedCustomers.length > 0) {
+                q = q.in('roll_for_customer', selectedCustomers);
+            }
+            return q;
         });
+
+        const pivotData = {};
+        const allWidths = new Set();
+
+        (data || []).forEach(row => {
+            allWidths.add(row.width);
+            if (!pivotData[row.grade]) pivotData[row.grade] = { total: 0 };
+            if (!pivotData[row.grade][row.width]) pivotData[row.grade][row.width] = 0;
+
+            const rolls = Number(row.used_kgs) / 500;
+            pivotData[row.grade][row.width] += rolls;
+            pivotData[row.grade].total     += rolls;
+        });
+
+        const sortedWidths = Array.from(allWidths).sort((a, b) => a - b);
+
+        // ===== Header =====
+        let headerHtml = '<tr><th>Grade</th>';
+        sortedWidths.forEach(w => headerHtml += `<th>${w}</th>`);
+        headerHtml += '<th>Grand Total</th></tr>';
+        thead.innerHTML = headerHtml;
+
+        // ===== Body =====
+        let bodyHtml = '';
+        if (Object.keys(pivotData).length === 0) {
+            bodyHtml = `<tr><td colspan="${sortedWidths.length + 2}" style="text-align:center;">ไม่มีข้อมูลในเดือนนี้</td></tr>`;
+        } else {
+            Object.keys(pivotData).sort().forEach(grade => {
+                const row = pivotData[grade];
+                bodyHtml += `<tr><td><strong>${escHtml(grade)}</strong></td>`;
+                sortedWidths.forEach(w => {
+                    const val = row[w] || 0;
+                    bodyHtml += `<td>${val > 0 ? val.toFixed(2) : ''}</td>`;
+                });
+                bodyHtml += `<td style="background:#e6f2ff;font-weight:bold;">${row.total.toFixed(2)}</td></tr>`;
+            });
+        }
+        tbody.innerHTML = bodyHtml;
+
+        // ===== เก็บ state =====
+        fcState.pivotData     = pivotData;
+        fcState.pivotWidths   = sortedWidths;
+        fcState.pivotMonth    = month;
+        fcState.pivotCustomer = selectedCustomers.length === 0 ? 'ALL' : selectedCustomers.join(',');
+
+        showToast(`โหลด Pivot สำเร็จ (${Object.keys(pivotData).length} grade)`, 'ok');
+
+    } catch (err) {
+        console.error(err);
+        tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:red;">Error: ${escHtml(err.message)}</td></tr>`;
+        showToast('Error loading pivot', 'err');
     }
-    tbody.innerHTML = bodyHtml;
-
-    // ===== เก็บ state =====
-    fcState.pivotData     = pivotData;
-    fcState.pivotWidths   = sortedWidths;
-    fcState.pivotMonth    = month;
-    fcState.pivotCustomer = selectedCustomers.length === 0 ? 'ALL' : selectedCustomers.join(',');
-
-    showToast(`โหลด Pivot สำเร็จ (${Object.keys(pivotData).length} grade)`, 'ok');
 }
 
 async function saveUsageSnapshot() {
@@ -547,7 +551,7 @@ async function saveUsageSnapshot() {
 }
 
 // ==========================================
-// 3. Import Excel (Usage Pivot)
+// 3. Import Excel (Usage Pivot) — UPDATED
 // ==========================================
 async function handleUsageImport(event) {
     const file = event.target.files[0];
@@ -560,30 +564,84 @@ async function handleUsageImport(event) {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, { type: 'array' });
             const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-            const rows = XLSX.utils.sheet_to_json(firstSheet);
+
+            // อ่านข้อมูลจาก Excel
+            const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
 
             if (rows.length === 0) return showToast('ไม่พบข้อมูลในไฟล์ Excel', 'warn');
 
+            // ==========================================
+            // 🔍 ขั้นตอนที่ 1: ตรวจสอบเงื่อนไข sbjob_no (ห้ามเกิน 6 แถว)
+            // ==========================================
+            const sbjobCounts = {};
+            let missingJobNoCount = 0;
+
+            rows.forEach(row => {
+                // ดึงค่า sbjob_no (รองรับเผื่อชื่อคอลัมน์ต่างกันนิดหน่อย)
+                const jobNo = String(row['sbjob_no'] || row['SBJOB_NO'] || row['job_no'] || '').trim();
+
+                if (!jobNo) {
+                    missingJobNoCount++;
+                } else {
+                    sbjobCounts[jobNo] = (sbjobCounts[jobNo] || 0) + 1;
+                }
+            });
+
+            // หา Job ที่มีแถวเกิน 6
+            const invalidJobs = Object.keys(sbjobCounts).filter(jobNo => sbjobCounts[jobNo] > 6);
+
+            if (missingJobNoCount > 0) {
+                return showToast(`❌ ไฟล์มีปัญหา: พบ ${missingJobNoCount} แถวที่ไม่มี sbjob_no`, 'err', 5000);
+            }
+
+            if (invalidJobs.length > 0) {
+                const exampleJobs = invalidJobs.slice(0, 3).join(', ');
+                const moreText = invalidJobs.length > 3 ? ' และอื่นๆ' : '';
+                return showToast(`❌ บล็อกการ Import: พบ ${invalidJobs.length} sbjob_no ที่มีแถวเกิน 6 แถว (เช่น ${exampleJobs}${moreText}) กรุณาแก้ไฟล์ก่อน`, 'err', 6000);
+            }
+
+            // ถ้าผ่านเงื่อนไขข้อ 1 แสดงว่าข้อมูลปกติ
+            const uniqueJobsCount = Object.keys(sbjobCounts).length;
+            showToast(`✅ ไฟล์ปกติ: พบ ${rows.length} แถว (มี ${uniqueJobsCount} sbjob_no) กำลังเตรียมบันทึก...`, 'info', 4000);
+
+            // ==========================================
+            // 🔄 ขั้นตอนที่ 2: แปลงข้อมูลและเตรียมลบของเก่า (แบบ A)
+            // ==========================================
             const batchId = crypto.randomUUID();
-            const importData = rows.map(row => {
+            const importData = [];
+            const monthsToDelete = new Set(); // เก็บเดือนเพื่อไปลบข้อมูลเก่าทิ้ง
+
+            rows.forEach(row => {
+                // Map คอลัมน์จาก Excel
                 const rawDate  = row['prod_date'] || row['doc_date'] || row['Date'] || row['usage_date'];
                 const rawWidth = row['Size'] || row['size'] || row['Width'] || row['width'];
-                const rawKgs   = row['kgs'] || row['used_kgs'] || row['Kgs'];
+                const rawKgs   = row['used_kgs'] || row['kgs'] || row['Kgs'];
                 const rawGrade = row['grade'] || row['Grade'];
                 const customer = row['customer_code'] || row['Customer'] || row['customer_name'] || row['roll_for_customer'] || '';
+                const jobNo    = String(row['sbjob_no'] || row['SBJOB_NO'] || row['job_no'] || '').trim();
 
                 const width = parseFloat(rawWidth) || 0;
                 const kgs   = parseFloat(rawKgs) || 0;
-                const grade = typeof normalizeGrade === 'function'
-                    ? normalizeGrade(rawGrade || '')
-                    : String(rawGrade || '').toUpperCase();
 
-                const item = fcState.masterData.find(m =>
-                    m.grade === grade && Number(m.size) === width);
+                // แปลง Grade ให้เป็นมาตรฐาน
+                const grade = typeof normalizeGrade === 'function' ? normalizeGrade(rawGrade || '') : String(rawGrade || '').toUpperCase();
 
-                return {
-                    usage_date: typeof toISODate === 'function' ? toISODate(rawDate) : rawDate,
-                    doc_date:   typeof toISODate === 'function' ? toISODate(rawDate) : rawDate,
+                // แปลงวันที่เป็น ISO
+                const dateISO = typeof toISODate === 'function' ? toISODate(rawDate) : rawDate;
+
+                // เก็บเดือน (YYYY-MM) ไว้สำหรับลบข้อมูลเก่า
+                if (dateISO && dateISO.length >= 7) {
+                    monthsToDelete.add(dateISO.slice(0, 7));
+                }
+
+                // หา item_code จาก Master
+                const item = fcState.masterData.find(m => m.grade === grade && Number(m.size) === width);
+
+                // ⚠️ หมายเหตุ: ตรงนี้ผมใส่ sbjob_no เข้าไปด้วย (ถ้าตาราง DB ยังไม่มีคอลัมน์นี้ ต้องเพิ่มก่อนนะครับ)
+                importData.push({
+                    usage_date: dateISO,
+                    doc_date:   dateISO,
+                    sbjob_no:   jobNo,       // 🔽 บันทึก sbjob_no ลง DB ด้วย
                     grade:      grade,
                     width:      width,
                     used_kgs:   kgs,
@@ -593,31 +651,50 @@ async function handleUsageImport(event) {
                     is_valid:   true,
                     import_batch_id: batchId,
                     created_by: currentUser?.id || null
-                };
+                });
             });
 
             const validData = importData.filter(d => d.usage_date && d.grade && d.width > 0);
-            if (validData.length === 0) {
-                return showToast('ไม่พบข้อมูลที่ถูกต้อง (ตรวจหัวคอลัมน์)', 'warn');
+            if (validData.length === 0) return showToast('ไม่พบข้อมูลที่ถูกต้อง', 'warn');
+
+            // 🔽 ลบข้อมูลเก่าของเดือนนั้นๆ ทิ้งก่อน (เขียนทับ)
+            if (monthsToDelete.size > 0) {
+                showToast('กำลังล้างข้อมูลเก่าของเดือนในไฟล์นี้...', 'info');
+                for (const m of monthsToDelete) {
+                    const [y, mo] = m.split('-').map(Number);
+                    // เรียกใช้ RPC ที่มีอยู่ใน app.js
+                    await supabase.rpc('delete_usage_by_month', { p_year: y, p_month: mo });
+                }
             }
 
+            // ==========================================
+            // 💾 ขั้นตอนที่ 3: บันทึกข้อมูลใหม่
+            // ==========================================
             showToast(`กำลังบันทึก ${validData.length} รายการ...`, 'info');
 
-            // 🔽 insert เป็นชุด 500 แถวกัน timeout
             const CHUNK = 500;
             let ok = 0, fail = 0;
             for (let i = 0; i < validData.length; i += CHUNK) {
                 const chunk = validData.slice(i, i + CHUNK);
                 const { error } = await supabase.from('usage_records_raw').insert(chunk);
-                if (error) { fail += chunk.length; console.error(error); }
-                else       { ok   += chunk.length; }
+                if (error) {
+                    fail += chunk.length;
+                    console.error('Insert error:', error);
+                } else {
+                    ok += chunk.length;
+                }
             }
 
-            if (fail > 0) showToast(`Import สำเร็จ ${ok} / ล้มเหลว ${fail}`, 'err');
-            else         showToast(`Import สำเร็จ ${ok} รายการ`, 'ok');
+            if (fail > 0) {
+                showToast(`Import สำเร็จ ${ok} / ล้มเหลว ${fail}`, 'err', 5000);
+            } else {
+                showToast(`Import สำเร็จ ${ok} รายการ`, 'ok');
+            }
 
+            // เคลียร์ค่า input file และโหลด Pivot ใหม่
             document.getElementById('pivot-file-upload').value = '';
             loadUsagePivot();
+
         } catch (err) {
             console.error(err);
             showToast('เกิดข้อผิดพลาด: ' + err.message, 'err');
