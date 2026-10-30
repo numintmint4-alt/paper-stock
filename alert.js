@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 //  STOCK V10.1 — alert.js — V.13.5 (Default Date: ตามเงื่อนไข)
 //  Fix: setDate(..., false) ไม่ trigger onChange + ใช้ toISODate helper
-//  Fix: Alert History — ไม่เซ็ตวันที่อัตโนมัติ ให้ผู้ใช้เลือกเอง
+//  Fix: Alert History — Default เป็นวันปัจจุบัน + แจ้งเตือนชัดเจนเมื่อไม่พบข้อมูล
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -2764,7 +2764,17 @@ function showAlertHistoryCard() {
   const card = $('alertHistoryCard');
   if (card) card.style.display = '';
   
-  // 🔽 ไม่ต้องเซ็ตวันที่ตรงนี้ ปล่อยให้ว่างไว้เพื่อให้ผู้ใช้เลือกเอง 🔽
+  // 🔽 ใส่วันที่ปัจจุบันเป็น Default กลับคืนไป 🔽
+  const dateEl = $('alertHistoryDate');
+  if (dateEl && !dateEl.value) {
+    const today = toISODate(new Date());
+    dateEl.value = today;
+    
+    // อัปเดต Flatpickr ให้ตรงกับค่าที่ใส่ไป
+    if (window.flatpickrInstances && window.flatpickrInstances['alertHistoryDate']) {
+      window.flatpickrInstances['alertHistoryDate'].setDate(today, false);
+    }
+  }
 }
 
 function setAlertHistoryMode(mode) {
@@ -2777,7 +2787,6 @@ function setAlertHistoryMode(mode) {
 }
 
 async function loadAlertHistory() {
-  // 🔽 ดึงค่าจาก Input โดยตรง 🔽
   const date = getISODateFromInput('alertHistoryDate');
   
   if (!date) { 
@@ -2792,7 +2801,7 @@ async function loadAlertHistory() {
     const snapshot = await loadAlertSnapshot(date);
 
     if (!snapshot) {
-      body.innerHTML = '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่พบข้อมูลของวันนี้ 🎉</p>';
+      body.innerHTML = `<p style="text-align:center;color:#94a3b8;padding:30px">ไม่พบข้อมูลของวันที่ ${fmtDateThai(date)} 🎉<br><small>ลองตรวจสอบว่าวันนี้มีการบันทึก Snapshot ไว้หรือไม่</small></p>`;
       alertHistoryData = null;
       alertHistoryMeta = null;
       return;
