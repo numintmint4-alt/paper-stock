@@ -445,7 +445,99 @@
         <div id="poListBody"></div>
       </div>
     </div>
+    <!-- ==================== หน้า Forecast ==================== -->
+    <div id="tab-forecast" class="hidden">
+        <div class="card">
+            <div class="report-title">Production Forecast (ประมาณการสั่งผลิต)</div>
+            
+            <div class="filters">
+                <label>Stock Date:
+                    <input type="text" id="fc-stock-date" name="no_autofill_fc" autocomplete="new-password" readonly>
+                </label>
+                <label>Forecast Month:
+                    <input type="month" id="fc-month" class="form-control">
+                </label>
+                <label>M1 (Month 1):
+                    <input type="month" id="fc-m1" class="form-control">
+                </label>
+                <label>M2 (Month 2):
+                    <input type="month" id="fc-m2" class="form-control">
+                </label>
+                <label>M3 (Month 3):
+                    <input type="month" id="fc-m3" class="form-control">
+                </label>
+                <label>Prev Actual Month:
+                    <input type="month" id="fc-prev-month" class="form-control">
+                </label>
+            </div>
 
+            <!-- Tabs ย่อย: CA, KA, KI, KK, KW, FSC -->
+            <div class="sub-tabs" id="fc-grade-tabs" style="margin-bottom: 15px; display: flex; gap: 10px;">
+                <!-- สร้างด้วย JS -->
+            </div>
+
+            <!-- ตาราง Matrix -->
+            <div class="table-container" style="overflow-x: auto;">
+                <table class="data-table" id="forecast-matrix">
+                    <thead>
+                        <tr>
+                            <th>Grade</th>
+                            <th>Width</th>
+                            <th>M1</th>
+                            <th>M2</th>
+                            <th>M3</th>
+                            <th>Avg 3 Mths</th>
+                            <th>Forecast (NEN)</th>
+                            <th>Forecast (NEA)</th>
+                            <th>Forecast (ไทยฟู้ด)</th>
+                            <th>Forecast (KTP)</th>
+                            <th>ใช้จริง (Actual)</th>
+                            <th>ใช้จริง (ก่อนหน้า)</th>
+                            <th>Stock (ณ วันที่เลือก)</th>
+                            <th>ยอดจองคงเหลือ</th>
+                            <th>Roll S&D คงเหลือ</th>
+                            <th>คาดการณ์ว่าจะต้องใช้</th>
+                            <th>Stock Level</th>
+                            <th>Stock Level 50%</th>
+                            <th>ยอดที่ต้องสั่งซื้อ (คำนวณ)</th>
+                            <th>ยอดที่ต้องสั่งซื้อ (ROUNDUP)</th>
+                            <th>ปรับเพิ่ม/ลด</th>
+                            <th>หมายเหตุ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="forecast-tbody">
+                        <!-- ข้อมูลจะถูก Render ที่นี่ -->
+                    </tbody>
+                </table>
+            </div>
+            <button class="primary" onclick="saveForecastData()" style="margin-top: 15px;">Save Forecast</button>
+        </div>
+    </div>
+
+    <!-- ==================== หน้า Usage Pivot ==================== -->
+    <div id="tab-usage-pivot" class="hidden">
+        <div class="card">
+            <div class="report-title">Usage Pivot & Import</div>
+            
+            <div class="filters">
+                <label>Filter Month:
+                    <input type="month" id="pivot-month" class="form-control">
+                </label>
+                <label>Upload Excel:
+                    <input type="file" id="pivot-file-upload" accept=".xlsx, .xls" onchange="handleUsageImport(event)">
+                </label>
+                <button class="primary" onclick="loadUsagePivot()">Load Pivot</button>
+            </div>
+
+            <!-- ตาราง Pivot -->
+            <div class="table-container" style="overflow-x: auto;">
+                <table class="data-table" id="pivot-table">
+                    <thead id="pivot-thead"></thead>
+                    <tbody id="pivot-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
     <!-- ========== TAB 5.6: SUMMARY ========== -->
     <div id="tab-summary" class="hidden">
       <div class="card">
@@ -953,6 +1045,8 @@
 <script src="summary.js"></script>
 <script src="alert.js"></script>
 <script src="purchase-order.js"></script>
+<script src="forecast.js"></script>
+<script src="usage-pivot.js"></script>
 <script src="price-master.js"></script>
 
 <script>
