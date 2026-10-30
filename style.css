@@ -925,3 +925,59 @@ table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
 }
 .sub-tab:hover { background: var(--surface-soft); border-color: var(--primary); color: var(--primary); }
 .sub-tab.active { background: var(--primary); color: #fff; border-color: var(--primary); box-shadow: 0 2px 6px rgba(59,130,246,.25); }
+/* ================= FIX FORECAST & PIVOT STYLES ================= */
+/* ตกแต่งตาราง Pivot ให้เส้นบาง สวยงาม */
+#pivot-table th, #pivot-table td {
+    border: 1px solid var(--border);
+    padding: 6px 10px;
+    font-size: 12px;
+    text-align: center;
+}
+#pivot-table thead th {
+    background: var(--primary);
+    color: white;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+#pivot-table tbody td:first-child {
+    font-weight: 700;
+    background: var(--surface-soft);
+    text-align: left;
+    position: sticky;
+    left: 0;
+}
+#pivot-table tbody tr:hover td {
+    background-color: var(--primary-soft) !important;
+}
+
+/* ประวัติ Snapshot */
+.snapshot-history-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: #fff;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
+    margin-bottom: 8px;
+    box-shadow: var(--shadow-sm);
+}
+.snapshot-history-card:hover {
+    border-color: var(--primary);
+}
+.snapshot-info { font-size: 13px; }
+.snapshot-info b { color: var(--primary-dark); }
+
+/* ปุ่ม Import โทนเดียวกับหน้า Stock */
+.btn-import-stock {
+    background: #fff;
+    border: 1px solid var(--border-strong);
+    color: var(--text);
+    font-weight: 600;
+}
+.btn-import-stock:hover {
+    background: var(--surface-soft);
+    border-color: var(--primary);
+    color: var(--primary);
+}
