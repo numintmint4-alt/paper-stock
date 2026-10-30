@@ -514,7 +514,7 @@
         </div>
     </div>
 
-      <!-- ==================== หน้า Usage Pivot ==================== -->
+         <!-- ==================== หน้า Usage Pivot ==================== -->
     <div id="tab-usage-pivot" class="hidden">
       <div class="card">
         <div class="report-head">
@@ -528,34 +528,45 @@
             <input type="month" id="pivot-month" class="form-control">
           </label>
           
-          <label>👤 ลูกค้า:
-            <select id="pivot-customer" class="form-control">
-              <option value="ALL">ทั้งหมด (ทุกคน)</option>
-              <!-- รายชื่อลูกค้าจะถูกโหลดด้วย JS -->
-            </select>
+          <label class="grade-filter-wrap">
+            👤 ลูกค้า
+            <div class="grade-filter-box" id="pivotCustomerFilterBox">
+              <button type="button" class="grade-filter-btn" id="pivotCustomerFilterBtn">
+                <span id="pivotCustomerFilterLabel">ทั้งหมด</span>
+                <span class="arrow">▼</span>
+              </button>
+              <div class="grade-dropdown hidden" id="pivotCustomerDropdown">
+                <div class="grade-actions">
+                  <button type="button" onclick="selectAllPivotCustomers()">✓ เลือกทั้งหมด</button>
+                  <button type="button" onclick="clearAllPivotCustomers()">✗ ล้างทั้งหมด</button>
+                </div>
+                <div class="grade-list" id="pivotCustomerList"></div>
+              </div>
+            </div>
           </label>
 
-          <label>📥 Upload Excel:
-            <input type="file" id="pivot-file-upload" accept=".xlsx, .xls" onchange="handleUsageImport(event)">
-          </label>
+          <button class="btn-import-stock" onclick="document.getElementById('pivot-file-upload').click()">📥 Import Excel</button>
+          <input type="file" id="pivot-file-upload" accept=".xlsx, .xls" class="hidden" onchange="handleUsageImport(event)">
           
-          <button class="primary" onclick="loadUsagePivot()">🔍 Load Pivot</button>
+          <button class="primary" onclick="loadUsagePivot()">🔍 โหลดข้อมูล Pivot</button>
           
           <button class="primary" onclick="saveUsageSnapshot()" style="background:var(--green); border-color:var(--green);">
             💾 บันทึก Snapshot
           </button>
         </div>
 
-        <div id="pivotBody" class="report-wrap">
-          <!-- ตาราง Pivot จะแสดงที่นี่ -->
+        <div id="pivotBody" class="report-wrap" style="max-height: 50vh;">
           <table class="data-table" id="pivot-table">
               <thead id="pivot-thead"></thead>
               <tbody id="pivot-tbody"></tbody>
           </table>
         </div>
+
+        <!-- ส่วนแสดงประวัติ Snapshot -->
+        <h3 style="margin: 20px 0 10px; font-size: 16px; border-bottom: 2px solid var(--primary); padding-bottom: 8px;">📋 ประวัติการบันทึก Snapshot ล่าสุด</h3>
+        <div id="snapshot-history-list" style="max-height: 300px; overflow-y: auto;"></div>
       </div>
     </div>
-    
     <!-- ========== TAB 5.6: SUMMARY ========== -->
     <div id="tab-summary" class="hidden">
       <div class="card">
