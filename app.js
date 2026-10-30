@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK ม้วนกระดาษ V6 — app.js (Core) — V.13.4 (ISO Date + No Autofill)
+//  STOCK ม้วนกระดาษ V6 — app.js (Core) — V.13.5 (ISO Date + No Autofill)
 // ═══════════════════════════════════════════════════════════════
 const SUPABASE_URL      = 'https://gwwgycbqzdjlijsuxahx.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_rMoUE6tUsQZHnJu2ULDxFg_4NAiw6wg';
@@ -1215,7 +1215,7 @@ async function delUser(id, username) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  INIT  — V.13.4: dateFormat = "Y-m-d" (ISO) + No Autofill
+//  INIT  — V.13.5: ปิด Autofill แบบเด็ดขาด + dateFormat = "Y-m-d"
 // ═══════════════════════════════════════════════════════════════
 
 (function init() {
@@ -1237,6 +1237,8 @@ async function delUser(id, username) {
     'receiveDate',
     'summaryDate',
     'stockImportDate',
+    'dtFrom',
+    'dtTo',
     'exportPoDateFrom',
     'exportPoDateTo',
     'firstReceiveDateInput'
@@ -1245,26 +1247,25 @@ async function delUser(id, username) {
   dateInputIds.forEach(id => {
     const el = document.getElementById(id);
     if (el) {
-      // 1. เปลี่ยน type เป็น text และปิด Autofill
+      // 🔽 1. เปลี่ยน type เป็น text และปิด Autofill แบบเด็ดขาด 🔽
       el.setAttribute('type', 'text');
       el.setAttribute('placeholder', 'YYYY-MM-DD');
-      el.setAttribute('autocomplete', 'new-password');
+      el.setAttribute('autocomplete', 'new-password'); // ทริคหลอก Browser
       el.setAttribute('aria-autocomplete', 'none');
-      el.setAttribute('readonly', true);
+      el.setAttribute('readonly', true); // ป้องกันการพิมพ์เอง
 
-      // 2. ล้างค่าเก่าที่อาจค้างอยู่
+      // 🔽 2. ล้างค่าที่ค้างอยู่ในช่องทิ้งก่อนสร้าง Flatpickr 🔽
       el.value = '';
 
-      // 3. สร้าง Flatpickr — ใช้ ISO (YYYY-MM-DD) ตามที่ต้องการ
+      // 🔽 3. สร้าง Flatpickr 🔽
       flatpickrInstances[id] = flatpickr(el, {
         locale: "th",
-        dateFormat: "Y-m-d",   // 🔽 เปลี่ยนจาก "d/m/Y" เป็น "Y-m-d"
-        allowInput: false,
-        disableMobile: true,
-        // ไม่ใส่ defaultDate → ช่องว่าง
+        dateFormat: "Y-m-d",   // 🔽 รูปแบบ ค.ศ. (ISO) ตามที่คุณต้องการ 🔽
+        allowInput: false,     // ห้ามพิมพ์เอง ให้คลิกเลือกจากปฏิทินอย่างเดียว
+        disableMobile: true
       });
 
-      // 4. เอา readonly ออกหลัง Flatpickr ผูก event เสร็จ
+      // 🔽 4. เอา readonly ออกหลังจาก Flatpickr สร้างเสร็จ (เพื่อให้คลิกเปิดปฏิทินได้) 🔽
       setTimeout(() => {
         if (el) el.removeAttribute('readonly');
       }, 100);
