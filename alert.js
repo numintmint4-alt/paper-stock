@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 //  STOCK V10.1 — alert.js — V.13.5 (Default Date: ตามเงื่อนไข)
 //  Fix: setDate(..., false) ไม่ trigger onChange + ใช้ toISODate helper
+//  Fix: Alert History — ไม่เซ็ตวันที่อัตโนมัติ ให้ผู้ใช้เลือกเอง
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -2763,10 +2764,7 @@ function showAlertHistoryCard() {
   const card = $('alertHistoryCard');
   if (card) card.style.display = '';
   
-  const dateEl = $('alertHistoryDate');
-  if (dateEl && !dateEl.value) {
-    dateEl.value = toISODate(new Date());
-  }
+  // 🔽 ไม่ต้องเซ็ตวันที่ตรงนี้ ปล่อยให้ว่างไว้เพื่อให้ผู้ใช้เลือกเอง 🔽
 }
 
 function setAlertHistoryMode(mode) {
@@ -2779,13 +2777,13 @@ function setAlertHistoryMode(mode) {
 }
 
 async function loadAlertHistory() {
-  const dateEl = $('alertHistoryDate');
-  if (dateEl && !dateEl.value) {
-    dateEl.value = toISODate(new Date());
-  }
-
+  // 🔽 ดึงค่าจาก Input โดยตรง 🔽
   const date = getISODateFromInput('alertHistoryDate');
-  if (!date) { alert('กรุณาเลือกวันที่'); return; }
+  
+  if (!date) { 
+    alert('กรุณาเลือกวันที่ก่อนกดปุ่ม "ดู"'); 
+    return; 
+  }
 
   const body = $('alertHistoryBody');
   if (body) body.innerHTML = '<p style="text-align:center;color:#94a3b8;padding:30px">กำลังโหลด...</p>';
