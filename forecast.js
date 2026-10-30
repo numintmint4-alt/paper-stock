@@ -446,53 +446,53 @@ async function loadUsagePivot() {
 
         const pivotData = {};
         const allWidths = new Set();
-        const missingMasterSet = new Set(); // 🔽 เก็บรายการที่ไม่มีใน Master เพื่อแจ้งเตือน
+        const missingMasterSet = new Set();
 
         (data || []).forEach(row => {
             allWidths.add(row.width);
             if (!pivotData[row.grade]) pivotData[row.grade] = { total: 0 };
             if (!pivotData[row.grade][row.width]) pivotData[row.grade][row.width] = 0;
 
-            // 🔽 ค้นหาค่า Std Weight จาก Master Data
-            const masterItem = fcState.masterData.find(m =>
-                m.grade === row.grade && Number(m.size) === Number(row.width)
-            );
+            // 🔽 1. ประกอบร่าง Item Code จากข้อมูลที่ Import (เช่น KA125 + "-" + 80)
+            const rowGrade = String(row.grade || '').trim().toUpperCase();
+            const rowSize  = Number(row.width);
+            const rowItemCode = `${rowGrade}-${rowSize}`;
 
+            // 🔽 2. ค้นหาใน Master Data โดยใช้ item_code ในการจับคู่
+            const masterItem = fcState.masterData.find(m => 
+                String(m.item_code || '').trim().toUpperCase() === rowItemCode
+            );
+            
             const kgs = Number(row.used_kgs);
             let rolls = 0;
 
             if (!masterItem || !masterItem.std_weight_kg || Number(masterItem.std_weight_kg) <= 0) {
-                // ❌ ถ้าไม่มีตัวหาร หรือตัวหาร <= 0 ให้แจ้งเตือน
-                missingMasterSet.add(`${row.grade} Size ${row.width}`);
-                rolls = null; // 🔽 ปล่อยเป็น null ไม่ต้องคำนวณ ห้ามใช้ 500 เด็ดขาด
+                missingMasterSet.add(rowItemCode); // เก็บ Item code ที่หาไม่เจอ
+                rolls = null; 
             } else {
-                // ✅ ถ้ามีตัวหาร ให้คำนวณตามปกติ
+                // ✅ เจอแล้ว! เอาค่า KG มาหาร Std Weight
                 rolls = kgs / Number(masterItem.std_weight_kg);
             }
 
-            // 🔽 ถ้ามีตัวหาร (rolls ไม่เป็น null) ถึงจะเอาไปบวกในตาราง
             if (rolls !== null) {
                 pivotData[row.grade][row.width] += rolls;
                 pivotData[row.grade].total     += rolls;
             }
         });
 
-        // 🔽 แจ้งเตือนถ้าเจอ Grade/Size ที่ไม่มีใน Master
         if (missingMasterSet.size > 0) {
             const list = Array.from(missingMasterSet).slice(0, 5).join(', ');
             const more = missingMasterSet.size > 5 ? ' และอื่นๆ' : '';
-            showToast(`❌ ไม่พบตัวหาร (Std Weight) ใน Master: ${list}${more} กรุณาไป Up Master ที่หน้าตั้งค่าก่อน`, 'err', 8000);
+            showToast(`❌ ไม่พบ Item Code ใน Master: ${list}${more} กรุณาไป Up Master ที่หน้าตั้งค่าก่อน`, 'err', 8000);
         }
 
         const sortedWidths = Array.from(allWidths).sort((a, b) => a - b);
 
-        // ===== Header =====
         let headerHtml = '<tr><th>Grade</th>';
         sortedWidths.forEach(w => headerHtml += `<th>${w}</th>`);
         headerHtml += '<th>Grand Total</th></tr>';
         thead.innerHTML = headerHtml;
 
-        // ===== Body =====
         let bodyHtml = '';
         if (Object.keys(pivotData).length === 0) {
             bodyHtml = `<tr><td colspan="${sortedWidths.length + 2}" style="text-align:center;">ไม่มีข้อมูลในเดือนนี้</td></tr>`;
@@ -502,7 +502,6 @@ async function loadUsagePivot() {
                 bodyHtml += `<tr><td><strong>${escHtml(grade)}</strong></td>`;
                 sortedWidths.forEach(w => {
                     const val = row[w] || 0;
-                    // 🔽 ถ้ายอดเป็น 0 ให้โชว์ช่องว่าง (หรือคุณจะโชว์ 0.00 ก็ได้ครับ)
                     bodyHtml += `<td>${val > 0 ? val.toFixed(2) : ''}</td>`;
                 });
                 bodyHtml += `<td style="background:#e6f2ff;font-weight:bold;">${row.total > 0 ? row.total.toFixed(2) : '0.00'}</td></tr>`;
@@ -510,7 +509,6 @@ async function loadUsagePivot() {
         }
         tbody.innerHTML = bodyHtml;
 
-        // ===== เก็บ state =====
         fcState.pivotData     = pivotData;
         fcState.pivotWidths   = sortedWidths;
         fcState.pivotMonth    = month;
