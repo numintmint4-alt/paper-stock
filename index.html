@@ -190,7 +190,7 @@
 
         <div class="filters no-print">
           <label>📅 วันที่ Stock
-            <input type="text" id="stockDate" autocomplete="off">
+            <input type="text" id="stockDate" name="no_autofill_stock" autocomplete="new-password" readonly>
           </label>
 
           <label class="grade-filter-wrap">
@@ -286,7 +286,7 @@
 
         <div class="filters no-print" id="receiveFilterBox">
           <label>📅 วันที่รับเข้า
-            <input type="text" id="receiveDate" autocomplete="off">
+            <input type="text" id="receiveDate" name="no_autofill_receive" autocomplete="new-password" readonly>
           </label>
 
           <label class="grade-filter-wrap">
@@ -365,15 +365,15 @@
 
         <div class="filters no-print">
           <label>📅 วันที่วิเคราะห์
-            <input type="text" id="alertDate" autocomplete="off" onchange="onAlertDateChange()">
+            <input type="text" id="alertDate" name="no_autofill_alert" autocomplete="new-password" readonly onchange="onAlertDateChange()">
           </label>
 
           <label>📅 Stock วันที่
-            <input type="text" id="alertStockDate" autocomplete="off">
+            <input type="text" id="alertStockDate" name="no_autofill_alert_stock" autocomplete="new-password" readonly>
           </label>
 
           <label>📅 Receive วันที่
-            <input type="text" id="alertReceiveDate" autocomplete="off">
+            <input type="text" id="alertReceiveDate" name="no_autofill_alert_receive" autocomplete="new-password" readonly>
           </label>
 
           <label>📅 Stock Level เดือน
@@ -403,7 +403,7 @@
             <h3>📜 Alert History (ย้อนหลัง)</h3>
             <div class="alert-history-controls">
               <label>📅 วันที่:</label>
-              <input type="text" id="alertHistoryDate" autocomplete="off">
+              <input type="text" id="alertHistoryDate" name="no_autofill_alert_hist" autocomplete="new-password" readonly>
               <div class="alert-history-toggle" id="alertHistoryToggle">
                 <button data-mode="matrix" onclick="setAlertHistoryMode('matrix')" class="active">📊 Matrix</button>
                 <button data-mode="flat" onclick="setAlertHistoryMode('flat')">📋 รายการ</button>
@@ -456,7 +456,7 @@
 
         <div class="filters no-print" id="summaryFilterBox">
           <label>📅 วันที่รับเข้า
-            <input type="text" id="summaryDate" autocomplete="off">
+            <input type="text" id="summaryDate" name="no_autofill_summary" autocomplete="new-password" readonly>
           </label>
 
           <label class="grade-filter-wrap">
@@ -516,8 +516,8 @@
         <h2>Data — ทุกคอลัมน์จาก Excel</h2>
         <p class="hint">แสดงข้อมูลดิบทั้งหมดจากตาราง <b>usage_records_raw</b> · แถวสีแดง = แถวที่ไม่ผ่านการตรวจสอบ</p>
         <div class="filters">
-          <label>จาก <input type="text" id="dtFrom" autocomplete="off"></label>
-          <label>ถึง <input type="text" id="dtTo" autocomplete="off"></label>
+          <label>จาก <input type="text" id="dtFrom" name="no_autofill_dt_from" autocomplete="new-password" readonly></label>
+          <label>ถึง <input type="text" id="dtTo" name="no_autofill_dt_to" autocomplete="new-password" readonly></label>
           <label>สถานะ
             <select id="dtValid">
               <option value="">ทั้งหมด</option>
@@ -695,7 +695,7 @@
     <div id="stockImportError"></div>
     <div class="form-grid" style="grid-template-columns:1fr">
       <label>วันที่ Stock คงเหลือ
-        <input type="text" id="stockImportDate" autocomplete="off">
+        <input type="text" id="stockImportDate" name="no_autofill_stock_import" autocomplete="new-password" readonly>
       </label>
     </div>
     <div class="hint">ค่าเริ่มต้น = เมื่อวาน (Stock คงเหลือจากการใช้งานเมื่อวาน)</div>
