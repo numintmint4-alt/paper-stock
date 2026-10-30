@@ -421,14 +421,10 @@ async function loadUsagePivot() {
     const selectedCustomers = getSelectedPivotCustomers();
     const tbody = document.getElementById('pivot-tbody');
     const thead = document.getElementById('pivot-thead');
-    const historyList = document.getElementById('snapshot-history-list'); // 🔽 อ้างอิงกล่องประวัติด้านล่าง
     
     if (!tbody || !thead) return;
 
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;">กำลังโหลด...</td></tr>';
-    
-    // 🔽 ล้างข้อความแจ้งเตือนเก่าในกล่องประวัติก่อนเริ่มโหลดใหม่
-    if (historyList) historyList.innerHTML = ''; 
 
     const [y, mo] = month.split('-').map(Number);
     const firstDay = `${month}-01`;
@@ -458,15 +454,16 @@ async function loadUsagePivot() {
             if (!pivotData[row.grade]) pivotData[row.grade] = { total: 0 };
             if (!pivotData[row.grade][row.width]) pivotData[row.grade][row.width] = 0;
 
-            // 🔽 ประกอบ Item Code
+            // 🔽 1. สร้าง Item Code จากข้อมูลที่ Import แล้วลบช่องว่างทิ้งให้หมด
             const rowGrade = String(row.grade || '').trim().toUpperCase();
             const rowSize  = Number(row.width);
-            const rowItemCode = `${rowGrade}-${rowSize}`;
+            const rowItemCode = `${rowGrade}-${rowSize}`.replace(/\s+/g, ''); // ลบช่องว่างทั้งหมด
 
-            // 🔽 หาใน Master
-            const masterItem = fcState.masterData.find(m => 
-                String(m.item_code || '').trim().toUpperCase() === rowItemCode
-            );
+            // 🔽 2. ค้นหาใน Master Data แบบลบช่องว่างเช่นกัน
+            const masterItem = fcState.masterData.find(m => {
+                const masterItemCode = String(m.item_code || '').trim().toUpperCase().replace(/\s+/g, '');
+                return masterItemCode === rowItemCode;
+            });
             
             const kgs = Number(row.used_kgs);
             let rolls = 0;
@@ -484,19 +481,28 @@ async function loadUsagePivot() {
             }
         });
 
-        // 🔽 แสดงแจ้งเตือนค้างไว้ที่ด้านล่าง (ในกล่องประวัติ)
-        if (missingMasterSet.size > 0 && historyList) {
-            const listHtml = Array.from(missingMasterSet).map(code => `<li style="margin-bottom:4px;">👉 <b>${code}</b></li>`).join('');
-            
-            historyList.innerHTML = `
-                <div class="msg err" style="margin-bottom: 16px; border-left: 4px solid #dc2626; background: #fee2e2; color: #991b1b; padding: 12px; border-radius: 4px;">
-                    <h4 style="margin: 0 0 8px 0;">❌ พบรายการที่ไม่มีใน Master Data (ไม่สามารถคำนวณได้)</h4>
-                    <p style="margin: 0 0 8px 0; font-size: 14px;">กรุณาไป Up Master ที่หน้า <b>"ตั้งค่า > Master Data"</b> สำหรับ Item Code เหล่านี้:</p>
-                    <ul style="margin: 0; padding-left: 20px; font-size: 14px; max-height: 150px; overflow-y: auto;">
-                        ${listHtml}
-                    </ul>
-                </div>
-            `;
+        // ==========================================
+        // 🔽 แจ้งเตือนด้านบน "ประวัติการบันทึก Snapshot"
+        // ==========================================
+        const historyHeader = document.querySelector('#tab-usage-pivot h3'); 
+        let alertBox = document.getElementById('pivot-missing-alert');
+
+        if (historyHeader) {
+            if (missingMasterSet.size > 0) {
+                const missingList = Array.from(missingMasterSet).join(', ');
+                const alertHtml = `<div id="pivot-missing-alert" class="msg err" style="margin-bottom: 10px; border-left: 4px solid #dc2626; background: #fee2e2; color: #991b1b; padding: 10px; border-radius: 4px; font-size: 14px;">
+                    ❌ <b>พบรายการที่ไม่มีใน Master Data (ไม่สามารถคำนวณได้):</b><br>
+                    <span style="word-break: break-all;">${missingList}</span>
+                </div>`;
+
+                if (alertBox) {
+                    alertBox.outerHTML = alertHtml;
+                } else {
+                    historyHeader.insertAdjacentHTML('beforebegin', alertHtml);
+                }
+            } else {
+                if (alertBox) alertBox.remove();
+            }
         }
 
         const sortedWidths = Array.from(allWidths).sort((a, b) => a - b);
@@ -526,6 +532,10 @@ async function loadUsagePivot() {
         fcState.pivotWidths   = sortedWidths;
         fcState.pivotMonth    = month;
         fcState.pivotCustomer = selectedCustomers.length === 0 ? 'ALL' : selectedCustomers.join(',');
+
+        if (missingMasterSet.size === 0) {
+            showToast(`โหลด Pivot สำเร็จ (${Object.keys(pivotData).length} grade)`, 'ok');
+        }
 
     } catch (err) {
         console.error(err);
