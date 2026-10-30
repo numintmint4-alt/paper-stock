@@ -355,11 +355,12 @@ document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
     if (t === 'receive' && typeof initReceiveTab === 'function') initReceiveTab();
     if (t === 'alert' && typeof initAlertTab === 'function') initAlertTab();
     if (t === 'purchase-order' && typeof initPurchaseOrderTab === 'function') initPurchaseOrderTab();
-    if (t === 'summary' && typeof initSummaryTab === 'function') initSummaryTab(); 
+    if (t === 'summary' && typeof initSummaryTab === 'function') initSummaryTab();
+    if (t === 'forecast' && typeof initForecastTab === 'function') initForecastTab();          // ✅ เพิ่ม
+    if (t === 'usage-pivot' && typeof initUsagePivotTab === 'function') initUsagePivotTab();   // ✅ เพิ่ม
     if (t === 'data') renderData();
   };
 });
-
 // ================= MASTER =================
 async function loadMaster(onProgress = null) {
   masterCache = await fetchAllRows(
