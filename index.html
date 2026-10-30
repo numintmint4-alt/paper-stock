@@ -514,12 +514,12 @@
         </div>
     </div>
 
-        <!-- ==================== หน้า Usage Pivot ==================== -->
+      <!-- ==================== หน้า Usage Pivot ==================== -->
     <div id="tab-usage-pivot" class="hidden">
       <div class="card">
         <div class="report-head">
           <div></div>
-          <div class="report-title">Usage Pivot & Import</div>
+          <div class="report-title">Usage Pivot & Snapshot</div>
           <div></div>
         </div>
 
@@ -527,10 +527,23 @@
           <label>📅 Filter Month:
             <input type="month" id="pivot-month" class="form-control">
           </label>
+          
+          <label>👤 ลูกค้า:
+            <select id="pivot-customer" class="form-control">
+              <option value="ALL">ทั้งหมด (ทุกคน)</option>
+              <!-- รายชื่อลูกค้าจะถูกโหลดด้วย JS -->
+            </select>
+          </label>
+
           <label>📥 Upload Excel:
             <input type="file" id="pivot-file-upload" accept=".xlsx, .xls" onchange="handleUsageImport(event)">
           </label>
+          
           <button class="primary" onclick="loadUsagePivot()">🔍 Load Pivot</button>
+          
+          <button class="primary" onclick="saveUsageSnapshot()" style="background:var(--green); border-color:var(--green);">
+            💾 บันทึก Snapshot
+          </button>
         </div>
 
         <div id="pivotBody" class="report-wrap">
