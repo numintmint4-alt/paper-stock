@@ -39,11 +39,11 @@
     <strong>📦 Stock ม้วนกระดาษ</strong>
     <button data-tab="matrix" class="active">Stock Level</button>
     <button data-tab="stock">Stock</button>
-    <button data-tab="receive">Receive</button>
-    <button data-tab="alert">Alert</button>
+    <button data-tab="receive">Purchase Summary</button>
+    <button data-tab="alert">Stock Alert</button>
     <button data-tab="purchase-order">Purchase Order</button>
-    <button data-tab="summary">Summary</button>
-    <button data-tab="data">Data</button>
+    <button data-tab="summary" class="hidden">Summary</button>
+    <button data-tab="data" class="hidden">Data</button>
     <button data-tab="settings">⚙ ตั้งค่า</button>
     <span class="spacer"></span>
     <span class="user-badge" id="userBadge"></span>
@@ -274,7 +274,7 @@
       </div>
     </div>
 
-    <!-- ========== TAB 4: RECEIVE (Roll Receive) ========== -->
+    <!-- ========== TAB 4: RECEIVE (Purchase Summary) ========== -->
     <div id="tab-receive" class="hidden">
       <div class="card">
         <div class="report-head">
@@ -353,7 +353,7 @@
       </div>
     </div>
 
-    <!-- ========== TAB 5: ALERT ========== -->
+    <!-- ========== TAB 5: ALERT (Stock Alert) ========== -->
     <div id="tab-alert" class="hidden">
       <div class="card">
         <div class="report-head">
