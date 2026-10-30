@@ -551,7 +551,7 @@ async function saveUsageSnapshot() {
 }
 
 // ==========================================
-// 3. Import Excel (Usage Pivot) — UPDATED
+// 3. Import Excel (Usage Pivot) — UPDATED (delete ตรงๆ ไม่ใช้ RPC)
 // ==========================================
 async function handleUsageImport(event) {
     const file = event.target.files[0];
@@ -564,8 +564,6 @@ async function handleUsageImport(event) {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, { type: 'array' });
             const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-
-            // อ่านข้อมูลจาก Excel
             const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
 
             if (rows.length === 0) return showToast('ไม่พบข้อมูลในไฟล์ Excel', 'warn');
@@ -577,9 +575,7 @@ async function handleUsageImport(event) {
             let missingJobNoCount = 0;
 
             rows.forEach(row => {
-                // ดึงค่า sbjob_no (รองรับเผื่อชื่อคอลัมน์ต่างกันนิดหน่อย)
                 const jobNo = String(row['sbjob_no'] || row['SBJOB_NO'] || row['job_no'] || '').trim();
-
                 if (!jobNo) {
                     missingJobNoCount++;
                 } else {
@@ -587,7 +583,6 @@ async function handleUsageImport(event) {
                 }
             });
 
-            // หา Job ที่มีแถวเกิน 6
             const invalidJobs = Object.keys(sbjobCounts).filter(jobNo => sbjobCounts[jobNo] > 6);
 
             if (missingJobNoCount > 0) {
@@ -597,22 +592,20 @@ async function handleUsageImport(event) {
             if (invalidJobs.length > 0) {
                 const exampleJobs = invalidJobs.slice(0, 3).join(', ');
                 const moreText = invalidJobs.length > 3 ? ' และอื่นๆ' : '';
-                return showToast(`❌ บล็อกการ Import: พบ ${invalidJobs.length} sbjob_no ที่มีแถวเกิน 6 แถว (เช่น ${exampleJobs}${moreText}) กรุณาแก้ไฟล์ก่อน`, 'err', 6000);
+                return showToast(`❌ บล็อกการ Import: พบ ${invalidJobs.length} sbjob_no ที่มีแถวเกิน 6 แถว (เช่น ${exampleJobs}${moreText})`, 'err', 6000);
             }
 
-            // ถ้าผ่านเงื่อนไขข้อ 1 แสดงว่าข้อมูลปกติ
             const uniqueJobsCount = Object.keys(sbjobCounts).length;
             showToast(`✅ ไฟล์ปกติ: พบ ${rows.length} แถว (มี ${uniqueJobsCount} sbjob_no) กำลังเตรียมบันทึก...`, 'info', 4000);
 
             // ==========================================
-            // 🔄 ขั้นตอนที่ 2: แปลงข้อมูลและเตรียมลบของเก่า (แบบ A)
+            // 🔄 ขั้นตอนที่ 2: แปลงข้อมูลและเตรียมลบของเก่า
             // ==========================================
             const batchId = crypto.randomUUID();
             const importData = [];
-            const monthsToDelete = new Set(); // เก็บเดือนเพื่อไปลบข้อมูลเก่าทิ้ง
+            const monthsToDelete = new Set();
 
             rows.forEach(row => {
-                // Map คอลัมน์จาก Excel
                 const rawDate  = row['prod_date'] || row['doc_date'] || row['Date'] || row['usage_date'];
                 const rawWidth = row['Size'] || row['size'] || row['Width'] || row['width'];
                 const rawKgs   = row['used_kgs'] || row['kgs'] || row['Kgs'];
@@ -622,26 +615,19 @@ async function handleUsageImport(event) {
 
                 const width = parseFloat(rawWidth) || 0;
                 const kgs   = parseFloat(rawKgs) || 0;
-
-                // แปลง Grade ให้เป็นมาตรฐาน
                 const grade = typeof normalizeGrade === 'function' ? normalizeGrade(rawGrade || '') : String(rawGrade || '').toUpperCase();
-
-                // แปลงวันที่เป็น ISO
                 const dateISO = typeof toISODate === 'function' ? toISODate(rawDate) : rawDate;
-
-                // เก็บเดือน (YYYY-MM) ไว้สำหรับลบข้อมูลเก่า
+                
                 if (dateISO && dateISO.length >= 7) {
                     monthsToDelete.add(dateISO.slice(0, 7));
                 }
 
-                // หา item_code จาก Master
                 const item = fcState.masterData.find(m => m.grade === grade && Number(m.size) === width);
 
-                // ⚠️ หมายเหตุ: ตรงนี้ผมใส่ sbjob_no เข้าไปด้วย (ถ้าตาราง DB ยังไม่มีคอลัมน์นี้ ต้องเพิ่มก่อนนะครับ)
                 importData.push({
                     usage_date: dateISO,
                     doc_date:   dateISO,
-                    sbjob_no:   jobNo,       // 🔽 บันทึก sbjob_no ลง DB ด้วย
+                    sbjob_no:   jobNo,
                     grade:      grade,
                     width:      width,
                     used_kgs:   kgs,
@@ -657,13 +643,27 @@ async function handleUsageImport(event) {
             const validData = importData.filter(d => d.usage_date && d.grade && d.width > 0);
             if (validData.length === 0) return showToast('ไม่พบข้อมูลที่ถูกต้อง', 'warn');
 
-            // 🔽 ลบข้อมูลเก่าของเดือนนั้นๆ ทิ้งก่อน (เขียนทับ)
+            // ==========================================
+            // 🗑️ ลบข้อมูลเก่าของเดือนนั้นๆ ทิ้งก่อน (เขียนทับ)
+            // ==========================================
             if (monthsToDelete.size > 0) {
                 showToast('กำลังล้างข้อมูลเก่าของเดือนในไฟล์นี้...', 'info');
                 for (const m of monthsToDelete) {
                     const [y, mo] = m.split('-').map(Number);
-                    // เรียกใช้ RPC ที่มีอยู่ใน app.js
-                    await supabase.rpc('delete_usage_by_month', { p_year: y, p_month: mo });
+                    const firstDay = `${m}-01`;
+                    const lastDay  = new Date(y, mo, 0).toISOString().slice(0, 10);
+
+                    // ลบโดยตรงจากตาราง (ไม่ใช้ RPC แล้ว)
+                    const { error: delError } = await supabase
+                        .from('usage_records_raw')
+                        .delete()
+                        .gte('usage_date', firstDay)
+                        .lte('usage_date', lastDay);
+
+                    if (delError) {
+                        console.error(`ลบข้อมูลเดือน ${m} ไม่สำเร็จ:`, delError);
+                        return showToast(`ลบข้อมูลเก่าไม่สำเร็จ (ติด RLS หรือ Network): ${delError.message}`, 'err', 6000);
+                    }
                 }
             }
 
@@ -677,11 +677,11 @@ async function handleUsageImport(event) {
             for (let i = 0; i < validData.length; i += CHUNK) {
                 const chunk = validData.slice(i, i + CHUNK);
                 const { error } = await supabase.from('usage_records_raw').insert(chunk);
-                if (error) {
-                    fail += chunk.length;
-                    console.error('Insert error:', error);
-                } else {
-                    ok += chunk.length;
+                if (error) { 
+                    fail += chunk.length; 
+                    console.error('Insert error:', error); 
+                } else { 
+                    ok += chunk.length; 
                 }
             }
 
@@ -691,7 +691,6 @@ async function handleUsageImport(event) {
                 showToast(`Import สำเร็จ ${ok} รายการ`, 'ok');
             }
 
-            // เคลียร์ค่า input file และโหลด Pivot ใหม่
             document.getElementById('pivot-file-upload').value = '';
             loadUsagePivot();
 
