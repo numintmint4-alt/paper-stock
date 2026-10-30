@@ -514,30 +514,35 @@
         </div>
     </div>
 
-    <!-- ==================== หน้า Usage Pivot ==================== -->
+        <!-- ==================== หน้า Usage Pivot ==================== -->
     <div id="tab-usage-pivot" class="hidden">
-        <div class="card">
-            <div class="report-title">Usage Pivot & Import</div>
-            
-            <div class="filters">
-                <label>Filter Month:
-                    <input type="month" id="pivot-month" class="form-control">
-                </label>
-                <label>Upload Excel:
-                    <input type="file" id="pivot-file-upload" accept=".xlsx, .xls" onchange="handleUsageImport(event)">
-                </label>
-                <button class="primary" onclick="loadUsagePivot()">Load Pivot</button>
-            </div>
-
-            <!-- ตาราง Pivot -->
-            <div class="table-container" style="overflow-x: auto;">
-                <table class="data-table" id="pivot-table">
-                    <thead id="pivot-thead"></thead>
-                    <tbody id="pivot-tbody"></tbody>
-                </table>
-            </div>
+      <div class="card">
+        <div class="report-head">
+          <div></div>
+          <div class="report-title">Usage Pivot & Import</div>
+          <div></div>
         </div>
+
+        <div class="filters no-print">
+          <label>📅 Filter Month:
+            <input type="month" id="pivot-month" class="form-control">
+          </label>
+          <label>📥 Upload Excel:
+            <input type="file" id="pivot-file-upload" accept=".xlsx, .xls" onchange="handleUsageImport(event)">
+          </label>
+          <button class="primary" onclick="loadUsagePivot()">🔍 Load Pivot</button>
+        </div>
+
+        <div id="pivotBody" class="report-wrap">
+          <!-- ตาราง Pivot จะแสดงที่นี่ -->
+          <table class="data-table" id="pivot-table">
+              <thead id="pivot-thead"></thead>
+              <tbody id="pivot-tbody"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
+    
     <!-- ========== TAB 5.6: SUMMARY ========== -->
     <div id="tab-summary" class="hidden">
       <div class="card">
