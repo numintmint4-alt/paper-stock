@@ -425,22 +425,19 @@ async function loadUsagePivot() {
 
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;">กำลังโหลด...</td></tr>';
 
-    // คำนวณช่วงเดือน (กันเดือน 31 วัน)
     const [y, mo] = month.split('-').map(Number);
     const firstDay = `${month}-01`;
     const lastDay  = new Date(y, mo, 0).toISOString().slice(0, 10);
 
     try {
-        // 🔽 ใช้ fetchAllRows ดึงข้อมูลให้ครบ (แก้ปัญหา Size หาย)
         const data = await fetchAllRows(() => {
             let q = supabase
                 .from('usage_records_raw')
-                .select('grade, width, used_kgs, roll_for_customer')
+                .select('grade, width, used_kgs')
                 .eq('is_valid', true)
                 .gte('usage_date', firstDay)
                 .lte('usage_date', lastDay);
 
-            // ถ้ามีการเลือก Dropdown ลูกค้า ให้กรอง
             if (selectedCustomers.length > 0) {
                 q = q.in('roll_for_customer', selectedCustomers);
             }
@@ -449,16 +446,43 @@ async function loadUsagePivot() {
 
         const pivotData = {};
         const allWidths = new Set();
+        const missingMasterSet = new Set(); // 🔽 เก็บรายการที่ไม่มีใน Master เพื่อแจ้งเตือน
 
         (data || []).forEach(row => {
             allWidths.add(row.width);
             if (!pivotData[row.grade]) pivotData[row.grade] = { total: 0 };
             if (!pivotData[row.grade][row.width]) pivotData[row.grade][row.width] = 0;
 
-            const rolls = Number(row.used_kgs) / 500;
-            pivotData[row.grade][row.width] += rolls;
-            pivotData[row.grade].total     += rolls;
+            // 🔽 ค้นหาค่า Std Weight จาก Master Data
+            const masterItem = fcState.masterData.find(m =>
+                m.grade === row.grade && Number(m.size) === Number(row.width)
+            );
+
+            const kgs = Number(row.used_kgs);
+            let rolls = 0;
+
+            if (!masterItem || !masterItem.std_weight_kg || Number(masterItem.std_weight_kg) <= 0) {
+                // ❌ ถ้าไม่มีตัวหาร หรือตัวหาร <= 0 ให้แจ้งเตือน
+                missingMasterSet.add(`${row.grade} Size ${row.width}`);
+                rolls = null; // 🔽 ปล่อยเป็น null ไม่ต้องคำนวณ ห้ามใช้ 500 เด็ดขาด
+            } else {
+                // ✅ ถ้ามีตัวหาร ให้คำนวณตามปกติ
+                rolls = kgs / Number(masterItem.std_weight_kg);
+            }
+
+            // 🔽 ถ้ามีตัวหาร (rolls ไม่เป็น null) ถึงจะเอาไปบวกในตาราง
+            if (rolls !== null) {
+                pivotData[row.grade][row.width] += rolls;
+                pivotData[row.grade].total     += rolls;
+            }
         });
+
+        // 🔽 แจ้งเตือนถ้าเจอ Grade/Size ที่ไม่มีใน Master
+        if (missingMasterSet.size > 0) {
+            const list = Array.from(missingMasterSet).slice(0, 5).join(', ');
+            const more = missingMasterSet.size > 5 ? ' และอื่นๆ' : '';
+            showToast(`❌ ไม่พบตัวหาร (Std Weight) ใน Master: ${list}${more} กรุณาไป Up Master ที่หน้าตั้งค่าก่อน`, 'err', 8000);
+        }
 
         const sortedWidths = Array.from(allWidths).sort((a, b) => a - b);
 
@@ -478,9 +502,10 @@ async function loadUsagePivot() {
                 bodyHtml += `<tr><td><strong>${escHtml(grade)}</strong></td>`;
                 sortedWidths.forEach(w => {
                     const val = row[w] || 0;
+                    // 🔽 ถ้ายอดเป็น 0 ให้โชว์ช่องว่าง (หรือคุณจะโชว์ 0.00 ก็ได้ครับ)
                     bodyHtml += `<td>${val > 0 ? val.toFixed(2) : ''}</td>`;
                 });
-                bodyHtml += `<td style="background:#e6f2ff;font-weight:bold;">${row.total.toFixed(2)}</td></tr>`;
+                bodyHtml += `<td style="background:#e6f2ff;font-weight:bold;">${row.total > 0 ? row.total.toFixed(2) : '0.00'}</td></tr>`;
             });
         }
         tbody.innerHTML = bodyHtml;
@@ -491,7 +516,9 @@ async function loadUsagePivot() {
         fcState.pivotMonth    = month;
         fcState.pivotCustomer = selectedCustomers.length === 0 ? 'ALL' : selectedCustomers.join(',');
 
-        showToast(`โหลด Pivot สำเร็จ (${Object.keys(pivotData).length} grade)`, 'ok');
+        if (missingMasterSet.size === 0) {
+            showToast(`โหลด Pivot สำเร็จ (${Object.keys(pivotData).length} grade)`, 'ok');
+        }
 
     } catch (err) {
         console.error(err);
@@ -617,7 +644,7 @@ async function handleUsageImport(event) {
                 const kgs   = parseFloat(rawKgs) || 0;
                 const grade = typeof normalizeGrade === 'function' ? normalizeGrade(rawGrade || '') : String(rawGrade || '').toUpperCase();
                 const dateISO = typeof toISODate === 'function' ? toISODate(rawDate) : rawDate;
-                
+
                 if (dateISO && dateISO.length >= 7) {
                     monthsToDelete.add(dateISO.slice(0, 7));
                 }
@@ -677,11 +704,11 @@ async function handleUsageImport(event) {
             for (let i = 0; i < validData.length; i += CHUNK) {
                 const chunk = validData.slice(i, i + CHUNK);
                 const { error } = await supabase.from('usage_records_raw').insert(chunk);
-                if (error) { 
-                    fail += chunk.length; 
-                    console.error('Insert error:', error); 
-                } else { 
-                    ok += chunk.length; 
+                if (error) {
+                    fail += chunk.length;
+                    console.error('Insert error:', error);
+                } else {
+                    ok += chunk.length;
                 }
             }
 
