@@ -135,14 +135,15 @@ function initFirstReceiveDatePicker() {
   if (window.flatpickrInstances && window.flatpickrInstances['firstReceiveDateInput']) return;
 
   el.setAttribute('type', 'text');
-  el.setAttribute('placeholder', 'วว/ดด/ปปปป');
+  el.setAttribute('placeholder', 'YYYY-MM-DD'); // 🔽 1. เปลี่ยน Placeholder 🔽
+  el.setAttribute('autocomplete', 'new-password'); // 🔽 ปิด Autofill 🔽
 
   if (!window.flatpickrInstances) window.flatpickrInstances = {};
 
   window.flatpickrInstances['firstReceiveDateInput'] = flatpickr(el, {
     locale: "th",
-    dateFormat: "d/m/Y",
-    allowInput: true,
+    dateFormat: "Y-m-d",   // 🔽 2. เปลี่ยน Format เป็น ค.ศ. 🔽
+    allowInput: false,     // 🔽 3. ห้ามพิมพ์เอง ให้คลิกเลือกจากปฏิทินอย่างเดียว 🔽
     disableMobile: true
   });
 
