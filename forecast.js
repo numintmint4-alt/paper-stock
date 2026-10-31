@@ -469,38 +469,64 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// หา master item จากแถว usage
-// ลำดับความแม่นยำ: item_code → GRADE-SIZE → grade+gram+size → grade+size
+// หา master item จากแถว usage (รองรับ gram แบบ 125.0 / 0125 และ grade ที่เก็บรวมหรือแยก)
+// ลำดับความแม่นยำ: item_code → GRADE-SIZE → แยก grade/gram/size → grade+size
 function findMasterForUsageRow(rowGrade, rowSize, rowItemCode) {
     const master = fcState.masterData;
-    const norm = (v) => String(v ?? '').trim().toUpperCase().replace(/\s+/g, '');
 
-    // ชั้นที่ 1: ถ้า raw data มี item_code ให้จับคู่ตรงๆ ก่อน (เช่น KA125-44)
-    if (rowItemCode) {
-        const target = norm(rowItemCode);
-        const hit = master.find(m => norm(m.item_code) === target);
+    // ลบช่องว่างทั้งหมด + ตัวพิมพ์ใหญ่
+    const norm = (v) => String(v ?? '').trim().replace(/\s+/g, '').toUpperCase();
+
+    // จัดรูปแกรมให้เทียบกันได้: "125.0" → "125", "085" → "85", ว่าง → ""
+    const normGram = (v) => {
+        const s = String(v ?? '').trim();
+        if (s === '') return '';
+        const n = Number(s);
+        return isNaN(n) ? s.toUpperCase() : String(n);
+    };
+
+    const rCode  = norm(rowItemCode);
+    const rGrade = norm(rowGrade);   // เช่น "KK125"
+    const rSize  = Number(rowSize);
+
+    // ชั้นที่ 1: ถ้า raw data มี item_code ให้จับคู่ตรงๆ ก่อน (แม่นที่สุด เช่น KA125-44)
+    if (rCode) {
+        const hit = master.find(m => norm(m.item_code) === rCode);
         if (hit) return hit;
     }
 
     // ชั้นที่ 2: ประกอบ Grade + Size เป็น item_code (เช่น KA125 + 44 = KA125-44)
-    const composed = norm(`${rowGrade}-${rowSize}`);
+    const composed = norm(`${rGrade}-${rSize}`);
     let hit = master.find(m => norm(m.item_code) === composed);
     if (hit) return hit;
 
-    // ชั้นที่ 3: master.grade + master.gram == row.grade (เช่น CA + 085 = CA085) และ size ตรง
-    // (เจาะจงกว่า grade อย่างเดียว จึงลองก่อน เพื่อไม่ให้ไปเจอแถวที่ gram ต่างกัน)
+    // ชั้นที่ 3: แยก "KK125" เป็น "KK" + "125" แล้วเทียบ Grade, Gram, Size แยกกัน
+    const gradeMatch = rGrade.match(/^([A-Z]+)(\d+)$/);
+    const baseGrade = gradeMatch ? gradeMatch[1] : rGrade;          // "KK"
+    const baseGram  = gradeMatch ? normGram(gradeMatch[2]) : '';    // "125"
+
     hit = master.find(m => {
-        if (Number(m.size) !== rowSize) return false;
-        const gram = norm(m.gram);
-        if (!gram) return false;
-        return norm(m.grade) + gram === rowGrade;
+        if (Number(m.size) !== rSize) return false;
+
+        const mGrade = norm(m.grade);
+        const mGram  = normGram(m.gram);
+
+        // 3.1: Master เก็บ Grade แยก (KK) และ Gram แยก (125)
+        if (gradeMatch && mGrade === baseGrade && mGram === baseGram) return true;
+
+        // 3.2: Master เก็บ Grade รวมกันเป็น "KK125" เลย
+        if (mGrade === rGrade) return true;
+
+        return false;
     });
     if (hit) return hit;
 
-    // ชั้นที่ 4: Fallback สุดท้าย grade + size ตรงกัน
+    // ชั้นที่ 4: Fallback สุดท้าย ลองเทียบ Grade + Size ตรงๆ
+    // (เผื่อ raw data ใส่มาแค่ "KK" โดยไม่มีแกรม)
     hit = master.find(m =>
-        Number(m.size) === rowSize && norm(m.grade) === rowGrade
+        norm(m.grade) === rGrade && Number(m.size) === rSize
     );
+
     return hit || null;
 }
 
