@@ -454,20 +454,31 @@ async function loadUsagePivot() {
             if (!pivotData[row.grade]) pivotData[row.grade] = { total: 0 };
             if (!pivotData[row.grade][row.width]) pivotData[row.grade][row.width] = 0;
 
-            // 🔽 1. สร้าง Item Code จากข้อมูลที่ Import แล้วลบช่องว่างทิ้งให้หมด
             const rowGrade = String(row.grade || '').trim().toUpperCase();
             const rowSize  = Number(row.width);
-            const rowItemCode = `${rowGrade}-${rowSize}`.replace(/\s+/g, ''); // ลบช่องว่างทั้งหมด
+            let masterItem = null;
 
-            // 🔽 2. ค้นหาใน Master Data แบบลบช่องว่างเช่นกัน
-            const masterItem = fcState.masterData.find(m => {
-                const masterItemCode = String(m.item_code || '').trim().toUpperCase().replace(/\s+/g, '');
-                return masterItemCode === rowItemCode;
+            // 🔽 ตรวจชั้นที่ 1: หาจาก Item Code (เช่น KK125-62)
+            const rowItemCode = `${rowGrade}-${rowSize}`;
+            masterItem = fcState.masterData.find(m => {
+                const masterCode = String(m.item_code || '').trim().toUpperCase().replace(/\s+/g, '');
+                return masterCode === rowItemCode.replace(/\s+/g, '');
             });
+
+            // 🔽 ตรวจชั้นที่ 2: ถ้าไม่เจอ ให้หาจาก Grade + Gram (เช่น CA + 085)
+            if (!masterItem) {
+                masterItem = fcState.masterData.find(m => {
+                    const mg = String(m.grade || '').trim().toUpperCase().replace(/\s+/g, '');
+                    const mgram = String(m.gram || '').trim().replace(/\s+/g, '');
+                    const masterGradeStr = mg + mgram;
+                    return masterGradeStr === rowGrade && Number(m.size) === rowSize;
+                });
+            }
             
             const kgs = Number(row.used_kgs);
             let rolls = 0;
 
+            // ถ้าหาทั้ง 2 วิธีแล้วไม่เจอจริงๆ
             if (!masterItem || !masterItem.std_weight_kg || Number(masterItem.std_weight_kg) <= 0) {
                 missingMasterSet.add(rowItemCode); 
                 rolls = null; 
@@ -482,7 +493,7 @@ async function loadUsagePivot() {
         });
 
         // ==========================================
-        // 🔽 แจ้งเตือนด้านบน "ประวัติการบันทึก Snapshot"
+        // 🔽 จัดการแจ้งเตือน: วางไว้ด้านบน "ประวัติการบันทึก Snapshot"
         // ==========================================
         const historyHeader = document.querySelector('#tab-usage-pivot h3'); 
         let alertBox = document.getElementById('pivot-missing-alert');
