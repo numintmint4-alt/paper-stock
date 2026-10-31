@@ -381,6 +381,9 @@ async function initUsagePivotTab() {
         monthInput.value = fcCurrentMonthStr();
     }
 
+    // โหลด Master Data ล่วงหน้าตอนเปิดแท็บ เพื่อให้ตอนกด Load Pivot ใช้ชุดเดิมซ้ำ ไม่ต้องโหลดใหม่ทุกครั้ง
+    await loadForecastMasterData();
+
     // populate dropdown ลูกค้า
     const list = document.getElementById('pivotCustomerList');
     if (!list) return;
@@ -518,9 +521,17 @@ async function loadUsagePivot() {
     const lastDay  = fcLastDayOfMonth(y, mo);
 
     try {
-        // โหลด Master ใหม่ทุกครั้งที่กด Load Pivot เพื่อให้ได้ข้อมูลล่าสุด
-        // (ถ้าโหลดไม่สำเร็จ จะคงค่าเดิมไว้)
-        await loadForecastMasterData();
+        // Master โหลดมาแล้วจาก initUsagePivotTab → ใช้ชุดเดิม ไม่โหลดซ้ำทุกครั้งที่กดปุ่ม
+        // เผื่อกรณีที่ยังว่าง (เช่น โหลดไม่สำเร็จตอนเปิดแท็บ) ให้ลองโหลดอีกครั้งเดียว
+        if (!fcState.masterData || fcState.masterData.length === 0) {
+            await loadForecastMasterData();
+        }
+
+        // ถ้า Master ยังว่างอยู่ ห้ามคำนวณต่อ เพราะทุกรายการจะขึ้นว่าไม่มีใน Master
+        if (!fcState.masterData || fcState.masterData.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:red;">ไม่พบข้อมูล Master Data กรุณารีเฟรชหน้าเว็บ</td></tr>`;
+            return showToast('ไม่พบ Master Data', 'err');
+        }
 
         const data = await fetchAllRows(() => {
             let q = supabase
