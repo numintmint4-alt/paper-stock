@@ -68,22 +68,52 @@ function initForecastDatePickers() {
 }
 
 async function loadForecastMasterData() {
-    // ลองดึงพร้อม gram ก่อน
-    let res = await supabase
+    // เรียงตาม item_code เพื่อให้ผลลัพธ์คงที่ทุกครั้ง (กรณีมีแถวซ้ำ จะได้เลือกแถวเดิมเสมอ)
+    const buildQuery = (cols) => supabase
         .from('paper_specs')
-        .select('grade, size, gram, item_code, std_weight_kg');
+        .select(cols)
+        .order('item_code', { ascending: true });
+
+    // ลองดึงพร้อม gram ก่อน
+    let res = await buildQuery('grade, size, gram, item_code, std_weight_kg');
 
     // ถ้าไม่มีคอลัมน์ gram ใน DB, Supabase จะ return error (ไม่ใช่ undefined)
     // จึงต้อง fallback ไปดึงแบบไม่มี gram เพื่อไม่ให้ master ว่างทั้งหมด
     if (res.error) {
         console.warn('loadForecastMasterData (with gram) error:', res.error.message, '→ retry without gram');
-        res = await supabase
-            .from('paper_specs')
-            .select('grade, size, item_code, std_weight_kg');
+        res = await buildQuery('grade, size, item_code, std_weight_kg');
     }
 
-    if (!res.error) fcState.masterData = res.data || [];
-    else console.warn('loadForecastMasterData error:', res.error.message);
+    // โหลดไม่สำเร็จ → คงค่าเดิมไว้ ไม่ล้างทิ้ง (กัน Pivot พังทั้งหมด)
+    if (res.error) {
+        console.warn('loadForecastMasterData error:', res.error.message);
+        return;
+    }
+
+    // ลบแถวซ้ำ โดยยึด item_code + grade + size และตรวจว่าแถวซ้ำมีน้ำหนักไม่เท่ากันหรือไม่
+    const seen = new Map();
+    const unique = [];
+    const conflicts = new Set();
+
+    for (const item of (res.data || [])) {
+        const key = `${item.item_code || ''}|${item.grade || ''}|${item.size || ''}`
+            .toUpperCase().replace(/\s+/g, '');
+        const exist = seen.get(key);
+        if (!exist) {
+            seen.set(key, item);
+            unique.push(item);
+        } else if (Number(exist.std_weight_kg) !== Number(item.std_weight_kg)) {
+            conflicts.add(item.item_code || `${item.grade}-${item.size}`);
+        }
+    }
+
+    if (conflicts.size > 0) {
+        const list = Array.from(conflicts).slice(0, 5).join(', ');
+        console.warn('paper_specs มีรายการซ้ำที่ std_weight_kg ไม่เท่ากัน:', Array.from(conflicts));
+        showToast(`⚠️ Master มีรายการซ้ำที่น้ำหนักไม่เท่ากัน (เช่น ${list}) ควรแก้ที่ตาราง paper_specs`, 'warn', 6000);
+    }
+
+    fcState.masterData = unique;
 }
 
 function renderGradeTabs() {
@@ -436,24 +466,26 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// หา master item จากแถว usage (ลำดับความแม่นยำ: item_code → grade+gram+size → grade+size)
+// หา master item จากแถว usage
+// ลำดับความแม่นยำ: item_code → GRADE-SIZE → grade+gram+size → grade+size
 function findMasterForUsageRow(rowGrade, rowSize, rowItemCode) {
     const master = fcState.masterData;
     const norm = (v) => String(v ?? '').trim().toUpperCase().replace(/\s+/g, '');
 
-    // ชั้นที่ 1: item_code ตรงๆ (แม่นที่สุด)
+    // ชั้นที่ 1: ถ้า raw data มี item_code ให้จับคู่ตรงๆ ก่อน (เช่น KA125-44)
     if (rowItemCode) {
         const target = norm(rowItemCode);
         const hit = master.find(m => norm(m.item_code) === target);
         if (hit) return hit;
     }
 
-    // ชั้นที่ 2: item_code แบบ GRADE-SIZE (เช่น KK125-62)
+    // ชั้นที่ 2: ประกอบ Grade + Size เป็น item_code (เช่น KA125 + 44 = KA125-44)
     const composed = norm(`${rowGrade}-${rowSize}`);
     let hit = master.find(m => norm(m.item_code) === composed);
     if (hit) return hit;
 
     // ชั้นที่ 3: master.grade + master.gram == row.grade (เช่น CA + 085 = CA085) และ size ตรง
+    // (เจาะจงกว่า grade อย่างเดียว จึงลองก่อน เพื่อไม่ให้ไปเจอแถวที่ gram ต่างกัน)
     hit = master.find(m => {
         if (Number(m.size) !== rowSize) return false;
         const gram = norm(m.gram);
@@ -462,7 +494,7 @@ function findMasterForUsageRow(rowGrade, rowSize, rowItemCode) {
     });
     if (hit) return hit;
 
-    // ชั้นที่ 4: grade + size ตรงกัน
+    // ชั้นที่ 4: Fallback สุดท้าย grade + size ตรงกัน
     hit = master.find(m =>
         Number(m.size) === rowSize && norm(m.grade) === rowGrade
     );
@@ -486,10 +518,9 @@ async function loadUsagePivot() {
     const lastDay  = fcLastDayOfMonth(y, mo);
 
     try {
-        // master ยังว่าง (เช่น เปิดแท็บนี้ก่อนแท็บ Forecast) → โหลดก่อน
-        if (!fcState.masterData || fcState.masterData.length === 0) {
-            await loadForecastMasterData();
-        }
+        // โหลด Master ใหม่ทุกครั้งที่กด Load Pivot เพื่อให้ได้ข้อมูลล่าสุด
+        // (ถ้าโหลดไม่สำเร็จ จะคงค่าเดิมไว้)
+        await loadForecastMasterData();
 
         const data = await fetchAllRows(() => {
             let q = supabase
