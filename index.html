@@ -564,19 +564,6 @@
           </button>
         </div>
 
-        <!-- แท็บกรองเกรด (กรองเฉพาะตอนแสดงผล ไม่กระทบข้อมูลที่บันทึก Snapshot) -->
-        <div class="sub-tabs no-print" id="pivot-sub-tabs" style="margin-bottom: 12px; display: flex; gap: 10px; flex-wrap: wrap;">
-          <button type="button" class="sub-tab active" onclick="filterPivotByGrade('ALL', this)">ALL</button>
-          <button type="button" class="sub-tab" onclick="filterPivotByGrade('CA', this)">CA</button>
-          <button type="button" class="sub-tab" onclick="filterPivotByGrade('KA', this)">KA</button>
-          <button type="button" class="sub-tab" onclick="filterPivotByGrade('KI', this)">KI</button>
-          <button type="button" class="sub-tab" onclick="filterPivotByGrade('KK', this)">KK</button>
-          <button type="button" class="sub-tab" onclick="filterPivotByGrade('KW', this)">KW</button>
-          <button type="button" class="sub-tab" onclick="filterPivotByGrade('TG', this)">TG</button>
-          <!-- FSC: เป็นสีเขียวเมื่อถูกเลือก (JS จัดการสี) -->
-          <button type="button" class="sub-tab" id="btn-tab-fsc" onclick="filterPivotByGrade('FSC', this)" style="border: 2px solid #10b981; color: #10b981; font-weight: bold;">FSC</button>
-        </div>
-
         <div id="pivotBody" class="report-wrap" style="max-height: 50vh;">
           <table class="data-table" id="pivot-table">
               <thead id="pivot-thead"></thead>
