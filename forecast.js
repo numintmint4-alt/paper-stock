@@ -68,35 +68,44 @@ function initForecastDatePickers() {
 }
 
 async function loadForecastMasterData() {
-    // เรียงตาม item_code เพื่อให้ผลลัพธ์คงที่ทุกครั้ง (กรณีมีแถวซ้ำ จะได้เลือกแถวเดิมเสมอ)
-    const buildQuery = (cols) => supabase
+    // Supabase จำกัดผลลัพธ์ที่ 1000 แถวต่อ 1 query แต่ paper_specs มีมากกว่านั้น
+    // จึงต้องดึงเป็นหน้าๆ ด้วย fetchAllRows และ "ต้องเรียงลำดับให้คงที่" ไม่งั้นแต่ละหน้าอาจซ้ำ/ตกหล่น
+    const buildQuery = (cols) => () => supabase
         .from('paper_specs')
         .select(cols)
-        .order('item_code', { ascending: true });
+        .order('item_code', { ascending: true })
+        .order('size', { ascending: true });
 
-    // ลองดึงพร้อม gram ก่อน
-    let res = await buildQuery('grade, size, gram, item_code, std_weight_kg');
-
-    // ถ้าไม่มีคอลัมน์ gram ใน DB, Supabase จะ return error (ไม่ใช่ undefined)
-    // จึงต้อง fallback ไปดึงแบบไม่มี gram เพื่อไม่ให้ master ว่างทั้งหมด
-    if (res.error) {
-        console.warn('loadForecastMasterData (with gram) error:', res.error.message, '→ retry without gram');
-        res = await buildQuery('grade, size, item_code, std_weight_kg');
+    let rows = null;
+    try {
+        // ลองดึงพร้อม gram ก่อน
+        rows = await fetchAllRows(buildQuery('grade, size, gram, item_code, std_weight_kg'));
+    } catch (err) {
+        // ถ้าไม่มีคอลัมน์ gram ใน DB จะ error → fallback ไปดึงแบบไม่มี gram
+        console.warn('loadForecastMasterData (with gram) error:', err?.message, '→ retry without gram');
+        try {
+            rows = await fetchAllRows(buildQuery('grade, size, item_code, std_weight_kg'));
+        } catch (err2) {
+            console.error('loadForecastMasterData error:', err2);
+        }
     }
 
-    // โหลดไม่สำเร็จ → คงค่าเดิมไว้ ไม่ล้างทิ้ง (กัน Pivot พังทั้งหมด)
-    if (res.error) {
-        console.warn('loadForecastMasterData error:', res.error.message);
+    // โหลดไม่สำเร็จ หรือได้ 0 แถว → คงค่าเดิมไว้ ไม่ล้างทิ้ง (กัน Pivot พังทั้งหมด)
+    if (!rows || rows.length === 0) {
+        console.warn('⚠️ โหลด Master Data ไม่สำเร็จหรือได้ 0 รายการ');
         return;
     }
 
-    // ลบแถวซ้ำ โดยยึด item_code + grade + size และตรวจว่าแถวซ้ำมีน้ำหนักไม่เท่ากันหรือไม่
+    // ลบแถวซ้ำ โดยยึด item_code เป็นหลัก (ถ้าไม่มี item_code ใช้ grade+gram+size)
+    // และตรวจว่าแถวซ้ำมีน้ำหนักไม่เท่ากันหรือไม่
     const seen = new Map();
     const unique = [];
     const conflicts = new Set();
 
-    for (const item of (res.data || [])) {
-        const key = `${item.item_code || ''}|${item.grade || ''}|${item.size || ''}`
+    for (const item of rows) {
+        const key = (item.item_code
+            ? String(item.item_code)
+            : `${item.grade || ''}|${item.gram || ''}|${item.size || ''}`)
             .toUpperCase().replace(/\s+/g, '');
         const exist = seen.get(key);
         if (!exist) {
@@ -114,6 +123,7 @@ async function loadForecastMasterData() {
     }
 
     fcState.masterData = unique;
+    console.log(`✅ โหลด Master Data สำเร็จ: ${rows.length} แถว → ${unique.length} รายการ (หลังลบซ้ำ)`);
 }
 
 function renderGradeTabs() {
