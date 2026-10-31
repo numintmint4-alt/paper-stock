@@ -1,5 +1,5 @@
 // ==========================================
-// forecast.js - Production Forecast & Usage Pivot (FIXED v3)
+// forecast.js - Production Forecast & Usage Pivot (FIXED v2)
 // ==========================================
 
 const fcState = {
@@ -10,7 +10,8 @@ const fcState = {
     pivotWidths: [],
     pivotMonth: '',
     pivotCustomer: 'ALL',
-    pivotCustomers: [],   // รายชื่อลูกค้าที่โหลดมา
+    pivotCustomers: [],  // รายชื่อลูกค้าที่โหลดมา
+    pivotGradeFilter: 'ALL',  // แท็บกรองเกรดในหน้า Pivot (กรองเฉพาะตอนแสดงผล)
     // 🛡️ locks กันกดซ้ำ (Race Condition)
     _loadingPivot: false,
     _savingForecast: false,
@@ -334,63 +335,67 @@ function recalculateRow(tr, stockQty, prev) {
     tr.querySelector('.col-order-round').innerText   = orderRound;
 }
 
+// 🛡️ กันกดซ้ำ: ครอบ lock ไว้ข้างนอก ตัวทำงานจริงอยู่ใน _saveForecastDataImpl
 async function saveForecastData() {
-    // 🛡️ กันกดซ้ำ
     if (fcState._savingForecast) return;
     fcState._savingForecast = true;
-
     try {
-        const monthYear = document.getElementById('fc-month')?.value;
-        if (!monthYear) return showToast('กรุณาเลือกเดือน Forecast', 'warn');
-
-        const rows = document.querySelectorAll('#forecast-tbody tr');
-        const payloads = [];
-
-        rows.forEach(tr => {
-            const grade = tr.dataset.grade;
-            const width = tr.dataset.width;
-            if (!grade || !width) return;
-
-            const getVal = (field) => {
-                const input = tr.querySelector(`.fc-input[data-field="${field}"]`);
-                if (!input) return field === 'note' ? '' : 0;
-                if (input.type === 'number') {
-                    const v = Number(input.value);
-                    return isNaN(v) ? 0 : v;
-                }
-                return input.value;
-            };
-
-            payloads.push({
-                month_year: monthYear,
-                grade: grade,
-                width: Number(width),
-                forecast_nen:      getVal('forecast_nen'),
-                forecast_nea:      getVal('forecast_nea'),
-                forecast_thaifood: getVal('forecast_thaifood'),
-                forecast_ktp:      getVal('forecast_ktp'),
-                reserve_qty:       getVal('reserve_qty'),
-                adjust_qty:        getVal('adjust_qty'),
-                note:              getVal('note')
-            });
-        });
-
-        if (payloads.length === 0) return showToast('ไม่มีข้อมูลให้บันทึก', 'warn');
-
-        const { error } = await supabase
-            .from('forecast_data')
-            .upsert(payloads, { onConflict: 'month_year,grade,width' });
-
-        if (error) {
-            console.error('saveForecast error:', error);
-            showToast('บันทึกไม่สำเร็จ: ' + error.message, 'err');
-        } else {
-            showToast(`บันทึก Forecast สำเร็จ (${payloads.length} แถว)`, 'ok');
-        }
+        await _saveForecastDataImpl();
     } finally {
         fcState._savingForecast = false;
     }
 }
+
+async function _saveForecastDataImpl() {
+    const monthYear = document.getElementById('fc-month')?.value;
+    if (!monthYear) return showToast('กรุณาเลือกเดือน Forecast', 'warn');
+
+    const rows = document.querySelectorAll('#forecast-tbody tr');
+    const payloads = [];
+
+    rows.forEach(tr => {
+        const grade = tr.dataset.grade;
+        const width = tr.dataset.width;
+        if (!grade || !width) return;
+
+        const getVal = (field) => {
+            const input = tr.querySelector(`.fc-input[data-field="${field}"]`);
+            if (!input) return field === 'note' ? '' : 0;
+            if (input.type === 'number') {
+                const v = Number(input.value);
+                return isNaN(v) ? 0 : v;
+            }
+            return input.value;
+        };
+
+        payloads.push({
+            month_year: monthYear,
+            grade: grade,
+            width: Number(width),
+            forecast_nen:      getVal('forecast_nen'),
+            forecast_nea:      getVal('forecast_nea'),
+            forecast_thaifood: getVal('forecast_thaifood'),
+            forecast_ktp:      getVal('forecast_ktp'),
+            reserve_qty:       getVal('reserve_qty'),
+            adjust_qty:        getVal('adjust_qty'),
+            note:              getVal('note')
+        });
+    });
+
+    if (payloads.length === 0) return showToast('ไม่มีข้อมูลให้บันทึก', 'warn');
+
+    const { error } = await supabase
+        .from('forecast_data')
+        .upsert(payloads, { onConflict: 'month_year,grade,width' });
+
+    if (error) {
+        console.error('saveForecast error:', error);
+        showToast('บันทึกไม่สำเร็จ: ' + error.message, 'err');
+    } else {
+        showToast(`บันทึก Forecast สำเร็จ (${payloads.length} แถว)`, 'ok');
+    }
+}
+
 // ==========================================
 // 2. Usage Pivot & Snapshot
 // ==========================================
@@ -551,8 +556,89 @@ function findMasterForUsageRow(rowGrade, rowSize, rowItemCode) {
     return hit || null;
 }
 
+// ===== Pivot: แท็บกรองเกรด (กรองเฉพาะตอนแสดงผล ไม่กระทบข้อมูลที่ใช้บันทึก Snapshot) =====
+
+// เกรด FSC = ชื่อเกรดมีตัว F (เช่น CAF085)
+function isFscGrade(grade) {
+    return String(grade || '').toUpperCase().includes('F');
+}
+
+function pivotGradeMatches(grade, group) {
+    const g = String(grade || '').trim().toUpperCase();
+    if (!group || group === 'ALL') return true;
+    if (group === 'FSC') return isFscGrade(g);
+    return g.startsWith(group);
+}
+
+// วาดตาราง Pivot จากข้อมูลที่โหลดไว้ใน fcState ตามแท็บเกรดที่เลือก (ไม่ดึง DB ใหม่)
+function renderUsagePivotTable() {
+    const tbody = document.getElementById('pivot-tbody');
+    const thead = document.getElementById('pivot-thead');
+    const pivotData = fcState.pivotData;
+    if (!tbody || !thead || !pivotData) return;
+
+    const group  = fcState.pivotGradeFilter || 'ALL';
+    const grades = Object.keys(pivotData)
+        .filter(g => pivotGradeMatches(g, group))
+        .sort();
+
+    // แสดงเฉพาะความกว้างที่มีอยู่ในเกรดที่ถูกกรอง
+    const widths = group === 'ALL'
+        ? fcState.pivotWidths
+        : fcState.pivotWidths.filter(w => grades.some(g => pivotData[g][w] !== undefined));
+
+    let headerHtml = '<tr><th>Grade</th>';
+    widths.forEach(w => headerHtml += `<th>${escHtml(w)}</th>`);
+    headerHtml += '<th>Grand Total</th></tr>';
+    thead.innerHTML = headerHtml;
+
+    let bodyHtml = '';
+    if (grades.length === 0) {
+        const msg = Object.keys(pivotData).length === 0
+            ? 'ไม่มีข้อมูลในเดือนนี้'
+            : `ไม่มีข้อมูลเกรดกลุ่ม ${escHtml(group)} ในเดือนนี้`;
+        bodyHtml = `<tr><td colspan="${widths.length + 2}" style="text-align:center;">${msg}</td></tr>`;
+    } else {
+        grades.forEach(grade => {
+            const row = pivotData[grade];
+            bodyHtml += `<tr><td><strong>${escHtml(grade)}</strong></td>`;
+            widths.forEach(w => {
+                const val = row[w] || 0;
+                bodyHtml += `<td>${val > 0 ? val.toFixed(2) : ''}</td>`;
+            });
+            bodyHtml += `<td style="background:#e6f2ff;font-weight:bold;">${row.total > 0 ? row.total.toFixed(2) : '0.00'}</td></tr>`;
+        });
+    }
+    tbody.innerHTML = bodyHtml;
+}
+
+// เรียกจากปุ่มแท็บ (onclick="filterPivotByGrade('CA', this)")
+function filterPivotByGrade(gradeGroup, btnElement) {
+    fcState.pivotGradeFilter = gradeGroup;
+
+    // รีเซ็ตสไตล์ปุ่มทั้งหมด
+    document.querySelectorAll('#pivot-sub-tabs .sub-tab').forEach(btn => {
+        btn.classList.remove('active');
+        btn.style.backgroundColor = '';
+        btn.style.color = (btn.id === 'btn-tab-fsc') ? '#10b981' : '';
+    });
+
+    if (btnElement) {
+        btnElement.classList.add('active');
+        // FSC เป็นสีเขียวเมื่อถูกเลือก
+        if (gradeGroup === 'FSC') {
+            btnElement.style.backgroundColor = '#10b981';
+            btnElement.style.color = '#ffffff';
+        }
+    }
+
+    // วาดตารางใหม่จากข้อมูลที่โหลดไว้แล้ว (ไม่ต้องดึง DB ซ้ำ)
+    renderUsagePivotTable();
+}
+
+// 🛡️ กันกดซ้ำ (Race Condition): ถ้ากำลังโหลดอยู่ ให้หยุดทันที และ disable ปุ่มระหว่างโหลด
+// ตัวทำงานจริงอยู่ใน _loadUsagePivotImpl
 async function loadUsagePivot() {
-    // 🛡️ เกราะป้องกัน Race Condition: ถ้ากำลังโหลดอยู่ ให้หยุดทำงานทันที
     if (fcState._loadingPivot) return;
 
     const btnLoad = document.querySelector('button[onclick="loadUsagePivot()"]')
@@ -570,21 +656,34 @@ async function loadUsagePivot() {
     }
 
     try {
-        const month = document.getElementById('pivot-month')?.value;
-        if (!month) return showToast('กรุณาเลือกเดือน', 'warn');
+        await _loadUsagePivotImpl();
+    } finally {
+        // ปลดล็อคเมื่อโหลดเสร็จ (ไม่ว่าจะสำเร็จหรือ error)
+        fcState._loadingPivot = false;
+        if (btnLoad) {
+            btnLoad.disabled = false;
+            btnLoad.innerHTML = originalBtnText || '🔍 โหลดข้อมูล Pivot';
+        }
+    }
+}
 
-        const selectedCustomers = getSelectedPivotCustomers();
-        const tbody = document.getElementById('pivot-tbody');
-        const thead = document.getElementById('pivot-thead');
+async function _loadUsagePivotImpl() {
+    const month = document.getElementById('pivot-month')?.value;
+    if (!month) return showToast('กรุณาเลือกเดือน', 'warn');
 
-        if (!tbody || !thead) return;
+    const selectedCustomers = getSelectedPivotCustomers();
+    const tbody = document.getElementById('pivot-tbody');
+    const thead = document.getElementById('pivot-thead');
 
-        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;">กำลังโหลด...</td></tr>';
+    if (!tbody || !thead) return;
 
-        const [y, mo] = month.split('-').map(Number);
-        const firstDay = `${month}-01`;
-        const lastDay  = fcLastDayOfMonth(y, mo);
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;">กำลังโหลด...</td></tr>';
 
+    const [y, mo] = month.split('-').map(Number);
+    const firstDay = `${month}-01`;
+    const lastDay  = fcLastDayOfMonth(y, mo);
+
+    try {
         // Master โหลดมาแล้วจาก initUsagePivotTab → ใช้ชุดเดิม ไม่โหลดซ้ำทุกครั้งที่กดปุ่ม
         // เผื่อกรณีที่ยังว่าง (เช่น โหลดไม่สำเร็จตอนเปิดแท็บ) ให้ลองโหลดอีกครั้งเดียว
         if (!fcState.masterData || fcState.masterData.length === 0) {
@@ -665,33 +764,14 @@ async function loadUsagePivot() {
             }
         }
 
-        const sortedWidths = Array.from(allWidths).sort((a, b) => a - b);
-
-        let headerHtml = '<tr><th>Grade</th>';
-        sortedWidths.forEach(w => headerHtml += `<th>${escHtml(w)}</th>`);
-        headerHtml += '<th>Grand Total</th></tr>';
-        thead.innerHTML = headerHtml;
-
-        let bodyHtml = '';
-        if (Object.keys(pivotData).length === 0) {
-            bodyHtml = `<tr><td colspan="${sortedWidths.length + 2}" style="text-align:center;">ไม่มีข้อมูลในเดือนนี้</td></tr>`;
-        } else {
-            Object.keys(pivotData).sort().forEach(grade => {
-                const row = pivotData[grade];
-                bodyHtml += `<tr><td><strong>${escHtml(grade)}</strong></td>`;
-                sortedWidths.forEach(w => {
-                    const val = row[w] || 0;
-                    bodyHtml += `<td>${val > 0 ? val.toFixed(2) : ''}</td>`;
-                });
-                bodyHtml += `<td style="background:#e6f2ff;font-weight:bold;">${row.total > 0 ? row.total.toFixed(2) : '0.00'}</td></tr>`;
-            });
-        }
-        tbody.innerHTML = bodyHtml;
-
+        // เก็บข้อมูล "ทุกเกรด" ไว้ใน state เสมอ (saveUsageSnapshot ใช้ชุดนี้)
+        // การกรองด้วยแท็บเกรดทำเฉพาะตอนแสดงผลใน renderUsagePivotTable()
         fcState.pivotData     = pivotData;
-        fcState.pivotWidths   = sortedWidths;
+        fcState.pivotWidths   = Array.from(allWidths).sort((a, b) => a - b);
         fcState.pivotMonth    = month;
         fcState.pivotCustomer = selectedCustomers.length === 0 ? 'ALL' : selectedCustomers.join(',');
+
+        renderUsagePivotTable();
 
         if (missingMasterSet.size === 0) {
             showToast(`โหลด Pivot สำเร็จ (${Object.keys(pivotData).length} grade)`, 'ok');
@@ -701,15 +781,225 @@ async function loadUsagePivot() {
 
     } catch (err) {
         console.error(err);
-        const tbody = document.getElementById('pivot-tbody');
-        if (tbody) tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:red;">Error: ${escHtml(err.message)}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:red;">Error: ${escHtml(err.message)}</td></tr>`;
         showToast('Error loading pivot', 'err');
-    } finally {
-        // 🛡️ ปลดล็อคปุ่มเมื่อโหลดเสร็จ (ไม่ว่าจะสำเร็จหรือ error)
-        fcState._loadingPivot = false;
-        if (btnLoad) {
-            btnLoad.disabled = false;
-            btnLoad.innerHTML = originalBtnText || '🔍 โหลดข้อมูล Pivot';
-        }
     }
+}
+
+// 🛡️ กันกดซ้ำ: ตัวทำงานจริงอยู่ใน _saveUsageSnapshotImpl
+async function saveUsageSnapshot() {
+    if (fcState._savingSnapshot) return;
+    fcState._savingSnapshot = true;
+    try {
+        await _saveUsageSnapshotImpl();
+    } finally {
+        fcState._savingSnapshot = false;
+    }
+}
+
+async function _saveUsageSnapshotImpl() {
+    if (!fcState.pivotData || !fcState.pivotMonth) {
+        return showToast('กรุณากด Load Pivot ก่อนบันทึก', 'warn');
+    }
+
+    const month = fcState.pivotMonth;
+    const customerFilter = fcState.pivotCustomer;
+    const pivotData = fcState.pivotData;
+
+    const payloads = [];
+    Object.keys(pivotData).forEach(grade => {
+        const row = pivotData[grade];
+        fcState.pivotWidths.forEach(width => {
+            const rolls = row[width] || 0;
+            if (rolls > 0) {
+                payloads.push({
+                    snapshot_month: month,
+                    customer_filter: customerFilter,
+                    grade: grade,
+                    width: Number(width),
+                    total_rolls: rolls
+                });
+            }
+        });
+    });
+
+    if (payloads.length === 0) return showToast('ไม่มีข้อมูลให้บันทึก Snapshot', 'warn');
+
+    showToast('กำลังบันทึก Snapshot...', 'info');
+
+    // ลบของเดิมก่อน
+    const { error: delErr } = await supabase.from('usage_snapshots')
+        .delete()
+        .eq('snapshot_month', month)
+        .eq('customer_filter', customerFilter);
+
+    if (delErr) {
+        console.error(delErr);
+        return showToast('ลบ Snapshot เก่าไม่สำเร็จ: ' + delErr.message, 'err');
+    }
+
+    const { error } = await supabase.from('usage_snapshots').insert(payloads);
+    if (error) {
+        console.error(error);
+        showToast('บันทึก Snapshot ไม่สำเร็จ: ' + error.message, 'err');
+    } else {
+        showToast(`บันทึก Snapshot สำเร็จ (${payloads.length} รายการ)`, 'ok');
+    }
+}
+
+// ==========================================
+// 3. Import Excel (Usage Pivot)
+// ==========================================
+async function handleUsageImport(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            showToast('กำลังอ่านไฟล์ Excel...', 'info');
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+
+            if (rows.length === 0) return showToast('ไม่พบข้อมูลในไฟล์ Excel', 'warn');
+
+            // ==========================================
+            // ขั้นตอนที่ 1: ตรวจสอบเงื่อนไข sbjob_no (ห้ามเกิน 6 แถว)
+            // ==========================================
+            const sbjobCounts = {};
+            let missingJobNoCount = 0;
+
+            rows.forEach(row => {
+                const jobNo = String(row['sbjob_no'] || row['SBJOB_NO'] || row['job_no'] || '').trim();
+                if (!jobNo) {
+                    missingJobNoCount++;
+                } else {
+                    sbjobCounts[jobNo] = (sbjobCounts[jobNo] || 0) + 1;
+                }
+            });
+
+            const invalidJobs = Object.keys(sbjobCounts).filter(jobNo => sbjobCounts[jobNo] > 6);
+
+            if (missingJobNoCount > 0) {
+                return showToast(`❌ ไฟล์มีปัญหา: พบ ${missingJobNoCount} แถวที่ไม่มี sbjob_no`, 'err', 5000);
+            }
+
+            if (invalidJobs.length > 0) {
+                const exampleJobs = invalidJobs.slice(0, 3).join(', ');
+                const moreText = invalidJobs.length > 3 ? ' และอื่นๆ' : '';
+                return showToast(`❌ บล็อกการ Import: พบ ${invalidJobs.length} sbjob_no ที่มีแถวเกิน 6 แถว (เช่น ${exampleJobs}${moreText})`, 'err', 6000);
+            }
+
+            const uniqueJobsCount = Object.keys(sbjobCounts).length;
+            showToast(`✅ ไฟล์ปกติ: พบ ${rows.length} แถว (มี ${uniqueJobsCount} sbjob_no) กำลังเตรียมบันทึก...`, 'info', 4000);
+
+            // ==========================================
+            // ขั้นตอนที่ 2: แปลงข้อมูลและเตรียมลบของเก่า
+            // ==========================================
+            if (!fcState.masterData || fcState.masterData.length === 0) {
+                await loadForecastMasterData();
+            }
+
+            const batchId = crypto.randomUUID();
+            const importData = [];
+            const monthsToDelete = new Set();
+
+            rows.forEach(row => {
+                const rawDate  = row['prod_date'] || row['doc_date'] || row['Date'] || row['usage_date'];
+                const rawWidth = row['Size'] || row['size'] || row['Width'] || row['width'];
+                const rawKgs   = row['used_kgs'] || row['kgs'] || row['Kgs'];
+                const rawGrade = row['grade'] || row['Grade'];
+                const customer = row['customer_code'] || row['Customer'] || row['customer_name'] || row['roll_for_customer'] || '';
+                const jobNo    = String(row['sbjob_no'] || row['SBJOB_NO'] || row['job_no'] || '').trim();
+
+                const width = parseFloat(rawWidth) || 0;
+                const kgs   = parseFloat(rawKgs) || 0;
+                const grade = typeof normalizeGrade === 'function' ? normalizeGrade(rawGrade || '') : String(rawGrade || '').toUpperCase();
+                const dateISO = typeof toISODate === 'function' ? toISODate(rawDate) : rawDate;
+
+                if (dateISO && dateISO.length >= 7) {
+                    monthsToDelete.add(dateISO.slice(0, 7));
+                }
+
+                // ใช้ตัวหา master ตัวเดียวกับ Pivot เพื่อให้ item_code ที่บันทึกสอดคล้องกัน
+                const item = findMasterForUsageRow(String(grade || '').trim().toUpperCase(), width, '');
+
+                importData.push({
+                    usage_date: dateISO,
+                    doc_date:   dateISO,
+                    sbjob_no:   jobNo,
+                    grade:      grade,
+                    width:      width,
+                    used_kgs:   kgs,
+                    kgs:        kgs,
+                    roll_for_customer: customer,
+                    item_code:  item ? (item.item_code || '') : '',
+                    is_valid:   true,
+                    import_batch_id: batchId,
+                    created_by: (typeof currentUser !== 'undefined' && currentUser?.id) || null
+                });
+            });
+
+            const validData = importData.filter(d => d.usage_date && d.grade && d.width > 0);
+            if (validData.length === 0) return showToast('ไม่พบข้อมูลที่ถูกต้อง', 'warn');
+
+            // ==========================================
+            // ลบข้อมูลเก่าของเดือนนั้นๆ ทิ้งก่อน (เขียนทับ)
+            // ==========================================
+            if (monthsToDelete.size > 0) {
+                showToast('กำลังล้างข้อมูลเก่าของเดือนในไฟล์นี้...', 'info');
+                for (const m of monthsToDelete) {
+                    const [y, mo] = m.split('-').map(Number);
+                    const firstDay = `${m}-01`;
+                    const lastDay  = fcLastDayOfMonth(y, mo);
+
+                    const { error: delError } = await supabase
+                        .from('usage_records_raw')
+                        .delete()
+                        .gte('usage_date', firstDay)
+                        .lte('usage_date', lastDay);
+
+                    if (delError) {
+                        console.error(`ลบข้อมูลเดือน ${m} ไม่สำเร็จ:`, delError);
+                        return showToast(`ลบข้อมูลเก่าไม่สำเร็จ (ติด RLS หรือ Network): ${delError.message}`, 'err', 6000);
+                    }
+                }
+            }
+
+            // ==========================================
+            // ขั้นตอนที่ 3: บันทึกข้อมูลใหม่
+            // ==========================================
+            showToast(`กำลังบันทึก ${validData.length} รายการ...`, 'info');
+
+            const CHUNK = 500;
+            let ok = 0, fail = 0;
+            for (let i = 0; i < validData.length; i += CHUNK) {
+                const chunk = validData.slice(i, i + CHUNK);
+                const { error } = await supabase.from('usage_records_raw').insert(chunk);
+                if (error) {
+                    fail += chunk.length;
+                    console.error('Insert error:', error);
+                } else {
+                    ok += chunk.length;
+                }
+            }
+
+            if (fail > 0) {
+                showToast(`Import สำเร็จ ${ok} / ล้มเหลว ${fail}`, 'err', 5000);
+            } else {
+                showToast(`Import สำเร็จ ${ok} รายการ`, 'ok');
+            }
+
+            const fileInput = document.getElementById('pivot-file-upload');
+            if (fileInput) fileInput.value = '';
+            loadUsagePivot();
+
+        } catch (err) {
+            console.error(err);
+            showToast('เกิดข้อผิดพลาด: ' + err.message, 'err');
+        }
+    };
+    reader.readAsArrayBuffer(file);
 }
