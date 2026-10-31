@@ -981,3 +981,31 @@ table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
     border-color: var(--primary);
     color: var(--primary);
 }
+/* ==========================================
+   Custom Styles for Usage Pivot Sub-Tabs
+   ========================================== */
+
+/* จัดตำแหน่งกล่องปุ่ม Tab ให้อยู่มุมขวา */
+#pivot-sub-tabs {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px; /* ระยะห่างระหว่างปุ่ม */
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+/* 🟢 สไตล์พิเศษสำหรับปุ่ม FSC (ตอนที่ยังไม่ถูกกด) */
+#btn-tab-fsc {
+    border: 1.5px solid var(--green) !important;
+    color: var(--green-dark) !important;
+    background-color: var(--green-soft) !important;
+}
+
+/* 🟢 สไตล์พิเศษสำหรับปุ่ม FSC (ตอนที่ถูกกด Active) */
+#btn-tab-fsc.active {
+    background-color: var(--green) !important;
+    color: #ffffff !important;
+    border-color: var(--green-dark) !important;
+    box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3) !important;
+}
