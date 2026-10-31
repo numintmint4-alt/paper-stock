@@ -1009,3 +1009,71 @@ table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
     border-color: var(--green-dark) !important;
     box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3) !important;
 }
+/* ================= YEARLY PIVOT TABLE ================= */
+.yearly-pivot-table {
+    border-collapse: collapse;
+    width: max-content;
+    min-width: 100%;
+    font-size: 12px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow-sm);
+    background: #fff;
+}
+
+.yearly-pivot-table th, 
+.yearly-pivot-table td {
+    border: 1px solid var(--border-strong);
+    padding: 6px 8px;
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* หัวตาราง (Grade) */
+.yearly-pivot-header-grade {
+    background: var(--primary-dark) !important;
+    color: #fff !important;
+    text-align: left !important;
+    font-weight: 800;
+    font-size: 14px;
+    padding-left: 12px !important;
+    position: sticky;
+    left: 0;
+    z-index: 10;
+}
+
+/* คอลัมน์เดือน */
+.yearly-pivot-month-col {
+    background: var(--surface-soft);
+    font-weight: 700;
+    color: var(--text);
+    text-align: left !important;
+    padding-left: 12px !important;
+    position: sticky;
+    left: 0;
+    z-index: 5;
+}
+
+/* คอลัมน์ Total (ขวาสุด) */
+.yearly-pivot-total-col {
+    background: var(--primary-soft);
+    color: var(--primary-dark);
+    font-weight: 800;
+}
+
+/* แถว Total ล่างสุดของแต่ละ Grade */
+.yearly-pivot-row-total td {
+    background: #cbd5e1;
+    font-weight: 800;
+    color: var(--text);
+}
+.yearly-pivot-row-total .yearly-pivot-month-col {
+    background: #94a3b8;
+    color: #fff;
+}
+
+/* สลับสีพื้นหลังของแต่ละ Grade */
+.yearly-pivot-table:nth-child(even) tbody td:not(.yearly-pivot-month-col):not(.yearly-pivot-total-col) { background-color: #f8fafc; }
+.yearly-pivot-table:nth-child(odd) tbody td:not(.yearly-pivot-month-col):not(.yearly-pivot-total-col) { background-color: #ffffff; }
+
+/* ไฮไลท์เมื่อ Hover */
+.yearly-pivot-table tbody tr:hover td:not(.yearly-pivot-month-col) { background-color: var(--primary-soft) !important; }
