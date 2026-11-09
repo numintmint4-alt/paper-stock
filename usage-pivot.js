@@ -48,7 +48,7 @@ async function handleUsageImport(event) {
                 const rolls = stdWeight > 0 ? (kgs / stdWeight) : 0;
 
                 return {
-                    prod_date: row['prod_date'] ? String(row['prod_date']).split(' ')[0] : null,
+                    prod_date: row['prod_date'] ? (typeof toISODate === 'function' ? toISODate(row['prod_date']) : String(row['prod_date']).split(' ')[0]) : null,
                     customer_code: row['customer_code'],
                     customer_name: row['customer_name'],
                     grade: grade, // บันทึกเป็น Format มาตรฐาน
@@ -90,16 +90,16 @@ async function loadUsagePivot() {
     const thead = document.getElementById('pivot-thead');
     if (!tbody || !thead) return;
 
-    // ✅ แสดง Loading แบบ Dynamic
     tbody.innerHTML = '<tr><td colspan="100%" style="text-align:center;padding:20px;">Loading...</td></tr>';
 
     try {
-        // ✅ หาวันสุดท้ายของเดือนแบบถูกต้อง (เช่น 2026-02 -> 2026-02-28)
+        // ✅ หาวันแรก และวันสุดท้ายของเดือน (บังคับ Format YYYY-MM-DD)
         const [year, monthNum] = month.split('-').map(Number);
         const lastDay = new Date(year, monthNum, 0).getDate();
-        const startDate = `${month}-01`;
-        const endDate = `${month}-${String(lastDay).padStart(2, '0')}`;
+        const startDate = typeof toISODate === 'function' ? toISODate(`${month}-01`) : `${month}-01`;
+        const endDate = typeof toISODate === 'function' ? toISODate(`${month}-${String(lastDay).padStart(2, '0')}`) : `${month}-${String(lastDay).padStart(2, '0')}`;
 
+        // ✅ ตรวจสอบให้ชัวร์ว่าใน DB ชื่อคอลัมน์คือ 'grade' จริงๆ (ถ้าเป็นชื่ออื่นให้เปลี่ยนตรง select)
         const { data, error } = await supabase
             .from('usage_records')
             .select('grade, width, rolls, customer_name')
@@ -113,10 +113,13 @@ async function loadUsagePivot() {
 
         (data || []).forEach(row => {
             allWidths.add(row.width);
-            if (!pivotData[row.grade]) pivotData[row.grade] = { total: 0 };
-            if (!pivotData[row.grade][row.width]) pivotData[row.grade][row.width] = 0;
-            pivotData[row.grade][row.width] += Number(row.rolls || 0);
-            pivotData[row.grade].total += Number(row.rolls || 0);
+            // ดึง Grade ออกมา (รองรับทั้ง grade และ gradegram เผื่อใน DB ตั้งชื่อต่างกัน)
+            const gradeKey = row.grade || row.gradegram || 'UNKNOWN';
+            
+            if (!pivotData[gradeKey]) pivotData[gradeKey] = { total: 0 };
+            if (!pivotData[gradeKey][row.width]) pivotData[gradeKey][row.width] = 0;
+            pivotData[gradeKey][row.width] += Number(row.rolls || 0);
+            pivotData[gradeKey].total += Number(row.rolls || 0);
         });
 
         const sortedWidths = Array.from(allWidths).sort((a, b) => a - b);
@@ -130,7 +133,6 @@ async function loadUsagePivot() {
         const grades = Object.keys(pivotData).sort();
         
         if (!grades.length) {
-            // ✅ ใช้ colspan แบบ Dynamic ตามจำนวนคอลัมน์จริง
             tbody.innerHTML = `<tr><td colspan="${sortedWidths.length + 2}" style="text-align:center;color:#94a3b8;padding:20px;">ไม่มีข้อมูลในเดือนนี้</td></tr>`;
             return;
         }
