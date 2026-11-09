@@ -1,18 +1,18 @@
 // ==========================================
-// forecast.js - Production Forecast & Usage Pivot (FIXED v3)
+// forecast.js - Production Forecast & Usage Pivot (FIXED v4)
 // ==========================================
 
 const fcState = {
     currentGradeGroup: 'CA',
     masterData: [],
-    masterMap: new Map(), // ✅ เพิ่ม Map สำหรับค้นหาข้อมูลเร็วขึ้น (ข้อ 3)
+    masterMap: new Map(), // ✅ Map สำหรับค้นหาข้อมูลเร็วขึ้น
     // pivot state
     pivotData: null,
     pivotWidths: [],
     pivotMonth: '',
     pivotCustomer: 'ALL',
-    pivotCustomers: [],  // รายชื่อลูกค้าที่โหลดมา
-    pivotGradeFilter: 'ALL',  // แท็บกรองเกรดในหน้า Pivot (กรองเฉพาะตอนแสดงผล)
+    pivotCustomers: [],
+    pivotGradeFilter: 'ALL',
     // 🛡️ locks กันกดซ้ำ (Race Condition)
     _loadingPivot: false,
     _savingForecast: false,
@@ -65,7 +65,7 @@ function initForecastDatePickers() {
         });
     }
 
-    // ✅ แก้ไข (ข้อ 4): ให้ m1, m2, m3 ถอยหลังอัตโนมัติ
+    // ✅ ให้ m1, m2, m3 ถอยหลังอัตโนมัติ
     const getMonthStr = (offset) => {
         const d = new Date();
         d.setMonth(d.getMonth() + offset);
@@ -143,13 +143,10 @@ async function loadForecastMasterData() {
 
     fcState.masterData = unique;
 
-    // ✅ แก้ไข (จุดที่ 1): สร้าง Map ที่แม่นยำขึ้น
-    // บังคับให้ 1 Grade+Size มีแค่ 1 รายการ และ Std Weight ต้อง > 0
+    // ✅ สร้าง Map ที่แม่นยำขึ้น (บังคับให้ 1 Grade+Size มีแค่ 1 รายการ และ Std Weight ต้อง > 0)
     fcState.masterMap.clear();
     unique.forEach(m => {
         if (!m.std_weight_kg || Number(m.std_weight_kg) <= 0) return; // ข้ามถ้าน้ำหนัก 0
-
-        // ใช้ Grade+Size เป็น Key หลัก
         const key = `${String(m.grade).trim().toUpperCase()}-${Number(m.size)}`;
         if (!fcState.masterMap.has(key)) {
             fcState.masterMap.set(key, m);
@@ -201,8 +198,6 @@ async function loadForecastMatrix() {
 
     try {
         // 1) Stock
-        // ✅ แก้ไข (ข้อ 1): ใช้ select('*') เพื่อความชัวร์ หรือเช็กดีๆ ว่าใน DB มีคอลัมน์ rolls รวมมาแล้วหรือไม่
-        // ถ้า DB เก็บเป็นราย SN และไม่มีคอลัมน์ rolls ที่รวมแล้ว ให้ใช้ .select('grade, size')
         const { data: stockRaw } = await supabase
             .from('stock_balance')
             .select('grade, size, rolls')
@@ -211,7 +206,6 @@ async function loadForecastMatrix() {
         const stockData = {};
         (stockRaw || []).forEach(item => {
             const k = `${item.grade}-${item.size}`;
-            // ถ้าใน DB ไม่มี rolls ให้ใช้ 1 แทน (เพราะ 1 แถว = 1 ม้วน) แต่ถ้ามี rolls ให้ใช้ค่านั้น
             const rollVal = item.rolls !== undefined ? Number(item.rolls) : 1;
             stockData[k] = (stockData[k] || 0) + rollVal;
         });
@@ -309,7 +303,7 @@ async function loadForecastMatrix() {
             tr.dataset.grade = m.grade;
             tr.dataset.width = m.size;
             tr.dataset.avg3 = avg3;
-            tr.dataset.stockLevel = 0; // ถ้ามีตาราง stock_level ให้ดึงมาใส่ตรงนี้
+            tr.dataset.stockLevel = 0;
 
             tr.querySelectorAll('.fc-input').forEach(inp => {
                 inp.addEventListener('change', () => recalculateRow(tr, stockQty, prev));
@@ -352,13 +346,8 @@ function recalculateRow(tr, stockQty, prev) {
 
     const rollSND = Number(stockQty) + reserve;
 
-    // ✅ แก้ไข (ข้อ 2): ป้องกันการบวกซ้ำซ้อน
-    // ปกติ actual (Avg 3 เดือน + Forecast) คือยอดที่ต้องใช้อยู่แล้ว
-    // ไม่ควรเอา prevActual มาบวกทับอีก (ยกเว้นคุณมีสูตรเฉพาะ)
+    // ป้องกันการบวกซ้ำซ้อน: actual คือยอดที่ต้องใช้อยู่แล้ว ไม่บวก prevActual ทับ
     const estUse = actual - rollSND;
-
-    // ถ้าต้องการให้บวก prevActual ด้วย ให้เปลี่ยนเป็น:
-    // const estUse = actual + prevActual - rollSND;
 
     const stockLvl50 = stockLvl / 2;
     const orderCalc  = estUse + stockLvl50 + adjust;
@@ -446,7 +435,7 @@ async function initUsagePivotTab() {
         monthInput.value = fcCurrentMonthStr();
     }
 
-    // โหลด Master Data ล่วงหน้าตอนเปิดแท็บ เพื่อให้ตอนกด Load Pivot ใช้ชุดเดิมซ้ำ ไม่ต้องโหลดใหม่ทุกครั้ง
+    // โหลด Master Data ล่วงหน้าตอนเปิดแท็บ
     await loadForecastMasterData();
 
     // populate dropdown ลูกค้า
@@ -534,64 +523,45 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// หา master item จากแถว usage (รองรับ gram แบบ 125.0 / 0125 และ grade ที่เก็บรวมหรือแยก)
-// ลำดับความแม่นยำ: item_code → GRADE-SIZE → แยก grade/gram/size → grade+size
+// ✅ [แก้ #1] หา master item จากแถว usage
+// ปรับให้ normalize โดยตัดช่องว่าง/ขีดกลาง/ขีดล่างออก เพื่อให้ "KA-125", "KA 125", "KA_125", "KA125" จับคู่กันได้หมด
 function findMasterForUsageRow(rowGrade, rowSize, rowItemCode) {
     const master = fcState.masterData;
+    // ลบช่องว่าง, ขีดกลาง, ตัวพิมพ์เล็ก ให้เหลือแต่ตัวอักษรและตัวเลข
+    const clean = (v) => String(v ?? '').replace(/[\s\-_]/g, '').toUpperCase();
 
-    // ลบช่องว่างทั้งหมด + ตัวพิมพ์ใหญ่
-    const norm = (v) => String(v ?? '').trim().replace(/\s+/g, '').toUpperCase();
-
-    // จัดรูปแกรมให้เทียบกันได้: "125.0" → "125", "085" → "85", ว่าง → ""
-    const normGram = (v) => {
-        const s = String(v ?? '').trim();
-        if (s === '') return '';
-        const n = Number(s);
-        return isNaN(n) ? s.toUpperCase() : String(n);
-    };
-
-    const rCode  = norm(rowItemCode);
-    const rGrade = norm(rowGrade);   // เช่น "KK125"
+    const rCode  = clean(rowItemCode);
+    const rGrade = clean(rowGrade);
     const rSize  = Number(rowSize);
 
-    // ชั้นที่ 1: ถ้า raw data มี item_code ให้จับคู่ตรงๆ ก่อน (แม่นที่สุด เช่น KA125-44)
+    // ชั้นที่ 1: จับ item_code ตรงๆ
     if (rCode) {
-        const hit = master.find(m => norm(m.item_code) === rCode);
+        const hit = master.find(m => clean(m.item_code) === rCode);
         if (hit) return hit;
     }
 
-    // ชั้นที่ 2: ประกอบ Grade + Size เป็น item_code (เช่น KA125 + 44 = KA125-44)
-    const composed = norm(`${rGrade}-${rSize}`);
-    let hit = master.find(m => norm(m.item_code) === composed);
+    // ชั้นที่ 2: ประกอบ Grade + Size เป็น item_code (เช่น KA125 + 44 = KA12544)
+    const composed = `${rGrade}${rSize}`;
+    let hit = master.find(m => clean(m.item_code) === composed);
     if (hit) return hit;
 
-    // ชั้นที่ 3: แยก "KK125" เป็น "KK" + "125" แล้วเทียบ Grade, Gram, Size แยกกัน
+    // ชั้นที่ 3: แยก "KK125" เป็น "KK" + "125" แล้วเทียบ grade / gram / size แยกกัน
     const gradeMatch = rGrade.match(/^([A-Z]+)(\d+)$/);
-    const baseGrade = gradeMatch ? gradeMatch[1] : rGrade;          // "KK"
-    const baseGram  = gradeMatch ? normGram(gradeMatch[2]) : '';    // "125"
+    if (gradeMatch) {
+        const baseGrade = gradeMatch[1];
+        const baseGram  = gradeMatch[2];
 
-    hit = master.find(m => {
-        if (Number(m.size) !== rSize) return false;
+        hit = master.find(m => {
+            if (Number(m.size) !== rSize) return false;
+            const mGrade = clean(m.grade);
+            const mGram  = String(Number(m.gram));
+            return mGrade === baseGrade && mGram === baseGram;
+        });
+        if (hit) return hit;
+    }
 
-        const mGrade = norm(m.grade);
-        const mGram  = normGram(m.gram);
-
-        // 3.1: Master เก็บ Grade แยก (KK) และ Gram แยก (125)
-        if (gradeMatch && mGrade === baseGrade && mGram === baseGram) return true;
-
-        // 3.2: Master เก็บ Grade รวมกันเป็น "KK125" เลย
-        if (mGrade === rGrade) return true;
-
-        return false;
-    });
-    if (hit) return hit;
-
-    // ชั้นที่ 4: Fallback สุดท้าย ลองเทียบ Grade + Size ตรงๆ
-    // (เผื่อ raw data ใส่มาแค่ "KK" โดยไม่มีแกรม)
-    hit = master.find(m =>
-        norm(m.grade) === rGrade && Number(m.size) === rSize
-    );
-
+    // ชั้นที่ 4: Fallback เทียบ Grade + Size ตรงๆ
+    hit = master.find(m => clean(m.grade) === rGrade && Number(m.size) === rSize);
     return hit || null;
 }
 
@@ -675,15 +645,13 @@ function filterPivotByGrade(gradeGroup, btnElement) {
     renderUsagePivotTable();
 }
 
-// 🛡️ กันกดซ้ำ (Race Condition): ถ้ากำลังโหลดอยู่ ให้หยุดทันที และ disable ปุ่มระหว่างโหลด
-// ตัวทำงานจริงอยู่ใน _loadUsagePivotImpl
+// 🛡️ กันกดซ้ำ (Race Condition)
 async function loadUsagePivot() {
     if (fcState._loadingPivot) return;
 
     const btnLoad = document.querySelector('button[onclick="loadUsagePivot()"]')
                  || document.getElementById('btnLoadPivot');
 
-    // ถ้าปุ่มถูก disable อยู่ (เช่น กำลังโหลดจากทางอื่น) ก็ไม่ต้องทำอะไร
     if (btnLoad && btnLoad.disabled) return;
 
     fcState._loadingPivot = true;
@@ -697,7 +665,6 @@ async function loadUsagePivot() {
     try {
         await _loadUsagePivotImpl();
     } finally {
-        // ปลดล็อคเมื่อโหลดเสร็จ (ไม่ว่าจะสำเร็จหรือ error)
         fcState._loadingPivot = false;
         if (btnLoad) {
             btnLoad.disabled = false;
@@ -724,18 +691,16 @@ async function _loadUsagePivotImpl() {
 
     try {
         // Master โหลดมาแล้วจาก initUsagePivotTab → ใช้ชุดเดิม ไม่โหลดซ้ำทุกครั้งที่กดปุ่ม
-        // เผื่อกรณีที่ยังว่าง (เช่น โหลดไม่สำเร็จตอนเปิดแท็บ) ให้ลองโหลดอีกครั้งเดียว
         if (!fcState.masterData || fcState.masterData.length === 0) {
             await loadForecastMasterData();
         }
 
-        // ถ้า Master ยังว่างอยู่ ห้ามคำนวณต่อ เพราะทุกรายการจะขึ้นว่าไม่มีใน Master
         if (!fcState.masterData || fcState.masterData.length === 0) {
             tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:red;">ไม่พบข้อมูล Master Data กรุณารีเฟรชหน้าเว็บ</td></tr>`;
             return showToast('ไม่พบ Master Data', 'err');
         }
 
-        // ✅ แก้ไข (จุดที่ 3): ดึง usage_date และ doc_no มาช่วยกันซ้ำ และกรอง is_valid = true
+        // ดึง usage_date และ doc_no มาช่วยกันซ้ำ และกรอง is_valid = true
         const data = await fetchAllRows(() => {
             let q = supabase
                 .from('usage_records_raw')
@@ -755,37 +720,47 @@ async function _loadUsagePivotImpl() {
         const missingMasterSet = new Set();
         const processedRows = new Set(); // ✅ กันการบวกซ้ำ
 
+        // ✅ [แก้ #2] forEach ใหม่:
+        // - บังคับ bucket ตาม Master (grade+gram) เพื่อไม่ให้ข้อมูลไปตกใน grade ที่พิมพ์เพี้ยน
+        // - log console.warn เมื่อหา Master ไม่เจอ
+        // - เพิ่ม allWidths เฉพาะแถวที่นับจริง
         (data || []).forEach(row => {
-            allWidths.add(row.width);
-
-            // สร้าง Unique Key ของแถวนี้ เพื่อป้องกันข้อมูลซ้ำจาก DB
-            const rowUniqueKey = `${row.usage_date}_${row.doc_no}_${row.grade}_${row.width}_${row.used_kgs}`;
+            const rowUniqueKey = `${row.usage_date}_${row.grade}_${row.width}_${row.used_kgs}`;
             if (processedRows.has(rowUniqueKey)) return;
             processedRows.add(rowUniqueKey);
-
-            if (!pivotData[row.grade]) pivotData[row.grade] = { total: 0 };
-            if (!pivotData[row.grade][row.width]) pivotData[row.grade][row.width] = 0;
 
             const rowGrade    = String(row.grade || '').trim().toUpperCase();
             const rowSize     = Number(row.width);
             const rowItemCode = String(row.item_code || '').trim().toUpperCase();
 
-            // ✅ แก้ไข (จุดที่ 2): ใช้ฟังก์ชันค้นหา Master ตัวเดิมที่แม่นยำ (รองรับการแยกแกรม)
             const masterItem = findMasterForUsageRow(rowGrade, rowSize, rowItemCode);
 
-            const kgs = Number(row.used_kgs);
+            let finalGrade = rowGrade;
             let rolls = null;
 
             if (!masterItem || !masterItem.std_weight_kg || Number(masterItem.std_weight_kg) <= 0) {
+                // ✅ เพิ่ม console.warn เพื่อดูใน F12 ว่ามีแถวไหนหาไม่เจอ
+                console.warn('❌ หา Master ไม่เจอ:', row.grade, row.width, row.item_code);
                 missingMasterSet.add(rowItemCode || `${rowGrade}-${rowSize}`);
             } else {
-                // คำนวณม้วน
-                rolls = kgs / Number(masterItem.std_weight_kg);
+                rolls = Number(row.used_kgs) / Number(masterItem.std_weight_kg);
+
+                // ✅ บังคับใช้ชื่อ Grade จาก Master Data
+                if (masterItem.gram) {
+                    finalGrade = `${masterItem.grade}${masterItem.gram}`;
+                } else {
+                    finalGrade = masterItem.grade;
+                }
             }
 
             if (rolls !== null) {
-                pivotData[row.grade][row.width] += rolls;
-                pivotData[row.grade].total     += rolls;
+                if (!pivotData[finalGrade]) pivotData[finalGrade] = { total: 0 };
+                if (!pivotData[finalGrade][rowSize]) pivotData[finalGrade][rowSize] = 0;
+
+                pivotData[finalGrade][rowSize] += rolls;
+                pivotData[finalGrade].total     += rolls;
+
+                allWidths.add(rowSize);
             }
         });
 
@@ -814,7 +789,6 @@ async function _loadUsagePivotImpl() {
         }
 
         // เก็บข้อมูล "ทุกเกรด" ไว้ใน state เสมอ (saveUsageSnapshot ใช้ชุดนี้)
-        // การกรองด้วยแท็บเกรดทำเฉพาะตอนแสดงผลใน renderUsagePivotTable()
         fcState.pivotData     = pivotData;
         fcState.pivotWidths   = Array.from(allWidths).sort((a, b) => a - b);
         fcState.pivotMonth    = month;
@@ -1038,10 +1012,8 @@ async function handleUsageImport(event) {
                 }
             }
 
-            // ✅ แก้ไข (ข้อ 5): แจ้งเตือนให้ชัดเจนถ้าล้มเหลว
             if (fail > 0) {
                 showToast(`❌ Import ล้มเหลว! (สำเร็จ ${ok} / ล้มเหลว ${fail})`, 'err', 8000);
-                // แสดง Modal หรือ Alert ให้ผู้ใช้รู้ว่าต้อง Import ไฟล์เดิมซ้ำ
                 alert(`คำเตือน: การนำเข้าข้อมูลล้มเหลวบางส่วน!\n\nสาเหตุ: ${insertErrorMsg}\n\nกรุณากด Import ไฟล์เดิมซ้ำอีกครั้งเพื่อให้ข้อมูลสมบูรณ์ (ระบบได้ลบข้อมูลเก่าไปแล้ว)`);
             } else {
                 showToast(`Import สำเร็จ ${ok} รายการ`, 'ok');
@@ -1218,7 +1190,7 @@ async function loadYearlyPivot() {
 
         // 3. ประมวลผลข้อมูล (จัดกลุ่มตาม Grade -> Size -> Month)
         const monthNames = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
-        const pivotData = {}; // { "KA125": { sizes: Set, data: { 0: {34: 1.5, 36: 2.0}, 1: {...} } } }
+        const pivotData = {};
         const allSizesSet = new Set();
 
         data.forEach(row => {
@@ -1234,22 +1206,18 @@ async function loadYearlyPivot() {
 
             const rolls = Number(row.used_kgs) / Number(masterItem.std_weight_kg);
 
-            // สร้าง Key ของ Grade (เช่น KA125, KA150)
-            // ถ้าใน DB เก็บ grade='KA', gram='125' ให้เอาคำว่า KA125
-            // แต่ถ้าใน DB เก็บ grade='KA125' เลย ก็ใช้ค่านั้น
+            // สร้าง Key ของ Grade จาก Master (ถ้ามี gram ให้ต่อท้าย)
             const masterGrade = String(masterItem.grade || '').trim().toUpperCase();
             const masterGram = String(masterItem.gram || '').trim();
             const gradeKey = masterGrade.includes(masterGram) ? masterGrade : `${masterGrade}${masterGram}`;
 
             if (!pivotData[gradeKey]) {
                 pivotData[gradeKey] = { data: {} };
-                // สร้างแถวสำหรับ 12 เดือน
                 for (let m = 0; m < 12; m++) pivotData[gradeKey].data[m] = {};
             }
 
             allSizesSet.add(rowSize);
 
-            // บวกสะสมยอด
             if (!pivotData[gradeKey].data[monthIndex][rowSize]) {
                 pivotData[gradeKey].data[monthIndex][rowSize] = 0;
             }
@@ -1284,20 +1252,20 @@ async function loadYearlyPivot() {
             for (let m = 0; m < 12; m++) {
                 let monthTotal = 0;
                 html += `<tr><td class="yearly-pivot-month-col">${monthNames[m]}</td>`;
-                
+
                 sortedSizes.forEach(size => {
                     const val = pivotData[grade].data[m][size] || 0;
                     monthTotal += val;
                     html += `<td>${val > 0 ? val.toFixed(2) : ''}</td>`;
                 });
-                
+
                 html += `<td class="yearly-pivot-total-col">${monthTotal > 0 ? monthTotal.toFixed(2) : ''}</td></tr>`;
             }
 
             // แถว Total ล่างสุด
             html += `<tr class="yearly-pivot-row-total">
                 <td class="yearly-pivot-month-col">Total</td>`;
-            
+
             let grandTotal = 0;
             sortedSizes.forEach(size => {
                 let sizeTotal = 0;
@@ -1307,7 +1275,7 @@ async function loadYearlyPivot() {
                 grandTotal += sizeTotal;
                 html += `<td>${sizeTotal > 0 ? sizeTotal.toFixed(2) : ''}</td>`;
             });
-            
+
             html += `<td class="yearly-pivot-total-col">${grandTotal > 0 ? grandTotal.toFixed(2) : ''}</td></tr>`;
             html += `</tbody></table>`;
         });
