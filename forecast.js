@@ -1,10 +1,11 @@
 // ==========================================
-// forecast.js - Production Forecast & Usage Pivot (FIXED v2)
+// forecast.js - Production Forecast & Usage Pivot (FIXED v3)
 // ==========================================
 
 const fcState = {
     currentGradeGroup: 'CA',
     masterData: [],
+    masterMap: new Map(), // ✅ เพิ่ม Map สำหรับค้นหาข้อมูลเร็วขึ้น (ข้อ 3)
     // pivot state
     pivotData: null,
     pivotWidths: [],
@@ -64,11 +65,24 @@ function initForecastDatePickers() {
         });
     }
 
-    // default ค่า month inputs (ถ้ายังว่าง)
-    const cur = fcCurrentMonthStr();
-    ['fc-month', 'fc-m1', 'fc-m2', 'fc-m3', 'fc-prev-month'].forEach(id => {
+    // ✅ แก้ไข (ข้อ 4): ให้ m1, m2, m3 ถอยหลังอัตโนมัติ
+    const getMonthStr = (offset) => {
+        const d = new Date();
+        d.setMonth(d.getMonth() + offset);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    };
+
+    const defaults = {
+        'fc-month': getMonthStr(1),       // เดือนหน้า
+        'fc-m1': getMonthStr(-1),         // เดือนที่แล้ว
+        'fc-m2': getMonthStr(-2),         // 2 เดือนที่แล้ว
+        'fc-m3': getMonthStr(-3),         // 3 เดือนที่แล้ว
+        'fc-prev-month': getMonthStr(-1)  // เดือนที่แล้ว
+    };
+
+    Object.keys(defaults).forEach(id => {
         const el = document.getElementById(id);
-        if (el && !el.value) el.value = cur;
+        if (el && !el.value) el.value = defaults[id];
     });
 }
 
@@ -128,6 +142,16 @@ async function loadForecastMasterData() {
     }
 
     fcState.masterData = unique;
+
+    // ✅ แก้ไข (ข้อ 3): สร้าง Map สำหรับค้นหาข้อมูลเร็วขึ้น
+    fcState.masterMap.clear();
+    unique.forEach(m => {
+        const key = `${String(m.grade).toUpperCase()}-${Number(m.size)}`;
+        if (!fcState.masterMap.has(key)) {
+            fcState.masterMap.set(key, m);
+        }
+    });
+
     console.log(`✅ โหลด Master Data สำเร็จ: ${rows.length} แถว → ${unique.length} รายการ (หลังลบซ้ำ)`);
 }
 
@@ -173,6 +197,8 @@ async function loadForecastMatrix() {
 
     try {
         // 1) Stock
+        // ✅ แก้ไข (ข้อ 1): ใช้ select('*') เพื่อความชัวร์ หรือเช็กดีๆ ว่าใน DB มีคอลัมน์ rolls รวมมาแล้วหรือไม่
+        // ถ้า DB เก็บเป็นราย SN และไม่มีคอลัมน์ rolls ที่รวมแล้ว ให้ใช้ .select('grade, size')
         const { data: stockRaw } = await supabase
             .from('stock_balance')
             .select('grade, size, rolls')
@@ -181,7 +207,9 @@ async function loadForecastMatrix() {
         const stockData = {};
         (stockRaw || []).forEach(item => {
             const k = `${item.grade}-${item.size}`;
-            stockData[k] = (stockData[k] || 0) + Number(item.rolls || 0);
+            // ถ้าใน DB ไม่มี rolls ให้ใช้ 1 แทน (เพราะ 1 แถว = 1 ม้วน) แต่ถ้ามี rolls ให้ใช้ค่านั้น
+            const rollVal = item.rolls !== undefined ? Number(item.rolls) : 1;
+            stockData[k] = (stockData[k] || 0) + rollVal;
         });
 
         // 2) Forecast ที่เคยเซฟ
@@ -319,7 +347,14 @@ function recalculateRow(tr, stockQty, prev) {
         : 0;
 
     const rollSND = Number(stockQty) + reserve;
-    const estUse  = actual + prevActual - rollSND;
+
+    // ✅ แก้ไข (ข้อ 2): ป้องกันการบวกซ้ำซ้อน
+    // ปกติ actual (Avg 3 เดือน + Forecast) คือยอดที่ต้องใช้อยู่แล้ว
+    // ไม่ควรเอา prevActual มาบวกทับอีก (ยกเว้นคุณมีสูตรเฉพาะ)
+    const estUse = actual - rollSND;
+
+    // ถ้าต้องการให้บวก prevActual ด้วย ให้เปลี่ยนเป็น:
+    // const estUse = actual + prevActual - rollSND;
 
     const stockLvl50 = stockLvl / 2;
     const orderCalc  = estUse + stockLvl50 + adjust;
@@ -723,7 +758,14 @@ async function _loadUsagePivotImpl() {
             const rowSize     = Number(row.width);
             const rowItemCode = String(row.item_code || '').trim().toUpperCase();
 
-            const masterItem = findMasterForUsageRow(rowGrade, rowSize, rowItemCode);
+            // ✅ แก้ไข (ข้อ 3): ใช้ Map ค้นหาแทน Loop ปกติ
+            const mapKey = `${rowGrade}-${rowSize}`;
+            let masterItem = fcState.masterMap.get(mapKey);
+
+            // ถ้าหาไม่เจอด้วย Key หลัก ให้ใช้ฟังก์ชันเดิมเป็น Fallback (กรณีแกรมซ้อน)
+            if (!masterItem) {
+                masterItem = findMasterForUsageRow(rowGrade, rowSize, rowItemCode);
+            }
 
             const kgs = Number(row.used_kgs);
             let rolls = null;
@@ -975,19 +1017,25 @@ async function handleUsageImport(event) {
 
             const CHUNK = 500;
             let ok = 0, fail = 0;
+            let insertErrorMsg = '';
+
             for (let i = 0; i < validData.length; i += CHUNK) {
                 const chunk = validData.slice(i, i + CHUNK);
                 const { error } = await supabase.from('usage_records_raw').insert(chunk);
                 if (error) {
                     fail += chunk.length;
+                    insertErrorMsg = error.message; // เก็บ Error ไว้
                     console.error('Insert error:', error);
                 } else {
                     ok += chunk.length;
                 }
             }
 
+            // ✅ แก้ไข (ข้อ 5): แจ้งเตือนให้ชัดเจนถ้าล้มเหลว
             if (fail > 0) {
-                showToast(`Import สำเร็จ ${ok} / ล้มเหลว ${fail}`, 'err', 5000);
+                showToast(`❌ Import ล้มเหลว! (สำเร็จ ${ok} / ล้มเหลว ${fail})`, 'err', 8000);
+                // แสดง Modal หรือ Alert ให้ผู้ใช้รู้ว่าต้อง Import ไฟล์เดิมซ้ำ
+                alert(`คำเตือน: การนำเข้าข้อมูลล้มเหลวบางส่วน!\n\nสาเหตุ: ${insertErrorMsg}\n\nกรุณากด Import ไฟล์เดิมซ้ำอีกครั้งเพื่อให้ข้อมูลสมบูรณ์ (ระบบได้ลบข้อมูลเก่าไปแล้ว)`);
             } else {
                 showToast(`Import สำเร็จ ${ok} รายการ`, 'ok');
             }
