@@ -1,5 +1,5 @@
 // ==========================================
-// forecast.js - Production Forecast & Usage Pivot (FIXED v4)
+// forecast.js - Production Forecast & Usage Pivot (FIXED v5)
 // ==========================================
 
 const fcState = {
@@ -440,37 +440,41 @@ async function initUsagePivotTab() {
 
     // populate dropdown ลูกค้า
     const list = document.getElementById('pivotCustomerList');
-    if (!list) return;
-    if (fcState.pivotCustomers.length > 0) return;   // โหลดแล้วไม่ต้องซ้ำ
+    if (list && fcState.pivotCustomers.length === 0) {
+        try {
+            const data = await fetchAllRows(() =>
+                supabase.from('usage_records_raw').select('roll_for_customer')
+            );
 
-    try {
-        const data = await fetchAllRows(() =>
-            supabase.from('usage_records_raw').select('roll_for_customer')
-        );
+            const unique = [...new Set((data || [])
+                .map(d => (d.roll_for_customer || '').trim())
+                .filter(Boolean))]
+                .sort();
 
-        const unique = [...new Set((data || [])
-            .map(d => (d.roll_for_customer || '').trim())
-            .filter(Boolean))]
-            .sort();
+            fcState.pivotCustomers = unique;
 
-        fcState.pivotCustomers = unique;
+            list.innerHTML = unique.map(c => `
+                <label class="item" data-customer="${escAttr(c)}">
+                    <input type="checkbox" value="${escAttr(c)}">
+                    <span>${escHtml(c)}</span>
+                </label>
+            `).join('');
 
-        list.innerHTML = unique.map(c => `
-            <label class="item" data-customer="${escAttr(c)}">
-                <input type="checkbox" value="${escAttr(c)}">
-                <span>${escHtml(c)}</span>
-            </label>
-        `).join('');
-
-        list.querySelectorAll('.item input[type="checkbox"]').forEach(cb => {
-            cb.addEventListener('change', () => {
-                cb.closest('.item').classList.toggle('checked', cb.checked);
-                updatePivotCustomerLabel();
+            list.querySelectorAll('.item input[type="checkbox"]').forEach(cb => {
+                cb.addEventListener('change', () => {
+                    cb.closest('.item').classList.toggle('checked', cb.checked);
+                    updatePivotCustomerLabel();
+                });
             });
-        });
-    } catch (e) {
-        console.warn('load pivot customers error:', e);
+        } catch (e) {
+            console.warn('load pivot customers error:', e);
+        }
     }
+
+    // ✅ จุดที่ 1: ให้โหลดตาราง Pivot รายเดือนอัตโนมัติทันทีที่เข้าหน้านี้
+    setTimeout(() => {
+        loadUsagePivot();
+    }, 100);
 }
 
 // ===== helpers =====
@@ -523,8 +527,8 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// ✅ [แก้ #1] หา master item จากแถว usage
-// ปรับให้ normalize โดยตัดช่องว่าง/ขีดกลาง/ขีดล่างออก เพื่อให้ "KA-125", "KA 125", "KA_125", "KA125" จับคู่กันได้หมด
+// ✅ หา master item จากแถว usage
+// normalize โดยตัดช่องว่าง/ขีดกลาง/ขีดล่างออก เพื่อให้ "KA-125", "KA 125", "KA_125", "KA125" จับคู่กันได้หมด
 function findMasterForUsageRow(rowGrade, rowSize, rowItemCode) {
     const master = fcState.masterData;
     // ลบช่องว่าง, ขีดกลาง, ตัวพิมพ์เล็ก ให้เหลือแต่ตัวอักษรและตัวเลข
@@ -720,10 +724,7 @@ async function _loadUsagePivotImpl() {
         const missingMasterSet = new Set();
         const processedRows = new Set(); // ✅ กันการบวกซ้ำ
 
-        // ✅ [แก้ #2] forEach ใหม่:
-        // - บังคับ bucket ตาม Master (grade+gram) เพื่อไม่ให้ข้อมูลไปตกใน grade ที่พิมพ์เพี้ยน
-        // - log console.warn เมื่อหา Master ไม่เจอ
-        // - เพิ่ม allWidths เฉพาะแถวที่นับจริง
+        // forEach: บังคับ bucket ตาม Master (grade+gram) + log เมื่อหาไม่เจอ + เพิ่ม allWidths เฉพาะแถวที่นับจริง
         (data || []).forEach(row => {
             const rowUniqueKey = `${row.usage_date}_${row.grade}_${row.width}_${row.used_kgs}`;
             if (processedRows.has(rowUniqueKey)) return;
@@ -739,7 +740,6 @@ async function _loadUsagePivotImpl() {
             let rolls = null;
 
             if (!masterItem || !masterItem.std_weight_kg || Number(masterItem.std_weight_kg) <= 0) {
-                // ✅ เพิ่ม console.warn เพื่อดูใน F12 ว่ามีแถวไหนหาไม่เจอ
                 console.warn('❌ หา Master ไม่เจอ:', row.grade, row.width, row.item_code);
                 missingMasterSet.add(rowItemCode || `${rowGrade}-${rowSize}`);
             } else {
@@ -1005,7 +1005,7 @@ async function handleUsageImport(event) {
                 const { error } = await supabase.from('usage_records_raw').insert(chunk);
                 if (error) {
                     fail += chunk.length;
-                    insertErrorMsg = error.message; // เก็บ Error ไว้
+                    insertErrorMsg = error.message;
                     console.error('Insert error:', error);
                 } else {
                     ok += chunk.length;
@@ -1030,11 +1030,14 @@ async function handleUsageImport(event) {
     };
     reader.readAsArrayBuffer(file);
 }
+
 // ==========================================
 // 5. Pivot รายปี (Yearly Pivot Mode)
 // ==========================================
 
 let yearlyPivotCustomers = []; // เก็บรายชื่อลูกค้าสำหรับโหมดรายปี
+let yearlyPivotDataCache = null; // ✅ เก็บข้อมูลดิบไว้โชว์
+let yearlyPivotSizesCache = [];  // ✅ เก็บ Size ที่มีทั้งหมด
 
 // ฟังก์ชันสลับโหมด
 function switchPivotMode(mode) {
@@ -1048,19 +1051,32 @@ function switchPivotMode(mode) {
         btnYearly.classList.remove('primary');
         containerMonthly.classList.remove('hidden');
         containerYearly.classList.add('hidden');
+
+        // ✅ สลับกลับมารายเดือน → โหลดใหม่
+        loadUsagePivot();
+
     } else {
         btnYearly.classList.add('primary');
         btnMonthly.classList.remove('primary');
         containerYearly.classList.remove('hidden');
         containerMonthly.classList.add('hidden');
-        initYearlyPivot(); // เริ่มต้นโหลดข้อมูลครั้งแรก
+
+        // ✅ โหลดข้อมูลรายปีอัตโนมัติทันทีที่กดแท็บนี้
+        initYearlyPivot();
+        if (yearlyPivotDataCache) {
+            // มี Cache แล้ว → แค่วาดตารางขึ้นมาโชว์
+            renderYearlyPivotTable('CA');
+        } else {
+            // ยังไม่มีข้อมูล → โหลดอัตโนมัติ
+            loadYearlyPivot();
+        }
     }
 }
 
 // ฟังก์ชันเริ่มต้นโหมดรายปี (สร้าง Dropdown ปี และโหลดลูกค้า)
 async function initYearlyPivot() {
     const yearSelect = document.getElementById('yearly-pivot-year');
-    if (yearSelect.options.length === 0) {
+    if (yearSelect && yearSelect.options.length === 0) {
         const currentYear = new Date().getFullYear() + 543; // ปี พ.ศ. ปัจจุบัน
         for (let i = 0; i < 3; i++) {
             const opt = document.createElement('option');
@@ -1083,6 +1099,7 @@ async function loadYearlyCustomers() {
         yearlyPivotCustomers = unique;
 
         const list = document.getElementById('yearlyCustomerList');
+        if (!list) return;
         list.innerHTML = unique.map(c => `
             <label class="item" data-customer="${escAttr(c)}">
                 <input type="checkbox" value="${escAttr(c)}">
@@ -1147,15 +1164,17 @@ document.addEventListener('click', (e) => {
 // ==========================================
 async function loadYearlyPivot() {
     const btn = document.getElementById('btnLoadYearlyPivot');
-    if (btn.disabled) return;
+    if (btn && btn.disabled) return;
 
-    const year = document.getElementById('yearly-pivot-year').value; // ค.ศ.
+    const year = document.getElementById('yearly-pivot-year')?.value; // ค.ศ.
     if (!year) return showToast('กรุณาเลือกปี', 'warn');
 
     const selectedCustomers = [...document.querySelectorAll('#yearlyCustomerList input:checked')].map(cb => cb.value);
 
-    btn.disabled = true;
-    btn.innerHTML = '⏳ กำลังโหลด...';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '⏳ กำลังโหลด...';
+    }
     const container = document.getElementById('yearly-pivot-result');
     container.innerHTML = '<div style="text-align:center; padding: 20px; color: var(--primary);">กำลังประมวลผลข้อมูล...</div>';
 
@@ -1184,12 +1203,15 @@ async function loadYearlyPivot() {
         });
 
         if (!data || data.length === 0) {
+            yearlyPivotDataCache = null;
+            yearlyPivotSizesCache = [];
+            const tabsContainer = document.getElementById('yearly-grade-tabs-container');
+            if (tabsContainer) tabsContainer.classList.add('hidden');
             container.innerHTML = '<div style="text-align:center; padding: 20px; color: var(--orange-dark);">ไม่พบข้อมูล Usage ในปีที่เลือก</div>';
             return;
         }
 
         // 3. ประมวลผลข้อมูล (จัดกลุ่มตาม Grade -> Size -> Month)
-        const monthNames = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
         const pivotData = {};
         const allSizesSet = new Set();
 
@@ -1198,7 +1220,6 @@ async function loadYearlyPivot() {
             const rowSize = Number(row.width);
             const rowItemCode = String(row.item_code || '').trim().toUpperCase();
             const monthIndex = new Date(row.usage_date).getMonth(); // 0-11
-            const customer = String(row.roll_for_customer || '').trim();
 
             // หา Master และคำนวณ Rolls
             const masterItem = findMasterForUsageRow(rowGrade, rowSize, rowItemCode);
@@ -1227,67 +1248,131 @@ async function loadYearlyPivot() {
         const sortedSizes = Array.from(allSizesSet).sort((a, b) => a - b);
         const sortedGrades = Object.keys(pivotData).sort();
 
-        // 4. สร้าง HTML ตาราง
+        // 4. ตรวจว่ามีข้อมูลให้คำนวณหรือไม่
         if (sortedGrades.length === 0) {
+            yearlyPivotDataCache = null;
+            yearlyPivotSizesCache = [];
+            const tabsContainer = document.getElementById('yearly-grade-tabs-container');
+            if (tabsContainer) tabsContainer.classList.add('hidden');
             container.innerHTML = '<div style="text-align:center; padding: 20px; color: red;">ไม่พบข้อมูลที่สามารถคำนวณได้ (อาจไม่มี Master)</div>';
             return;
         }
 
-        let html = '';
-        sortedGrades.forEach(grade => {
-            html += `<table class="yearly-pivot-table">
-                <thead>
-                    <tr>
-                        <th class="yearly-pivot-header-grade" colspan="${sortedSizes.length + 2}">${escHtml(grade)}</th>
-                    </tr>
-                    <tr>
-                        <th class="yearly-pivot-month-col">เดือน / Size</th>
-                        ${sortedSizes.map(s => `<th>${s}</th>`).join('')}
-                        <th class="yearly-pivot-total-col">Total</th>
-                    </tr>
-                </thead>
-                <tbody>`;
+        // ✅ เก็บ Cache ไว้สำหรับการกด Tab
+        yearlyPivotDataCache = pivotData;
+        yearlyPivotSizesCache = sortedSizes;
 
-            // ลูป 12 เดือน
-            for (let m = 0; m < 12; m++) {
-                let monthTotal = 0;
-                html += `<tr><td class="yearly-pivot-month-col">${monthNames[m]}</td>`;
+        // ✅ แสดงปุ่ม Tabs
+        const tabsContainer = document.getElementById('yearly-grade-tabs-container');
+        if (tabsContainer) tabsContainer.classList.remove('hidden');
 
-                sortedSizes.forEach(size => {
-                    const val = pivotData[grade].data[m][size] || 0;
-                    monthTotal += val;
-                    html += `<td>${val > 0 ? val.toFixed(2) : ''}</td>`;
-                });
-
-                html += `<td class="yearly-pivot-total-col">${monthTotal > 0 ? monthTotal.toFixed(2) : ''}</td></tr>`;
-            }
-
-            // แถว Total ล่างสุด
-            html += `<tr class="yearly-pivot-row-total">
-                <td class="yearly-pivot-month-col">Total</td>`;
-
-            let grandTotal = 0;
-            sortedSizes.forEach(size => {
-                let sizeTotal = 0;
-                for (let m = 0; m < 12; m++) {
-                    sizeTotal += (pivotData[grade].data[m][size] || 0);
-                }
-                grandTotal += sizeTotal;
-                html += `<td>${sizeTotal > 0 ? sizeTotal.toFixed(2) : ''}</td>`;
-            });
-
-            html += `<td class="yearly-pivot-total-col">${grandTotal > 0 ? grandTotal.toFixed(2) : ''}</td></tr>`;
-            html += `</tbody></table>`;
-        });
-
-        container.innerHTML = html;
+        // วาดตารางเริ่มต้น (CA)
+        renderYearlyPivotTable('CA');
         showToast(`โหลด Pivot รายปีสำเร็จ`, 'ok');
 
     } catch (err) {
         console.error(err);
         container.innerHTML = `<div style="text-align:center; padding: 20px; color: red;">เกิดข้อผิดพลาด: ${escHtml(err.message)}</div>`;
     } finally {
-        btn.disabled = false;
-        btn.innerHTML = '🔍 โหลดข้อมูล Pivot รายปี';
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '🔍 โหลดข้อมูล Pivot รายปี';
+        }
     }
+}
+
+// ==========================================
+// 6. Yearly Pivot: Tabs & Render จาก Cache
+// ==========================================
+
+// ✅ ฟังก์ชันสำหรับวาดตารางตาม Grade ที่เลือก (ดึงจาก Cache)
+function renderYearlyPivotTable(gradeGroup) {
+    const container = document.getElementById('yearly-pivot-result');
+    if (!container || !yearlyPivotDataCache) return;
+
+    const monthNames = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
+    const sortedSizes = yearlyPivotSizesCache;
+
+    // กรองเกรดตามกลุ่มที่เลือก (เช่น CA จะได้ CA085, CA125)
+    const filteredGrades = Object.keys(yearlyPivotDataCache)
+        .filter(g => {
+            if (gradeGroup === 'FSC') return g.includes('F');
+            return g.startsWith(gradeGroup) && !g.includes('F'); // ถ้าเป็น CA ก็ไม่เอา CAF
+        })
+        .sort();
+
+    if (filteredGrades.length === 0) {
+        container.innerHTML = `<div style="text-align:center; padding: 20px; color: var(--text-muted);">ไม่พบข้อมูลเกรดกลุ่ม ${escHtml(gradeGroup)} ในปีนี้</div>`;
+        return;
+    }
+
+    let html = '';
+    filteredGrades.forEach(grade => {
+        html += `<table class="yearly-pivot-table">
+            <thead>
+                <tr>
+                    <th class="yearly-pivot-header-grade" colspan="${sortedSizes.length + 2}">${escHtml(grade)}</th>
+                </tr>
+                <tr>
+                    <th class="yearly-pivot-month-col">เดือน / Size</th>
+                    ${sortedSizes.map(s => `<th>${s}</th>`).join('')}
+                    <th class="yearly-pivot-total-col">Total</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
+        for (let m = 0; m < 12; m++) {
+            let monthTotal = 0;
+            html += `<tr><td class="yearly-pivot-month-col">${monthNames[m]}</td>`;
+
+            sortedSizes.forEach(size => {
+                const val = yearlyPivotDataCache[grade].data[m][size] || 0;
+                monthTotal += val;
+                html += `<td>${val > 0 ? val.toFixed(2) : ''}</td>`;
+            });
+
+            html += `<td class="yearly-pivot-total-col">${monthTotal > 0 ? monthTotal.toFixed(2) : ''}</td></tr>`;
+        }
+
+        html += `<tr class="yearly-pivot-row-total">
+            <td class="yearly-pivot-month-col">Total</td>`;
+
+        let grandTotal = 0;
+        sortedSizes.forEach(size => {
+            let sizeTotal = 0;
+            for (let m = 0; m < 12; m++) {
+                sizeTotal += (yearlyPivotDataCache[grade].data[m][size] || 0);
+            }
+            grandTotal += sizeTotal;
+            html += `<td>${sizeTotal > 0 ? sizeTotal.toFixed(2) : ''}</td>`;
+        });
+
+        html += `<td class="yearly-pivot-total-col">${grandTotal > 0 ? grandTotal.toFixed(2) : ''}</td></tr>`;
+        html += `</tbody></table>`;
+    });
+
+    container.innerHTML = html;
+}
+
+// ✅ ฟังก์ชันเปลี่ยน Tab
+function filterYearlyPivot(gradeGroup, btnElement) {
+    // รีเซ็ตสไตล์ปุ่ม
+    document.querySelectorAll('#yearly-grade-tabs-container .sub-tab').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.id === 'btn-tab-fsc-yearly') {
+            btn.style.backgroundColor = '';
+            btn.style.color = 'var(--green-dark)';
+        }
+    });
+
+    if (btnElement) {
+        btnElement.classList.add('active');
+        if (gradeGroup === 'FSC') {
+            btnElement.style.backgroundColor = 'var(--green)';
+            btnElement.style.color = '#fff';
+        }
+    }
+
+    // วาดตารางใหม่
+    renderYearlyPivotTable(gradeGroup);
 }
