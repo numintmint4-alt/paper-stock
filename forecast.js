@@ -143,16 +143,20 @@ async function loadForecastMasterData() {
 
     fcState.masterData = unique;
 
-    // ✅ แก้ไข (ข้อ 3): สร้าง Map สำหรับค้นหาข้อมูลเร็วขึ้น
+    // ✅ แก้ไข (จุดที่ 1): สร้าง Map ที่แม่นยำขึ้น
+    // บังคับให้ 1 Grade+Size มีแค่ 1 รายการ และ Std Weight ต้อง > 0
     fcState.masterMap.clear();
     unique.forEach(m => {
-        const key = `${String(m.grade).toUpperCase()}-${Number(m.size)}`;
+        if (!m.std_weight_kg || Number(m.std_weight_kg) <= 0) return; // ข้ามถ้าน้ำหนัก 0
+
+        // ใช้ Grade+Size เป็น Key หลัก
+        const key = `${String(m.grade).trim().toUpperCase()}-${Number(m.size)}`;
         if (!fcState.masterMap.has(key)) {
             fcState.masterMap.set(key, m);
         }
     });
 
-    console.log(`✅ โหลด Master Data สำเร็จ: ${rows.length} แถว → ${unique.length} รายการ (หลังลบซ้ำ)`);
+    console.log(`✅ โหลด Master Data สำเร็จ: ${rows.length} แถว → ${unique.length} รายการ`);
 }
 
 function renderGradeTabs() {
@@ -731,10 +735,11 @@ async function _loadUsagePivotImpl() {
             return showToast('ไม่พบ Master Data', 'err');
         }
 
+        // ✅ แก้ไข (จุดที่ 3): ดึง usage_date และ doc_no มาช่วยกันซ้ำ และกรอง is_valid = true
         const data = await fetchAllRows(() => {
             let q = supabase
                 .from('usage_records_raw')
-                .select('grade, width, used_kgs, item_code')
+                .select('grade, width, used_kgs, item_code, usage_date, doc_no')
                 .eq('is_valid', true)
                 .gte('usage_date', firstDay)
                 .lte('usage_date', lastDay);
@@ -748,9 +753,16 @@ async function _loadUsagePivotImpl() {
         const pivotData = {};
         const allWidths = new Set();
         const missingMasterSet = new Set();
+        const processedRows = new Set(); // ✅ กันการบวกซ้ำ
 
         (data || []).forEach(row => {
             allWidths.add(row.width);
+
+            // สร้าง Unique Key ของแถวนี้ เพื่อป้องกันข้อมูลซ้ำจาก DB
+            const rowUniqueKey = `${row.usage_date}_${row.doc_no}_${row.grade}_${row.width}_${row.used_kgs}`;
+            if (processedRows.has(rowUniqueKey)) return;
+            processedRows.add(rowUniqueKey);
+
             if (!pivotData[row.grade]) pivotData[row.grade] = { total: 0 };
             if (!pivotData[row.grade][row.width]) pivotData[row.grade][row.width] = 0;
 
@@ -758,14 +770,8 @@ async function _loadUsagePivotImpl() {
             const rowSize     = Number(row.width);
             const rowItemCode = String(row.item_code || '').trim().toUpperCase();
 
-            // ✅ แก้ไข (ข้อ 3): ใช้ Map ค้นหาแทน Loop ปกติ
-            const mapKey = `${rowGrade}-${rowSize}`;
-            let masterItem = fcState.masterMap.get(mapKey);
-
-            // ถ้าหาไม่เจอด้วย Key หลัก ให้ใช้ฟังก์ชันเดิมเป็น Fallback (กรณีแกรมซ้อน)
-            if (!masterItem) {
-                masterItem = findMasterForUsageRow(rowGrade, rowSize, rowItemCode);
-            }
+            // ✅ แก้ไข (จุดที่ 2): ใช้ฟังก์ชันค้นหา Master ตัวเดิมที่แม่นยำ (รองรับการแยกแกรม)
+            const masterItem = findMasterForUsageRow(rowGrade, rowSize, rowItemCode);
 
             const kgs = Number(row.used_kgs);
             let rolls = null;
@@ -773,6 +779,7 @@ async function _loadUsagePivotImpl() {
             if (!masterItem || !masterItem.std_weight_kg || Number(masterItem.std_weight_kg) <= 0) {
                 missingMasterSet.add(rowItemCode || `${rowGrade}-${rowSize}`);
             } else {
+                // คำนวณม้วน
                 rolls = kgs / Number(masterItem.std_weight_kg);
             }
 
