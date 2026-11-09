@@ -1229,7 +1229,7 @@ async function delUser(id, username) {
     el.onclick = e => { if (e.target === el) el.classList.remove('show'); };
   });
 
-  const dateInputIds = [
+    const dateInputIds = [
     'alertDate',
     'alertStockDate',
     'alertReceiveDate',
@@ -1242,7 +1242,8 @@ async function delUser(id, username) {
     'dtTo',
     'exportPoDateFrom',
     'exportPoDateTo',
-    'firstReceiveDateInput'
+    'firstReceiveDateInput',
+    'fc-stock-date' // ✅ เพิ่มเพื่อให้ช่องวันที่ในหน้า Forecast เป็น Flatpickr
   ];
 
   dateInputIds.forEach(id => {
