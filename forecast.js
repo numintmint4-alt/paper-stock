@@ -1,5 +1,5 @@
 // ==========================================
-// forecast.js - Production Forecast & Usage Pivot (FIXED v6)
+// forecast.js - Production Forecast & Usage Pivot (FIXED v7)
 // ==========================================
 
 const fcState = {
@@ -445,13 +445,11 @@ async function initUsagePivotTab() {
         }
     }
 
-        // ... (โค้ดด้านบนที่โหลด Master และ Customer เหมือนเดิม) ...
-
-    // ✅ โหลดประวัติ Snapshot ล่าสุด
     renderSnapshotHistory();
 
-    // ✅ แก้ไข: ลบ setTimeout ออก แล้วใช้ await เพื่อบังคับให้รอโหลดข้อมูลให้เสร็จก่อน
-    await loadUsagePivot(); 
+    setTimeout(() => {
+        loadUsagePivot();
+    }, 100);
 }
 
 // ===== helpers =====
@@ -503,23 +501,28 @@ document.addEventListener('click', (e) => {
     }
 });
 
+// ✅ [เวอร์ชันที่ถูกต้องเมื่อวาน] หา master จากแถว usage
 function findMasterForUsageRow(rowGrade, rowSize, rowItemCode) {
     const master = fcState.masterData;
+    // ลบช่องว่าง, ขีดกลาง, ตัวพิมพ์เล็ก ให้เหลือแต่ตัวอักษรและตัวเลข
     const clean = (v) => String(v ?? '').replace(/[\s\-_]/g, '').toUpperCase();
 
     const rCode  = clean(rowItemCode);
     const rGrade = clean(rowGrade);
     const rSize  = Number(rowSize);
 
+    // 1. ค้นหาด้วย item_code เป็นอันดับแรก (แม่นยำที่สุด)
     if (rCode) {
         const hit = master.find(m => clean(m.item_code) === rCode);
         if (hit) return hit;
     }
 
+    // 2. ประกอบ Grade + Size เป็น item_code (เช่น CA125 + 44 = CA12544)
     const composed = `${rGrade}${rSize}`;
     let hit = master.find(m => clean(m.item_code) === composed);
     if (hit) return hit;
 
+    // 3. แยก Grade และ Gram
     const gradeMatch = rGrade.match(/^([A-Z]+)(\d+)$/);
     if (gradeMatch) {
         const baseGrade = gradeMatch[1];
@@ -528,13 +531,15 @@ function findMasterForUsageRow(rowGrade, rowSize, rowItemCode) {
         hit = master.find(m => {
             if (Number(m.size) !== rSize) return false;
             const mGrade = clean(m.grade);
-            const mGram  = String(Number(m.gram));
+            const mGram  = String(Number(m.gram)); // แปลง 125.0 ให้เป็น 125
             return mGrade === baseGrade && mGram === baseGram;
         });
         if (hit) return hit;
     }
 
+    // 4. หาแบบ Grade + Size ตรงๆ
     hit = master.find(m => clean(m.grade) === rGrade && Number(m.size) === rSize);
+
     return hit || null;
 }
 
@@ -681,6 +686,7 @@ async function _loadUsagePivotImpl() {
         const missingMasterSet = new Set();
         const processedRows = new Set();
 
+        // ✅ [เวอร์ชันที่ถูกต้องเมื่อวาน] บังคับใช้ชื่อ Grade จาก Master
         (data || []).forEach(row => {
             const rowUniqueKey = `${row.usage_date}_${row.grade}_${row.width}_${row.used_kgs}`;
             if (processedRows.has(rowUniqueKey)) return;
@@ -701,6 +707,7 @@ async function _loadUsagePivotImpl() {
             } else {
                 rolls = Number(row.used_kgs) / Number(masterItem.std_weight_kg);
 
+                // ✅ บังคับใช้ชื่อ Grade จาก Master Data เพื่อป้องกันการนับซ้ำ
                 if (masterItem.gram) {
                     finalGrade = `${masterItem.grade}${masterItem.gram}`;
                 } else {
@@ -816,13 +823,12 @@ async function _saveUsageSnapshotImpl() {
         showToast('บันทึก Snapshot ไม่สำเร็จ: ' + error.message, 'err');
     } else {
         showToast(`บันทึก Snapshot สำเร็จ (${payloads.length} รายการ)`, 'ok');
-        // ✅ refresh history หลังบันทึก
         renderSnapshotHistory();
     }
 }
 
 // ==========================================
-// ✅ 2.1 Snapshot History
+// 2.1 Snapshot History
 // ==========================================
 async function renderSnapshotHistory() {
     const wrap = document.getElementById('snapshot-history-list');
@@ -831,7 +837,6 @@ async function renderSnapshotHistory() {
     wrap.innerHTML = '<div style="text-align:center; padding: 10px; color: var(--text-muted);">กำลังโหลดประวัติ...</div>';
 
     try {
-        // ดึง snapshot ล่าสุด 12 เดือน (เรียงจากเดือนใหม่ → เก่า)
         const { data, error } = await supabase
             .from('usage_snapshots')
             .select('snapshot_month, customer_filter, total_rolls')
@@ -845,7 +850,6 @@ async function renderSnapshotHistory() {
             return;
         }
 
-        // group by (snapshot_month, customer_filter)
         const groups = new Map();
         for (const row of data) {
             const key = `${row.snapshot_month}__${row.customer_filter}`;
@@ -880,7 +884,7 @@ async function renderSnapshotHistory() {
             </thead>
             <tbody>`;
 
-        list.forEach((g, idx) => {
+        list.forEach(g => {
             const cfLabel = g.customer_filter === 'ALL'
                 ? '<span style="color:#1e40af;font-weight:600;">ALL</span>'
                 : escHtml(g.customer_filter);
@@ -905,9 +909,7 @@ async function renderSnapshotHistory() {
 
         wrap.querySelectorAll('.btn-view-snapshot').forEach(btn => {
             btn.addEventListener('click', () => {
-                const month = btn.dataset.month;
-                const customer = btn.dataset.customer;
-                viewSnapshotDetail(month, customer);
+                viewSnapshotDetail(btn.dataset.month, btn.dataset.customer);
             });
         });
 
@@ -925,7 +927,6 @@ async function viewSnapshotDetail(month, customer) {
     if (modalTitle) modalTitle.textContent = `รายละเอียด Snapshot — ${month} / ${customer}`;
     modalBody.innerHTML = '<div style="text-align:center; padding: 20px;">กำลังโหลด...</div>';
 
-    // เปิด modal ก่อน
     const modal = document.getElementById('modalSnapshot');
     if (modal) modal.classList.add('show');
 
@@ -945,7 +946,6 @@ async function viewSnapshotDetail(month, customer) {
             return;
         }
 
-        // pivot: grade × width
         const grades = [];
         const widths = new Set();
         const map = new Map();
@@ -1134,7 +1134,7 @@ async function handleUsageImport(event) {
 }
 
 // ==========================================
-// 5. Pivot รายปี (Yearly Pivot Mode)
+// 5. Pivot รายปี
 // ==========================================
 
 let yearlyPivotCustomers = [];
@@ -1362,10 +1362,6 @@ async function loadYearlyPivot() {
         }
     }
 }
-
-// ==========================================
-// 6. Yearly Pivot: Tabs & Render จาก Cache
-// ==========================================
 
 function renderYearlyPivotTable(gradeGroup) {
     const container = document.getElementById('yearly-pivot-result');
