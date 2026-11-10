@@ -1,5 +1,5 @@
 // ==========================================
-// forecast.js - Production Forecast & Usage Pivot (FIXED v7)
+// forecast.js - Production Forecast & Usage Pivot (FIXED v8)
 // ==========================================
 
 const fcState = {
@@ -501,28 +501,23 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// ✅ [เวอร์ชันที่ถูกต้องเมื่อวาน] หา master จากแถว usage
 function findMasterForUsageRow(rowGrade, rowSize, rowItemCode) {
     const master = fcState.masterData;
-    // ลบช่องว่าง, ขีดกลาง, ตัวพิมพ์เล็ก ให้เหลือแต่ตัวอักษรและตัวเลข
     const clean = (v) => String(v ?? '').replace(/[\s\-_]/g, '').toUpperCase();
 
     const rCode  = clean(rowItemCode);
     const rGrade = clean(rowGrade);
     const rSize  = Number(rowSize);
 
-    // 1. ค้นหาด้วย item_code เป็นอันดับแรก (แม่นยำที่สุด)
     if (rCode) {
         const hit = master.find(m => clean(m.item_code) === rCode);
         if (hit) return hit;
     }
 
-    // 2. ประกอบ Grade + Size เป็น item_code (เช่น CA125 + 44 = CA12544)
     const composed = `${rGrade}${rSize}`;
     let hit = master.find(m => clean(m.item_code) === composed);
     if (hit) return hit;
 
-    // 3. แยก Grade และ Gram
     const gradeMatch = rGrade.match(/^([A-Z]+)(\d+)$/);
     if (gradeMatch) {
         const baseGrade = gradeMatch[1];
@@ -531,15 +526,13 @@ function findMasterForUsageRow(rowGrade, rowSize, rowItemCode) {
         hit = master.find(m => {
             if (Number(m.size) !== rSize) return false;
             const mGrade = clean(m.grade);
-            const mGram  = String(Number(m.gram)); // แปลง 125.0 ให้เป็น 125
+            const mGram  = String(Number(m.gram));
             return mGrade === baseGrade && mGram === baseGram;
         });
         if (hit) return hit;
     }
 
-    // 4. หาแบบ Grade + Size ตรงๆ
     hit = master.find(m => clean(m.grade) === rGrade && Number(m.size) === rSize);
-
     return hit || null;
 }
 
@@ -686,7 +679,6 @@ async function _loadUsagePivotImpl() {
         const missingMasterSet = new Set();
         const processedRows = new Set();
 
-        // ✅ [เวอร์ชันที่ถูกต้องเมื่อวาน] บังคับใช้ชื่อ Grade จาก Master
         (data || []).forEach(row => {
             const rowUniqueKey = `${row.usage_date}_${row.grade}_${row.width}_${row.used_kgs}`;
             if (processedRows.has(rowUniqueKey)) return;
@@ -707,7 +699,6 @@ async function _loadUsagePivotImpl() {
             } else {
                 rolls = Number(row.used_kgs) / Number(masterItem.std_weight_kg);
 
-                // ✅ บังคับใช้ชื่อ Grade จาก Master Data เพื่อป้องกันการนับซ้ำ
                 if (masterItem.gram) {
                     finalGrade = `${masterItem.grade}${masterItem.gram}`;
                 } else {
@@ -1363,6 +1354,10 @@ async function loadYearlyPivot() {
     }
 }
 
+// ==========================================
+// 6. Yearly Pivot: Tabs & Render จาก Cache
+// ==========================================
+
 function renderYearlyPivotTable(gradeGroup) {
     const container = document.getElementById('yearly-pivot-result');
     if (!container || !yearlyPivotDataCache) return;
@@ -1404,7 +1399,11 @@ function renderYearlyPivotTable(gradeGroup) {
             sortedSizes.forEach(size => {
                 const val = yearlyPivotDataCache[grade].data[m][size] || 0;
                 monthTotal += val;
-                html += `<td>${val > 0 ? val.toFixed(2) : ''}</td>`;
+                // ✅ คลิกได้เฉพาะช่องที่มีค่า > 0 เพื่อเปิด Drill-down ลูกค้า
+                const clickAttr = val > 0
+                    ? `onclick="openCustomerDrillDown('${grade}', ${size}, ${m + 1})" style="cursor:pointer;" title="คลิกเพื่อดูรายละเอียดลูกค้า"`
+                    : '';
+                html += `<td ${clickAttr}>${val > 0 ? val.toFixed(2) : ''}</td>`;
             });
 
             html += `<td class="yearly-pivot-total-col">${monthTotal > 0 ? monthTotal.toFixed(2) : ''}</td></tr>`;
@@ -1448,4 +1447,195 @@ function filterYearlyPivot(gradeGroup, btnElement) {
     }
 
     renderYearlyPivotTable(gradeGroup);
+}
+
+// ==========================================
+// 7. Drill-down ลูกค้า (Customer Ranking & Detail)
+// ==========================================
+async function openCustomerDrillDown(grade, size, monthNum) {
+    const year = document.getElementById('yearly-pivot-year')?.value;
+    if (!year) return;
+
+    const modal = document.getElementById('modalSnapshot');
+    const modalTitle = document.getElementById('snapshotViewTitle');
+    const modalBody = document.getElementById('snapshotViewBody');
+
+    if (!modal || !modalBody) return;
+
+    const startDate = `${year}-${String(monthNum).padStart(2, '0')}-01`;
+    const lastDay = new Date(year, monthNum, 0).getDate();
+    const endDate = `${year}-${String(monthNum).padStart(2, '0')}-${lastDay}`;
+    const monthNames = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
+
+    if (modalTitle) modalTitle.innerHTML = `📊 รายละเอียด: <span style="color:#2563eb;">${grade} (Size ${size})</span> - ${monthNames[monthNum-1]} ${Number(year)+543}`;
+    modalBody.innerHTML = '<div style="text-align:center; padding: 40px; color:#64748b;"><div class="spinner"></div>กำลังประมวลผลข้อมูล...</div>';
+    modal.classList.add('show');
+
+    try {
+        const { data, error } = await supabase
+            .from('usage_records_raw')
+            .select('*')
+            .eq('is_valid', true)
+            .gte('usage_date', startDate)
+            .lte('usage_date', endDate)
+            .eq('width', size);
+
+        if (error) throw error;
+
+        const customerStats = {};
+        const productStats = {};
+        const timelineStats = {};
+        let totalRollsAll = 0;
+        let totalKgsAll = 0;
+
+        data.forEach(row => {
+            const masterItem = findMasterForUsageRow(row.grade, row.width, row.item_code);
+            if (!masterItem) return;
+
+            const masterGradeName = masterItem.gram ? `${masterItem.grade}${masterItem.gram}` : masterItem.grade;
+            if (masterGradeName.toUpperCase() !== grade.toUpperCase()) return;
+
+            const rolls = Number(row.used_kgs) / Number(masterItem.std_weight_kg);
+            const kgs = Number(row.used_kgs);
+            const customer = (row.roll_for_customer || '').trim() || 'ไม่ระบุ (ทั่วไป)';
+            const product = row.description || row.product_name || row.customer_name || 'ไม่ระบุสินค้า';
+            const date = row.usage_date;
+
+            if (!customerStats[customer]) customerStats[customer] = { rolls: 0, kgs: 0 };
+            customerStats[customer].rolls += rolls;
+            customerStats[customer].kgs += kgs;
+
+            if (!productStats[product]) productStats[product] = { rolls: 0, kgs: 0 };
+            productStats[product].rolls += rolls;
+            productStats[product].kgs += kgs;
+
+            if (!timelineStats[date]) timelineStats[date] = { rolls: 0, kgs: 0 };
+            timelineStats[date].rolls += rolls;
+            timelineStats[date].kgs += kgs;
+
+            totalRollsAll += rolls;
+            totalKgsAll += kgs;
+        });
+
+        if (totalRollsAll === 0) {
+            modalBody.innerHTML = '<div style="text-align:center; padding: 40px; color:#94a3b8;">ไม่พบข้อมูลการใช้งานในเดือนนี้</div>';
+            return;
+        }
+
+        let html = `
+        <div style="background: linear-gradient(135deg, #eff6ff, #dbeafe); border: 1px solid #93c5fd; border-radius: 10px; padding: 16px; margin-bottom: 20px; display: flex; justify-content: space-around; text-align: center;">
+            <div>
+                <div style="font-size: 13px; color: #1e40af; font-weight: 600; margin-bottom: 4px;">จำนวนม้วนรวม</div>
+                <div style="font-size: 24px; font-weight: 800; color: #1e3a8a;">${totalRollsAll.toFixed(2)}</div>
+            </div>
+            <div style="border-left: 1px solid #bfdbfe;"></div>
+            <div>
+                <div style="font-size: 13px; color: #1e40af; font-weight: 600; margin-bottom: 4px;">น้ำหนักรวม (KG)</div>
+                <div style="font-size: 24px; font-weight: 800; color: #1e3a8a;">${totalKgsAll.toLocaleString('th-TH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+            </div>
+            <div style="border-left: 1px solid #bfdbfe;"></div>
+            <div>
+                <div style="font-size: 13px; color: #1e40af; font-weight: 600; margin-bottom: 4px;">จำนวนลูกค้า</div>
+                <div style="font-size: 24px; font-weight: 800; color: #1e3a8a;">${Object.keys(customerStats).length} ราย</div>
+            </div>
+        </div>`;
+
+        const sortedCustomers = Object.keys(customerStats).map(c => ({
+            name: c,
+            rolls: customerStats[c].rolls,
+            kgs: customerStats[c].kgs,
+            percent: (customerStats[c].rolls / totalRollsAll) * 100
+        })).sort((a, b) => b.rolls - a.rolls);
+
+        html += `<div class="drill-section">
+            <div class="drill-title"><span>🏆</span> อันดับลูกค้าที่ใช้งานสูงสุด (Top Customers)</div>
+            <table class="data-table" style="width:100%;">
+                <thead style="background:#f8fafc; color:#334155;">
+                    <tr>
+                        <th style="width:60px; text-align:center;">อันดับ</th>
+                        <th>ชื่อลูกค้า</th>
+                        <th style="text-align:right;">จำนวน (ม้วน)</th>
+                        <th style="text-align:right;">น้ำหนัก (KG)</th>
+                        <th style="width:200px;">สัดส่วน</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+        sortedCustomers.forEach((c, index) => {
+            const rank = index + 1;
+            let rankClass = 'rank-other';
+            if (rank === 1) rankClass = 'rank-1';
+            else if (rank === 2) rankClass = 'rank-2';
+            else if (rank === 3) rankClass = 'rank-3';
+
+            html += `<tr>
+                <td style="text-align:center;"><span class="rank-badge ${rankClass}">${rank}</span></td>
+                <td style="font-weight:600; color:#1e293b;">${escHtml(c.name)}</td>
+                <td style="text-align:right; font-weight:700; color:#2563eb;">${c.rolls.toFixed(2)}</td>
+                <td style="text-align:right; color:#64748b;">${c.kgs.toLocaleString('th-TH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td>
+                    <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:2px;"><span>${c.percent.toFixed(1)}%</span></div>
+                    <div class="customer-bar-wrap"><div class="customer-bar" style="width: ${c.percent}%;"></div></div>
+                </td>
+            </tr>`;
+        });
+        html += `</tbody></table></div>`;
+
+        const sortedProducts = Object.keys(productStats).map(p => ({
+            name: p,
+            rolls: productStats[p].rolls,
+            kgs: productStats[p].kgs
+        })).sort((a, b) => b.rolls - a.rolls);
+
+        html += `<div class="drill-section">
+            <div class="drill-title"><span>📦</span> สินค้าที่ผลิต (Top Products)</div>
+            <div style="max-height: 250px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
+                <table class="data-table" style="width:100%; margin:0;">
+                    <thead style="background:#f8fafc; color:#334155; position:sticky; top:0;">
+                        <tr>
+                            <th>รายละเอียดสินค้า (Description)</th>
+                            <th style="text-align:right; width:100px;">จำนวน (ม้วน)</th>
+                            <th style="text-align:right; width:120px;">น้ำหนัก (KG)</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+        sortedProducts.slice(0, 10).forEach(p => {
+            html += `<tr>
+                <td style="font-size:12.5px; color:#334155;">${escHtml(p.name)}</td>
+                <td style="text-align:right; font-weight:600; color:#2563eb;">${p.rolls.toFixed(2)}</td>
+                <td style="text-align:right; color:#64748b;">${p.kgs.toLocaleString('th-TH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+            </tr>`;
+        });
+        html += `</tbody></table></div></div>`;
+
+        const sortedDates = Object.keys(timelineStats).sort();
+        if (sortedDates.length > 0) {
+            const maxDailyRolls = Math.max(...sortedDates.map(d => timelineStats[d].rolls));
+
+            html += `<div class="drill-section">
+                <div class="drill-title"><span>📅</span> ไทม์ไลน์การใช้งานรายวัน</div>
+                <div style="display:flex; gap:8px; align-items:flex-end; height:120px; padding-top:10px; overflow-x:auto;">
+                    ${sortedDates.map(d => {
+                        const stat = timelineStats[d];
+                        const heightPercent = maxDailyRolls > 0 ? (stat.rolls / maxDailyRolls) * 100 : 0;
+                        const day = Number(d.split('-')[2]);
+                        return `
+                            <div style="display:flex; flex-direction:column; align-items:center; min-width:30px;" title="วันที่ ${day}: ${stat.rolls.toFixed(2)} ม้วน">
+                                <div style="font-size:10px; color:#64748b; margin-bottom:4px;">${stat.rolls.toFixed(1)}</div>
+                                <div style="width:20px; background:#3b82f6; height:${heightPercent}px; border-radius:4px 4px 0 0; transition:height 0.3s;"></div>
+                                <div style="font-size:11px; font-weight:700; color:#475569; margin-top:6px;">${day}</div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>`;
+        }
+
+        modalBody.innerHTML = html;
+
+    } catch (err) {
+        console.error('openCustomerDrillDown error:', err);
+        modalBody.innerHTML = `<div style="text-align:center; padding: 40px; color:#ef4444;">เกิดข้อผิดพลาด: ${escHtml(err.message)}</div>`;
+    }
 }
