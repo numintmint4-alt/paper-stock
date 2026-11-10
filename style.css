@@ -1077,3 +1077,107 @@ table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
 
 /* ไฮไลท์เมื่อ Hover */
 .yearly-pivot-table tbody tr:hover td:not(.yearly-pivot-month-col) { background-color: var(--primary-soft) !important; }
+/* ================= YEARLY PIVOT TABLE (MODERN & SOFT UI) ================= */
+.yearly-pivot-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    width: max-content;
+    min-width: 100%;
+    font-size: 12.5px;
+    margin-bottom: 24px;
+    background: #fff;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
+    border: 1px solid var(--border-strong);
+}
+
+/* คอลัมน์ Size กว้างเท่ากันเป๊ะ */
+.yearly-pivot-table th:not(.yearly-pivot-month-col):not(.yearly-pivot-header-grade):not(.yearly-pivot-total-col),
+.yearly-pivot-table td:not(.yearly-pivot-month-col):not(.yearly-pivot-header-grade):not(.yearly-pivot-total-col) {
+    min-width: 45px;
+    max-width: 45px;
+    text-align: center;
+    padding: 8px 4px;
+    border-bottom: 1px solid #f1f5f9;
+    border-right: 1px solid #f1f5f9;
+    font-weight: 600;
+    color: var(--text);
+    transition: background-color 0.2s;
+}
+
+/* หัวตาราง (ชื่อเกรด) */
+.yearly-pivot-header-grade {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+    color: #fff !important;
+    text-align: left !important;
+    font-weight: 800;
+    font-size: 15px;
+    padding: 12px 16px !important;
+    letter-spacing: 0.5px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    border: none;
+}
+
+/* คอลัมน์ชื่อเดือน */
+.yearly-pivot-month-col {
+    background: #f8fafc;
+    font-weight: 700;
+    color: #475569;
+    text-align: left !important;
+    padding: 8px 14px !important;
+    position: sticky;
+    left: 0;
+    z-index: 5;
+    border-right: 2px solid #e2e8f0 !important;
+    border-bottom: 1px solid #f1f5f9;
+    min-width: 100px;
+}
+
+/* คอลัมน์ Total ขวาสุด */
+.yearly-pivot-total-col {
+    background: #eff6ff;
+    color: #1e40af;
+    font-weight: 800;
+    border-left: 2px solid #e2e8f0 !important;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+/* แถว Total ล่างสุด */
+.yearly-pivot-row-total td {
+    background: #f1f5f9;
+    font-weight: 800;
+    color: #1e293b;
+    border-bottom: none !important;
+}
+.yearly-pivot-row-total .yearly-pivot-month-col {
+    background: #e2e8f0;
+    border-bottom: none !important;
+}
+
+/* Hover effect */
+.yearly-pivot-table tbody tr:hover td:not(.yearly-pivot-month-col):not(.yearly-pivot-total-col) {
+    background-color: #f0f9ff;
+    cursor: pointer;
+    color: #0284c7;
+}
+
+/* ================= CUSTOMER RANKING STYLES (DRILL-DOWN) ================= */
+.rank-badge {
+    display: inline-flex; justify-content: center; align-items: center;
+    width: 24px; height: 24px; border-radius: 50%;
+    font-weight: 800; font-size: 12px; color: #fff;
+}
+.rank-1 { background: linear-gradient(135deg, #fbbf24, #f59e0b); box-shadow: 0 2px 4px rgba(245,158,11,.4); }
+.rank-2 { background: linear-gradient(135deg, #cbd5e1, #94a3b8); }
+.rank-3 { background: linear-gradient(135deg, #fdba74, #f97316); }
+.rank-other { background: #e2e8f0; color: #64748b; }
+
+.customer-bar-wrap { width: 100%; background: #f1f5f9; border-radius: 4px; height: 6px; margin-top: 6px; overflow: hidden; }
+.customer-bar { height: 100%; background: #3b82f6; border-radius: 4px; }
+
+.drill-section { margin-bottom: 24px; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
+.drill-title { font-size: 15px; font-weight: 700; color: #1e293b; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 8px; }
+.drill-title span { font-size: 18px; }
