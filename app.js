@@ -186,7 +186,8 @@ function showToast(message, type = 'info', duration = 3000) {
 }
 
 // ================= PAGINATION =================
-async function fetchAllRows(buildQuery, pageSize = 1000, onProgress = null) {
+// ✅ เปลี่ยนจาก 1000 เป็น 5000
+async function fetchAllRows(buildQuery, pageSize = 5000, onProgress = null) {
   const all = [];
   let from = 0;
   while (true) {
