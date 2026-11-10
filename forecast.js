@@ -1,5 +1,5 @@
 // ==========================================
-// forecast.js - Production Forecast & Usage Pivot (FIXED v8)
+// forecast.js - Production Forecast & Usage Pivot (FIXED v9)
 // ==========================================
 
 const fcState = {
@@ -90,11 +90,12 @@ async function loadForecastMasterData() {
 
     let rows = null;
     try {
-        rows = await fetchAllRows(buildQuery('grade, size, gram, item_code, std_weight_kg'));
+        // ✅ บังคับให้ดึง 5000 แถว (กัน limit default 1000 ของ Supabase)
+        rows = await fetchAllRows(buildQuery('grade, size, gram, item_code, std_weight_kg'), 5000);
     } catch (err) {
         console.warn('loadForecastMasterData (with gram) error:', err?.message, '→ retry without gram');
         try {
-            rows = await fetchAllRows(buildQuery('grade, size, item_code, std_weight_kg'));
+            rows = await fetchAllRows(buildQuery('grade, size, item_code, std_weight_kg'), 5000);
         } catch (err2) {
             console.error('loadForecastMasterData error:', err2);
         }
@@ -447,9 +448,8 @@ async function initUsagePivotTab() {
 
     renderSnapshotHistory();
 
-    setTimeout(() => {
-        loadUsagePivot();
-    }, 100);
+    // ✅ จุดที่ 1: ใช้ await แทน setTimeout (กัน race condition ตอน F5)
+    await loadUsagePivot();
 }
 
 // ===== helpers =====
@@ -1293,12 +1293,18 @@ async function loadYearlyPivot() {
 
         const pivotData = {};
         const allSizesSet = new Set();
+        const processedRows = new Set(); // ✅ จุดที่ 2: ดักข้อมูลซ้ำ
 
         data.forEach(row => {
             const rowGrade = String(row.grade || '').trim().toUpperCase();
             const rowSize = Number(row.width);
             const rowItemCode = String(row.item_code || '').trim().toUpperCase();
             const monthIndex = new Date(row.usage_date).getMonth();
+
+            // ✅ จุดที่ 2: ดักข้อมูลซ้ำ (กันตัวเลข 98.73 vs 62.79)
+            const rowKey = `${row.usage_date}_${rowGrade}_${rowSize}_${row.used_kgs}`;
+            if (processedRows.has(rowKey)) return;
+            processedRows.add(rowKey);
 
             const masterItem = findMasterForUsageRow(rowGrade, rowSize, rowItemCode);
             if (!masterItem || !masterItem.std_weight_kg || Number(masterItem.std_weight_kg) <= 0) return;
@@ -1485,6 +1491,7 @@ async function openCustomerDrillDown(grade, size, monthNum) {
         const customerStats = {};
         const productStats = {};
         const timelineStats = {};
+        const processedRows = new Set(); // ✅ กันซ้ำใน drill-down ด้วย
         let totalRollsAll = 0;
         let totalKgsAll = 0;
 
@@ -1494,6 +1501,11 @@ async function openCustomerDrillDown(grade, size, monthNum) {
 
             const masterGradeName = masterItem.gram ? `${masterItem.grade}${masterItem.gram}` : masterItem.grade;
             if (masterGradeName.toUpperCase() !== grade.toUpperCase()) return;
+
+            // ✅ ดักข้อมูลซ้ำ
+            const rowKey = `${row.usage_date}_${row.grade}_${row.width}_${row.used_kgs}`;
+            if (processedRows.has(rowKey)) return;
+            processedRows.add(rowKey);
 
             const rolls = Number(row.used_kgs) / Number(masterItem.std_weight_kg);
             const kgs = Number(row.used_kgs);
