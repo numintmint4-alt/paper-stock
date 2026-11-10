@@ -1,5 +1,5 @@
 // ==========================================
-// forecast.js - Production Forecast & Usage Pivot (FIXED v5)
+// forecast.js - Production Forecast & Usage Pivot (FIXED v6)
 // ==========================================
 
 const fcState = {
@@ -445,6 +445,9 @@ async function initUsagePivotTab() {
         }
     }
 
+    // ✅ โหลดประวัติ Snapshot ล่าสุด
+    renderSnapshotHistory();
+
     // ✅ ให้โหลดตาราง Pivot รายเดือนอัตโนมัติทันทีที่เข้าหน้านี้
     setTimeout(() => {
         loadUsagePivot();
@@ -813,6 +816,172 @@ async function _saveUsageSnapshotImpl() {
         showToast('บันทึก Snapshot ไม่สำเร็จ: ' + error.message, 'err');
     } else {
         showToast(`บันทึก Snapshot สำเร็จ (${payloads.length} รายการ)`, 'ok');
+        // ✅ refresh history หลังบันทึก
+        renderSnapshotHistory();
+    }
+}
+
+// ==========================================
+// ✅ 2.1 Snapshot History
+// ==========================================
+async function renderSnapshotHistory() {
+    const wrap = document.getElementById('snapshot-history-list');
+    if (!wrap) return;
+
+    wrap.innerHTML = '<div style="text-align:center; padding: 10px; color: var(--text-muted);">กำลังโหลดประวัติ...</div>';
+
+    try {
+        // ดึง snapshot ล่าสุด 12 เดือน (เรียงจากเดือนใหม่ → เก่า)
+        const { data, error } = await supabase
+            .from('usage_snapshots')
+            .select('snapshot_month, customer_filter, total_rolls')
+            .order('snapshot_month', { ascending: false })
+            .limit(5000);
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+            wrap.innerHTML = '<div style="text-align:center; padding: 20px; color: var(--text-muted);">ยังไม่มีประวัติการบันทึก</div>';
+            return;
+        }
+
+        // group by (snapshot_month, customer_filter)
+        const groups = new Map();
+        for (const row of data) {
+            const key = `${row.snapshot_month}__${row.customer_filter}`;
+            if (!groups.has(key)) {
+                groups.set(key, {
+                    snapshot_month: row.snapshot_month,
+                    customer_filter: row.customer_filter,
+                    total: 0,
+                    count: 0
+                });
+            }
+            const g = groups.get(key);
+            g.total += Number(row.total_rolls || 0);
+            g.count += 1;
+        }
+
+        const list = Array.from(groups.values())
+            .sort((a, b) => {
+                if (a.snapshot_month !== b.snapshot_month) return a.snapshot_month < b.snapshot_month ? 1 : -1;
+                return String(a.customer_filter).localeCompare(String(b.customer_filter));
+            });
+
+        let html = `<table class="data-table" style="width:100%">
+            <thead>
+                <tr>
+                    <th>เดือน</th>
+                    <th>ลูกค้า</th>
+                    <th style="text-align:right">จำนวนรายการ</th>
+                    <th style="text-align:right">รวม Rolls</th>
+                    <th style="text-align:center">จัดการ</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
+        list.forEach((g, idx) => {
+            const cfLabel = g.customer_filter === 'ALL'
+                ? '<span style="color:#1e40af;font-weight:600;">ALL</span>'
+                : escHtml(g.customer_filter);
+            html += `<tr>
+                <td><strong>${escHtml(g.snapshot_month)}</strong></td>
+                <td>${cfLabel}</td>
+                <td style="text-align:right">${g.count}</td>
+                <td style="text-align:right;font-weight:600;">${g.total.toFixed(2)}</td>
+                <td style="text-align:center">
+                    <button type="button" class="btn-view-snapshot"
+                        data-month="${escAttr(g.snapshot_month)}"
+                        data-customer="${escAttr(g.customer_filter)}"
+                        style="padding:4px 12px;border-radius:6px;border:1px solid #cbd5e1;background:#f8fafc;cursor:pointer;">
+                        👁 ดู
+                    </button>
+                </td>
+            </tr>`;
+        });
+
+        html += `</tbody></table>`;
+        wrap.innerHTML = html;
+
+        wrap.querySelectorAll('.btn-view-snapshot').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const month = btn.dataset.month;
+                const customer = btn.dataset.customer;
+                viewSnapshotDetail(month, customer);
+            });
+        });
+
+    } catch (err) {
+        console.error('renderSnapshotHistory error:', err);
+        wrap.innerHTML = `<div style="text-align:center; padding: 20px; color: red;">โหลดประวัติไม่สำเร็จ: ${escHtml(err.message)}</div>`;
+    }
+}
+
+async function viewSnapshotDetail(month, customer) {
+    const modalBody = document.getElementById('snapshotViewBody');
+    const modalTitle = document.getElementById('snapshotViewTitle');
+    if (!modalBody) return;
+
+    if (modalTitle) modalTitle.textContent = `รายละเอียด Snapshot — ${month} / ${customer}`;
+    modalBody.innerHTML = '<div style="text-align:center; padding: 20px;">กำลังโหลด...</div>';
+
+    // เปิด modal ก่อน
+    const modal = document.getElementById('modalSnapshot');
+    if (modal) modal.classList.add('show');
+
+    try {
+        const { data, error } = await supabase
+            .from('usage_snapshots')
+            .select('grade, width, total_rolls')
+            .eq('snapshot_month', month)
+            .eq('customer_filter', customer)
+            .order('grade', { ascending: true })
+            .order('width', { ascending: true });
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+            modalBody.innerHTML = '<div style="text-align:center; padding: 20px;">ไม่พบข้อมูล</div>';
+            return;
+        }
+
+        // pivot: grade × width
+        const grades = [];
+        const widths = new Set();
+        const map = new Map();
+
+        data.forEach(row => {
+            const g = row.grade;
+            const w = Number(row.width);
+            widths.add(w);
+            if (!map.has(g)) { map.set(g, {}); grades.push(g); }
+            map.get(g)[w] = (map.get(g)[w] || 0) + Number(row.total_rolls);
+        });
+
+        const sortedWidths = Array.from(widths).sort((a, b) => a - b);
+        grades.sort();
+
+        let html = '<table class="data-table" style="width:100%"><thead><tr><th>Grade</th>';
+        sortedWidths.forEach(w => html += `<th style="text-align:right">${w}</th>`);
+        html += '<th style="text-align:right">Total</th></tr></thead><tbody>';
+
+        grades.forEach(g => {
+            let total = 0;
+            html += `<tr><td><strong>${escHtml(g)}</strong></td>`;
+            sortedWidths.forEach(w => {
+                const v = map.get(g)[w] || 0;
+                total += v;
+                html += `<td style="text-align:right">${v > 0 ? v.toFixed(2) : ''}</td>`;
+            });
+            html += `<td style="text-align:right;font-weight:700;">${total.toFixed(2)}</td></tr>`;
+        });
+
+        html += '</tbody></table>';
+        modalBody.innerHTML = html;
+
+    } catch (err) {
+        console.error('viewSnapshotDetail error:', err);
+        modalBody.innerHTML = `<div style="text-align:center; padding: 20px; color: red;">${escHtml(err.message)}</div>`;
     }
 }
 
