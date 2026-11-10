@@ -445,13 +445,13 @@ async function initUsagePivotTab() {
         }
     }
 
+        // ... (โค้ดด้านบนที่โหลด Master และ Customer เหมือนเดิม) ...
+
     // ✅ โหลดประวัติ Snapshot ล่าสุด
     renderSnapshotHistory();
 
-    // ✅ ให้โหลดตาราง Pivot รายเดือนอัตโนมัติทันทีที่เข้าหน้านี้
-    setTimeout(() => {
-        loadUsagePivot();
-    }, 100);
+    // ✅ แก้ไข: ลบ setTimeout ออก แล้วใช้ await เพื่อบังคับให้รอโหลดข้อมูลให้เสร็จก่อน
+    await loadUsagePivot(); 
 }
 
 // ===== helpers =====
