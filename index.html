@@ -47,7 +47,6 @@
 
   <div class="container">
 
-    <!-- ========== TAB 1: STOCK LEVEL (Matrix) ========== -->
     <div id="tab-matrix">
       <div class="card">
         <div class="report-head">
@@ -515,7 +514,6 @@
           <button type="button" id="btn-mode-yearly" onclick="switchPivotMode('yearly')" style="padding: 10px 20px; font-weight: 700;">📊 Pivot สรุปรายปี</button>
         </div>
 
-        <!-- ===== โหมดรายเดือน (ของเดิม) ===== -->
         <div id="pivot-monthly-container">
 
         <div class="filters no-print">
@@ -550,7 +548,6 @@
           </button>
         </div>
 
-        <!-- ✅ แท็บกรองเกรดในโหมดรายเดือน (ใหม่) -->
         <div id="pivot-sub-tabs" class="sub-tabs" style="margin-bottom: 12px; display: flex; gap: 10px; flex-wrap: wrap;">
           <button type="button" class="sub-tab active" onclick="filterPivotByGrade('ALL', this)">ALL</button>
           <button type="button" class="sub-tab" onclick="filterPivotByGrade('CA', this)">CA</button>
@@ -568,13 +565,11 @@
           </table>
         </div>
 
-        <!-- ✅ ประวัติการบันทึก Snapshot (ใหม่) -->
         <h3 style="margin: 20px 0 10px; font-size: 16px; border-bottom: 2px solid var(--primary); padding-bottom: 8px;">📋 ประวัติการบันทึก Snapshot ล่าสุด</h3>
         <div id="snapshot-history-list" style="max-height: 400px; overflow-y: auto;"></div>
 
         </div><!-- /pivot-monthly-container -->
 
-        <!-- ===== โหมดรายปี (ใหม่) ===== -->
         <div id="pivot-yearly-container" class="hidden">
           <div class="filters no-print" style="margin-bottom: 15px; background: var(--surface-soft, #f8fafc); padding: 10px; border-radius: var(--radius-md, 8px);">
             <label>เลือกปี:
@@ -615,7 +610,6 @@
       </div>
     </div>
 
-    <!-- ========== TAB 5.6: SUMMARY ========== -->
     <div id="tab-summary" class="hidden">
       <div class="card">
         <div class="report-head">
@@ -681,7 +675,6 @@
       </div>
     </div>
 
-    <!-- ========== TAB 6: DATA ========== -->
     <div id="tab-data" class="hidden">
       <div class="card">
         <h2>Data — ทุกคอลัมน์จาก Excel</h2>
@@ -706,7 +699,6 @@
       </div>
     </div>
 
-    <!-- ========== TAB 7: SETTINGS ========== -->
     <div id="tab-settings" class="hidden">
       <div class="card">
         <h2>⚙ ตั้งค่า</h2>
