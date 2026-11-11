@@ -31,12 +31,10 @@ function getISODateFromInput(inputId) {
   const el = document.getElementById(inputId);
   if (!el) return '';
 
-  // ถ้ามี Flatpickr ให้ดึงจาก Flatpickr ก่อน
   if (window.flatpickrInstances[inputId] && window.flatpickrInstances[inputId].selectedDates.length > 0) {
     return toISODate(window.flatpickrInstances[inputId].selectedDates[0]);
   }
 
-  // ถ้าไม่มี ให้ดึงจาก Value ของ Input
   return toISODate(el.value);
 }
 
@@ -357,16 +355,17 @@ document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
     if (t === 'alert' && typeof initAlertTab === 'function') initAlertTab();
     if (t === 'purchase-order' && typeof initPurchaseOrderTab === 'function') initPurchaseOrderTab();
     if (t === 'summary' && typeof initSummaryTab === 'function') initSummaryTab();
-    if (t === 'forecast' && typeof initForecastTab === 'function') initForecastTab();          // ✅ เพิ่ม
-    if (t === 'usage-pivot' && typeof initUsagePivotTab === 'function') initUsagePivotTab();   // ✅ เพิ่ม
+    if (t === 'forecast' && typeof initForecastTab === 'function') initForecastTab();
+    if (t === 'usage-pivot' && typeof initUsagePivotTab === 'function') initUsagePivotTab();
     if (t === 'data') renderData();
   };
 });
 // ================= MASTER =================
 async function loadMaster(onProgress = null) {
+  // ✅ แก้จาก 1000 เป็น 5000
   masterCache = await fetchAllRows(
     () => supabase.from('paper_specs').select('*').order('grade').order('gram').order('size'),
-    1000, onProgress
+    5000, onProgress
   );
   return masterCache;
 }
@@ -1244,31 +1243,27 @@ async function delUser(id, username) {
     'exportPoDateFrom',
     'exportPoDateTo',
     'firstReceiveDateInput',
-    'fc-stock-date' // ✅ เพิ่มเพื่อให้ช่องวันที่ในหน้า Forecast เป็น Flatpickr
+    'fc-stock-date'
   ];
 
   dateInputIds.forEach(id => {
     const el = document.getElementById(id);
     if (el) {
-      // 🔽 1. เปลี่ยน type เป็น text และปิด Autofill แบบเด็ดขาด 🔽
       el.setAttribute('type', 'text');
       el.setAttribute('placeholder', 'YYYY-MM-DD');
-      el.setAttribute('autocomplete', 'new-password'); // ทริคหลอก Browser
+      el.setAttribute('autocomplete', 'new-password');
       el.setAttribute('aria-autocomplete', 'none');
-      el.setAttribute('readonly', true); // ป้องกันการพิมพ์เอง
+      el.setAttribute('readonly', true);
 
-      // 🔽 2. ล้างค่าที่ค้างอยู่ในช่องทิ้งก่อนสร้าง Flatpickr 🔽
       el.value = '';
 
-      // 🔽 3. สร้าง Flatpickr 🔽
       flatpickrInstances[id] = flatpickr(el, {
         locale: "th",
-        dateFormat: "Y-m-d",   // 🔽 รูปแบบ ค.ศ. (ISO) ตามที่คุณต้องการ 🔽
-        allowInput: false,     // ห้ามพิมพ์เอง ให้คลิกเลือกจากปฏิทินอย่างเดียว
+        dateFormat: "Y-m-d",
+        allowInput: false,
         disableMobile: true
       });
 
-      // 🔽 4. เอา readonly ออกหลังจาก Flatpickr สร้างเสร็จ (เพื่อให้คลิกเปิดปฏิทินได้) 🔽
       setTimeout(() => {
         if (el) el.removeAttribute('readonly');
       }, 100);
