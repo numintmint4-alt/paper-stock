@@ -90,6 +90,7 @@ async function loadForecastMasterData() {
 
     let rows = null;
     try {
+        // ✅ ลบเลข 5000 ออก ให้ใช้ fetchAllRows จัดการ Pagination เอง
         rows = await fetchAllRows(buildQuery('grade, size, gram, item_code, std_weight_kg'));
     } catch (err) {
         console.warn('loadForecastMasterData (with gram) error:', err?.message, '→ retry without gram');
@@ -447,7 +448,7 @@ async function initUsagePivotTab() {
 
     renderSnapshotHistory();
 
-    await loadUsagePivot();
+    await loadUsagePivot(); 
 }
 
 // ===== helpers =====
