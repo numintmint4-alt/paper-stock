@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK ม้วนกระดาษ V6 — app.js (Core) — V.13.5 (ISO Date + No Autofill)
+//  STOCK ม้วนกระดาษ V6 — app.js (Core) — V.13.6 (Pagination 1000)
 // ═══════════════════════════════════════════════════════════════
 const SUPABASE_URL      = 'https://gwwgycbqzdjlijsuxahx.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_rMoUE6tUsQZHnJu2ULDxFg_4NAiw6wg';
@@ -184,18 +184,23 @@ function showToast(message, type = 'info', duration = 3000) {
 }
 
 // ================= PAGINATION =================
-// ✅ เปลี่ยนจาก 1000 เป็น 5000
-async function fetchAllRows(buildQuery, pageSize = 5000, onProgress = null) {
+// ✅ เปลี่ยน default เป็น 1000 แล้ววนลูปเองจนครบ
+async function fetchAllRows(buildQuery, pageSize = 1000, onProgress = null) {
   const all = [];
   let from = 0;
+  
   while (true) {
     const { data, error } = await buildQuery().range(from, from + pageSize - 1);
     if (error) throw error;
     if (!data || data.length === 0) break;
+    
     all.push(...data);
     if (onProgress) onProgress(all.length);
-    if (data.length < pageSize) break;
-    from += pageSize;
+    
+    // ถ้าดึงมาได้น้อยกว่า pageSize แสดงว่าครบแล้วให้หยุด
+    if (data.length < pageSize) break; 
+    
+    from += pageSize; // วนไปดึง 1,000 แถวถัดไป
   }
   return all;
 }
@@ -362,10 +367,10 @@ document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
 });
 // ================= MASTER =================
 async function loadMaster(onProgress = null) {
-  // ✅ แก้จาก 1000 เป็น 5000
+  // ✅ ลบ 5000 ออก — ใช้ default 1000 วนลูปเอง
   masterCache = await fetchAllRows(
     () => supabase.from('paper_specs').select('*').order('grade').order('gram').order('size'),
-    5000, onProgress
+    undefined, onProgress
   );
   return masterCache;
 }
@@ -1216,7 +1221,7 @@ async function delUser(id, username) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  INIT  — V.13.5: ปิด Autofill แบบเด็ดขาด + dateFormat = "Y-m-d"
+//  INIT  — V.13.6
 // ═══════════════════════════════════════════════════════════════
 
 (function init() {
