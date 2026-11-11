@@ -1,5 +1,5 @@
 // ==========================================
-// forecast.js - Production Forecast & Usage Pivot (FIXED v14)
+// forecast.js - Production Forecast & Usage Pivot (FIXED v15)
 // ==========================================
 
 const fcState = {
@@ -850,55 +850,86 @@ async function _saveUsageSnapshotImpl() {
 }
 
 // ==========================================
-// 2.1 Snapshot History (มีปุ่มยกเลิก)
+// 2.1 Snapshot History (มี Dropdown เลือกปี + ปุ่มยกเลิก + RPC fallback)
 // ==========================================
-async function renderSnapshotHistory() {
+async function renderSnapshotHistory(selectedYear = null) {
     const wrap = document.getElementById('snapshot-history-list');
+    const yearSelect = document.getElementById('snapshotYearFilter');
     if (!wrap) return;
+
+    // ✅ 1. ตั้งค่าเริ่มต้น Dropdown ปี (ถ้ายังไม่มี)
+    if (yearSelect && yearSelect.options.length === 0) {
+        const currentYear = new Date().getFullYear();
+        for (let i = 0; i < 5; i++) { // สร้างตัวเลือกย้อนหลัง 5 ปี
+            const y = currentYear - i;
+            const opt = document.createElement('option');
+            opt.value = y;
+            opt.text = `ปี ${y + 543} (${y})`;
+            yearSelect.appendChild(opt);
+        }
+        yearSelect.value = currentYear;
+    }
+
+    // ✅ 2. กำหนดปีที่จะดึงข้อมูล
+    const yearToFetch = selectedYear || (yearSelect ? yearSelect.value : new Date().getFullYear());
+    if (!yearToFetch) return;
 
     wrap.innerHTML = '<div style="text-align:center; padding: 10px; color: var(--text-muted);">กำลังโหลดประวัติ...</div>';
 
     try {
-        const { data, error } = await supabase
-            .from('usage_snapshots')
-            .select('snapshot_month, customer_filter, total_rolls, created_by')
-            .order('snapshot_month', { ascending: false })
-            .limit(5000);
+        // ✅ 3. ลองเรียก RPC ก่อน (ให้ Database สรุปผลให้เสร็จ)
+        let data = null;
+        let rpcError = null;
 
-        if (error) throw error;
+        try {
+            const rpcResult = await supabase.rpc('get_snapshot_history_summary', { p_year: String(yearToFetch) });
+            if (rpcResult.error) throw rpcResult.error;
+            data = rpcResult.data;
+        } catch (e) {
+            rpcError = e;
+            console.warn('RPC get_snapshot_history_summary ใช้ไม่ได้ → fallback:', e.message);
+        }
+
+        // ✅ 3.1 Fallback: ถ้า RPC ไม่มี/error → ดึงตรงจากตารางแล้ว group ใน JS
+        if (!data) {
+            const yearPrefix = `${yearToFetch}-`;
+            const { data: rawData, error: rawErr } = await supabase
+                .from('usage_snapshots')
+                .select('snapshot_month, customer_filter, total_rolls, created_by')
+                .gte('snapshot_month', `${yearPrefix}01`)
+                .lte('snapshot_month', `${yearPrefix}12`)
+                .order('snapshot_month', { ascending: false });
+
+            if (rawErr) throw rawErr;
+
+            const groups = new Map();
+            (rawData || []).forEach(row => {
+                const key = `${row.snapshot_month}__${row.customer_filter}`;
+                if (!groups.has(key)) {
+                    groups.set(key, {
+                        snapshot_month: row.snapshot_month,
+                        customer_filter: row.customer_filter,
+                        item_count: 0,
+                        total_rolls: 0,
+                        created_by: row.created_by || null,
+                        created_at: null
+                    });
+                }
+                const g = groups.get(key);
+                g.item_count += 1;
+                g.total_rolls += Number(row.total_rolls || 0);
+                if (!g.created_by && row.created_by) g.created_by = row.created_by;
+            });
+
+            data = Array.from(groups.values());
+        }
 
         if (!data || data.length === 0) {
-            wrap.innerHTML = '<div style="text-align:center; padding: 20px; color: var(--text-muted);">ยังไม่มีประวัติการบันทึก</div>';
+            wrap.innerHTML = `<div style="text-align:center; padding: 20px; color: var(--text-muted);">ไม่พบประวัติการบันทึกในปี ${Number(yearToFetch)+543}</div>`;
             return;
         }
 
-        const groups = new Map();
-        for (const row of data) {
-            const key = `${row.snapshot_month}__${row.customer_filter}`;
-            if (!groups.has(key)) {
-                groups.set(key, {
-                    snapshot_month: row.snapshot_month,
-                    customer_filter: row.customer_filter,
-                    total: 0,
-                    count: 0,
-                    created_by: row.created_by || '-'
-                });
-            }
-            const g = groups.get(key);
-            g.total += Number(row.total_rolls || 0);
-            g.count += 1;
-            // ใช้ created_by ของแถวแรก (ควรเหมือนกันทุกแถวของ snapshot เดียวกัน)
-            if (!g.created_by || g.created_by === '-') {
-                if (row.created_by) g.created_by = row.created_by;
-            }
-        }
-
-        const list = Array.from(groups.values())
-            .sort((a, b) => {
-                if (a.snapshot_month !== b.snapshot_month) return a.snapshot_month < b.snapshot_month ? 1 : -1;
-                return String(a.customer_filter).localeCompare(String(b.customer_filter));
-            });
-
+        // ✅ 4. วาดตาราง (ข้อมูลที่ได้จะถูกสรุปมาแล้ว)
         let html = `<table class="data-table" style="width:100%">
             <thead>
                 <tr>
@@ -912,16 +943,20 @@ async function renderSnapshotHistory() {
             </thead>
             <tbody>`;
 
-        list.forEach(g => {
+        data.forEach(g => {
             const cfLabel = g.customer_filter === 'ALL'
                 ? '<span style="color:#1e40af;font-weight:600;">ALL</span>'
                 : escHtml(g.customer_filter);
+
+            // แปลงวันที่ให้เป็นรูปแบบไทย (ถ้ามี created_at)
+            const dateStr = g.created_at ? new Date(g.created_at).toLocaleString('th-TH') : '';
+
             html += `<tr>
                 <td><strong>${escHtml(g.snapshot_month)}</strong></td>
                 <td>${cfLabel}</td>
-                <td style="text-align:right">${g.count}</td>
-                <td style="text-align:right;font-weight:600;">${g.total.toFixed(2)}</td>
-                <td style="font-size:12px; color:#64748b;">${escHtml(g.created_by)}</td>
+                <td style="text-align:right">${g.item_count}</td>
+                <td style="text-align:right;font-weight:600;">${Number(g.total_rolls).toFixed(2)}</td>
+                <td style="font-size:12px; color:#64748b;">${escHtml(g.created_by || '-')}${dateStr ? `<br><span style="font-size:10px;">${dateStr}</span>` : ''}</td>
                 <td style="text-align:center; white-space:nowrap;">
                     <button type="button" class="btn-view-snapshot"
                         data-month="${escAttr(g.snapshot_month)}"
@@ -970,7 +1005,7 @@ async function renderSnapshotHistory() {
                         btn.textContent = '❌ ยกเลิก';
                     } else {
                         showToast('ลบ Snapshot สำเร็จ', 'ok');
-                        renderSnapshotHistory(); // รีเฟรชตาราง
+                        renderSnapshotHistory(selectedYear); // รีเฟรชตารางของปีเดิม
                     }
                 }
             });
