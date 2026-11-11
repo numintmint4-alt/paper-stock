@@ -1,5 +1,5 @@
 // ==========================================
-// forecast.js - Production Forecast & Usage Pivot (FIXED v15)
+// forecast.js - Production Forecast & Usage Pivot (FIXED v16)
 // ==========================================
 
 const fcState = {
@@ -1408,9 +1408,12 @@ async function loadYearlyPivot() {
 
         data.forEach(row => {
             const monthIndex = new Date(row.snapshot_month + '-01').getMonth();
-            const gradeKey = row.grade;
+            // ✅ FIX: normalize gradeKey (trim + upper + ลบช่องว่าง)
+            const gradeKey = String(row.grade || '').trim().toUpperCase().replace(/\s+/g, '');
             const rowSize = Number(row.width);
             const rolls = Number(row.total_rolls);
+
+            if (!gradeKey) return;
 
             if (!pivotData[gradeKey]) {
                 pivotData[gradeKey] = { data: {} };
@@ -1427,6 +1430,15 @@ async function loadYearlyPivot() {
 
         const sortedSizes = Array.from(allSizesSet).sort((a, b) => a - b);
         const sortedGrades = Object.keys(pivotData).sort();
+
+        // ✅ Debug log
+        console.log('✅ loadYearlyPivot:', {
+            year,
+            customersSelected: selectedCustomers.length === 0 ? 'ALL' : selectedCustomers,
+            rowsFromDB: data.length,
+            gradesInCache: sortedGrades,
+            sizes: sortedSizes
+        });
 
         if (sortedGrades.length === 0) {
             yearlyPivotDataCache = null;
@@ -1458,7 +1470,7 @@ async function loadYearlyPivot() {
 }
 
 // ==========================================
-// 6. Yearly Pivot: Tabs & Render จาก Cache
+// 6. Yearly Pivot: Tabs & Render จาก Cache (v16: normalize + safe access)
 // ==========================================
 
 function renderYearlyPivotTable(gradeGroup) {
@@ -1466,14 +1478,31 @@ function renderYearlyPivotTable(gradeGroup) {
     if (!container || !yearlyPivotDataCache) return;
 
     const monthNames = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
-    const sortedSizes = yearlyPivotSizesCache;
+    const sortedSizes = yearlyPivotSizesCache || [];
 
+    // ✅ FIX: normalize gradeGroup
+    const groupNorm = String(gradeGroup || '').trim().toUpperCase();
+
+    // ✅ Debug log
+    console.log('🔍 renderYearlyPivotTable:', {
+        gradeGroupRaw: gradeGroup,
+        gradeGroupNorm: groupNorm,
+        allGradesInCache: Object.keys(yearlyPivotDataCache),
+        sizes: sortedSizes
+    });
+
+    // ✅ FIX: normalize g ก่อน filter + รองรับ ALL
     const filteredGrades = Object.keys(yearlyPivotDataCache)
         .filter(g => {
-            if (gradeGroup === 'FSC') return g.includes('F');
-            return g.startsWith(gradeGroup) && !g.includes('F');
+            const gn = String(g || '').trim().toUpperCase().replace(/\s+/g, '');
+            if (!gn) return false;
+            if (groupNorm === 'FSC') return gn.includes('F');
+            if (groupNorm === 'ALL') return true;
+            return gn.startsWith(groupNorm) && !gn.includes('F');
         })
         .sort();
+
+    console.log(`  → filteredGrades (${groupNorm}):`, filteredGrades);
 
     if (filteredGrades.length === 0) {
         container.innerHTML = `<div style="text-align:center; padding: 20px; color: var(--text-muted);">ไม่พบข้อมูลเกรดกลุ่ม ${escHtml(gradeGroup)} ในปีนี้</div>`;
@@ -1482,6 +1511,9 @@ function renderYearlyPivotTable(gradeGroup) {
 
     let html = '';
     filteredGrades.forEach(grade => {
+        // ✅ FIX: safe access กัน grade data undefined
+        const gradeData = (yearlyPivotDataCache[grade] && yearlyPivotDataCache[grade].data) || {};
+
         html += `<table class="yearly-pivot-table">
             <thead>
                 <tr>
@@ -1499,11 +1531,14 @@ function renderYearlyPivotTable(gradeGroup) {
             let monthTotal = 0;
             html += `<tr><td class="yearly-pivot-month-col">${monthNames[m]}</td>`;
 
+            // ✅ FIX: safe access กัน month data undefined
+            const monthData = gradeData[m] || {};
+
             sortedSizes.forEach(size => {
-                const val = yearlyPivotDataCache[grade].data[m][size] || 0;
+                const val = monthData[size] || 0;
                 monthTotal += val;
                 const clickAttr = val > 0
-                    ? `onclick="openCustomerDrillDown('${grade}', ${size}, ${m + 1})" style="cursor:pointer;" title="คลิกเพื่อดูรายละเอียดลูกค้า"`
+                    ? `onclick="openCustomerDrillDown('${escAttr(grade)}', ${size}, ${m + 1})" style="cursor:pointer;" title="คลิกเพื่อดูรายละเอียดลูกค้า"`
                     : '';
                 html += `<td ${clickAttr}>${val > 0 ? val.toFixed(2) : ''}</td>`;
             });
@@ -1518,7 +1553,7 @@ function renderYearlyPivotTable(gradeGroup) {
         sortedSizes.forEach(size => {
             let sizeTotal = 0;
             for (let m = 0; m < 12; m++) {
-                sizeTotal += (yearlyPivotDataCache[grade].data[m][size] || 0);
+                sizeTotal += ((gradeData[m] || {})[size] || 0);
             }
             grandTotal += sizeTotal;
             html += `<td>${sizeTotal > 0 ? sizeTotal.toFixed(2) : ''}</td>`;
@@ -1569,7 +1604,10 @@ async function openCustomerDrillDown(grade, size, monthNum) {
     const endDate = `${year}-${String(monthNum).padStart(2, '0')}-${lastDay}`;
     const monthNames = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
 
-    if (modalTitle) modalTitle.innerHTML = `📊 รายละเอียด: <span style="color:#2563eb;">${grade} (Size ${size})</span> - ${monthNames[monthNum-1]} ${Number(year)+543}`;
+    // ✅ FIX: normalize grade ที่รับเข้ามา
+    const gradeNorm = String(grade || '').trim().toUpperCase().replace(/\s+/g, '');
+
+    if (modalTitle) modalTitle.innerHTML = `📊 รายละเอียด: <span style="color:#2563eb;">${gradeNorm} (Size ${size})</span> - ${monthNames[monthNum-1]} ${Number(year)+543}`;
     modalBody.innerHTML = '<div style="text-align:center; padding: 40px; color:#64748b;"><div class="spinner"></div>กำลังประมวลผลข้อมูล...</div>';
     modal.classList.add('show');
 
@@ -1594,8 +1632,10 @@ async function openCustomerDrillDown(grade, size, monthNum) {
             const masterItem = findMasterForUsageRow(row.grade, row.width, row.item_code);
             if (!masterItem) return;
 
-            const masterGradeName = masterItem.gram ? `${masterItem.grade}${masterItem.gram}` : masterItem.grade;
-            if (masterGradeName.toUpperCase() !== grade.toUpperCase()) return;
+            // ✅ FIX: normalize masterGradeName ก่อนเทียบ
+            const masterGradeName = (masterItem.gram ? `${masterItem.grade}${masterItem.gram}` : masterItem.grade)
+                .trim().toUpperCase().replace(/\s+/g, '');
+            if (masterGradeName !== gradeNorm) return;
 
             const rolls = Number(row.used_kgs) / Number(masterItem.std_weight_kg);
             const kgs = Number(row.used_kgs);
