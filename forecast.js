@@ -1,5 +1,5 @@
 // ==========================================
-// forecast.js - Production Forecast & Usage Pivot (FIXED v11)
+// forecast.js - Production Forecast & Usage Pivot (FIXED v12)
 // ==========================================
 
 const fcState = {
@@ -90,7 +90,6 @@ async function loadForecastMasterData() {
 
     let rows = null;
     try {
-        // ✅ ลบเลข 5000 ออก ให้ใช้ fetchAllRows จัดการ Pagination เอง
         rows = await fetchAllRows(buildQuery('grade, size, gram, item_code, std_weight_kg'));
     } catch (err) {
         console.warn('loadForecastMasterData (with gram) error:', err?.message, '→ retry without gram');
@@ -1265,7 +1264,7 @@ async function loadYearlyPivot() {
         const data = await fetchAllRows(() => {
             let q = supabase
                 .from('usage_records_raw')
-                .select('grade, width, used_kgs, item_code, usage_date, roll_for_customer')
+                .select('id, grade, width, used_kgs, item_code, usage_date, roll_for_customer, sbjob_no, doc_no')
                 .eq('is_valid', true)
                 .gte('usage_date', firstDay)
                 .lte('usage_date', lastDay);
@@ -1285,10 +1284,34 @@ async function loadYearlyPivot() {
             return;
         }
 
+        // ✅ FIX: Deduplicate by id (or sbjob_no+date+size+grade) ก่อนบวก
+        const seenKeys = new Set();
+        const uniqueRows = [];
+        let dupCount = 0;
+
+        for (const row of data) {
+            // ใช้ composite key: id > (sbjob_no|usage_date|grade|width|used_kgs)
+            const key = row.id
+                ? `id:${row.id}`
+                : `c:${row.sbjob_no || ''}|${row.usage_date || ''}|${row.grade || ''}|${row.width || ''}|${row.used_kgs || ''}`;
+
+            if (seenKeys.has(key)) {
+                dupCount++;
+                continue;
+            }
+            seenKeys.add(key);
+            uniqueRows.push(row);
+        }
+
+        if (dupCount > 0) {
+            console.warn(`⚠️ loadYearlyPivot: พบ ${dupCount} แถวซ้ำ ถูกตัดออก (จากทั้งหมด ${data.length} → ${uniqueRows.length})`);
+            showToast(`⚠️ พบข้อมูลซ้ำ ${dupCount} แถวในระบบ ถูกตัดออกก่อนคำนวณ (กรุณาตรวจสอบ import ซ้ำ)`, 'warn', 6000);
+        }
+
         const pivotData = {};
         const allSizesSet = new Set();
 
-        data.forEach(row => {
+        uniqueRows.forEach(row => {
             const rowGrade = String(row.grade || '').trim().toUpperCase();
             const rowSize = Number(row.width);
             const rowItemCode = String(row.item_code || '').trim().toUpperCase();
