@@ -655,14 +655,12 @@ async function _loadUsagePivotImpl() {
             .select('grade, width, total_rolls')
             .eq('snapshot_month', month);
 
-        // ถ้าเลือกหลายลูกค้า ให้ดึง ALL + ลูกค้าที่เลือก
-        if (selectedCustomers.length > 0) {
-            const filters = ['ALL', ...selectedCustomers];
-            q = q.in('customer_filter', filters);
+        // ✅ ของใหม่ (ถ้าเลือกใคร ให้ดึงเฉพาะคนนั้น ไม่ต้องเอา ALL)
+        if (selectedCustomers.length === 0) {
+            q = q.eq('customer_filter', 'ALL'); // ถ้าไม่เลือก ให้ดูยอดรวม
         } else {
-            q = q.eq('customer_filter', 'ALL'); // ถ้าไม่เลือกใคร ให้ดูยอดรวม ALL
+            q = q.in('customer_filter', selectedCustomers); // ถ้าเลือก ให้ดูเฉพาะที่เลือก
         }
-
         const { data, error } = await q;
         if (error) throw error;
 
