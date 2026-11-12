@@ -1,5 +1,5 @@
 // ==========================================
-// forecast.js - Production Forecast & Usage Pivot (FIXED v23)
+// forecast.js - Production Forecast & Usage Pivot (FIXED v24)
 // ==========================================
 
 const fcState = {
@@ -456,18 +456,28 @@ async function initUsagePivotTab() {
 
     await loadForecastMasterData();
 
+    // ✅ v24: แก้ไขการดึงข้อมูลลูกค้าในหน้ารายเดือน ให้แสดง Code (Name)
     const list = document.getElementById('pivotCustomerList');
     if (list && fcState.pivotCustomers.length === 0) {
         try {
             const data = await fetchAllRows(() =>
-                supabase.from('usage_records_raw').select('roll_for_customer')
+                supabase.from('usage_records_raw').select('customer_code, customer_name')
             );
 
-            const unique = [...new Set((data || [])
-                .map(d => (d.roll_for_customer || '').trim())
-                .filter(Boolean))]
-                .sort();
+            const uniqueSet = new Set();
+            (data || []).forEach(d => {
+                const code = (d.customer_code || '').trim();
+                const name = (d.customer_name || '').trim();
+                
+                let display = '';
+                if (code && name) display = `${code} (${name})`;
+                else if (code) display = code;
+                else if (name) display = name;
 
+                if (display) uniqueSet.add(display);
+            });
+
+            const unique = [...uniqueSet].sort();
             fcState.pivotCustomers = unique;
 
             list.innerHTML = unique.map(c => `
@@ -707,13 +717,23 @@ async function _loadUsagePivotImpl() {
         const data = await fetchAllRows(() => {
             let q = supabase
                 .from('usage_records_raw')
-                .select('grade, width, used_kgs, item_code, usage_date, roll_for_customer')
+                .select('grade, width, used_kgs, item_code, usage_date, customer_code, customer_name')
                 .eq('is_valid', true)
                 .gte('usage_date', firstDay)
                 .lte('usage_date', lastDay);
 
             if (selectedCustomers.length > 0) {
-                q = q.in('roll_for_customer', selectedCustomers);
+                // ⚠️ ต้องใช้ OR condition เพราะถ้าเราเลือกจาก Dropdown ที่เป็น "Code (Name)"
+                // แต่ฐานข้อมูลอาจจะเก็บแยกกัน หรือเก็บใน roll_for_customer
+                // แต่เพื่อความง่าย ให้ใช้ roll_for_customer ในการกรองเหมือนเดิม 
+                // (ในกรณีที่ roll_for_customer เก็บ "Code (Name)" ไว้)
+                // หรือถ้าเรามั่นใจว่า customer_code คือ key ที่ใช้ filter
+                const codes = selectedCustomers.map(c => {
+                    // ดึงแค่ Code ออกมา เช่น "01ABB (บริษัท...)" -> "01ABB"
+                    const match = c.match(/^([^\(]+)/);
+                    return match ? match[1].trim() : c;
+                });
+                q = q.in('customer_code', codes); 
             }
             return q;
         });
