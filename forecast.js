@@ -1,5 +1,5 @@
 // ==========================================
-// forecast.js - Production Forecast & Usage Pivot (FIXED v21)
+// forecast.js - Production Forecast & Usage Pivot (FIXED v22)
 // ==========================================
 
 const fcState = {
@@ -50,7 +50,7 @@ async function getLatestMonthWithData() {
     }
 }
 
-// ✅ v21: ฟังก์ชันค้นหาลูกค้าใน Dropdown (แก้ไขให้กรองจาก dataset.customer)
+// ✅ v22: ฟังก์ชันค้นหาลูกค้าใน Dropdown (ดึงจาก span เพื่อความแม่นยำ)
 function filterCustomerList(searchText, mode) {
     const listId = mode === 'monthly' ? 'pivotCustomerList' : 'yearlyCustomerList';
     const list = document.getElementById(listId);
@@ -60,8 +60,15 @@ function filterCustomerList(searchText, mode) {
     const items = list.querySelectorAll('.item');
 
     items.forEach(item => {
-        const customerName = (item.dataset.customer || '').toLowerCase();
-        item.style.display = customerName.includes(text) ? 'flex' : 'none';
+        // ดึงข้อความจาก span (ชื่อลูกค้า) โดยตรง
+        const span = item.querySelector('span');
+        const labelText = span ? span.textContent.toLowerCase() : '';
+        
+        if (labelText.includes(text)) {
+            item.style.display = 'flex'; // ถ้าเจอให้แสดง
+        } else {
+            item.style.display = 'none'; // ถ้าไม่เจอให้ซ่อน
+        }
     });
 }
 
@@ -612,11 +619,11 @@ function renderUsagePivotTable() {
             const row = pivotData[grade];
             bodyHtml += `<tr><td><strong>${escHtml(grade)}</strong></td>`;
             widths.forEach(w => {
-    const val = row[w] || 0;
-    // ✅ เพิ่มตัวแปรสำหรับ Tooltip
-    const tipAttr = val > 0 ? `class="clickable" data-tip="Gradegrams ${grade} · Size ${w}"` : '';
-    bodyHtml += `<td ${tipAttr}>${val > 0 ? val.toFixed(2) : ''}</td>`;
-});
+                const val = row[w] || 0;
+                // ✅ เพิ่มตัวแปรสำหรับ Tooltip
+                const tipAttr = val > 0 ? `class="clickable" data-tip="Gradegrams ${grade} · Size ${w}"` : '';
+                bodyHtml += `<td ${tipAttr}>${val > 0 ? val.toFixed(2) : ''}</td>`;
+            });
             bodyHtml += `<td style="background:#e6f2ff;font-weight:bold;">${row.total > 0 ? row.total.toFixed(2) : '0.00'}</td></tr>`;
         });
     }
@@ -1575,14 +1582,14 @@ function renderYearlyPivotTable(gradeGroup) {
             const monthData = gradeData[m] || {};
 
             sortedSizes.forEach(size => {
-    const val = monthData[size] || 0;
-    monthTotal += val;
-    // ✅ รวม onclick (เดิม) + data-tip (ใหม่) เข้าไว้ด้วยกัน
-    const cellAttr = val > 0
-        ? `onclick="openCustomerDrillDown('${escAttr(grade)}', ${size}, ${m + 1})" class="clickable" data-tip="Gradegrams ${escAttr(grade)} · Size ${size}"`
-        : '';
-    html += `<td ${cellAttr}>${val > 0 ? val.toFixed(2) : ''}</td>`;
-});
+                const val = monthData[size] || 0;
+                monthTotal += val;
+                // ✅ รวม onclick (เดิม) + data-tip (ใหม่) เข้าไว้ด้วยกัน
+                const cellAttr = val > 0
+                    ? `onclick="openCustomerDrillDown('${escAttr(grade)}', ${size}, ${m + 1})" class="clickable" data-tip="Gradegrams ${escAttr(grade)} · Size ${size}"`
+                    : '';
+                html += `<td ${cellAttr}>${val > 0 ? val.toFixed(2) : ''}</td>`;
+            });
 
             html += `<td class="yearly-pivot-total-col">${monthTotal > 0 ? monthTotal.toFixed(2) : ''}</td></tr>`;
         }
