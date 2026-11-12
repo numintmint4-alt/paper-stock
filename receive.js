@@ -355,7 +355,9 @@ function renderReceiveMatrix(rows, dateThai, supHtml = '') {
       if (!v || v.qty === 0) {
         html += '<td class="empty">-</td>';
       } else {
-        html += `<td class="clickable" onclick="openReceiveDetail('${esc(rk)}', ${s}, '${dateThai}')">
+                html += `<td class="clickable" 
+                     onclick="openReceiveDetail('${esc(rk)}', ${s}, '${dateThai}')"
+                     data-tip="Gradegrams ${esc(rk)} · Size ${s}">
           <div class="cell-content">
             <div class="cell-main">${v.qty}</div>
           </div>
