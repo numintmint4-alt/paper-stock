@@ -1101,3 +1101,77 @@ table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
 .drill-section { margin-bottom: 24px; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
 .drill-title { font-size: 15px; font-weight: 700; color: #1e293b; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 8px; }
 .drill-title span { font-size: 18px; }
+/* ================= TOOLTIP FOR PIVOT TABLES ================= */
+/* สำหรับหน้ารายเดือน (Pivot Table) */
+#pivot-table td.clickable {
+    cursor: pointer;
+    position: relative;
+}
+
+#pivot-table td.clickable[data-tip]:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--primary-dark);
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: var(--radius-md);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(37,99,235,.35);
+    pointer-events: none;
+    animation: tipFadeIn .15s ease;
+}
+
+#pivot-table td.clickable[data-tip]:hover::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: var(--primary-dark);
+    z-index: 1000;
+    pointer-events: none;
+}
+
+/* สำหรับหน้ารายปี (Yearly Pivot Table) */
+.yearly-pivot-table td.clickable {
+    cursor: pointer;
+    position: relative;
+}
+
+.yearly-pivot-table td.clickable[data-tip]:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--primary-dark);
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: var(--radius-md);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(37,99,235,.35);
+    pointer-events: none;
+    animation: tipFadeIn .15s ease;
+}
+
+.yearly-pivot-table td.clickable[data-tip]:hover::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: var(--primary-dark);
+    z-index: 1000;
+    pointer-events: none;
+}
