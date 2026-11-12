@@ -533,6 +533,9 @@
                   <button type="button" onclick="selectAllPivotCustomers()">✓ เลือกทั้งหมด</button>
                   <button type="button" onclick="clearAllPivotCustomers()">✗ ล้างทั้งหมด</button>
                 </div>
+                <div style="padding: 8px; border-bottom: 1px solid #e2e8f0;">
+                    <input type="text" placeholder="🔍 ค้นหาลูกค้า..." oninput="filterCustomerList(this.value, 'monthly')" style="width: 100%; padding: 6px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px;">
+                </div>
                 <div class="grade-list" id="pivotCustomerList"></div>
               </div>
             </div>
@@ -607,6 +610,9 @@
                     <button type="button" onclick="selectAllYearlyCustomers()">✓ เลือกทั้งหมด</button>
                     <button type="button" onclick="clearAllYearlyCustomers()">✗ ล้างทั้งหมด</button>
                   </div>
+                  <div style="padding: 8px; border-bottom: 1px solid #e2e8f0;">
+                    <input type="text" placeholder="🔍 ค้นหาลูกค้า..." oninput="filterCustomerList(this.value, 'yearly')" style="width: 100%; padding: 6px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px;">
+                  </div>
                   <div class="grade-list" id="yearlyCustomerList"></div>
                 </div>
               </div>
@@ -615,13 +621,24 @@
             <button type="button" class="primary" onclick="loadYearlyPivot()" id="btnLoadYearlyPivot">🔍 โหลดข้อมูล Pivot รายปี</button>
           </div>
 
-          <div id="yearly-grade-tabs-container" class="sub-tabs hidden" style="margin-bottom: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
-            <button class="sub-tab active" onclick="filterYearlyPivot('CA', this)">CA</button>
-            <button class="sub-tab" onclick="filterYearlyPivot('KA', this)">KA</button>
-            <button class="sub-tab" onclick="filterYearlyPivot('KI', this)">KI</button>
-            <button class="sub-tab" onclick="filterYearlyPivot('KK', this)">KK</button>
-            <button class="sub-tab" onclick="filterYearlyPivot('KW', this)">KW</button>
-            <button class="sub-tab" onclick="filterYearlyPivot('FSC', this)" id="btn-tab-fsc-yearly" style="border-color: var(--green); color: var(--green-dark);">FSC</button>
+          <!-- ✅ ปรับปรุงส่วนหัวข้อและ Tabs หน้ารายปี -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+              
+              <!-- ข้อความหัวข้อ (ซ้าย) -->
+              <div id="yearlyPivotTitle" style="font-size: 16px; font-weight: 700; margin: 0; color: #1e293b;">
+                  ตารางแสดงผลการใช้งานม้วนกระดาษปี : -
+              </div>
+
+              <!-- ปุ่ม Tabs (ขวา) -->
+              <div id="yearly-grade-tabs-container" class="sub-tabs hidden" style="display: flex; gap: 8px; flex-wrap: wrap; margin: 0;">
+                  <button class="sub-tab active" onclick="filterYearlyPivot('CA', this)">CA</button>
+                  <button class="sub-tab" onclick="filterYearlyPivot('KA', this)">KA</button>
+                  <button class="sub-tab" onclick="filterYearlyPivot('KI', this)">KI</button>
+                  <button class="sub-tab" onclick="filterYearlyPivot('KK', this)">KK</button>
+                  <button class="sub-tab" onclick="filterYearlyPivot('KW', this)">KW</button>
+                  <button class="sub-tab" onclick="filterYearlyPivot('FSC', this)" id="btn-tab-fsc-yearly" style="border-color: var(--green); color: var(--green-dark);">FSC</button>
+              </div>
+
           </div>
 
           <div id="yearly-pivot-result" class="report-wrap" style="overflow-x: auto; padding-bottom: 20px;"></div>
