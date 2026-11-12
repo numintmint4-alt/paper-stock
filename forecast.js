@@ -1,5 +1,5 @@
 // ==========================================
-// forecast.js - Production Forecast & Usage Pivot (FIXED v18)
+// forecast.js - Production Forecast & Usage Pivot (FIXED v19)
 // ==========================================
 
 const fcState = {
@@ -28,6 +28,26 @@ function fcCurrentMonthStr() {
 function fcLastDayOfMonth(y, mo) {
     const last = new Date(y, mo, 0).getDate();
     return `${y}-${String(mo).padStart(2, '0')}-${String(last).padStart(2, '0')}`;
+}
+
+// ✅ v19: ฟังก์ชันหาเดือนล่าสุดที่มีข้อมูลใน Database
+async function getLatestMonthWithData() {
+    try {
+        const { data, error } = await supabase
+            .from('usage_records_raw')
+            .select('usage_date')
+            .order('usage_date', { ascending: false })
+            .limit(1);
+
+        if (error || !data || data.length === 0) {
+            return fcCurrentMonthStr();
+        }
+
+        return data[0].usage_date.slice(0, 7);
+    } catch (e) {
+        console.warn('getLatestMonthWithData error:', e);
+        return fcCurrentMonthStr();
+    }
 }
 
 // ==========================================
@@ -405,10 +425,12 @@ async function _saveForecastDataImpl() {
 // 2. Usage Pivot & Snapshot
 // ==========================================
 
+// ✅ v19: ใช้ getLatestMonthWithData() เพื่อดึงเดือนล่าสุดจาก DB เป็น default
 async function initUsagePivotTab() {
     const monthInput = document.getElementById('pivot-month');
     if (monthInput && !monthInput.value) {
-        monthInput.value = fcCurrentMonthStr();
+        const latestMonth = await getLatestMonthWithData();
+        monthInput.value = latestMonth;
     }
 
     await loadForecastMasterData();
@@ -739,13 +761,13 @@ async function _loadUsagePivotImpl() {
 
         renderUsagePivotTable();
 
-        // ✅ v18: อัปเดตข้อความหัวข้อบอกเดือน
+        // ✅ v19: อัปเดตข้อความหัวข้อบอกเดือน (เปลี่ยน "ยอดใช้" → "การใช้งาน")
         const monthLabel = document.getElementById('pivotCurrentMonthLabel');
         if (monthLabel) {
             const [yyyy, mm] = month.split('-');
             const thaiMonths = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
             const thaiYear = Number(yyyy) + 543;
-            monthLabel.innerHTML = `ตารางแสดงผลยอดใช้งานม้วนกระดาษเดือน : <span style="color: var(--primary);">${thaiMonths[Number(mm) - 1]} ${thaiYear}</span>`;
+            monthLabel.innerHTML = `ตารางแสดงผลการใช้งานม้วนกระดาษเดือน : <span style="color: var(--primary);">${thaiMonths[Number(mm) - 1]} ${thaiYear}</span>`;
         }
 
         if (missingMasterSet.size === 0) {
