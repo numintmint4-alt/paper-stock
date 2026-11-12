@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════ */
-/*  STOCK V10.1 — style.css — V.14                                 */
+/*  STOCK V10.1 — style.css — V.15                                 */
 /*  Design Tokens + Components + Print Styles                      */
-/*  V.14: ปรับปรุงสไตล์ตารางรายปี (Yearly Pivot Table)              */
+/*  V.15: ปรับแต่งตารางรายปี (Yearly Pivot) ตามคำขอ              */
 /* ═══════════════════════════════════════════════════════════════ */
 
 :root {
@@ -137,20 +137,19 @@ th { background: var(--surface-soft); color: var(--text); font: 700 12px inherit
   grid-template-columns: 1fr auto 1fr; 
   align-items: start; 
   border-bottom: 2px solid var(--primary); 
-  padding-top: 10px;           /* ✅ เพิ่ม padding-top */
+  padding-top: 10px;           
   padding-bottom: 14px; 
   margin-bottom: 14px; 
   gap: 16px; 
 }
-/* ✅ ปรับ report-title ให้ใหญ่และหนาขึ้น */
 .report-title { 
   text-align: center; 
-  font-size: 23px;             /* ✅ เพิ่มจาก 21px เป็น 26px */
-  font-weight: 800;            /* ✅ เพิ่มจาก 700 เป็น 800 */
+  font-size: 23px;             
+  font-weight: 800;            
   line-height: 1.4; 
   color: var(--text); 
   justify-self: center; 
-  letter-spacing: -0.3px;      /* ✅ ทำให้ตัวอักษรดูแน่นขึ้น */
+  letter-spacing: -0.3px;      
 }
 .report-subtitle { text-align: center; font-size: 13px; color: var(--text-muted); font-weight: 400; margin-top: 6px; }
 .report-doc { font-size: 12px; color: var(--text-muted); white-space: nowrap; font-weight: 600; justify-self: end; }
