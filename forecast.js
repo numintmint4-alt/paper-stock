@@ -612,9 +612,11 @@ function renderUsagePivotTable() {
             const row = pivotData[grade];
             bodyHtml += `<tr><td><strong>${escHtml(grade)}</strong></td>`;
             widths.forEach(w => {
-                const val = row[w] || 0;
-                bodyHtml += `<td>${val > 0 ? val.toFixed(2) : ''}</td>`;
-            });
+    const val = row[w] || 0;
+    // ✅ เพิ่มตัวแปรสำหรับ Tooltip
+    const tipAttr = val > 0 ? `class="clickable" data-tip="Gradegrams ${grade} · Size ${w}"` : '';
+    bodyHtml += `<td ${tipAttr}>${val > 0 ? val.toFixed(2) : ''}</td>`;
+});
             bodyHtml += `<td style="background:#e6f2ff;font-weight:bold;">${row.total > 0 ? row.total.toFixed(2) : '0.00'}</td></tr>`;
         });
     }
@@ -1573,13 +1575,14 @@ function renderYearlyPivotTable(gradeGroup) {
             const monthData = gradeData[m] || {};
 
             sortedSizes.forEach(size => {
-                const val = monthData[size] || 0;
-                monthTotal += val;
-                const clickAttr = val > 0
-                    ? `onclick="openCustomerDrillDown('${escAttr(grade)}', ${size}, ${m + 1})" style="cursor:pointer;" title="คลิกเพื่อดูรายละเอียดลูกค้า"`
-                    : '';
-                html += `<td ${clickAttr}>${val > 0 ? val.toFixed(2) : ''}</td>`;
-            });
+    const val = monthData[size] || 0;
+    monthTotal += val;
+    // ✅ รวม onclick (เดิม) + data-tip (ใหม่) เข้าไว้ด้วยกัน
+    const cellAttr = val > 0
+        ? `onclick="openCustomerDrillDown('${escAttr(grade)}', ${size}, ${m + 1})" class="clickable" data-tip="Gradegrams ${escAttr(grade)} · Size ${size}"`
+        : '';
+    html += `<td ${cellAttr}>${val > 0 ? val.toFixed(2) : ''}</td>`;
+});
 
             html += `<td class="yearly-pivot-total-col">${monthTotal > 0 ? monthTotal.toFixed(2) : ''}</td></tr>`;
         }
