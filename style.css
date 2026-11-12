@@ -1023,14 +1023,15 @@ table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
     border: 1px solid var(--border-strong);
 }
 
-.yearly-pivot-table th, 
-.yearly-pivot-table td {
-    border: 1px solid var(--border);
-    padding: 6px 8px;
+/* ปรับความกว้างคอลัมน์ Size ให้เท่ากันเป๊ะ */
+.yearly-pivot-table th:not(.yearly-pivot-month-col):not(.yearly-pivot-total-col),
+.yearly-pivot-table td:not(.yearly-pivot-month-col):not(.yearly-pivot-total-col) {
+    min-width: 45px !important;  /* ✅ บังคับความกว้างขั้นต่ำ */
+    max-width: 45px !important;  /* ✅ บังคับความกว้างสูงสุด */
+    width: 45px !important;      /* ✅ บังคับความกว้างคงที่ */
     text-align: center;
-    white-space: nowrap;
+    padding: 6px 4px;
 }
-
 .yearly-pivot-table thead th {
     background: var(--primary);
     color: #fff;
