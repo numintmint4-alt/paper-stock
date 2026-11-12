@@ -1,5 +1,5 @@
 // ==========================================
-// forecast.js - Production Forecast & Usage Pivot (FIXED v20)
+// forecast.js - Production Forecast & Usage Pivot (FIXED v21)
 // ==========================================
 
 const fcState = {
@@ -50,7 +50,7 @@ async function getLatestMonthWithData() {
     }
 }
 
-// ✅ v20: ฟังก์ชันค้นหาลูกค้าใน Dropdown
+// ✅ v21: ฟังก์ชันค้นหาลูกค้าใน Dropdown (แก้ไขให้กรองจาก dataset.customer)
 function filterCustomerList(searchText, mode) {
     const listId = mode === 'monthly' ? 'pivotCustomerList' : 'yearlyCustomerList';
     const list = document.getElementById(listId);
@@ -60,8 +60,8 @@ function filterCustomerList(searchText, mode) {
     const items = list.querySelectorAll('.item');
 
     items.forEach(item => {
-        const labelText = item.textContent.toLowerCase();
-        item.style.display = labelText.includes(text) ? 'flex' : 'none';
+        const customerName = (item.dataset.customer || '').toLowerCase();
+        item.style.display = customerName.includes(text) ? 'flex' : 'none';
     });
 }
 
@@ -1175,7 +1175,9 @@ async function handleUsageImport(event) {
                 const rawWidth = row['Size'] || row['size'] || row['Width'] || row['width'];
                 const rawKgs   = row['used_kgs'] || row['kgs'] || row['Kgs'];
                 const rawGrade = row['grade'] || row['Grade'];
-                const customer = row['customer_code'] || row['Customer'] || row['customer_name'] || row['roll_for_customer'] || '';
+                // ✅ v21: แยก Code/Name
+                const customerCode = row['customer_code'] || row['Customer'] || '';
+                const customerName = row['customer_name'] || '';
                 const jobNo    = String(row['sbjob_no'] || row['SBJOB_NO'] || row['job_no'] || '').trim();
 
                 const width = parseFloat(rawWidth) || 0;
@@ -1197,7 +1199,9 @@ async function handleUsageImport(event) {
                     width:      width,
                     used_kgs:   kgs,
                     kgs:        kgs,
-                    roll_for_customer: customer,
+                    roll_for_customer: customerCode || customerName, // ยังเก็บไว้เพื่อ backward compat
+                    customer_code: customerCode, // ✅ v21
+                    customer_name: customerName, // ✅ v21
                     item_code:  item ? (item.item_code || '') : '',
                     is_valid:   true,
                     import_batch_id: batchId,
@@ -1645,7 +1649,7 @@ async function openCustomerDrillDown(grade, size, monthNum) {
     modal.classList.add('show');
 
     try {
-        // ✅ v20: เพิ่ม customer_code, customer_name
+        // ✅ v21: ดึง customer_code, customer_name
         const { data, error } = await supabase
             .from('usage_records_raw')
             .select('grade, width, used_kgs, item_code, usage_date, customer_code, customer_name')
@@ -1673,14 +1677,14 @@ async function openCustomerDrillDown(grade, size, monthNum) {
             const rolls = Number(row.used_kgs) / Number(masterItem.std_weight_kg);
             const kgs = Number(row.used_kgs);
 
-            // ✅ v20: ใช้ customer_code + customer_name
-            const customerCode = (row.customer_code || '').trim() || 'ไม่ระบุ';
-            const customerName = (row.customer_name || '').trim() || '';
-            const customerKey = `${customerCode}_${customerName}`;
+            // ✅ v21: จัดกลุ่มด้วย Code + Name
+            const cCode = (row.customer_code || '').trim() || 'ไม่ระบุ';
+            const cName = (row.customer_name || '').trim() || '';
+            const cKey = `${cCode}_${cName}`;
 
-            if (!customerStats[customerKey]) customerStats[customerKey] = { code: customerCode, name: customerName, rolls: 0, kgs: 0 };
-            customerStats[customerKey].rolls += rolls;
-            customerStats[customerKey].kgs += kgs;
+            if (!customerStats[cKey]) customerStats[cKey] = { code: cCode, name: cName, rolls: 0, kgs: 0 };
+            customerStats[cKey].rolls += rolls;
+            customerStats[cKey].kgs += kgs;
 
             const product = row.description || row.product_name || row.customer_name || 'ไม่ระบุสินค้า';
             const date = row.usage_date;
@@ -1721,9 +1725,9 @@ async function openCustomerDrillDown(grade, size, monthNum) {
         </div>`;
 
         const sortedCustomers = Object.keys(customerStats).map(c => ({
-            name: c, // ใช้ key เป็น name เพื่ออ้างอิง
+            key: c,
             code: customerStats[c].code,
-            displayName: customerStats[c].name,
+            name: customerStats[c].name,
             rolls: customerStats[c].rolls,
             kgs: customerStats[c].kgs,
             percent: (customerStats[c].rolls / totalRollsAll) * 100
@@ -1750,8 +1754,8 @@ async function openCustomerDrillDown(grade, size, monthNum) {
             else if (rank === 2) rankClass = 'rank-2';
             else if (rank === 3) rankClass = 'rank-3';
 
-            // ✅ v20: แสดง Code + Name
-            const displayStr = c.displayName ? `${escHtml(c.code)} (${escHtml(c.displayName)})` : escHtml(c.code);
+            // ✅ v21: แสดง Code + Name
+            const displayStr = c.name ? `${escHtml(c.code)} (${escHtml(c.name)})` : escHtml(c.code);
 
             html += `<tr>
                 <td style="text-align:center;"><span class="rank-badge ${rankClass}">${rank}</span></td>
