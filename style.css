@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════ */
-/*  STOCK V10.1 — style.css — V.15                                 */
+/*  STOCK V10.1 — style.css — V.16                                 */
 /*  Design Tokens + Components + Print Styles                      */
-/*  V.15: ปรับแต่งตารางรายปี (Yearly Pivot) ตามคำขอ              */
+/*  V.16: แก้ไข Tooltip ใน Alert Matrix + จัดระเบียบ CSS          */
 /* ═══════════════════════════════════════════════════════════════ */
 
 :root {
@@ -1214,15 +1214,16 @@ table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
     pointer-events: none;
 }
 
-/* สำหรับตาราง Matrix ของ Stock Alert (alert.js) */
+/* สำหรับตาราง Matrix ของ Stock Alert (alert.js) - แก้ไขใหม่ให้ Tooltip ลอย */
 .alert-matrix-new-table .matrix-cell {
     position: relative; /* ✅ จำเป็นสำหรับการจัดตำแหน่ง Tooltip */
+    overflow: visible !important; /* ✅ ดันให้ Tooltip ลอยพ้นขอบ */
 }
 
 .alert-matrix-new-table .matrix-cell[data-tip]:hover::after {
     content: attr(data-tip);
     position: absolute;
-    bottom: calc(100% + 6px);
+    bottom: calc(100% + 5px);
     left: 50%;
     transform: translateX(-50%);
     background: var(--primary-dark);
@@ -1232,7 +1233,7 @@ table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
     font-size: 12px;
     font-weight: 600;
     white-space: nowrap;
-    z-index: 1000;
+    z-index: 9999 !important; /* ✅ ดันขึ้นบนสุด */
     box-shadow: 0 4px 12px rgba(37,99,235,.35);
     pointer-events: none;
     animation: tipFadeIn .15s ease;
@@ -1246,6 +1247,6 @@ table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
     transform: translateX(-50%);
     border: 5px solid transparent;
     border-top-color: var(--primary-dark);
-    z-index: 1000;
+    z-index: 9999 !important;
     pointer-events: none;
 }
