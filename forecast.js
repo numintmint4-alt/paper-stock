@@ -1,5 +1,5 @@
 // ==========================================
-// forecast.js - Production Forecast & Usage Pivot (FIXED v19)
+// forecast.js - Production Forecast & Usage Pivot (FIXED v20)
 // ==========================================
 
 const fcState = {
@@ -48,6 +48,21 @@ async function getLatestMonthWithData() {
         console.warn('getLatestMonthWithData error:', e);
         return fcCurrentMonthStr();
     }
+}
+
+// ✅ v20: ฟังก์ชันค้นหาลูกค้าใน Dropdown
+function filterCustomerList(searchText, mode) {
+    const listId = mode === 'monthly' ? 'pivotCustomerList' : 'yearlyCustomerList';
+    const list = document.getElementById(listId);
+    if (!list) return;
+
+    const text = String(searchText || '').toLowerCase().trim();
+    const items = list.querySelectorAll('.item');
+
+    items.forEach(item => {
+        const labelText = item.textContent.toLowerCase();
+        item.style.display = labelText.includes(text) ? 'flex' : 'none';
+    });
 }
 
 // ==========================================
@@ -425,7 +440,6 @@ async function _saveForecastDataImpl() {
 // 2. Usage Pivot & Snapshot
 // ==========================================
 
-// ✅ v19: ใช้ getLatestMonthWithData() เพื่อดึงเดือนล่าสุดจาก DB เป็น default
 async function initUsagePivotTab() {
     const monthInput = document.getElementById('pivot-month');
     if (monthInput && !monthInput.value) {
@@ -761,7 +775,7 @@ async function _loadUsagePivotImpl() {
 
         renderUsagePivotTable();
 
-        // ✅ v19: อัปเดตข้อความหัวข้อบอกเดือน (เปลี่ยน "ยอดใช้" → "การใช้งาน")
+        // ✅ v19: อัปเดตข้อความหัวข้อบอกเดือน
         const monthLabel = document.getElementById('pivotCurrentMonthLabel');
         if (monthLabel) {
             const [yyyy, mm] = month.split('-');
@@ -1473,6 +1487,14 @@ async function loadYearlyPivot() {
         if (tabsContainer) tabsContainer.classList.remove('hidden');
 
         renderYearlyPivotTable('CA');
+
+        // ✅ v20: อัปเดตข้อความหัวข้อบอกปี
+        const yearTitle = document.getElementById('yearlyPivotTitle');
+        if (yearTitle) {
+            const thaiYear = Number(year) + 543;
+            yearTitle.innerHTML = `ตารางแสดงผลการใช้งานม้วนกระดาษปี : <span style="color: var(--primary);">${thaiYear}</span>`;
+        }
+
         showToast(`โหลด Pivot รายปีสำเร็จ (จาก Snapshot, ${data.length} แถว)`, 'ok');
 
     } catch (err) {
@@ -1623,9 +1645,10 @@ async function openCustomerDrillDown(grade, size, monthNum) {
     modal.classList.add('show');
 
     try {
+        // ✅ v20: เพิ่ม customer_code, customer_name
         const { data, error } = await supabase
             .from('usage_records_raw')
-            .select('*')
+            .select('grade, width, used_kgs, item_code, usage_date, customer_code, customer_name')
             .eq('is_valid', true)
             .gte('usage_date', startDate)
             .lte('usage_date', endDate)
@@ -1649,13 +1672,18 @@ async function openCustomerDrillDown(grade, size, monthNum) {
 
             const rolls = Number(row.used_kgs) / Number(masterItem.std_weight_kg);
             const kgs = Number(row.used_kgs);
-            const customer = (row.roll_for_customer || '').trim() || 'ไม่ระบุ (ทั่วไป)';
+
+            // ✅ v20: ใช้ customer_code + customer_name
+            const customerCode = (row.customer_code || '').trim() || 'ไม่ระบุ';
+            const customerName = (row.customer_name || '').trim() || '';
+            const customerKey = `${customerCode}_${customerName}`;
+
+            if (!customerStats[customerKey]) customerStats[customerKey] = { code: customerCode, name: customerName, rolls: 0, kgs: 0 };
+            customerStats[customerKey].rolls += rolls;
+            customerStats[customerKey].kgs += kgs;
+
             const product = row.description || row.product_name || row.customer_name || 'ไม่ระบุสินค้า';
             const date = row.usage_date;
-
-            if (!customerStats[customer]) customerStats[customer] = { rolls: 0, kgs: 0 };
-            customerStats[customer].rolls += rolls;
-            customerStats[customer].kgs += kgs;
 
             if (!productStats[product]) productStats[product] = { rolls: 0, kgs: 0 };
             productStats[product].rolls += rolls;
@@ -1693,7 +1721,9 @@ async function openCustomerDrillDown(grade, size, monthNum) {
         </div>`;
 
         const sortedCustomers = Object.keys(customerStats).map(c => ({
-            name: c,
+            name: c, // ใช้ key เป็น name เพื่ออ้างอิง
+            code: customerStats[c].code,
+            displayName: customerStats[c].name,
             rolls: customerStats[c].rolls,
             kgs: customerStats[c].kgs,
             percent: (customerStats[c].rolls / totalRollsAll) * 100
@@ -1720,9 +1750,12 @@ async function openCustomerDrillDown(grade, size, monthNum) {
             else if (rank === 2) rankClass = 'rank-2';
             else if (rank === 3) rankClass = 'rank-3';
 
+            // ✅ v20: แสดง Code + Name
+            const displayStr = c.displayName ? `${escHtml(c.code)} (${escHtml(c.displayName)})` : escHtml(c.code);
+
             html += `<tr>
                 <td style="text-align:center;"><span class="rank-badge ${rankClass}">${rank}</span></td>
-                <td style="font-weight:600; color:#1e293b;">${escHtml(c.name)}</td>
+                <td style="font-weight:600; color:#1e293b;">${displayStr}</td>
                 <td style="text-align:right; font-weight:700; color:#2563eb;">${c.rolls.toFixed(2)}</td>
                 <td style="text-align:right; color:#64748b;">${c.kgs.toLocaleString('th-TH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td>
@@ -1761,28 +1794,30 @@ async function openCustomerDrillDown(grade, size, monthNum) {
         });
         html += `</tbody></table></div></div>`;
 
-        const sortedDates = Object.keys(timelineStats).sort();
-        if (sortedDates.length > 0) {
-            const maxDailyRolls = Math.max(...sortedDates.map(d => timelineStats[d].rolls));
-
-            html += `<div class="drill-section">
-                <div class="drill-title"><span>📅</span> ไทม์ไลน์การใช้งานรายวัน</div>
-                <div style="display:flex; gap:8px; align-items:flex-end; height:120px; padding-top:10px; overflow-x:auto;">
-                    ${sortedDates.map(d => {
-                        const stat = timelineStats[d];
-                        const heightPercent = maxDailyRolls > 0 ? (stat.rolls / maxDailyRolls) * 100 : 0;
-                        const day = Number(d.split('-')[2]);
-                        return `
-                            <div style="display:flex; flex-direction:column; align-items:center; min-width:30px;" title="วันที่ ${day}: ${stat.rolls.toFixed(2)} ม้วน">
-                                <div style="font-size:10px; color:#64748b; margin-bottom:4px;">${stat.rolls.toFixed(1)}</div>
-                                <div style="width:20px; background:#3b82f6; height:${heightPercent}px; border-radius:4px 4px 0 0; transition:height 0.3s;"></div>
-                                <div style="font-size:11px; font-weight:700; color:#475569; margin-top:6px;">${day}</div>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            </div>`;
+        // ✅ v20: แก้กราฟไทม์ไลน์ให้แสดงครบทุกวัน
+        const lastDayOfMonth = new Date(year, monthNum, 0).getDate();
+        const allDays = [];
+        for (let d = 1; d <= lastDayOfMonth; d++) {
+            allDays.push(`${year}-${String(monthNum).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
         }
+        const maxDailyRolls = Math.max(...allDays.map(d => (timelineStats[d]?.rolls || 0)), 1);
+
+        html += `<div class="drill-section">
+            <div class="drill-title"><span>📅</span> ไทม์ไลน์การใช้งานรายวัน</div>
+            <div style="display:flex; gap:8px; align-items:flex-end; height:120px; padding-top:10px; overflow-x:auto;">
+                ${allDays.map(d => {
+                    const stat = timelineStats[d] || { rolls: 0, kgs: 0 };
+                    const heightPercent = (stat.rolls / maxDailyRolls) * 100;
+                    const day = Number(d.split('-')[2]);
+                    return `
+                        <div style="display:flex; flex-direction:column; align-items:center; min-width:30px;" title="วันที่ ${day}: ${stat.rolls.toFixed(2)} ม้วน">
+                            <div style="font-size:10px; color:#64748b; margin-bottom:4px;">${stat.rolls > 0 ? stat.rolls.toFixed(1) : ''}</div>
+                            <div style="width:20px; background:${stat.rolls > 0 ? '#3b82f6' : '#e2e8f0'}; height:${stat.rolls > 0 ? heightPercent : 2}px; border-radius:4px 4px 0 0; transition:height 0.3s;"></div>
+                            <div style="font-size:11px; font-weight:700; color:#475569; margin-top:6px;">${day}</div>
+                        </div>`;
+                }).join('')}
+            </div>
+        </div>`;
 
         modalBody.innerHTML = html;
 
