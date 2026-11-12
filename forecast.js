@@ -1377,22 +1377,22 @@ async function loadYearlyPivot() {
         const firstMonth = `${year}-01`;
         const lastMonth = `${year}-12`;
 
-        // ✅ ดึงจาก usage_snapshots
-        let q = supabase
-            .from('usage_snapshots')
-            .select('snapshot_month, grade, width, total_rolls, customer_filter')
-            .gte('snapshot_month', firstMonth)
-            .lte('snapshot_month', lastMonth);
+                // ✅ ของใหม่ (ใช้ fetchAllRows วนลูปดึงจนครบทุกแถว)
+        const data = await fetchAllRows(() => {
+            let q = supabase
+                .from('usage_snapshots')
+                .select('snapshot_month, grade, width, total_rolls, customer_filter')
+                .gte('snapshot_month', firstMonth)
+                .lte('snapshot_month', lastMonth);
 
-        const isAllSelected = selectedCustomers.length === 0;
-        if (isAllSelected) {
-            q = q.eq('customer_filter', 'ALL');
-        } else {
-            q = q.in('customer_filter', selectedCustomers);
-        }
-
-        const { data, error } = await q;
-        if (error) throw error;
+            const isAllSelected = selectedCustomers.length === 0;
+            if (isAllSelected) {
+                q = q.eq('customer_filter', 'ALL');
+            } else {
+                q = q.in('customer_filter', selectedCustomers);
+            }
+            return q;
+        });
 
         if (!data || data.length === 0) {
             yearlyPivotDataCache = null;
