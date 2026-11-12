@@ -1,5 +1,5 @@
 // ==========================================
-// forecast.js - Production Forecast & Usage Pivot (FIXED v22)
+// forecast.js - Production Forecast & Usage Pivot (FIXED v23)
 // ==========================================
 
 const fcState = {
@@ -1333,10 +1333,30 @@ async function initYearlyPivot() {
     }
 }
 
+// ✅ v23: แก้ไขการดึงข้อมูลลูกค้า ให้แสดง Code (Name)
 async function loadYearlyCustomers() {
     try {
-        const data = await fetchAllRows(() => supabase.from('usage_records_raw').select('roll_for_customer'));
-        const unique = [...new Set((data || []).map(d => (d.roll_for_customer || '').trim()).filter(Boolean))].sort();
+        // ✅ ดึง customer_code และ customer_name มาด้วย
+        const data = await fetchAllRows(() => 
+            supabase.from('usage_records_raw').select('customer_code, customer_name')
+        );
+
+        // ✅ สร้าง Set ของ "Code (Name)" เพื่อไม่ให้ซ้ำ
+        const uniqueSet = new Set();
+        (data || []).forEach(d => {
+            const code = (d.customer_code || '').trim();
+            const name = (d.customer_name || '').trim();
+            
+            // ถ้ามี Code และ Name ให้รวมกัน ถ้ามีแค่อย่างใดอย่างหนึ่งให้ใช้อันนั้น
+            let display = '';
+            if (code && name) display = `${code} (${name})`;
+            else if (code) display = code;
+            else if (name) display = name;
+
+            if (display) uniqueSet.add(display);
+        });
+
+        const unique = [...uniqueSet].sort();
         yearlyPivotCustomers = unique;
 
         const list = document.getElementById('yearlyCustomerList');
