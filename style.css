@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════ */
-/*  STOCK V10.1 — style.css — V.13                                 */
+/*  STOCK V10.1 — style.css — V.14                                 */
 /*  Design Tokens + Components + Print Styles                      */
-/*  V.13: ปรับ report-title ให้ใหญ่และหนาขึ้น                      */
+/*  V.14: ปรับปรุงสไตล์ตารางรายปี (Yearly Pivot Table)              */
 /* ═══════════════════════════════════════════════════════════════ */
 
 :root {
@@ -1009,159 +1009,53 @@ table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
     border-color: var(--green-dark) !important;
     box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3) !important;
 }
-/* ================= YEARLY PIVOT TABLE ================= */
+
+/* ================= YEARLY PIVOT TABLE (MODERN STYLE) ================= */
 .yearly-pivot-table {
     border-collapse: collapse;
-    width: max-content;
-    min-width: 100%;
-    font-size: 12px;
-    margin-bottom: 20px;
-    box-shadow: var(--shadow-sm);
-    background: #fff;
-}
-
-.yearly-pivot-table th, 
-.yearly-pivot-table td {
-    border: 1px solid var(--border-strong);
-    padding: 6px 8px;
-    text-align: center;
-    white-space: nowrap;
-}
-
-/* หัวตาราง (Grade) */
-.yearly-pivot-header-grade {
-    background: var(--primary-dark) !important;
-    color: #fff !important;
-    text-align: left !important;
-    font-weight: 800;
-    font-size: 14px;
-    padding-left: 12px !important;
-    position: sticky;
-    left: 0;
-    z-index: 10;
-}
-
-/* คอลัมน์เดือน */
-.yearly-pivot-month-col {
-    background: var(--surface-soft);
-    font-weight: 700;
-    color: var(--text);
-    text-align: left !important;
-    padding-left: 12px !important;
-    position: sticky;
-    left: 0;
-    z-index: 5;
-}
-
-/* คอลัมน์ Total (ขวาสุด) */
-.yearly-pivot-total-col {
-    background: var(--primary-soft);
-    color: var(--primary-dark);
-    font-weight: 800;
-}
-
-/* แถว Total ล่างสุดของแต่ละ Grade */
-.yearly-pivot-row-total td {
-    background: #cbd5e1;
-    font-weight: 800;
-    color: var(--text);
-}
-.yearly-pivot-row-total .yearly-pivot-month-col {
-    background: #94a3b8;
-    color: #fff;
-}
-
-/* สลับสีพื้นหลังของแต่ละ Grade */
-.yearly-pivot-table:nth-child(even) tbody td:not(.yearly-pivot-month-col):not(.yearly-pivot-total-col) { background-color: #f8fafc; }
-.yearly-pivot-table:nth-child(odd) tbody td:not(.yearly-pivot-month-col):not(.yearly-pivot-total-col) { background-color: #ffffff; }
-
-/* ไฮไลท์เมื่อ Hover */
-.yearly-pivot-table tbody tr:hover td:not(.yearly-pivot-month-col) { background-color: var(--primary-soft) !important; }
-/* ================= YEARLY PIVOT TABLE (MODERN & SOFT UI) ================= */
-.yearly-pivot-table {
-    border-collapse: separate;
-    border-spacing: 0;
     width: max-content;
     min-width: 100%;
     font-size: 12.5px;
     margin-bottom: 24px;
     background: #fff;
-    border-radius: 12px;
+    border-radius: 8px;
     overflow: hidden;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     border: 1px solid var(--border-strong);
 }
 
-/* คอลัมน์ Size กว้างเท่ากันเป๊ะ */
-.yearly-pivot-table th:not(.yearly-pivot-month-col):not(.yearly-pivot-header-grade):not(.yearly-pivot-total-col),
-.yearly-pivot-table td:not(.yearly-pivot-month-col):not(.yearly-pivot-header-grade):not(.yearly-pivot-total-col) {
-    min-width: 45px;
-    max-width: 45px;
+.yearly-pivot-table th, 
+.yearly-pivot-table td {
+    border: 1px solid var(--border);
+    padding: 6px 8px;
     text-align: center;
-    padding: 8px 4px;
-    border-bottom: 1px solid #f1f5f9;
-    border-right: 1px solid #f1f5f9;
-    font-weight: 600;
-    color: var(--text);
-    transition: background-color 0.2s;
+    white-space: nowrap;
 }
 
-/* หัวตาราง (ชื่อเกรด) */
-.yearly-pivot-header-grade {
-    background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
-    color: #fff !important;
-    text-align: left !important;
-    font-weight: 800;
-    font-size: 15px;
-    padding: 12px 16px !important;
-    letter-spacing: 0.5px;
+.yearly-pivot-table thead th {
+    background: var(--primary); /* สีน้ำเงินเหมือนรายเดือน */
+    color: #fff;
+    font-weight: 700;
     position: sticky;
     top: 0;
-    z-index: 10;
-    border: none;
+    z-index: 5;
 }
 
-/* คอลัมน์ชื่อเดือน */
-.yearly-pivot-month-col {
-    background: #f8fafc;
+.yearly-pivot-table .yearly-pivot-month-col {
+    background: var(--surface-soft);
     font-weight: 700;
-    color: #475569;
-    text-align: left !important;
-    padding: 8px 14px !important;
+    text-align: left;
+    padding-left: 12px;
     position: sticky;
     left: 0;
-    z-index: 5;
-    border-right: 2px solid #e2e8f0 !important;
-    border-bottom: 1px solid #f1f5f9;
-    min-width: 100px;
+    z-index: 4;
+    border-right: 2px solid var(--border);
 }
 
-/* คอลัมน์ Total ขวาสุด */
-.yearly-pivot-total-col {
-    background: #eff6ff;
-    color: #1e40af;
-    font-weight: 800;
-    border-left: 2px solid #e2e8f0 !important;
-    border-bottom: 1px solid #f1f5f9;
-}
-
-/* แถว Total ล่างสุด */
-.yearly-pivot-row-total td {
-    background: #f1f5f9;
-    font-weight: 800;
-    color: #1e293b;
-    border-bottom: none !important;
-}
-.yearly-pivot-row-total .yearly-pivot-month-col {
-    background: #e2e8f0;
-    border-bottom: none !important;
-}
-
-/* Hover effect */
-.yearly-pivot-table tbody tr:hover td:not(.yearly-pivot-month-col):not(.yearly-pivot-total-col) {
-    background-color: #f0f9ff;
-    cursor: pointer;
-    color: #0284c7;
+.yearly-pivot-table .yearly-pivot-total-col {
+    background: var(--primary-soft);
+    color: var(--primary-dark);
+    font-weight: 700;
 }
 
 /* ================= CUSTOMER RANKING STYLES (DRILL-DOWN) ================= */
