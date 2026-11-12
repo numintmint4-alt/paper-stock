@@ -505,12 +505,12 @@
       <div class="card">
         <div class="report-head">
           <div></div>
-          <div class="report-title">ยอดใช้ม้วนกระดาษ(Roll Paper Usage)</div>
+          <div class="report-title">การใช้ม้วนกระดาษ(Roll Paper Usage)</div>
           <div></div>
         </div>
 
         <div class="no-print" style="display: flex; gap: 10px; margin-bottom: 15px; border-bottom: 2px solid var(--border, #e2e8f0); padding-bottom: 10px;">
-          <button type="button" id="btn-mode-monthly" class="primary" onclick="switchPivotMode('monthly')" style="padding: 10px 20px; font-weight: 700;">📅 จัดทำผลสรุปยอดใช้งานรายเดือน</button>
+          <button type="button" id="btn-mode-monthly" class="primary" onclick="switchPivotMode('monthly')" style="padding: 10px 20px; font-weight: 700;">📅 จัดทำผลสรุปการใช้งานรายเดือน</button>
           <button type="button" id="btn-mode-yearly" onclick="switchPivotMode('yearly')" style="padding: 10px 20px; font-weight: 700;">📊 Pivot สรุปรายปี</button>
         </div>
 
@@ -558,8 +558,9 @@
           <button type="button" class="sub-tab" onclick="filterPivotByGrade('FSC', this)" id="btn-tab-fsc" style="border-color: var(--green); color: var(--green-dark);">FSC</button>
         </div>
         <div id="pivotCurrentMonthLabel" style="font-size: 16px; font-weight: 700; margin: 10px 0 0 5px; color: #1e293b;">
-      ตารางแสดงผลยอดใช้งานม้วนกระดาษเดือน : -
+      ตารางแสดงผลการใช้งานม้วนกระดาษเดือน : -
         </div>
+          
         <div id="pivotBody" class="report-wrap" style="max-height: 50vh;">
           <table class="data-table" id="pivot-table">
               <thead id="pivot-thead"></thead>
