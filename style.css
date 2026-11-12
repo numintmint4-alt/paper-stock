@@ -1041,7 +1041,6 @@ table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
     z-index: 5;
 }
 
-/* 🔧 จุดที่ 2: คอลัมน์เดือน (แก้ไข) */
 .yearly-pivot-table .yearly-pivot-month-col {
     background: var(--primary-soft) !important;
     color: var(--primary-dark) !important;
@@ -1052,12 +1051,24 @@ table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
     left: 0;
     z-index: 4;
     border-right: 2px solid var(--border-strong);
+    
+    /* ✅ เพิ่มส่วนนี้เพื่อจำกัดความกว้าง */
+    min-width: 100px !important; 
+    max-width: 100px !important;
+    width: 100px !important;
+    white-space: nowrap;
 }
 
 .yearly-pivot-table .yearly-pivot-total-col {
     background: var(--primary-soft);
     color: var(--primary-dark);
     font-weight: 700;
+    
+    /* ✅ เพิ่ม 3 บรรทัดนี้ลงไป */
+    min-width: 80px !important;
+    max-width: 80px !important;
+    width: 80px !important;
+    white-space: nowrap;
 }
 
 /* ➕ จุดที่ 1: หัวตาราง Gradegram (เพิ่มใหม่) */
