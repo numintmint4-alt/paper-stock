@@ -1407,7 +1407,8 @@ async function loadYearlyPivot() {
         const allSizesSet = new Set();
 
         data.forEach(row => {
-            const monthIndex = new Date(row.snapshot_month + '-01').getMonth();
+            // ✅ บังคับให้แปลงค่าเป็นตัวเลขโดยตรง (ไม่ต้องผ่าน Date Object)
+            const monthIndex = Number(row.snapshot_month.split('-')[1]) - 1;
             // ✅ FIX: normalize gradeKey (trim + upper + ลบช่องว่าง)
             const gradeKey = String(row.grade || '').trim().toUpperCase().replace(/\s+/g, '');
             const rowSize = Number(row.width);
