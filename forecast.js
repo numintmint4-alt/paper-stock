@@ -1,5 +1,5 @@
 // ==========================================
-// forecast.js - Production Forecast & Usage Pivot (FIXED v17)
+// forecast.js - Production Forecast & Usage Pivot (FIXED v18)
 // ==========================================
 
 const fcState = {
@@ -739,6 +739,15 @@ async function _loadUsagePivotImpl() {
 
         renderUsagePivotTable();
 
+        // ✅ v18: อัปเดตข้อความหัวข้อบอกเดือน
+        const monthLabel = document.getElementById('pivotCurrentMonthLabel');
+        if (monthLabel) {
+            const [yyyy, mm] = month.split('-');
+            const thaiMonths = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
+            const thaiYear = Number(yyyy) + 543;
+            monthLabel.innerHTML = `ตารางแสดงผลยอดใช้งานม้วนกระดาษเดือน : <span style="color: var(--primary);">${thaiMonths[Number(mm) - 1]} ${thaiYear}</span>`;
+        }
+
         if (missingMasterSet.size === 0) {
             showToast(`โหลด Pivot สำเร็จ (${Object.keys(pivotData).length} grade)`, 'ok');
         } else {
@@ -764,11 +773,9 @@ async function saveUsageSnapshot() {
 
 // ✅ v17 FIX: ดึงเดือนจาก input จริง (ไม่ใช้ fcState.pivotMonth ที่อาจค้าง)
 async function _saveUsageSnapshotImpl() {
-    // ✅ FIX ขั้นตอนที่ 1: ดึงเดือนจาก input บนหน้าจอจริง
     const month = document.getElementById('pivot-month')?.value;
     if (!month) return showToast('กรุณาเลือกเดือนก่อนบันทึก', 'warn');
 
-    // ยังต้องเช็คว่ามีข้อมูล pivot โหลดอยู่
     if (!fcState.pivotData) {
         return showToast('กรุณากดโหลดข้อมูล Pivot ก่อนบันทึก', 'warn');
     }
@@ -776,7 +783,6 @@ async function _saveUsageSnapshotImpl() {
     const selectedCustomers = getSelectedPivotCustomers();
     let customerFilter = 'ALL';
 
-    // 🌟 ระบบสอบถามชื่อลูกค้า/กลุ่ม
     if (selectedCustomers.length === 1) {
         customerFilter = selectedCustomers[0];
     } else if (selectedCustomers.length > 1) {
@@ -798,7 +804,6 @@ async function _saveUsageSnapshotImpl() {
         customerFilter = 'ALL';
     }
 
-    // ✅ ดึงชื่อผู้ใช้ปัจจุบัน
     let createdBy = 'Unknown';
     if (typeof currentProfile !== 'undefined' && currentProfile && currentProfile.full_name) {
         createdBy = currentProfile.full_name;
@@ -806,7 +811,6 @@ async function _saveUsageSnapshotImpl() {
         createdBy = currentUser.email;
     }
 
-    // เตรียมข้อมูลสำหรับบันทึก
     const pivotData = fcState.pivotData;
     const payloads = [];
 
@@ -816,7 +820,7 @@ async function _saveUsageSnapshotImpl() {
             const rolls = row[width] || 0;
             if (rolls > 0) {
                 payloads.push({
-                    snapshot_month: month,           // ✅ ใช้ค่าจาก input
+                    snapshot_month: month,
                     customer_filter: customerFilter,
                     grade: grade,
                     width: Number(width),
@@ -831,7 +835,6 @@ async function _saveUsageSnapshotImpl() {
 
     showToast(`กำลังบันทึก Snapshot เดือน ${month}...`, 'info');
 
-    // ลบของเดิม (ถ้ามี)
     const { error: delErr } = await supabase.from('usage_snapshots')
         .delete()
         .eq('snapshot_month', month)
@@ -841,7 +844,6 @@ async function _saveUsageSnapshotImpl() {
         console.warn('ไม่สามารถลบ Snapshot เก่าได้:', delErr.message);
     }
 
-    // บันทึกข้อมูลใหม่
     const { error } = await supabase.from('usage_snapshots').insert(payloads);
 
     if (error) {
@@ -849,7 +851,7 @@ async function _saveUsageSnapshotImpl() {
         showToast('บันทึก Snapshot ไม่สำเร็จ: ' + error.message, 'err');
     } else {
         showToast(`บันทึก Snapshot เดือน ${month} สำเร็จ (${payloads.length} รายการ)`, 'ok');
-        renderSnapshotHistory(); // รีเฟรชตารางประวัติทันที
+        renderSnapshotHistory();
     }
 }
 
@@ -861,10 +863,9 @@ async function renderSnapshotHistory(selectedYear = null) {
     const yearSelect = document.getElementById('snapshotYearFilter');
     if (!wrap) return;
 
-    // ✅ 1. ตั้งค่าเริ่มต้น Dropdown ปี (ถ้ายังไม่มี)
     if (yearSelect && yearSelect.options.length === 0) {
         const currentYear = new Date().getFullYear();
-        for (let i = 0; i < 5; i++) { // สร้างตัวเลือกย้อนหลัง 5 ปี
+        for (let i = 0; i < 5; i++) {
             const y = currentYear - i;
             const opt = document.createElement('option');
             opt.value = y;
@@ -874,14 +875,12 @@ async function renderSnapshotHistory(selectedYear = null) {
         yearSelect.value = currentYear;
     }
 
-    // ✅ 2. กำหนดปีที่จะดึงข้อมูล
     const yearToFetch = selectedYear || (yearSelect ? yearSelect.value : new Date().getFullYear());
     if (!yearToFetch) return;
 
     wrap.innerHTML = '<div style="text-align:center; padding: 10px; color: var(--text-muted);">กำลังโหลดประวัติ...</div>';
 
     try {
-        // ✅ 3. ลองเรียก RPC ก่อน (ให้ Database สรุปผลให้เสร็จ)
         let data = null;
         let rpcError = null;
 
@@ -894,7 +893,6 @@ async function renderSnapshotHistory(selectedYear = null) {
             console.warn('RPC get_snapshot_history_summary ใช้ไม่ได้ → fallback:', e.message);
         }
 
-        // ✅ 3.1 Fallback: ถ้า RPC ไม่มี/error → ดึงตรงจากตารางแล้ว group ใน JS
         if (!data) {
             const yearPrefix = `${yearToFetch}-`;
             const { data: rawData, error: rawErr } = await supabase
@@ -933,7 +931,6 @@ async function renderSnapshotHistory(selectedYear = null) {
             return;
         }
 
-        // ✅ 4. วาดตาราง (ข้อมูลที่ได้จะถูกสรุปมาแล้ว)
         let html = `<table class="data-table" style="width:100%">
             <thead>
                 <tr>
@@ -952,7 +949,6 @@ async function renderSnapshotHistory(selectedYear = null) {
                 ? '<span style="color:#1e40af;font-weight:600;">ALL</span>'
                 : escHtml(g.customer_filter);
 
-            // แปลงวันที่ให้เป็นรูปแบบไทย (ถ้ามี created_at)
             const dateStr = g.created_at ? new Date(g.created_at).toLocaleString('th-TH') : '';
 
             html += `<tr>
@@ -981,14 +977,12 @@ async function renderSnapshotHistory(selectedYear = null) {
         html += `</tbody></table>`;
         wrap.innerHTML = html;
 
-        // ปุ่มดูรายละเอียด
         wrap.querySelectorAll('.btn-view-snapshot').forEach(btn => {
             btn.addEventListener('click', () => {
                 viewSnapshotDetail(btn.dataset.month, btn.dataset.customer);
             });
         });
 
-        // ปุ่มยกเลิก (ลบ Snapshot)
         wrap.querySelectorAll('.btn-delete-snapshot').forEach(btn => {
             btn.addEventListener('click', async () => {
                 const month = btn.dataset.month;
@@ -1009,7 +1003,7 @@ async function renderSnapshotHistory(selectedYear = null) {
                         btn.textContent = '❌ ยกเลิก';
                     } else {
                         showToast('ลบ Snapshot สำเร็จ', 'ok');
-                        renderSnapshotHistory(selectedYear); // รีเฟรชตารางของปีเดิม
+                        renderSnapshotHistory(selectedYear);
                     }
                 }
             });
@@ -1226,7 +1220,6 @@ async function handleUsageImport(event) {
             const fileInput = document.getElementById('pivot-file-upload');
             if (fileInput) fileInput.value = '';
 
-            // ✅ เอา Auto-Save ออก ให้แค่โหลดข้อมูลใหม่
             loadUsagePivot();
 
         } catch (err) {
@@ -1381,7 +1374,6 @@ async function loadYearlyPivot() {
         const firstMonth = `${year}-01`;
         const lastMonth = `${year}-12`;
 
-        // ✅ v17 FIX ขั้นตอนที่ 2: ใช้ fetchAllRows วนลูปดึงจนครบทุกแถว (ไม่ติด limit 1000)
         const data = await fetchAllRows(() => {
             let q = supabase
                 .from('usage_snapshots')
@@ -1411,9 +1403,7 @@ async function loadYearlyPivot() {
         const allSizesSet = new Set();
 
         data.forEach(row => {
-            // ✅ บังคับให้แปลงค่าเป็นตัวเลขโดยตรง (ไม่ต้องผ่าน Date Object)
             const monthIndex = Number(row.snapshot_month.split('-')[1]) - 1;
-            // ✅ FIX: normalize gradeKey (trim + upper + ลบช่องว่าง)
             const gradeKey = String(row.grade || '').trim().toUpperCase().replace(/\s+/g, '');
             const rowSize = Number(row.width);
             const rolls = Number(row.total_rolls);
@@ -1437,7 +1427,6 @@ async function loadYearlyPivot() {
         const sortedSizes = Array.from(allSizesSet).sort((a, b) => a - b);
         const sortedGrades = Object.keys(pivotData).sort();
 
-        // ✅ Debug log
         console.log('✅ loadYearlyPivot:', {
             year,
             customersSelected: selectedCustomers.length === 0 ? 'ALL' : selectedCustomers,
@@ -1476,7 +1465,7 @@ async function loadYearlyPivot() {
 }
 
 // ==========================================
-// 6. Yearly Pivot: Tabs & Render จาก Cache (v16: normalize + safe access)
+// 6. Yearly Pivot: Tabs & Render จาก Cache
 // ==========================================
 
 function renderYearlyPivotTable(gradeGroup) {
@@ -1486,10 +1475,8 @@ function renderYearlyPivotTable(gradeGroup) {
     const monthNames = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
     const sortedSizes = yearlyPivotSizesCache || [];
 
-    // ✅ FIX: normalize gradeGroup
     const groupNorm = String(gradeGroup || '').trim().toUpperCase();
 
-    // ✅ Debug log
     console.log('🔍 renderYearlyPivotTable:', {
         gradeGroupRaw: gradeGroup,
         gradeGroupNorm: groupNorm,
@@ -1497,7 +1484,6 @@ function renderYearlyPivotTable(gradeGroup) {
         sizes: sortedSizes
     });
 
-    // ✅ FIX: normalize g ก่อน filter + รองรับ ALL
     const filteredGrades = Object.keys(yearlyPivotDataCache)
         .filter(g => {
             const gn = String(g || '').trim().toUpperCase().replace(/\s+/g, '');
@@ -1517,7 +1503,6 @@ function renderYearlyPivotTable(gradeGroup) {
 
     let html = '';
     filteredGrades.forEach(grade => {
-        // ✅ FIX: safe access กัน grade data undefined
         const gradeData = (yearlyPivotDataCache[grade] && yearlyPivotDataCache[grade].data) || {};
 
         html += `<table class="yearly-pivot-table">
@@ -1537,7 +1522,6 @@ function renderYearlyPivotTable(gradeGroup) {
             let monthTotal = 0;
             html += `<tr><td class="yearly-pivot-month-col">${monthNames[m]}</td>`;
 
-            // ✅ FIX: safe access กัน month data undefined
             const monthData = gradeData[m] || {};
 
             sortedSizes.forEach(size => {
@@ -1610,7 +1594,6 @@ async function openCustomerDrillDown(grade, size, monthNum) {
     const endDate = `${year}-${String(monthNum).padStart(2, '0')}-${lastDay}`;
     const monthNames = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
 
-    // ✅ FIX: normalize grade ที่รับเข้ามา
     const gradeNorm = String(grade || '').trim().toUpperCase().replace(/\s+/g, '');
 
     if (modalTitle) modalTitle.innerHTML = `📊 รายละเอียด: <span style="color:#2563eb;">${gradeNorm} (Size ${size})</span> - ${monthNames[monthNum-1]} ${Number(year)+543}`;
@@ -1638,7 +1621,6 @@ async function openCustomerDrillDown(grade, size, monthNum) {
             const masterItem = findMasterForUsageRow(row.grade, row.width, row.item_code);
             if (!masterItem) return;
 
-            // ✅ FIX: normalize masterGradeName ก่อนเทียบ
             const masterGradeName = (masterItem.gram ? `${masterItem.grade}${masterItem.gram}` : masterItem.grade)
                 .trim().toUpperCase().replace(/\s+/g, '');
             if (masterGradeName !== gradeNorm) return;
