@@ -1308,7 +1308,9 @@ function renderAlertMatrixView(rows) {
       if (hasOrder && allHaveSup) orderCls = 'has-order';
       else if (hasQtyNoSup) orderCls = 'order-incomplete';
 
-      html += `<td class="matrix-cell ${cellCls} ${orderCls}" onclick="openAlertMatrixCell('${esc(grade)}', ${size})">
+            html += `<td class="matrix-cell ${cellCls} ${orderCls}" 
+                   onclick="openAlertMatrixCell('${esc(grade)}', ${size})"
+                   data-tip="Gradegrams ${esc(grade)} · Size ${size}">
                  <div class="matrix-value">${a > 0 ? '+' + Number(a).toFixed(2) : Number(a).toFixed(2)}${cartIcon}</div>
                </td>`;
     });
