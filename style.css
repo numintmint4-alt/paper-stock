@@ -1175,3 +1175,77 @@ table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
     z-index: 1000;
     pointer-events: none;
 }
+/* ================= TOOLTIP FOR MATRIX TABLES (Receive & Alert) ================= */
+
+/* สำหรับตาราง Matrix ของ Purchase Summary (receive.js) */
+.report-table td.clickable {
+    cursor: pointer;
+    position: relative;
+}
+
+.report-table td.clickable[data-tip]:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--primary-dark);
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: var(--radius-md);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(37,99,235,.35);
+    pointer-events: none;
+    animation: tipFadeIn .15s ease;
+}
+
+.report-table td.clickable[data-tip]:hover::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: var(--primary-dark);
+    z-index: 1000;
+    pointer-events: none;
+}
+
+/* สำหรับตาราง Matrix ของ Stock Alert (alert.js) */
+.alert-matrix-new-table .matrix-cell {
+    position: relative; /* ✅ จำเป็นสำหรับการจัดตำแหน่ง Tooltip */
+}
+
+.alert-matrix-new-table .matrix-cell[data-tip]:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--primary-dark);
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: var(--radius-md);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(37,99,235,.35);
+    pointer-events: none;
+    animation: tipFadeIn .15s ease;
+}
+
+.alert-matrix-new-table .matrix-cell[data-tip]:hover::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: var(--primary-dark);
+    z-index: 1000;
+    pointer-events: none;
+}
