@@ -1,5 +1,5 @@
 // ==========================================
-// forecast.js - Production Forecast & Usage Pivot (FIXED v16)
+// forecast.js - Production Forecast & Usage Pivot (FIXED v17)
 // ==========================================
 
 const fcState = {
@@ -762,13 +762,17 @@ async function saveUsageSnapshot() {
     }
 }
 
-// ✅ เพิ่มการบันทึกชื่อคนบันทึก (created_by)
+// ✅ v17 FIX: ดึงเดือนจาก input จริง (ไม่ใช้ fcState.pivotMonth ที่อาจค้าง)
 async function _saveUsageSnapshotImpl() {
-    if (!fcState.pivotData || !fcState.pivotMonth) {
+    // ✅ FIX ขั้นตอนที่ 1: ดึงเดือนจาก input บนหน้าจอจริง
+    const month = document.getElementById('pivot-month')?.value;
+    if (!month) return showToast('กรุณาเลือกเดือนก่อนบันทึก', 'warn');
+
+    // ยังต้องเช็คว่ามีข้อมูล pivot โหลดอยู่
+    if (!fcState.pivotData) {
         return showToast('กรุณากดโหลดข้อมูล Pivot ก่อนบันทึก', 'warn');
     }
 
-    const month = fcState.pivotMonth;
     const selectedCustomers = getSelectedPivotCustomers();
     let customerFilter = 'ALL';
 
@@ -812,12 +816,12 @@ async function _saveUsageSnapshotImpl() {
             const rolls = row[width] || 0;
             if (rolls > 0) {
                 payloads.push({
-                    snapshot_month: month,
+                    snapshot_month: month,           // ✅ ใช้ค่าจาก input
                     customer_filter: customerFilter,
                     grade: grade,
                     width: Number(width),
                     total_rolls: rolls,
-                    created_by: createdBy // ✅ เพิ่มชื่อคนบันทึก
+                    created_by: createdBy
                 });
             }
         });
@@ -825,7 +829,7 @@ async function _saveUsageSnapshotImpl() {
 
     if (payloads.length === 0) return showToast('ไม่มีข้อมูลให้บันทึก Snapshot', 'warn');
 
-    showToast('กำลังบันทึก Snapshot...', 'info');
+    showToast(`กำลังบันทึก Snapshot เดือน ${month}...`, 'info');
 
     // ลบของเดิม (ถ้ามี)
     const { error: delErr } = await supabase.from('usage_snapshots')
@@ -844,7 +848,7 @@ async function _saveUsageSnapshotImpl() {
         console.error(error);
         showToast('บันทึก Snapshot ไม่สำเร็จ: ' + error.message, 'err');
     } else {
-        showToast(`บันทึก Snapshot สำเร็จ (${payloads.length} รายการ)`, 'ok');
+        showToast(`บันทึก Snapshot เดือน ${month} สำเร็จ (${payloads.length} รายการ)`, 'ok');
         renderSnapshotHistory(); // รีเฟรชตารางประวัติทันที
     }
 }
@@ -1377,7 +1381,7 @@ async function loadYearlyPivot() {
         const firstMonth = `${year}-01`;
         const lastMonth = `${year}-12`;
 
-                // ✅ ของใหม่ (ใช้ fetchAllRows วนลูปดึงจนครบทุกแถว)
+        // ✅ v17 FIX ขั้นตอนที่ 2: ใช้ fetchAllRows วนลูปดึงจนครบทุกแถว (ไม่ติด limit 1000)
         const data = await fetchAllRows(() => {
             let q = supabase
                 .from('usage_snapshots')
@@ -1415,6 +1419,7 @@ async function loadYearlyPivot() {
             const rolls = Number(row.total_rolls);
 
             if (!gradeKey) return;
+            if (isNaN(monthIndex) || monthIndex < 0 || monthIndex > 11) return;
 
             if (!pivotData[gradeKey]) {
                 pivotData[gradeKey] = { data: {} };
@@ -1457,7 +1462,7 @@ async function loadYearlyPivot() {
         if (tabsContainer) tabsContainer.classList.remove('hidden');
 
         renderYearlyPivotTable('CA');
-        showToast(`โหลด Pivot รายปีสำเร็จ (จาก Snapshot)`, 'ok');
+        showToast(`โหลด Pivot รายปีสำเร็จ (จาก Snapshot, ${data.length} แถว)`, 'ok');
 
     } catch (err) {
         console.error(err);
