@@ -548,18 +548,26 @@
           </button>
         </div>
 
-        <div id="pivot-sub-tabs" class="sub-tabs" style="margin-bottom: 12px; display: flex; gap: 10px; flex-wrap: wrap;">
-          <button type="button" class="sub-tab active" onclick="filterPivotByGrade('ALL', this)">ALL</button>
-          <button type="button" class="sub-tab" onclick="filterPivotByGrade('CA', this)">CA</button>
-          <button type="button" class="sub-tab" onclick="filterPivotByGrade('KA', this)">KA</button>
-          <button type="button" class="sub-tab" onclick="filterPivotByGrade('KI', this)">KI</button>
-          <button type="button" class="sub-tab" onclick="filterPivotByGrade('KK', this)">KK</button>
-          <button type="button" class="sub-tab" onclick="filterPivotByGrade('KW', this)">KW</button>
-          <button type="button" class="sub-tab" onclick="filterPivotByGrade('FSC', this)" id="btn-tab-fsc" style="border-color: var(--green); color: var(--green-dark);">FSC</button>
+        <!-- ✅ ปรับปรุงส่วนหัวข้อและ Tabs -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+            
+            <!-- ข้อความบอกเดือน (ชิดซ้าย) -->
+            <div id="pivotCurrentMonthLabel" style="font-size: 16px; font-weight: 700; margin: 0; color: #1e293b;">
+                ตารางแสดงผลการใช้งานม้วนกระดาษเดือน : -
+            </div>
+
+            <!-- ปุ่ม Tabs (ชิดขวา) -->
+            <div id="pivot-sub-tabs" class="sub-tabs" style="display: flex; gap: 8px; flex-wrap: wrap; margin: 0;">
+                <button type="button" class="sub-tab active" onclick="filterPivotByGrade('ALL', this)">ALL</button>
+                <button type="button" class="sub-tab" onclick="filterPivotByGrade('CA', this)">CA</button>
+                <button type="button" class="sub-tab" onclick="filterPivotByGrade('KA', this)">KA</button>
+                <button type="button" class="sub-tab" onclick="filterPivotByGrade('KI', this)">KI</button>
+                <button type="button" class="sub-tab" onclick="filterPivotByGrade('KK', this)">KK</button>
+                <button type="button" class="sub-tab" onclick="filterPivotByGrade('KW', this)">KW</button>
+                <button type="button" class="sub-tab" onclick="filterPivotByGrade('FSC', this)" id="btn-tab-fsc" style="border-color: var(--green); color: var(--green-dark);">FSC</button>
+            </div>
+
         </div>
-        <div id="pivotCurrentMonthLabel" style="font-size: 16px; font-weight: 700; margin: 10px 0 3mm 5px; color: #1e293b;">
-    ตารางแสดงผลการใช้งานม้วนกระดาษเดือน : -
-</div>
           
         <div id="pivotBody" class="report-wrap" style="max-height: 50vh;">
           <table class="data-table" id="pivot-table">
