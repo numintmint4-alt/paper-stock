@@ -2,12 +2,41 @@
 // reservations.js - ระบบจองม้วนกระดาษ (Roll Reservations)
 // แก้ไข: Matrix แสดงจาก Master Data + Supplier เลือกใน Modal
 // + ระบบปรับลด/คืนยอดจอง (Decrease / Return)
+// + Auto-load Master Data (ensureMasterDataLoaded)
 // ==========================================
 
 let resState = {
     data: [],
     gradeFilter: 'ALL'
 };
+
+// ==========================================
+// ฟังก์ชันสำหรับโหลด Master Data (ถ้ายังไม่มีในหน่วยความจำ)
+// ==========================================
+async function ensureMasterDataLoaded() {
+    // ถ้ามีข้อมูลอยู่แล้ว ไม่ต้องโหลดซ้ำ
+    if (typeof fcState !== 'undefined' && fcState.masterData && fcState.masterData.length > 0) {
+        return;
+    }
+
+    try {
+        console.log("⏳ กำลังโหลด Master Data สำหรับหน้า Reservations...");
+        // ⚠️ ตรงนี้คือชื่อตาราง Master Data ของคุณ (ถ้าไม่ใช่ 'paper_master' รบกวนเปลี่ยนชื่อให้ตรงกับ DB ครับ)
+        const { data, error } = await supabase
+            .from('paper_master')
+            .select('*');
+
+        if (error) throw error;
+
+        if (typeof fcState !== 'undefined') {
+            fcState.masterData = data || [];
+            console.log("✅ โหลด Master Data สำเร็จ:", fcState.masterData.length, "รายการ");
+        }
+    } catch (err) {
+        console.error("❌ โหลด Master Data ล้มเหลว:", err.message);
+        showToast('ไม่สามารถโหลด Master Data ได้', 'err');
+    }
+}
 
 // ==========================================
 // 8.1 ฟังก์ชันโหลดข้อมูลหลัก
@@ -20,6 +49,9 @@ async function loadReservations() {
     tbody.innerHTML = '<tr><td colspan="100%" style="text-align:center;padding:20px;">กำลังโหลด...</td></tr>';
 
     try {
+        // 👇 ให้โหลด Master Data อัตโนมัติก่อนวาดตาราง
+        await ensureMasterDataLoaded();
+
         const { data, error } = await supabase
             .from('roll_reservations')
             .select('*')
