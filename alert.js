@@ -1,10 +1,10 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK V10.1 — alert.js — V.13.8
-//  Fix: setDate(..., false) ไม่ trigger onChange + ใช้ toISODate helper
-//  Fix: Alert History — Default เป็นวันปัจจุบัน
-//  NEW: V.13.6 — แสดงยอดจอง (Reserved) ใน Modal Cell
-//  NEW: V.13.7 — Reservation Card UI + ปุ่มตะกร้า / ไม่แสดง Alert หลังหักจอง
-//  NEW: V.13.8 — ย้ายยอดจองเป็น Draft PO + หักยอดตอนบันทึก PO
+//  STOCK V10.1 — alert.js — V.13.9
+//  NEW: Draft PO in-memory (_draftPendingItems) + บล็อกสร้าง PO ถ้ามี Draft ค้าง
+//  - buildReservationHtml หักยอดด้วย Draft ที่ค้าง → ซ่อนปุ่มตะกร้าถ้าเหลือ 0
+//  - confirmCartQty → push Draft + refresh modal + fill form
+//  - saveMatrixOrder → UPDATE roll_reservations SET status='completed'
+//  - createPOFromAlert → บล็อกถ้ามี Draft ค้าง
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -41,6 +41,9 @@ let alertHistoryData = null;
 let alertHistoryMeta = null;
 
 let _pendingPOItems = [];
+
+// 🔥 NEW: ตัวแปรเก็บ Draft ที่ถูกดึงไปแต่ยังไม่เซฟ
+let _draftPendingItems = [];
 
 // ═══════════════════════════════════════════════════════════════
 //  CONSTANTS
@@ -1327,7 +1330,6 @@ async function openAlertMatrixCell(gradegram, size) {
   const r = alertCache.find(x => x.gradegram === gradegram && Number(x.size) === Number(size));
   if (!r) { alert('ไม่พบข้อมูล'); return; }
 
-  // ดึงยอดจอง
   const resMap = await loadAlertReservations();
   const reservations = resMap[`${gradegram}|${size}`] || [];
   const reservedTotal = reservations.reduce((s, x) => s + (Number(x.quantity) || 0), 0);
@@ -1377,7 +1379,6 @@ async function openAlertMatrixCell(gradegram, size) {
     </div>
   `;
 
-  // แสดงยอดจอง (Reserved + Draft)
   html += `
     <div class="matrix-cell-summary" style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border-color:#fcd34d;margin-top:12px">
       <div class="matrix-cell-summary-title" style="color:#92400e">
@@ -1561,7 +1562,7 @@ function showMatrixOrderForm(gradegram, size) {
   setTimeout(() => document.querySelector('#matrixOrderRows .matrix-row-qty')?.focus(), 100);
 }
 
-function saveMatrixOrder(gradegram, size) {
+async function saveMatrixOrder(gradegram, size) {
   const rows = document.querySelectorAll('#matrixOrderRows .matrix-order-row');
   if (!rows.length) {
     alert('⚠️ ต้องมีอย่างน้อย 1 รายการ');
@@ -1590,11 +1591,38 @@ function saveMatrixOrder(gradegram, size) {
 
   if (!items.length) {
     if (!confirm('⚠️ ไม่มีรายการที่กรอก → ต้องการลบข้อมูลของ cell นี้ทั้งหมดหรือไม่?')) return;
-
     saveAlertItems(gradegram, size, []);
     closeModal('modalAlertMatrixCell');
     applyAlertFiltersAndRender();
     return;
+  }
+
+  // 🔥 NEW: อัปเดต Database (roll_reservations) + ล้าง Draft ของ cell นี้
+  try {
+    const draftsToSave = _draftPendingItems.filter(d => d.gradegram === gradegram && Number(d.size) === Number(size));
+    if (draftsToSave.length > 0) {
+      const resIds = draftsToSave.map(d => d.resId);
+      const { error: updErr } = await supabase
+        .from('roll_reservations')
+        .update({ status: 'completed' })
+        .in('id', resIds);
+
+      if (updErr) {
+        console.warn('⚠️ อัปเดต roll_reservations เป็น completed ไม่สำเร็จ:', updErr);
+      } else {
+        console.log(`✅ mark completed ${resIds.length} draft refs`);
+      }
+
+      // ล้าง Draft ที่เซฟแล้วออกจาก array
+      _draftPendingItems = _draftPendingItems.filter(d => !(d.gradegram === gradegram && Number(d.size) === Number(size)));
+
+      // รีเฟรช Matrix หลัก (ถ้ามี)
+      if (typeof loadReservations === 'function') {
+        try { await loadReservations(); } catch (e) { console.warn(e); }
+      }
+    }
+  } catch (err) {
+    console.error('Error updating reservation status:', err);
   }
 
   saveAlertItems(gradegram, size, items);
@@ -2218,6 +2246,13 @@ function clearAllAlertInputsAllDates() {
 // ═══════════════════════════════════════════════════════════════
 
 async function createPOFromAlert() {
+  // 🔥 1. เช็ก Draft ค้างก่อน
+  if (_draftPendingItems && _draftPendingItems.length > 0) {
+    const draftNames = _draftPendingItems.map(d => `${d.gradegram}-${d.size} (${d.qty} ม้วน)`).join(', ');
+    alert(`⚠️ คุณมีรายการ Draft PO ที่ยังไม่ได้ทำการบันทึก\n\nรายการ: ${draftNames}\n\nกรุณากลับไปกด "บันทึก" หรือ "ยกเลิก" ที่ฟอร์มด้านล่างก่อน เพื่อให้จำนวนม้วนกระดาษเพียงพอต่อการสั่งซื้อ`);
+    return;
+  }
+
   if (!alertCache || !alertCache.length) {
     alert('ไม่มีข้อมูล Alert');
     return;
@@ -2366,7 +2401,7 @@ function renderAlertPODetail(items) {
   $('alertPODetailBody').innerHTML = html;
 }
 
-async function confirmCreatePO() {
+function confirmCreatePO() {
   if (!_pendingPOItems || !_pendingPOItems.length) return;
 
   const confirmBtn = document.querySelector('#modalAlertPODetail .form-actions .primary');
@@ -2381,23 +2416,6 @@ async function confirmCreatePO() {
     alert(`⚠️ ไม่สามารถสร้าง PO ได้\n\nมี ${missingSup.length} รายการที่ยังไม่ได้ระบุผู้ขาย (Sup.)\nกรุณาตรวจสอบและเลือก Sup. ให้ครบก่อน`);
     if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = '✅ ยืนยันสร้าง PO'; }
     return;
-  }
-
-  // 🔥 NEW: หา Draft PO ที่ถูกอ้างอิงในรายการ เพื่อ mark completed
-  const draftRefs = _pendingPOItems
-    .filter(it => it.note && it.note.includes('Ref: DRAFT-'))
-    .map(it => it.note.replace('Ref: ', '').trim());
-
-  if (draftRefs.length > 0) {
-    try {
-      const { error: updErr } = await supabase.from('roll_reservations')
-        .update({ status: 'completed' })
-        .in('draft_po_ref', draftRefs);
-      if (updErr) console.warn('⚠️ อัปเดต roll_reservations เป็น completed ไม่สำเร็จ:', updErr);
-      else console.log(`✅ mark completed ${draftRefs.length} draft refs`);
-    } catch (e) {
-      console.warn('confirmCreatePO update roll_reservations error:', e);
-    }
   }
 
   const analyzedDate = getISODateFromInput('alertDate') || toISODate(new Date());
@@ -3279,11 +3297,11 @@ function renderAllAlertFilters() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  RESERVATIONS (ยอดจองม้วน) — V.13.8
+//  RESERVATIONS (ยอดจองม้วน) — V.13.9 (Draft in-memory)
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * ดึงยอดจอง (Reserved + Draft) จากตาราง roll_reservations
+ * ดึงยอดจอง (Reserved) จากตาราง roll_reservations
  * คืนค่าเป็น map: { "GRADE|SIZE": [ {..}, {..} ] }
  */
 async function loadAlertReservations() {
@@ -3291,7 +3309,7 @@ async function loadAlertReservations() {
     const { data, error } = await supabase
       .from('roll_reservations')
       .select('*')
-      .in('status', ['reserved', 'draft']);   // 👈 NEW: ดึงทั้ง reserved และ draft
+      .eq('status', 'reserved');
 
     if (error) throw error;
 
@@ -3317,8 +3335,8 @@ function getAlertReservedTotal(resMap, gradegram, size) {
 
 /**
  * แสดง HTML ของยอดจอง — Card UI
- * - ถ้า status === 'draft' → ซ่อนปุ่มตะกร้า แสดง badge Draft
- * - ถ้า status === 'reserved' → แสดงปุ่มตะกร้า
+ * - หักยอดที่ถูก Draft ไปแล้ว (จาก _draftPendingItems)
+ * - ซ่อนปุ่มตะกร้าถ้ายอดเหลือ 0
  */
 function buildReservationHtml(list) {
   if (!list || !list.length) {
@@ -3327,50 +3345,56 @@ function buildReservationHtml(list) {
 
   let html = '<div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">';
 
-  list.forEach((r, index) => {
+  list.forEach((r) => {
     const dateStr = r.reservation_date
       ? new Date(r.reservation_date).toLocaleDateString('th-TH')
       : '-';
     const qualityTxt = r.quality === 'B' ? 'B' : 'A';
     const qualityColor = r.quality === 'B' ? '#dc2626' : '#166534';
     const qualityBg = r.quality === 'B' ? '#fee2e2' : '#dcfce7';
-    const isDraft = r.status === 'draft';
 
     const safeGrade = escAttr(r.grade || '');
     const safeSize = Number(r.size) || 0;
-    const safeQty = Number(r.quantity) || 0;
     const safeSup = escAttr(r.supplier || '');
     const safeQuality = escAttr(r.quality || 'A');
-    const safeId = escAttr(r.id || '');
+    const safeId = r.id;
+
+    // 🔍 คำนวณยอดที่เหลือ (ลบด้วย Draft ที่ค้างอยู่)
+    const totalQty = Number(r.quantity) || 0;
+    const pendingDraftQty = _draftPendingItems
+        .filter(d => d.resId === safeId)
+        .reduce((sum, d) => sum + d.qty, 0);
+
+    const remainingQty = totalQty - pendingDraftQty;
 
     html += `
-      <div style="background:#fff; border:1px solid ${isDraft ? '#cbd5e1' : '#e2e8f0'}; border-radius:8px; padding:10px 14px; display:flex; justify-content:space-between; align-items:center; box-shadow:0 1px 2px rgba(0,0,0,0.02); ${isDraft ? 'opacity:0.85;' : ''}">
+      <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; display:flex; justify-content:space-between; align-items:center; box-shadow:0 1px 2px rgba(0,0,0,0.02);">
         <div style="display:flex; flex-direction:column; gap:4px;">
           <div style="font-size:13px; font-weight:600; color:#1e293b;">
             📅 ${dateStr} <span style="color:#cbd5e1; margin:0 4px;">|</span> 🏢 ${esc(r.supplier || '-')}
           </div>
-          <div style="font-size:12px; color:#64748b; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+          <div style="font-size:12px; color:#64748b; display:flex; align-items:center; gap:6px;">
             <span>ลูกค้า: ${esc(r.customer_mark || '-')}</span>
             <span style="background:${qualityBg}; color:${qualityColor}; padding:2px 6px; border-radius:4px; font-weight:700; font-size:11px;">คุณภาพ ${qualityTxt}</span>
-            ${r.remark ? `<span>· ${esc(r.remark)}</span>` : ''}
           </div>
         </div>
         
         <div style="display:flex; align-items:center; gap:12px;">
           <div style="text-align:right;">
-            <div style="font-size:16px; font-weight:700; color:#b45309;">${safeQty}</div>
+            <div style="font-size:16px; font-weight:700; color:${remainingQty === 0 ? '#94a3b8' : '#b45309'};">${remainingQty}</div>
             <div style="font-size:10px; color:#94a3b8;">ม้วน</div>
           </div>
-          ${isDraft
-            ? `<span style="background:#f1f5f9;color:#64748b;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:600;white-space:nowrap;">📝 ${esc(r.draft_po_ref || 'Draft PO')}</span>`
-            : `<button type="button" 
-                     onclick="onReservationCartClick('${safeId}', '${safeGrade}', ${safeSize}, ${safeQty}, '${safeSup}', '${safeQuality}')"
-                     style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; width:32px; height:32px; border-radius:8px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s;"
-                     onmouseover="this.style.background='#bae6fd'"
-                     onmouseout="this.style.background='#e0f2fe'"
-                     title="ย้ายไป Draft PO">
+          
+          ${remainingQty > 0
+            ? `<button type="button" 
+                      onclick="onReservationCartClick('${safeId}', '${safeGrade}', ${safeSize}, ${remainingQty}, '${safeSup}', '${safeQuality}')"
+                      style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; width:32px; height:32px; border-radius:8px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s;"
+                      onmouseover="this.style.background='#bae6fd'"
+                      onmouseout="this.style.background='#e0f2fe'"
+                      title="นำไปสั่งซื้อ">
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
               </button>`
+            : `<div style="color:#166534; font-size:12px; font-weight:700; padding:6px 10px; background:#dcfce7; border-radius:6px;">✅ ใช้ครบแล้ว</div>`
           }
         </div>
       </div>
@@ -3392,7 +3416,7 @@ function onReservationCartClick(resId, gradegram, size, maxQty, supplier, qualit
     modal.className = 'modal-bg';
     modal.innerHTML = `
       <div class="modal" style="max-width:400px; text-align:center; padding:24px;">
-        <h3 style="margin-top:0; color:#1e293b;">🛒 ย้ายไป Draft PO</h3>
+        <h3 style="margin-top:0; color:#1e293b;">🛒 ระบุจำนวนที่ต้องการสั่ง</h3>
         <div style="background:#f8fafc; padding:12px; border-radius:8px; margin-bottom:16px; font-size:13px; text-align:left;">
           <div style="margin-bottom:4px;"><b>Gradegram:</b> ${esc(gradegram)} (Size ${size})</div>
           <div style="margin-bottom:4px;"><b>Supplier:</b> ${esc(supplier || '-')}</div>
@@ -3412,7 +3436,7 @@ function onReservationCartClick(resId, gradegram, size, maxQty, supplier, qualit
     `;
     document.body.appendChild(modal);
   }
-  
+
   modal.classList.add('show');
   setTimeout(() => {
     const input = document.getElementById('cartQtyInput');
@@ -3421,48 +3445,32 @@ function onReservationCartClick(resId, gradegram, size, maxQty, supplier, qualit
 }
 
 // ==========================================
-// NEW: ยืนยันจำนวน → UPDATE status='draft' → เติมฟอร์ม
+// NEW: ยืนยันจำนวน → push Draft + refresh modal + fill form
 // ==========================================
 async function confirmCartQty(resId, gradegram, size, supplier, quality) {
   const qty = Number(document.getElementById('cartQtyInput').value);
   if (!qty || qty <= 0) return alert('กรุณาระบุจำนวนมากกว่า 0');
 
-  const btn = document.getElementById('cartConfirmBtn');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ กำลังย้าย...'; }
+  // 🔍 1. บันทึก Draft ลงตัวแปรชั่วคราว
+  _draftPendingItems.push({ resId, gradegram, size, qty, supplier, quality });
 
-  // สร้างเลข Draft PO ชั่วคราว
-  const draftNo = `DRAFT-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${String(Math.floor(Math.random()*1000)).padStart(3,'0')}`;
+  closeModal('modalCartQty');
 
-  try {
-    // 1. อัปเดต Database → draft
-    const { error } = await supabase.from('roll_reservations')
-      .update({ status: 'draft', draft_po_ref: draftNo })
-      .eq('id', resId);
-
-    if (error) throw error;
-
-    closeModal('modalCartQty');
-
-    // 2. รีเฟรชหน้า Reservations (ถ้ามีฟังก์ชันโหลด)
-    if (typeof loadReservations === 'function') {
-      try { await loadReservations(); } catch (e) { console.warn(e); }
-    }
-
-    // 3. เติมข้อมูลลงฟอร์มด้านล่าง
-    fillOrderForm(gradegram, size, qty, supplier, quality, draftNo);
-
-  } catch (err) {
-    console.error('confirmCartQty error:', err);
-    alert('เกิดข้อผิดพลาด: ' + err.message);
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'ย้ายไป Draft'; }
+  // 🔍 2. รีเฟรช Modal Alert (เพื่อให้ยอดบนการ์ดลดลงทันที)
+  const titleStr = document.getElementById('alertMatrixCellTitle')?.innerText || '';
+  const match = titleStr.match(/([A-Za-z0-9]+)-(\d+)/);
+  if (match) {
+    await openAlertMatrixCell(match[1], Number(match[2]));
   }
+
+  // 🔍 3. เติมข้อมูลลงฟอร์มด้านล่าง
+  fillOrderForm(gradegram, size, qty, supplier, quality);
 }
 
 // ==========================================
-// NEW: เติมแถวลงฟอร์มพร้อมแปะเลข Draft
+// NEW: เติมแถวลงฟอร์ม (ไม่ต้องมี Draft ref แล้ว)
 // ==========================================
-function fillOrderForm(gradegram, size, qty, supplier, quality, draftNo) {
+function fillOrderForm(gradegram, size, qty, supplier, quality) {
   let form = document.getElementById('matrixOrderForm');
   if (!form) {
     const prompt = document.getElementById('matrixOrderPrompt');
@@ -3478,7 +3486,7 @@ function fillOrderForm(gradegram, size, qty, supplier, quality, draftNo) {
       sup: supplier,
       customer_roll: 'normal',
       quality_b: quality === 'B' ? 'nc' : 'normal',
-      note: `Ref: ${draftNo}`
+      note: ''
     };
 
     const wrapper = document.createElement('div');
@@ -3496,4 +3504,12 @@ function fillOrderForm(gradegram, size, qty, supplier, quality, draftNo) {
       }
     }, 100);
   }
+}
+
+// ==========================================
+// NEW: ยกเลิก Draft (ถ้าต้องการรีเซ็ต)
+// ==========================================
+function cancelDraftOrder() {
+  _draftPendingItems = [];
+  closeModal('modalAlertMatrixCell');
 }
