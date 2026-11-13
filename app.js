@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK ม้วนกระดาษ V6 — app.js (Core) — V.13.6 (Pagination 1000)
+//  STOCK ม้วนกระดาษ V6 — app.js (Core) — V.13.7 (Reservations tab)
 // ═══════════════════════════════════════════════════════════════
 const SUPABASE_URL      = 'https://gwwgycbqzdjlijsuxahx.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_rMoUE6tUsQZHnJu2ULDxFg_4NAiw6wg';
@@ -346,7 +346,7 @@ $('logoutBtn').onclick = async () => {
 };
 
 // ================= TABS =================
-const TAB_LIST = ['matrix','stock','receive','alert','purchase-order','data','settings','summary','forecast','usage-pivot'];
+const TAB_LIST = ['matrix','stock','receive','alert','purchase-order','data','settings','summary','forecast','usage-pivot','reservations'];
 
 document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
   btn.onclick = () => {
@@ -1222,7 +1222,7 @@ async function delUser(id, username) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  INIT  — V.13.6
+//  INIT  — V.13.7
 // ═══════════════════════════════════════════════════════════════
 
 (function init() {
@@ -1249,7 +1249,8 @@ async function delUser(id, username) {
     'exportPoDateFrom',
     'exportPoDateTo',
     'firstReceiveDateInput',
-    'fc-stock-date'
+    'fc-stock-date',
+    'reservationDate'   // ← เพิ่มสำหรับหน้า Reserved Rolls
   ];
 
   dateInputIds.forEach(id => {
