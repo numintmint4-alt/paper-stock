@@ -362,6 +362,7 @@ document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
     if (t === 'summary' && typeof initSummaryTab === 'function') initSummaryTab();
     if (t === 'forecast' && typeof initForecastTab === 'function') initForecastTab();
     if (t === 'usage-pivot' && typeof initUsagePivotTab === 'function') initUsagePivotTab();
+    if (t === 'reservations' && typeof loadReservations === 'function') loadReservations();
     if (t === 'data') renderData();
   };
 });
