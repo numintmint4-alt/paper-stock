@@ -1,9 +1,10 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK V10.1 — alert.js — V.13.5 (Default Date: ตามเงื่อนไข)
+//  STOCK V10.1 — alert.js — V.13.8
 //  Fix: setDate(..., false) ไม่ trigger onChange + ใช้ toISODate helper
-//  Fix: Alert History — Default เป็นวันปัจจุบัน + แจ้งเตือนชัดเจนเมื่อไม่พบข้อมูล
+//  Fix: Alert History — Default เป็นวันปัจจุบัน
 //  NEW: V.13.6 — แสดงยอดจอง (Reserved) ใน Modal Cell
 //  NEW: V.13.7 — Reservation Card UI + ปุ่มตะกร้า / ไม่แสดง Alert หลังหักจอง
+//  NEW: V.13.8 — ย้ายยอดจองเป็น Draft PO + หักยอดตอนบันทึก PO
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -15,7 +16,7 @@ let alertAllGrades = [];
 let alertCache = [];
 let alertSupplierCache = [];
 
-let alertViewMode = 'matrix'; // บังคับเป็น Matrix
+let alertViewMode = 'matrix';
 
 let alertSelectedSizes = [];
 let alertAllSizes = [];
@@ -176,22 +177,20 @@ function cleanOldAlertKeys() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  INIT — V.13.5 (Default Date ตามเงื่อนไข · setDate false)
+//  INIT
 // ═══════════════════════════════════════════════════════════════
 
 async function initAlertTab() {
   cleanOldAlertKeys();
-  
-  // 🔽 1. คำนวณวันที่ตามเงื่อนไข 🔽
+
   const today = getTodayISO();
-  const currentMonthStr = today.slice(0, 7); 
-  
+  const currentMonthStr = today.slice(0, 7);
+
   const yesterday = new Date(today + 'T00:00:00');
   yesterday.setDate(yesterday.getDate() - 1);
   if (yesterday.getDay() === 0) yesterday.setDate(yesterday.getDate() - 1);
   const stockDate = toISODate(yesterday);
 
-  // 🔽 2. ใส่ค่าเริ่มต้นให้ช่อง Input 🔽
   const alertDateEl = $('alertDate');
   if (alertDateEl) {
     alertDateEl.value = today;
@@ -201,7 +200,6 @@ async function initAlertTab() {
     alertDateEl.style.cursor = 'not-allowed';
   }
 
-  // 🔽 3. สั่ง Flatpickr อัปเดตค่า (setDate false = ไม่ trigger onChange) 🔽
   if (window.flatpickrInstances && window.flatpickrInstances['alertDate']) {
     window.flatpickrInstances['alertDate'].setDate(today, false);
   }
@@ -215,18 +213,14 @@ async function initAlertTab() {
   const monthInput = $('alertSnapshotMonth');
   if (monthInput) monthInput.value = currentMonthStr;
 
-  // 🕵️ DEBUG — ลบได้ทีหลัง
   console.log('[initAlertTab] today       =', today);
   console.log('[initAlertTab] stockDate   =', stockDate);
-  console.log('[initAlertTab] alertDate   =', window.flatpickrInstances?.['alertDate']?.input?.value);
-  console.log('[initAlertTab] alertStock  =', window.flatpickrInstances?.['alertStockDate']?.input?.value);
-  console.log('[initAlertTab] alertRecv   =', window.flatpickrInstances?.['alertReceiveDate']?.input?.value);
 
   attachAlertDateListener();
 
   await loadAlertSuppliers();
-  await loadSnapshotMonths(); 
-  
+  await loadSnapshotMonths();
+
   if (monthInput) monthInput.value = currentMonthStr;
 
   await loadAlertGradeFilter();
@@ -234,10 +228,9 @@ async function initAlertTab() {
   initAlertReceiveDates();
   await loadUsagePlanRanges();
   renderUsageRangeDropdown();
-  
-  // 🔽 4. วิเคราะห์ข้อมูลทันทีเมื่อเปิดหน้า 🔽
-  await onAlertDateChange(); 
-  
+
+  await onAlertDateChange();
+
   showAlertHistoryCard();
 
   if (alertReceiveDates.length > 0 && window._alertFullCache && window._alertFullCache.length > 0) {
@@ -337,7 +330,7 @@ async function onAlertDateChange() {
 
   $('alertBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
   const snapshot = await loadAlertSnapshot(analyzedDate);
-  
+
   if (snapshot) {
     await applyAlertSnapshot(snapshot);
     const today = toISODate(new Date());
@@ -399,11 +392,6 @@ function setAlertLocked(locked, analyzedDate) {
 async function applyAlertSnapshot(snapshot) {
   try {
     if (snapshot.snapshot_month) $('alertSnapshotMonth').value = snapshot.snapshot_month;
-    
-    console.log('[applyAlertSnapshot] stock_date    =', snapshot.stock_date);
-    console.log('[applyAlertSnapshot] receive_date  =', snapshot.receive_date);
-    console.log('[applyAlertSnapshot] stockInput    =', window.flatpickrInstances?.['alertStockDate']?.input?.value);
-    console.log('[applyAlertSnapshot] receiveInput  =', window.flatpickrInstances?.['alertReceiveDate']?.input?.value);
 
     if (snapshot.receive_dates && Array.isArray(snapshot.receive_dates)) {
       alertReceiveDates = [...snapshot.receive_dates];
@@ -521,7 +509,7 @@ async function loadSnapshotMonths() {
     const months = [...set].sort().reverse();
 
     if ($('alertSnapshotMonth') && months.length > 0) {
-      // ไม่ต้องเซ็ตค่าตรงนี้แล้ว เพราะ initAlertTab บังคับเดือนปัจจุบันไปแล้ว
+      // ค่าเริ่มต้นถูก set ใน initAlertTab แล้ว
     }
   } catch (e) {
     console.warn('loadSnapshotMonths:', e);
@@ -1339,7 +1327,7 @@ async function openAlertMatrixCell(gradegram, size) {
   const r = alertCache.find(x => x.gradegram === gradegram && Number(x.size) === Number(size));
   if (!r) { alert('ไม่พบข้อมูล'); return; }
 
-  // 🔽 NEW: ดึงยอดจองก่อน
+  // ดึงยอดจอง
   const resMap = await loadAlertReservations();
   const reservations = resMap[`${gradegram}|${size}`] || [];
   const reservedTotal = reservations.reduce((s, x) => s + (Number(x.quantity) || 0), 0);
@@ -1389,7 +1377,7 @@ async function openAlertMatrixCell(gradegram, size) {
     </div>
   `;
 
-  // 🔽 NEW: แสดงยอดจอง (Reserved) — ไม่มีกล่อง "Alert (หลังหักจอง)" แล้ว
+  // แสดงยอดจอง (Reserved + Draft)
   html += `
     <div class="matrix-cell-summary" style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border-color:#fcd34d;margin-top:12px">
       <div class="matrix-cell-summary-title" style="color:#92400e">
@@ -2378,7 +2366,7 @@ function renderAlertPODetail(items) {
   $('alertPODetailBody').innerHTML = html;
 }
 
-function confirmCreatePO() {
+async function confirmCreatePO() {
   if (!_pendingPOItems || !_pendingPOItems.length) return;
 
   const confirmBtn = document.querySelector('#modalAlertPODetail .form-actions .primary');
@@ -2393,6 +2381,23 @@ function confirmCreatePO() {
     alert(`⚠️ ไม่สามารถสร้าง PO ได้\n\nมี ${missingSup.length} รายการที่ยังไม่ได้ระบุผู้ขาย (Sup.)\nกรุณาตรวจสอบและเลือก Sup. ให้ครบก่อน`);
     if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = '✅ ยืนยันสร้าง PO'; }
     return;
+  }
+
+  // 🔥 NEW: หา Draft PO ที่ถูกอ้างอิงในรายการ เพื่อ mark completed
+  const draftRefs = _pendingPOItems
+    .filter(it => it.note && it.note.includes('Ref: DRAFT-'))
+    .map(it => it.note.replace('Ref: ', '').trim());
+
+  if (draftRefs.length > 0) {
+    try {
+      const { error: updErr } = await supabase.from('roll_reservations')
+        .update({ status: 'completed' })
+        .in('draft_po_ref', draftRefs);
+      if (updErr) console.warn('⚠️ อัปเดต roll_reservations เป็น completed ไม่สำเร็จ:', updErr);
+      else console.log(`✅ mark completed ${draftRefs.length} draft refs`);
+    } catch (e) {
+      console.warn('confirmCreatePO update roll_reservations error:', e);
+    }
   }
 
   const analyzedDate = getISODateFromInput('alertDate') || toISODate(new Date());
@@ -2780,12 +2785,12 @@ async function clearUsagePlan() {
 function showAlertHistoryCard() {
   const card = $('alertHistoryCard');
   if (card) card.style.display = '';
-  
+
   const dateEl = $('alertHistoryDate');
   if (dateEl && !dateEl.value) {
     const today = toISODate(new Date());
     dateEl.value = today;
-    
+
     if (window.flatpickrInstances && window.flatpickrInstances['alertHistoryDate']) {
       window.flatpickrInstances['alertHistoryDate'].setDate(today, false);
     }
@@ -2803,10 +2808,10 @@ function setAlertHistoryMode(mode) {
 
 async function loadAlertHistory() {
   const date = getISODateFromInput('alertHistoryDate');
-  
-  if (!date) { 
-    alert('กรุณาเลือกวันที่ก่อนกดปุ่ม "ดู"'); 
-    return; 
+
+  if (!date) {
+    alert('กรุณาเลือกวันที่ก่อนกดปุ่ม "ดู"');
+    return;
   }
 
   const body = $('alertHistoryBody');
@@ -3274,11 +3279,11 @@ function renderAllAlertFilters() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  RESERVATIONS (ยอดจองม้วน) — NEW
+//  RESERVATIONS (ยอดจองม้วน) — V.13.8
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * ดึงยอดจอง (Reserved) จากตาราง roll_reservations
+ * ดึงยอดจอง (Reserved + Draft) จากตาราง roll_reservations
  * คืนค่าเป็น map: { "GRADE|SIZE": [ {..}, {..} ] }
  */
 async function loadAlertReservations() {
@@ -3286,11 +3291,10 @@ async function loadAlertReservations() {
     const { data, error } = await supabase
       .from('roll_reservations')
       .select('*')
-      .eq('status', 'reserved');
+      .in('status', ['reserved', 'draft']);   // 👈 NEW: ดึงทั้ง reserved และ draft
 
     if (error) throw error;
 
-    // จัดกลุ่ม: Gradegram|Size
     const resMap = {};
     (data || []).forEach(r => {
       const key = `${r.grade}|${r.size}`;
@@ -3305,9 +3309,6 @@ async function loadAlertReservations() {
   }
 }
 
-/**
- * คำนวณยอดจองรวม สำหรับ cell หนึ่งๆ
- */
 function getAlertReservedTotal(resMap, gradegram, size) {
   if (!resMap) return 0;
   const list = resMap[`${gradegram}|${size}`] || [];
@@ -3315,7 +3316,9 @@ function getAlertReservedTotal(resMap, gradegram, size) {
 }
 
 /**
- * แสดง HTML ของยอดจอง (ใช้ใน modal) — Card style
+ * แสดง HTML ของยอดจอง — Card UI
+ * - ถ้า status === 'draft' → ซ่อนปุ่มตะกร้า แสดง badge Draft
+ * - ถ้า status === 'reserved' → แสดงปุ่มตะกร้า
  */
 function buildReservationHtml(list) {
   if (!list || !list.length) {
@@ -3331,21 +3334,22 @@ function buildReservationHtml(list) {
     const qualityTxt = r.quality === 'B' ? 'B' : 'A';
     const qualityColor = r.quality === 'B' ? '#dc2626' : '#166534';
     const qualityBg = r.quality === 'B' ? '#fee2e2' : '#dcfce7';
+    const isDraft = r.status === 'draft';
 
-    // ส่งข้อมูลที่จำเป็นไปให้ฟังก์ชัน onReservationCartClick
     const safeGrade = escAttr(r.grade || '');
     const safeSize = Number(r.size) || 0;
     const safeQty = Number(r.quantity) || 0;
     const safeSup = escAttr(r.supplier || '');
     const safeQuality = escAttr(r.quality || 'A');
+    const safeId = escAttr(r.id || '');
 
     html += `
-      <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; display:flex; justify-content:space-between; align-items:center; box-shadow:0 1px 2px rgba(0,0,0,0.02);">
+      <div style="background:#fff; border:1px solid ${isDraft ? '#cbd5e1' : '#e2e8f0'}; border-radius:8px; padding:10px 14px; display:flex; justify-content:space-between; align-items:center; box-shadow:0 1px 2px rgba(0,0,0,0.02); ${isDraft ? 'opacity:0.85;' : ''}">
         <div style="display:flex; flex-direction:column; gap:4px;">
           <div style="font-size:13px; font-weight:600; color:#1e293b;">
             📅 ${dateStr} <span style="color:#cbd5e1; margin:0 4px;">|</span> 🏢 ${esc(r.supplier || '-')}
           </div>
-          <div style="font-size:12px; color:#64748b; display:flex; align-items:center; gap:6px;">
+          <div style="font-size:12px; color:#64748b; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
             <span>ลูกค้า: ${esc(r.customer_mark || '-')}</span>
             <span style="background:${qualityBg}; color:${qualityColor}; padding:2px 6px; border-radius:4px; font-weight:700; font-size:11px;">คุณภาพ ${qualityTxt}</span>
             ${r.remark ? `<span>· ${esc(r.remark)}</span>` : ''}
@@ -3357,14 +3361,17 @@ function buildReservationHtml(list) {
             <div style="font-size:16px; font-weight:700; color:#b45309;">${safeQty}</div>
             <div style="font-size:10px; color:#94a3b8;">ม้วน</div>
           </div>
-          <button type="button" 
-                  onclick="onReservationCartClick('${safeGrade}', ${safeSize}, ${safeQty}, '${safeSup}', '${safeQuality}')"
-                  style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; width:32px; height:32px; border-radius:8px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s;"
-                  onmouseover="this.style.background='#bae6fd'"
-                  onmouseout="this.style.background='#e0f2fe'"
-                  title="นำไปสั่งซื้อ">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-          </button>
+          ${isDraft
+            ? `<span style="background:#f1f5f9;color:#64748b;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:600;white-space:nowrap;">📝 ${esc(r.draft_po_ref || 'Draft PO')}</span>`
+            : `<button type="button" 
+                     onclick="onReservationCartClick('${safeId}', '${safeGrade}', ${safeSize}, ${safeQty}, '${safeSup}', '${safeQuality}')"
+                     style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; width:32px; height:32px; border-radius:8px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s;"
+                     onmouseover="this.style.background='#bae6fd'"
+                     onmouseout="this.style.background='#e0f2fe'"
+                     title="ย้ายไป Draft PO">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+              </button>`
+          }
         </div>
       </div>
     `;
@@ -3377,8 +3384,7 @@ function buildReservationHtml(list) {
 // ==========================================
 // NEW: ฟังก์ชันเมื่อกดปุ่มตะกร้าในยอดจอง
 // ==========================================
-function onReservationCartClick(gradegram, size, maxQty, supplier, quality) {
-  // สร้าง Modal ขนาดเล็ก
+function onReservationCartClick(resId, gradegram, size, maxQty, supplier, quality) {
   let modal = document.getElementById('modalCartQty');
   if (!modal) {
     modal = document.createElement('div');
@@ -3386,7 +3392,7 @@ function onReservationCartClick(gradegram, size, maxQty, supplier, quality) {
     modal.className = 'modal-bg';
     modal.innerHTML = `
       <div class="modal" style="max-width:400px; text-align:center; padding:24px;">
-        <h3 style="margin-top:0; color:#1e293b;">🛒 ระบุจำนวนที่ต้องการสั่ง</h3>
+        <h3 style="margin-top:0; color:#1e293b;">🛒 ย้ายไป Draft PO</h3>
         <div style="background:#f8fafc; padding:12px; border-radius:8px; margin-bottom:16px; font-size:13px; text-align:left;">
           <div style="margin-bottom:4px;"><b>Gradegram:</b> ${esc(gradegram)} (Size ${size})</div>
           <div style="margin-bottom:4px;"><b>Supplier:</b> ${esc(supplier || '-')}</div>
@@ -3396,11 +3402,11 @@ function onReservationCartClick(gradegram, size, maxQty, supplier, quality) {
         <label style="display:block; text-align:left; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">จำนวนที่ต้องการสั่ง (ม้วน)</label>
         <input type="number" id="cartQtyInput" min="1" step="1" value="${maxQty}" 
                style="width:100%; padding:10px; font-size:18px; font-weight:700; text-align:center; border:2px solid #cbd5e1; border-radius:8px; outline:none; color:#0284c7; margin-bottom:20px;"
-               onfocus="this.select()" onkeypress="if(event.key==='Enter') confirmCartQty('${escAttr(gradegram)}', ${size}, '${escAttr(supplier)}', '${escAttr(quality)}')">
+               onfocus="this.select()">
         
         <div style="display:flex; gap:10px;">
           <button type="button" onclick="closeModal('modalCartQty')" style="flex:1; padding:10px; border-radius:6px; border:1px solid #cbd5e1; background:#f8fafc; cursor:pointer;">ยกเลิก</button>
-          <button type="button" class="primary" onclick="confirmCartQty('${escAttr(gradegram)}', ${size}, '${escAttr(supplier)}', '${escAttr(quality)}')" style="flex:1; padding:10px; border-radius:6px; cursor:pointer;">ตกลง</button>
+          <button type="button" class="primary" id="cartConfirmBtn" onclick="confirmCartQty('${escAttr(resId)}', '${escAttr(gradegram)}', ${size}, '${escAttr(supplier)}', '${escAttr(quality)}')" style="flex:1; padding:10px; border-radius:6px; cursor:pointer;">ย้ายไป Draft</button>
         </div>
       </div>
     `;
@@ -3415,45 +3421,64 @@ function onReservationCartClick(gradegram, size, maxQty, supplier, quality) {
 }
 
 // ==========================================
-// NEW: ยืนยันจำนวน แล้วเติมลงฟอร์มด้านล่าง
+// NEW: ยืนยันจำนวน → UPDATE status='draft' → เติมฟอร์ม
 // ==========================================
-function confirmCartQty(gradegram, size, supplier, quality) {
+async function confirmCartQty(resId, gradegram, size, supplier, quality) {
   const qty = Number(document.getElementById('cartQtyInput').value);
-  if (!qty || qty <= 0) {
-    alert('กรุณาระบุจำนวนมากกว่า 0');
-    return;
+  if (!qty || qty <= 0) return alert('กรุณาระบุจำนวนมากกว่า 0');
+
+  const btn = document.getElementById('cartConfirmBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ กำลังย้าย...'; }
+
+  // สร้างเลข Draft PO ชั่วคราว
+  const draftNo = `DRAFT-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${String(Math.floor(Math.random()*1000)).padStart(3,'0')}`;
+
+  try {
+    // 1. อัปเดต Database → draft
+    const { error } = await supabase.from('roll_reservations')
+      .update({ status: 'draft', draft_po_ref: draftNo })
+      .eq('id', resId);
+
+    if (error) throw error;
+
+    closeModal('modalCartQty');
+
+    // 2. รีเฟรชหน้า Reservations (ถ้ามีฟังก์ชันโหลด)
+    if (typeof loadReservations === 'function') {
+      try { await loadReservations(); } catch (e) { console.warn(e); }
+    }
+
+    // 3. เติมข้อมูลลงฟอร์มด้านล่าง
+    fillOrderForm(gradegram, size, qty, supplier, quality, draftNo);
+
+  } catch (err) {
+    console.error('confirmCartQty error:', err);
+    alert('เกิดข้อผิดพลาด: ' + err.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'ย้ายไป Draft'; }
   }
+}
 
-  closeModal('modalCartQty');
-
-  // 1. ตรวจสอบว่ามีฟอร์มอยู่แล้วหรือไม่ ถ้าไม่มีให้กดปุ่มสร้างก่อน
+// ==========================================
+// NEW: เติมแถวลงฟอร์มพร้อมแปะเลข Draft
+// ==========================================
+function fillOrderForm(gradegram, size, qty, supplier, quality, draftNo) {
   let form = document.getElementById('matrixOrderForm');
   if (!form) {
     const prompt = document.getElementById('matrixOrderPrompt');
-    if (prompt) {
-      // กดปุ่มกรอกข้อมูลสั่งซื้ออัตโนมัติ
-      showMatrixOrderForm(gradegram, size);
-      form = document.getElementById('matrixOrderForm');
-    }
+    if (prompt) { showMatrixOrderForm(gradegram, size); form = document.getElementById('matrixOrderForm'); }
   }
+  if (!form) return alert('ไม่พบฟอร์มสั่งซื้อ');
 
-  if (!form) {
-    alert('ไม่พบฟอร์มสั่งซื้อ กรุณาลองใหม่');
-    return;
-  }
-
-  // 2. เพิ่มแถวใหม่ในฟอร์ม
   const rowsBox = document.getElementById('matrixOrderRows');
   if (rowsBox) {
     const currentCount = rowsBox.querySelectorAll('.matrix-order-row').length;
-
-    // สร้างแถวใหม่
     const newRow = {
       qty: qty,
       sup: supplier,
       customer_roll: 'normal',
       quality_b: quality === 'B' ? 'nc' : 'normal',
-      note: ''
+      note: `Ref: ${draftNo}`
     };
 
     const wrapper = document.createElement('div');
@@ -3461,13 +3486,11 @@ function confirmCartQty(gradegram, size, supplier, quality) {
     rowsBox.appendChild(wrapper.firstElementChild);
     renumberMatrixOrderRows();
 
-    // 3. Scroll ไปที่แถวที่เพิ่งเพิ่ม + โฟกัส
     setTimeout(() => {
       const newRows = rowsBox.querySelectorAll('.matrix-order-row');
       const lastRow = newRows[newRows.length - 1];
       if (lastRow) {
         lastRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        // ใส่สีพื้นหลังชั่วคราวเพื่อให้เห็นว่าแถวใหม่มา
         lastRow.style.backgroundColor = '#fef3c7';
         setTimeout(() => lastRow.style.backgroundColor = '', 1500);
       }
