@@ -3,6 +3,7 @@
 //  Fix: setDate(..., false) ไม่ trigger onChange + ใช้ toISODate helper
 //  Fix: Alert History — Default เป็นวันปัจจุบัน + แจ้งเตือนชัดเจนเมื่อไม่พบข้อมูล
 //  NEW: V.13.6 — แสดงยอดจอง (Reserved) ใน Modal Cell
+//  NEW: V.13.7 — Reservation Card UI + ปุ่มตะกร้า / ไม่แสดง Alert หลังหักจอง
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -1305,7 +1306,7 @@ function renderAlertMatrixView(rows) {
       if (hasOrder && allHaveSup) orderCls = 'has-order';
       else if (hasQtyNoSup) orderCls = 'order-incomplete';
 
-            html += `<td class="matrix-cell ${cellCls} ${orderCls}" 
+      html += `<td class="matrix-cell ${cellCls} ${orderCls}" 
                    onclick="openAlertMatrixCell('${esc(grade)}', ${size})"
                    data-tip="Gradegrams ${esc(grade)} · Size ${size}">
                  <div class="matrix-value">${a > 0 ? '+' + Number(a).toFixed(2) : Number(a).toFixed(2)}${cartIcon}</div>
@@ -1388,7 +1389,7 @@ async function openAlertMatrixCell(gradegram, size) {
     </div>
   `;
 
-  // 🔽 NEW: แสดงยอดจอง (Reserved)
+  // 🔽 NEW: แสดงยอดจอง (Reserved) — ไม่มีกล่อง "Alert (หลังหักจอง)" แล้ว
   html += `
     <div class="matrix-cell-summary" style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border-color:#fcd34d;margin-top:12px">
       <div class="matrix-cell-summary-title" style="color:#92400e">
@@ -1400,15 +1401,6 @@ async function openAlertMatrixCell(gradegram, size) {
       <div style="margin-top:8px">
         ${buildReservationHtml(reservations)}
       </div>
-      ${reservedTotal > 0 ? `
-        <div style="margin-top:8px;padding:8px 12px;background:#fff;border-radius:6px;font-size:13px">
-          📊 <b>Alert (หลังหักจอง):</b>
-          <b style="color:${(a - reservedTotal) < 0 ? '#dc2626' : '#166534'}">
-            ${(a - reservedTotal) > 0 ? '+' : ''}${(a - reservedTotal).toFixed(2)} ม้วน
-          </b>
-          <span style="color:#64748b">(Alert ${a} − จอง ${reservedTotal})</span>
-        </div>
-      ` : ''}
     </div>
   `;
 
@@ -3323,31 +3315,162 @@ function getAlertReservedTotal(resMap, gradegram, size) {
 }
 
 /**
- * แสดง HTML ของยอดจอง (ใช้ใน modal)
+ * แสดง HTML ของยอดจอง (ใช้ใน modal) — Card style
  */
 function buildReservationHtml(list) {
   if (!list || !list.length) {
-    return '<p style="color:#94a3b8;margin:8px 0">ไม่มีรายการจอง</p>';
+    return '<p style="color:#94a3b8;margin:8px 0;text-align:center;">ไม่มีรายการจอง</p>';
   }
 
-  let html = '<table style="width:100%;font-size:12px;margin-top:6px">';
-  html += '<thead><tr>';
-  html += '<th>วันที่จอง</th><th>ลูกค้า</th><th>Supplier</th><th style="text-align:right">จำนวน</th><th>หมายเหตุ</th>';
-  html += '</tr></thead><tbody>';
+  let html = '<div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">';
 
-  list.forEach(r => {
+  list.forEach((r, index) => {
     const dateStr = r.reservation_date
       ? new Date(r.reservation_date).toLocaleDateString('th-TH')
       : '-';
-    html += `<tr>
-      <td>${dateStr}</td>
-      <td>${esc(r.customer || '-')}</td>
-      <td>${esc(r.supplier || '-')}</td>
-      <td style="text-align:right;font-weight:700;color:#b45309">${Number(r.quantity) || 0}</td>
-      <td>${esc(r.note || '-')}</td>
-    </tr>`;
+    const qualityTxt = r.quality === 'B' ? 'B' : 'A';
+    const qualityColor = r.quality === 'B' ? '#dc2626' : '#166534';
+    const qualityBg = r.quality === 'B' ? '#fee2e2' : '#dcfce7';
+
+    // ส่งข้อมูลที่จำเป็นไปให้ฟังก์ชัน onReservationCartClick
+    const safeGrade = escAttr(r.grade || '');
+    const safeSize = Number(r.size) || 0;
+    const safeQty = Number(r.quantity) || 0;
+    const safeSup = escAttr(r.supplier || '');
+    const safeQuality = escAttr(r.quality || 'A');
+
+    html += `
+      <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; display:flex; justify-content:space-between; align-items:center; box-shadow:0 1px 2px rgba(0,0,0,0.02);">
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <div style="font-size:13px; font-weight:600; color:#1e293b;">
+            📅 ${dateStr} <span style="color:#cbd5e1; margin:0 4px;">|</span> 🏢 ${esc(r.supplier || '-')}
+          </div>
+          <div style="font-size:12px; color:#64748b; display:flex; align-items:center; gap:6px;">
+            <span>ลูกค้า: ${esc(r.customer_mark || '-')}</span>
+            <span style="background:${qualityBg}; color:${qualityColor}; padding:2px 6px; border-radius:4px; font-weight:700; font-size:11px;">คุณภาพ ${qualityTxt}</span>
+            ${r.remark ? `<span>· ${esc(r.remark)}</span>` : ''}
+          </div>
+        </div>
+        
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div style="text-align:right;">
+            <div style="font-size:16px; font-weight:700; color:#b45309;">${safeQty}</div>
+            <div style="font-size:10px; color:#94a3b8;">ม้วน</div>
+          </div>
+          <button type="button" 
+                  onclick="onReservationCartClick('${safeGrade}', ${safeSize}, ${safeQty}, '${safeSup}', '${safeQuality}')"
+                  style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; width:32px; height:32px; border-radius:8px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s;"
+                  onmouseover="this.style.background='#bae6fd'"
+                  onmouseout="this.style.background='#e0f2fe'"
+                  title="นำไปสั่งซื้อ">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+          </button>
+        </div>
+      </div>
+    `;
   });
 
-  html += '</tbody></table>';
+  html += '</div>';
   return html;
+}
+
+// ==========================================
+// NEW: ฟังก์ชันเมื่อกดปุ่มตะกร้าในยอดจอง
+// ==========================================
+function onReservationCartClick(gradegram, size, maxQty, supplier, quality) {
+  // สร้าง Modal ขนาดเล็ก
+  let modal = document.getElementById('modalCartQty');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'modalCartQty';
+    modal.className = 'modal-bg';
+    modal.innerHTML = `
+      <div class="modal" style="max-width:400px; text-align:center; padding:24px;">
+        <h3 style="margin-top:0; color:#1e293b;">🛒 ระบุจำนวนที่ต้องการสั่ง</h3>
+        <div style="background:#f8fafc; padding:12px; border-radius:8px; margin-bottom:16px; font-size:13px; text-align:left;">
+          <div style="margin-bottom:4px;"><b>Gradegram:</b> ${esc(gradegram)} (Size ${size})</div>
+          <div style="margin-bottom:4px;"><b>Supplier:</b> ${esc(supplier || '-')}</div>
+          <div><b>คุณภาพ:</b> ${quality === 'B' ? 'B (NC)' : 'A'}</div>
+        </div>
+        
+        <label style="display:block; text-align:left; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">จำนวนที่ต้องการสั่ง (ม้วน)</label>
+        <input type="number" id="cartQtyInput" min="1" step="1" value="${maxQty}" 
+               style="width:100%; padding:10px; font-size:18px; font-weight:700; text-align:center; border:2px solid #cbd5e1; border-radius:8px; outline:none; color:#0284c7; margin-bottom:20px;"
+               onfocus="this.select()" onkeypress="if(event.key==='Enter') confirmCartQty('${escAttr(gradegram)}', ${size}, '${escAttr(supplier)}', '${escAttr(quality)}')">
+        
+        <div style="display:flex; gap:10px;">
+          <button type="button" onclick="closeModal('modalCartQty')" style="flex:1; padding:10px; border-radius:6px; border:1px solid #cbd5e1; background:#f8fafc; cursor:pointer;">ยกเลิก</button>
+          <button type="button" class="primary" onclick="confirmCartQty('${escAttr(gradegram)}', ${size}, '${escAttr(supplier)}', '${escAttr(quality)}')" style="flex:1; padding:10px; border-radius:6px; cursor:pointer;">ตกลง</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+  
+  modal.classList.add('show');
+  setTimeout(() => {
+    const input = document.getElementById('cartQtyInput');
+    if (input) { input.focus(); input.select(); }
+  }, 100);
+}
+
+// ==========================================
+// NEW: ยืนยันจำนวน แล้วเติมลงฟอร์มด้านล่าง
+// ==========================================
+function confirmCartQty(gradegram, size, supplier, quality) {
+  const qty = Number(document.getElementById('cartQtyInput').value);
+  if (!qty || qty <= 0) {
+    alert('กรุณาระบุจำนวนมากกว่า 0');
+    return;
+  }
+
+  closeModal('modalCartQty');
+
+  // 1. ตรวจสอบว่ามีฟอร์มอยู่แล้วหรือไม่ ถ้าไม่มีให้กดปุ่มสร้างก่อน
+  let form = document.getElementById('matrixOrderForm');
+  if (!form) {
+    const prompt = document.getElementById('matrixOrderPrompt');
+    if (prompt) {
+      // กดปุ่มกรอกข้อมูลสั่งซื้ออัตโนมัติ
+      showMatrixOrderForm(gradegram, size);
+      form = document.getElementById('matrixOrderForm');
+    }
+  }
+
+  if (!form) {
+    alert('ไม่พบฟอร์มสั่งซื้อ กรุณาลองใหม่');
+    return;
+  }
+
+  // 2. เพิ่มแถวใหม่ในฟอร์ม
+  const rowsBox = document.getElementById('matrixOrderRows');
+  if (rowsBox) {
+    const currentCount = rowsBox.querySelectorAll('.matrix-order-row').length;
+
+    // สร้างแถวใหม่
+    const newRow = {
+      qty: qty,
+      sup: supplier,
+      customer_roll: 'normal',
+      quality_b: quality === 'B' ? 'nc' : 'normal',
+      note: ''
+    };
+
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = renderMatrixOrderRow(currentCount, newRow);
+    rowsBox.appendChild(wrapper.firstElementChild);
+    renumberMatrixOrderRows();
+
+    // 3. Scroll ไปที่แถวที่เพิ่งเพิ่ม + โฟกัส
+    setTimeout(() => {
+      const newRows = rowsBox.querySelectorAll('.matrix-order-row');
+      const lastRow = newRows[newRows.length - 1];
+      if (lastRow) {
+        lastRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // ใส่สีพื้นหลังชั่วคราวเพื่อให้เห็นว่าแถวใหม่มา
+        lastRow.style.backgroundColor = '#fef3c7';
+        setTimeout(() => lastRow.style.backgroundColor = '', 1500);
+      }
+    }, 100);
+  }
 }
