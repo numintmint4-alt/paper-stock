@@ -2,6 +2,7 @@
 //  STOCK V10.1 — alert.js — V.13.5 (Default Date: ตามเงื่อนไข)
 //  Fix: setDate(..., false) ไม่ trigger onChange + ใช้ toISODate helper
 //  Fix: Alert History — Default เป็นวันปัจจุบัน + แจ้งเตือนชัดเจนเมื่อไม่พบข้อมูล
+//  NEW: V.13.6 — แสดงยอดจอง (Reserved) ใน Modal Cell
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -136,15 +137,15 @@ function initFirstReceiveDatePicker() {
   if (window.flatpickrInstances && window.flatpickrInstances['firstReceiveDateInput']) return;
 
   el.setAttribute('type', 'text');
-  el.setAttribute('placeholder', 'YYYY-MM-DD'); // 🔽 1. เปลี่ยน Placeholder 🔽
-  el.setAttribute('autocomplete', 'new-password'); // 🔽 ปิด Autofill 🔽
+  el.setAttribute('placeholder', 'YYYY-MM-DD');
+  el.setAttribute('autocomplete', 'new-password');
 
   if (!window.flatpickrInstances) window.flatpickrInstances = {};
 
   window.flatpickrInstances['firstReceiveDateInput'] = flatpickr(el, {
     locale: "th",
-    dateFormat: "Y-m-d",   // 🔽 2. เปลี่ยน Format เป็น ค.ศ. 🔽
-    allowInput: false,     // 🔽 3. ห้ามพิมพ์เอง ให้คลิกเลือกจากปฏิทินอย่างเดียว 🔽
+    dateFormat: "Y-m-d",
+    allowInput: false,
     disableMobile: true
   });
 
@@ -398,10 +399,6 @@ async function applyAlertSnapshot(snapshot) {
   try {
     if (snapshot.snapshot_month) $('alertSnapshotMonth').value = snapshot.snapshot_month;
     
-    // 🔽 ไม่ setDate ของ alertStockDate และ alertReceiveDate ตรงนี้ (ตาม requirement) 🔽
-    // ช่อง Stock/Receive จะคงค่า default จาก initAlertTab (เมื่อวาน/วันนี้)
-
-    // 🕵️ DEBUG — ลบได้ทีหลัง
     console.log('[applyAlertSnapshot] stock_date    =', snapshot.stock_date);
     console.log('[applyAlertSnapshot] receive_date  =', snapshot.receive_date);
     console.log('[applyAlertSnapshot] stockInput    =', window.flatpickrInstances?.['alertStockDate']?.input?.value);
@@ -1337,9 +1334,14 @@ function renderAlertMatrixView(rows) {
 //  MODAL CELL
 // ═══════════════════════════════════════════════════════════════
 
-function openAlertMatrixCell(gradegram, size) {
+async function openAlertMatrixCell(gradegram, size) {
   const r = alertCache.find(x => x.gradegram === gradegram && Number(x.size) === Number(size));
   if (!r) { alert('ไม่พบข้อมูล'); return; }
+
+  // 🔽 NEW: ดึงยอดจองก่อน
+  const resMap = await loadAlertReservations();
+  const reservations = resMap[`${gradegram}|${size}`] || [];
+  const reservedTotal = reservations.reduce((s, x) => s + (Number(x.quantity) || 0), 0);
 
   const a = Number(r.alert) || 0;
   let alertCls, alertTxt, alertIcon;
@@ -1383,6 +1385,30 @@ function openAlertMatrixCell(gradegram, size) {
       <div class="matrix-alert-big ${alertCls}">
         Alert: ${a > 0 ? '+' + a : a} ม้วน
       </div>
+    </div>
+  `;
+
+  // 🔽 NEW: แสดงยอดจอง (Reserved)
+  html += `
+    <div class="matrix-cell-summary" style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border-color:#fcd34d;margin-top:12px">
+      <div class="matrix-cell-summary-title" style="color:#92400e">
+        🔖 ยอดจอง (Reserved)
+        <span class="alert-status-badge" style="background:#fbbf24;color:#fff">
+          ${reservedTotal > 0 ? reservedTotal + ' ม้วน' : 'ไม่มี'}
+        </span>
+      </div>
+      <div style="margin-top:8px">
+        ${buildReservationHtml(reservations)}
+      </div>
+      ${reservedTotal > 0 ? `
+        <div style="margin-top:8px;padding:8px 12px;background:#fff;border-radius:6px;font-size:13px">
+          📊 <b>Alert (หลังหักจอง):</b>
+          <b style="color:${(a - reservedTotal) < 0 ? '#dc2626' : '#166534'}">
+            ${(a - reservedTotal) > 0 ? '+' : ''}${(a - reservedTotal).toFixed(2)} ม้วน
+          </b>
+          <span style="color:#64748b">(Alert ${a} − จอง ${reservedTotal})</span>
+        </div>
+      ` : ''}
     </div>
   `;
 
@@ -1955,8 +1981,6 @@ function initAlertReceiveDates() {
     return dt && dt.getDay() !== 0;
   });
 
-  // ❌ ไม่สร้างวันที่เริ่มต้นอัตโนมัติ — Array ว่างถ้าไม่มีข้อมูล
-
   alertActiveDateIdx = 0;
   renderAlertDateTabs();
 }
@@ -1980,7 +2004,6 @@ async function renderAlert() {
   const snapshotMonth = $('alertSnapshotMonth')?.value;
   const stockDate     = getISODateFromInput('alertStockDate');
 
-  // 🔽 Empty State — Flatpickr for firstReceiveDateInput 🔽
   if (alertReceiveDates.length === 0) {
     const html = `
       <div class="alert-date-tabs" style="display:flex; align-items:center; justify-content:space-between; background:#f8fafc; border:1px solid #e2e8f0; padding:8px; border-radius:6px; margin-bottom:15px; flex-wrap:wrap; gap:8px;">
@@ -2766,13 +2789,11 @@ function showAlertHistoryCard() {
   const card = $('alertHistoryCard');
   if (card) card.style.display = '';
   
-  // 🔽 ใส่วันที่ปัจจุบันเป็น Default กลับคืนไป 🔽
   const dateEl = $('alertHistoryDate');
   if (dateEl && !dateEl.value) {
     const today = toISODate(new Date());
     dateEl.value = today;
     
-    // อัปเดต Flatpickr ให้ตรงกับค่าที่ใส่ไป
     if (window.flatpickrInstances && window.flatpickrInstances['alertHistoryDate']) {
       window.flatpickrInstances['alertHistoryDate'].setDate(today, false);
     }
@@ -3258,4 +3279,75 @@ function renderAllAlertFilters() {
   _attachAlertDropdown('alertStockFilterBtn', 'alertStockFilterDropdown', 'alertStockFilterBox', 'alertStockFilter');
   _attachAlertDropdown('alertReceiveFilterBtn', 'alertReceiveFilterDropdown', 'alertReceiveFilterBox', 'alertReceiveFilter');
   _attachAlertDropdown('alertUsageFilterBtn', 'alertUsageFilterDropdown', 'alertUsageFilterBox', 'alertUsageFilter');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  RESERVATIONS (ยอดจองม้วน) — NEW
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * ดึงยอดจอง (Reserved) จากตาราง roll_reservations
+ * คืนค่าเป็น map: { "GRADE|SIZE": [ {..}, {..} ] }
+ */
+async function loadAlertReservations() {
+  try {
+    const { data, error } = await supabase
+      .from('roll_reservations')
+      .select('*')
+      .eq('status', 'reserved');
+
+    if (error) throw error;
+
+    // จัดกลุ่ม: Gradegram|Size
+    const resMap = {};
+    (data || []).forEach(r => {
+      const key = `${r.grade}|${r.size}`;
+      if (!resMap[key]) resMap[key] = [];
+      resMap[key].push(r);
+    });
+
+    return resMap;
+  } catch (err) {
+    console.error('loadAlertReservations error:', err);
+    return {};
+  }
+}
+
+/**
+ * คำนวณยอดจองรวม สำหรับ cell หนึ่งๆ
+ */
+function getAlertReservedTotal(resMap, gradegram, size) {
+  if (!resMap) return 0;
+  const list = resMap[`${gradegram}|${size}`] || [];
+  return list.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0);
+}
+
+/**
+ * แสดง HTML ของยอดจอง (ใช้ใน modal)
+ */
+function buildReservationHtml(list) {
+  if (!list || !list.length) {
+    return '<p style="color:#94a3b8;margin:8px 0">ไม่มีรายการจอง</p>';
+  }
+
+  let html = '<table style="width:100%;font-size:12px;margin-top:6px">';
+  html += '<thead><tr>';
+  html += '<th>วันที่จอง</th><th>ลูกค้า</th><th>Supplier</th><th style="text-align:right">จำนวน</th><th>หมายเหตุ</th>';
+  html += '</tr></thead><tbody>';
+
+  list.forEach(r => {
+    const dateStr = r.reservation_date
+      ? new Date(r.reservation_date).toLocaleDateString('th-TH')
+      : '-';
+    html += `<tr>
+      <td>${dateStr}</td>
+      <td>${esc(r.customer || '-')}</td>
+      <td>${esc(r.supplier || '-')}</td>
+      <td style="text-align:right;font-weight:700;color:#b45309">${Number(r.quantity) || 0}</td>
+      <td>${esc(r.note || '-')}</td>
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+  return html;
 }
