@@ -16,7 +16,6 @@ async function loadReservations() {
     tbody.innerHTML = '<tr><td colspan="100%" style="text-align:center;padding:20px;">กำลังโหลด...</td></tr>';
 
     try {
-        // ดึงข้อมูลทั้งหมดที่ status = reserved
         const { data, error } = await supabase
             .from('roll_reservations')
             .select('*')
@@ -26,14 +25,12 @@ async function loadReservations() {
 
         resState.data = data || [];
         
-        // อัปเดตข้อความวันที่
         const dateLabel = document.getElementById('resCurrentDateLabel');
         if (dateLabel) {
             const today = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
             dateLabel.innerHTML = `ตารางการจองม้วนกระดาษ ณ วันที่ : <span style="color: var(--primary);">${today}</span>`;
         }
 
-        // วาดตาราง
         renderReservationsTable();
 
     } catch (err) {
@@ -51,7 +48,6 @@ function renderReservationsTable() {
     const group = resState.gradeFilter;
     const data = resState.data;
 
-    // กรองตาม Grade
     const filteredData = data.filter(r => {
         const g = String(r.grade).toUpperCase();
         if (group === 'ALL') return true;
@@ -65,7 +61,6 @@ function renderReservationsTable() {
         return;
     }
 
-    // สร้างโครงสร้าง Matrix
     const grades = [...new Set(filteredData.map(r => r.grade))].sort();
     const sizes = [...new Set(filteredData.map(r => Number(r.size)))].sort((a,b) => a-b);
     
@@ -110,7 +105,6 @@ function renderReservationsTable() {
         });
     });
 
-    // แถว Total
     bodyHtml += '<tr class="total-row"><td colspan="2" style="text-align:right;font-weight:700;">รวมทั้งหมด</td>';
     sizes.forEach(size => {
         const sizeTotal = filteredData.filter(r => Number(r.size) === size).reduce((s, r) => s + Number(r.quantity), 0);
@@ -224,18 +218,15 @@ async function openReservationDetail(grade, size, supplier) {
         body.innerHTML = `<div style="text-align:center;padding:20px;color:red;">Error: ${err.message}</div>`;
     }
 }
-// ==========================================
+
 // 8.5 ฟังก์ชันเปิดฟอร์มเพิ่มรายการจอง
-// ==========================================
 function openAddReservationForm(grade, size, supplier) {
     const modalBody = document.getElementById('resDetailBody');
     const modalTitle = document.getElementById('resDetailTitle');
     if (!modalBody) return;
 
-    // เปลี่ยนหัวข้อ Modal
     if (modalTitle) modalTitle.innerHTML = `➕ เพิ่มรายการจอง: ${escHtml(grade)} (Size ${size}) - ${escHtml(supplier)}`;
 
-    // สร้างฟอร์ม HTML
     let html = `
         <div style="background:#f8fafc; padding:16px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:16px;">
             <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 12px;">
@@ -295,14 +286,21 @@ function openAddReservationForm(grade, size, supplier) {
 
     modalBody.innerHTML = html;
 
-    // ตั้งค่าเริ่มต้นวันที่เป็นวันนี้ (ผ่าน Flatpickr)
     const dateInput = document.getElementById('addResDate');
     if (dateInput) {
         dateInput.value = getTodayISO();
+        if (window.flatpickrInstances && !window.flatpickrInstances['addResDate']) {
+            window.flatpickrInstances['addResDate'] = flatpickr(dateInput, {
+                locale: "th",
+                dateFormat: "Y-m-d",
+                allowInput: false,
+                disableMobile: true
+            });
+        }
     }
 }
 
-// 8.6 ฟังก์ชันสลับช่องเหตุผล (เมื่อเลือก อื่นๆ)
+// 8.6 ฟังก์ชันสลับช่องเหตุผล
 function toggleResReasonNote() {
     const type = document.getElementById('addResReasonType')?.value;
     const noteWrap = document.getElementById('addResReasonNoteWrap');
@@ -311,7 +309,7 @@ function toggleResReasonNote() {
     }
 }
 
-// 8.7 ฟังก์ชันบันทึกข้อมูลลง Database
+// 8.7 ฟังก์ชันบันทึกข้อมูล
 async function saveReservation(grade, size, supplier) {
     const qty = Number(document.getElementById('addResQty')?.value);
     const resDate = document.getElementById('addResDate')?.value;
@@ -321,7 +319,6 @@ async function saveReservation(grade, size, supplier) {
     const reasonNote = document.getElementById('addResReasonNote')?.value || '';
     const remark = document.getElementById('addResRemark')?.value || '';
 
-    // ตรวจสอบข้อมูล
     if (!qty || qty <= 0) return showToast('กรุณากรอกจำนวนม้วนมากกว่า 0', 'warn');
     if (!resDate) return showToast('กรุณาเลือกวันที่จอง', 'warn');
     if (reasonType === 'other' && !reasonNote.trim()) return showToast('กรุณาระบุเหตุผล (กรณีเลือกอื่นๆ)', 'warn');
@@ -350,11 +347,7 @@ async function saveReservation(grade, size, supplier) {
         if (error) throw error;
 
         showToast('✅ บันทึกการจองสำเร็จ', 'ok');
-        
-        // รีเฟรชหน้า Matrix หลัก
         await loadReservations();
-        
-        // กลับไปหน้า Detail
         await openReservationDetail(grade, size, supplier);
 
     } catch (err) {
