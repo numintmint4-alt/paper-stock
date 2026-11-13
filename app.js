@@ -366,6 +366,7 @@ document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
     if (t === 'data') renderData();
   };
 });
+
 // ================= MASTER =================
 async function loadMaster(onProgress = null) {
   // ✅ ลบ 5000 ออก — ใช้ default 1000 วนลูปเอง
@@ -1235,7 +1236,7 @@ async function delUser(id, username) {
     el.onclick = e => { if (e.target === el) el.classList.remove('show'); };
   });
 
-    const dateInputIds = [
+  const dateInputIds = [
     'alertDate',
     'alertStockDate',
     'alertReceiveDate',
@@ -1250,7 +1251,8 @@ async function delUser(id, username) {
     'exportPoDateTo',
     'firstReceiveDateInput',
     'fc-stock-date',
-    'reservationDate'   // ← เพิ่มสำหรับหน้า Reserved Rolls
+    'reservationDate',   // ✅ หน้าแรก
+    'addResDate'         // ✅ Modal
   ];
 
   dateInputIds.forEach(id => {
