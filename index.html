@@ -37,6 +37,7 @@
     <button data-tab="purchase-order">Purchase Order</button>
     <button data-tab="forecast">Forecast</button>
     <button data-tab="usage-pivot">Roll Paper Usage</button>
+    <button data-tab="reservations">Reserved Rolls</button>
     <button data-tab="summary" class="hidden">Summary</button>
     <button data-tab="data" class="hidden">Data</button>
     <button data-tab="settings">⚙ ตั้งค่า</button>
@@ -646,6 +647,68 @@
       </div>
     </div>
 
+    <!-- ==================== หน้า Roll Reservations ==================== -->
+    <div id="tab-reservations" class="hidden">
+      <div class="card">
+        <div class="report-head">
+          <div></div>
+          <div class="report-title">ตารางการจองม้วนกระดาษ (Roll Reservations)</div>
+          <div></div>
+        </div>
+
+        <!-- ส่วนหัว: ฟิลเตอร์ -->
+        <div class="filters no-print">
+          <label>📅 วันที่จอง:
+            <input type="text" id="reservationDate" name="no_autofill_res" autocomplete="new-password" readonly>
+          </label>
+
+          <label class="grade-filter-wrap">
+            👤 ลูกค้า
+            <div class="grade-filter-box" id="resCustomerFilterBox">
+              <button type="button" class="grade-filter-btn" id="resCustomerFilterBtn">
+                <span id="resCustomerFilterLabel">ทั้งหมด</span>
+                <span class="arrow">▼</span>
+              </button>
+              <div class="grade-dropdown hidden" id="resCustomerDropdown">
+                <div class="grade-actions">
+                  <button type="button" onclick="selectAllResCustomers()">✓ เลือกทั้งหมด</button>
+                  <button type="button" onclick="clearAllResCustomers()">✗ ล้างทั้งหมด</button>
+                </div>
+                <div class="grade-list" id="resCustomerList"></div>
+              </div>
+            </div>
+          </label>
+
+          <button class="primary" onclick="loadReservations()">🔍 โหลดข้อมูล</button>
+        </div>
+
+        <!-- ส่วนหัว: ข้อความและ Tabs (เหมือน Usage Pivot) -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+          <div id="resCurrentDateLabel" style="font-size: 16px; font-weight: 700; margin: 0; color: #1e293b;">
+            ตารางการจองม้วนกระดาษ ณ วันที่ : -
+          </div>
+
+          <div id="res-sub-tabs" class="sub-tabs" style="display: flex; gap: 8px; flex-wrap: wrap; margin: 0;">
+            <button type="button" class="sub-tab active" onclick="filterResByGrade('ALL', this)">ALL</button>
+            <button type="button" class="sub-tab" onclick="filterResByGrade('CA', this)">CA</button>
+            <button type="button" class="sub-tab" onclick="filterResByGrade('KA', this)">KA</button>
+            <button type="button" class="sub-tab" onclick="filterResByGrade('KI', this)">KI</button>
+            <button type="button" class="sub-tab" onclick="filterResByGrade('KK', this)">KK</button>
+            <button type="button" class="sub-tab" onclick="filterResByGrade('KW', this)">KW</button>
+            <button type="button" class="sub-tab" onclick="filterResByGrade('FSC', this)" id="btn-tab-fsc-res" style="border-color: var(--green); color: var(--green-dark);">FSC</button>
+          </div>
+        </div>
+
+        <!-- ตาราง Matrix -->
+        <div id="resBody" class="report-wrap" style="max-height: 65vh; overflow-y: auto;">
+          <table class="data-table" id="res-table">
+            <thead id="res-thead"></thead>
+            <tbody id="res-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <div id="tab-summary" class="hidden">
       <div class="card">
         <div class="report-head">
@@ -1135,6 +1198,17 @@
       <button onclick="closeModal('modalSummaryDetail')">ปิด</button>
     </div>
     <div id="summaryDetailBody"></div>
+  </div>
+</div>
+
+<!-- Modal: Roll Reservations Detail -->
+<div class="modal-bg" id="modalReservationDetail">
+  <div class="modal" style="max-width: 800px;">
+    <div class="modal-head">
+      <h3 id="resDetailTitle">📋 รายละเอียดการจอง</h3>
+      <button onclick="closeModal('modalReservationDetail')">ปิด</button>
+    </div>
+    <div id="resDetailBody"></div>
   </div>
 </div>
 
