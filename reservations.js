@@ -224,3 +224,143 @@ async function openReservationDetail(grade, size, supplier) {
         body.innerHTML = `<div style="text-align:center;padding:20px;color:red;">Error: ${err.message}</div>`;
     }
 }
+// ==========================================
+// 8.5 ฟังก์ชันเปิดฟอร์มเพิ่มรายการจอง
+// ==========================================
+function openAddReservationForm(grade, size, supplier) {
+    const modalBody = document.getElementById('resDetailBody');
+    const modalTitle = document.getElementById('resDetailTitle');
+    if (!modalBody) return;
+
+    // เปลี่ยนหัวข้อ Modal
+    if (modalTitle) modalTitle.innerHTML = `➕ เพิ่มรายการจอง: ${escHtml(grade)} (Size ${size}) - ${escHtml(supplier)}`;
+
+    // สร้างฟอร์ม HTML
+    let html = `
+        <div style="background:#f8fafc; padding:16px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:16px;">
+            <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 12px;">
+                
+                <label style="font-size:13px; font-weight:600; color:#475569;">📅 วันที่จอง
+                    <input type="text" id="addResDate" name="no_autofill_add_res" autocomplete="new-password" readonly style="width:100%; margin-top:4px; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+                </label>
+
+                <label style="font-size:13px; font-weight:600; color:#475569;">🏢 Supplier
+                    <input type="text" id="addResSupplier" value="${escAttr(supplier)}" disabled style="width:100%; margin-top:4px; padding:8px; border:1px solid #cbd5e1; border-radius:6px; background:#e2e8f0;">
+                </label>
+
+                <label style="font-size:13px; font-weight:600; color:#475569;">⚖️ จำนวนม้วน (Quantity)
+                    <input type="number" id="addResQty" min="1" step="1" placeholder="0" style="width:100%; margin-top:4px; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-weight:700; color:#2563eb;">
+                </label>
+
+                <label style="font-size:13px; font-weight:600; color:#475569;">🏷️ คุณภาพ (Quality)
+                    <select id="addResQuality" style="width:100%; margin-top:4px; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+                        <option value="A">A (ปกติ)</option>
+                        <option value="B">B (NC)</option>
+                    </select>
+                </label>
+
+                <label style="font-size:13px; font-weight:600; color:#475569;">🎯 ปั๊มลูกค้า
+                    <select id="addResCustomerMark" style="width:100%; margin-top:4px; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+                        <option value="-">- (ไม่ระบุ)</option>
+                        <option value="ปั๊ม BT">ปั๊ม BT</option>
+                        <option value="ปั๊ม F">ปั๊ม F</option>
+                        <option value="ปั๊ม KTP">ปั๊ม KTP</option>
+                        <option value="NC">NC</option>
+                    </select>
+                </label>
+
+                <label style="font-size:13px; font-weight:600; color:#475569;">📌 ประเภทการจอง
+                    <select id="addResReasonType" onchange="toggleResReasonNote()" style="width:100%; margin-top:4px; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+                        <option value="forecast">ประมาณการสั่งซื้อ</option>
+                        <option value="other">อื่นๆ (ระบุเหตุผล)</option>
+                    </select>
+                </label>
+
+                <label id="addResReasonNoteWrap" class="hidden" style="font-size:13px; font-weight:600; color:#475569; grid-column: 1 / -1;">📝 เหตุผล (กรณีเลือกอื่นๆ)
+                    <input type="text" id="addResReasonNote" placeholder="เช่น ลูกค้าสั่งเพิ่ม" style="width:100%; margin-top:4px; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+                </label>
+
+                <label style="font-size:13px; font-weight:600; color:#475569; grid-column: 1 / -1;">📝 หมายเหตุเพิ่มเติม
+                    <input type="text" id="addResRemark" placeholder="ระบุหมายเหตุ (ถ้ามี)" style="width:100%; margin-top:4px; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+                </label>
+
+            </div>
+        </div>
+
+        <div class="form-actions" style="margin-top:20px; border-top:1px solid #e2e8f0; padding-top:16px;">
+            <button type="button" onclick="openReservationDetail('${escAttr(grade)}', ${size}, '${escAttr(supplier)}')" style="padding:8px 16px; border-radius:6px; border:1px solid #cbd5e1; background:#f8fafc; cursor:pointer;">ย้อนกลับ</button>
+            <button type="button" class="primary" onclick="saveReservation('${escAttr(grade)}', ${size}, '${escAttr(supplier)}')" style="padding:8px 20px; border-radius:6px;">💾 บันทึกการจอง</button>
+        </div>
+    `;
+
+    modalBody.innerHTML = html;
+
+    // ตั้งค่าเริ่มต้นวันที่เป็นวันนี้ (ผ่าน Flatpickr)
+    const dateInput = document.getElementById('addResDate');
+    if (dateInput) {
+        dateInput.value = getTodayISO();
+    }
+}
+
+// 8.6 ฟังก์ชันสลับช่องเหตุผล (เมื่อเลือก อื่นๆ)
+function toggleResReasonNote() {
+    const type = document.getElementById('addResReasonType')?.value;
+    const noteWrap = document.getElementById('addResReasonNoteWrap');
+    if (noteWrap) {
+        noteWrap.classList.toggle('hidden', type !== 'other');
+    }
+}
+
+// 8.7 ฟังก์ชันบันทึกข้อมูลลง Database
+async function saveReservation(grade, size, supplier) {
+    const qty = Number(document.getElementById('addResQty')?.value);
+    const resDate = document.getElementById('addResDate')?.value;
+    const quality = document.getElementById('addResQuality')?.value;
+    const customerMark = document.getElementById('addResCustomerMark')?.value;
+    const reasonType = document.getElementById('addResReasonType')?.value;
+    const reasonNote = document.getElementById('addResReasonNote')?.value || '';
+    const remark = document.getElementById('addResRemark')?.value || '';
+
+    // ตรวจสอบข้อมูล
+    if (!qty || qty <= 0) return showToast('กรุณากรอกจำนวนม้วนมากกว่า 0', 'warn');
+    if (!resDate) return showToast('กรุณาเลือกวันที่จอง', 'warn');
+    if (reasonType === 'other' && !reasonNote.trim()) return showToast('กรุณาระบุเหตุผล (กรณีเลือกอื่นๆ)', 'warn');
+
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '⏳ กำลังบันทึก...';
+
+    try {
+        const { error } = await supabase.from('roll_reservations').insert({
+            reservation_date: resDate,
+            grade: grade,
+            size: size,
+            supplier: supplier,
+            quantity: qty,
+            quality: quality,
+            customer_mark: customerMark,
+            reason_type: reasonType,
+            reason_note: reasonNote,
+            remark: remark,
+            status: 'reserved',
+            created_by: currentUser?.id || null
+        });
+
+        if (error) throw error;
+
+        showToast('✅ บันทึกการจองสำเร็จ', 'ok');
+        
+        // รีเฟรชหน้า Matrix หลัก
+        await loadReservations();
+        
+        // กลับไปหน้า Detail
+        await openReservationDetail(grade, size, supplier);
+
+    } catch (err) {
+        console.error('saveReservation error:', err);
+        showToast('บันทึกไม่สำเร็จ: ' + err.message, 'err');
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+}
