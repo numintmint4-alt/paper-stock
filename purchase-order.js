@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK V10.1 — purchase-order.js — V.12
+//  STOCK V10.1 — purchase-order.js — V.13
 //  V.12 Fix: getMonthFromDate safety + null check in saveCreatePO
+//  V.13 NEW: หักลบยอดจอง (Reservations) เมื่อบันทึก PO สำเร็จ
 // ═══════════════════════════════════════════════════════════════
 
 let poCache = [];
@@ -491,7 +492,7 @@ async function openCreatePOModal() {
 
     await loadPriceMasterForMonth(poSelectedMonth);
 
-    const todayISO = getTodayISO(); // 🔽 ใช้ getTodayISO()
+    const todayISO = getTodayISO();
     const emptyHeader = {
       id: null,
       po_no: nextPoNo || '',
@@ -793,7 +794,7 @@ function autoGroupPOItems(items) {
 }
 
 function renderMultiPOForm(posList, alertData) {
-  const analyzedDate = alertData.analyzed_date || getTodayISO(); // 🔽 ใช้ getTodayISO()
+  const analyzedDate = alertData.analyzed_date || getTodayISO();
 
   let html = '';
 
@@ -955,6 +956,7 @@ async function _doSaveAllPOs(posList, alertData, btnEl) {
 
   let successCount = 0;
   let errorMsg = '';
+  const savedPOs = []; // 🔽 NEW: เก็บ PO ที่บันทึกสำเร็จเพื่อหักลบยอดจอง
 
   for (let i = 0; i < posList.length; i++) {
     const po = posList[i];
@@ -1018,8 +1020,22 @@ async function _doSaveAllPOs(posList, alertData, btnEl) {
       });
       if (error) throw error;
       successCount++;
+
+      // 🔽 NEW: เก็บ PO ที่สำเร็จไว้หักลบยอดจอง
+      savedPOs.push({ poNo, items });
     } catch (e) {
       errorMsg += `PO #${i + 1}: ${e.message}; `;
+    }
+  }
+
+  // 🔽 NEW: หักลบยอดจองหลังบันทึก PO สำเร็จทั้งหมด
+  if (savedPOs.length > 0) {
+    for (const saved of savedPOs) {
+      try {
+        await deductReservationOnPO(saved.poNo, saved.items);
+      } catch (e) {
+        console.warn('deductReservationOnPO failed for', saved.poNo, e);
+      }
     }
   }
 
@@ -1476,6 +1492,13 @@ async function saveCreatePO(btnEl) {
       p_items: items
     });
     if (error) throw error;
+
+    // 🔽 NEW: หักลบยอดจองหลังบันทึกสำเร็จ
+    try {
+      await deductReservationOnPO(poNo, items);
+    } catch (e) {
+      console.warn('deductReservationOnPO failed:', e);
+    }
 
     alert(`✅ สร้าง PO ใหม่สำเร็จ: ${poNo}\n(${items.length} รายการ)`);
 
@@ -2265,7 +2288,7 @@ function exportPOToExcel() {
   // 🔽 ตั้งค่าเริ่มต้นเป็น "วันพรุ่งนี้ (ข้ามเสาร์-อาทิตย์)" 🔽
   const todayStr = getTodayISO();
   const tomorrow = new Date(todayStr);
-  tomorrow.setDate(tomorrow.getDate() + 1); // บวก 1 วัน
+  tomorrow.setDate(tomorrow.getDate() + 1);
 
   if (tomorrow.getDay() === 6) {
     tomorrow.setDate(tomorrow.getDate() + 2);
@@ -2747,4 +2770,72 @@ function closeAddPOItemsModal() {
   }
   closeModal('modalAddPOItems');
   _addItemsRows = [];
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  RESERVATIONS — หักลบยอดจองเมื่อสร้าง PO — NEW
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * หักลบยอดจอง (roll_reservations) เมื่อสร้าง PO สำเร็จ
+ * @param {string} poNo - เลข PO ที่เพิ่งสร้าง
+ * @param {Array} items - รายการ PO [{gradegram, size, quantity, ...}]
+ */
+async function deductReservationOnPO(poNo, items) {
+  try {
+    for (const item of items) {
+      // 🔍 หายอดจองที่ตรงกับ Gradegram + Size นี้
+      const { data: reservations, error } = await supabase
+        .from('roll_reservations')
+        .select('*')
+        .eq('grade', item.gradegram)
+        .eq('size', item.size)
+        .eq('status', 'reserved')
+        .order('created_at', { ascending: true })
+        .limit(1); // หาแค่ 1 รายการที่ตรงกัน (เก่าสุดก่อน)
+
+      if (error) {
+        console.warn(`[Deduct] error fetching reservation for ${item.gradegram}-${item.size}:`, error);
+        continue;
+      }
+      if (!reservations || reservations.length === 0) continue;
+
+      const res = reservations[0];
+      const deductQty = Number(item.quantity);
+      const newQty = Number(res.quantity) - deductQty;
+
+      if (newQty <= 0) {
+        // ยอดจอง <= ที่สั่ง → เปลี่ยนสถานะเป็น used
+        const { error: updErr } = await supabase
+          .from('roll_reservations')
+          .update({ 
+            status: 'used', 
+            po_ref_no: poNo,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', res.id);
+        if (updErr) console.warn('[Deduct] update to used error:', updErr);
+      } else {
+        // ยังเหลือ → ลดจำนวนลง
+        const { error: updErr } = await supabase
+          .from('roll_reservations')
+          .update({ 
+            quantity: newQty,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', res.id);
+        if (updErr) console.warn('[Deduct] update qty error:', updErr);
+      }
+    }
+
+    if (typeof showToast === 'function') {
+      showToast('✅ หักลบยอดจองสำเร็จ', 'ok', 2000);
+    }
+    console.log(`[Deduct] ✅ หักลบยอดจองสำหรับ PO ${poNo} สำเร็จ`);
+  } catch (err) {
+    console.error('deductReservationOnPO error:', err);
+    if (typeof showToast === 'function') {
+      showToast('⚠️ หักลบยอดจองไม่สำเร็จ: ' + err.message, 'warn', 3000);
+    }
+  }
 }
