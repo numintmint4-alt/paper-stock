@@ -2014,6 +2014,9 @@ function removeAlertReceiveDate(idx) {
     localStorage.removeItem(`${ALERT_LS_KEY_PREFIX}${dateToRemove}`);
   }
 
+  // 🔥 ล้าง Draft ที่ค้างอยู่ทั้งหมด เพราะลบวันทิ้งแล้ว
+  _draftPendingItems = []; 
+
   if (alertActiveDateIdx >= idx) {
     alertActiveDateIdx = Math.max(0, alertActiveDateIdx - 1);
   }
@@ -2038,10 +2041,13 @@ function renderAlertReceiveDates() {
 function switchAlertDate(idx) {
   if (idx < 0 || idx >= alertReceiveDates.length) return;
   alertActiveDateIdx = idx;
+  
+  // 🔥 ล้าง Draft ที่ค้างอยู่ทั้งหมด เพราะเปลี่ยนวันแล้ว
+  _draftPendingItems = []; 
+  
   renderAlertDateTabs();
   renderAlert();
 }
-
 function renderAlertDateTabs() {
   const box = $('alertDateTabsBox');
   if (!box) return;
