@@ -1,11 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK V10.1 — purchase-order.js — V.14
-//  V.12 Fix: getMonthFromDate safety + null check in saveCreatePO
-//  V.13 NEW: หักลบยอดจอง (Reservations) เมื่อบันทึก PO สำเร็จ
+//  STOCK V10.1 — purchase-order.js — V.15.0
 //  V.14 NEW: คืนยอดจอง (roll_reservations → reserved) เมื่อลบ PO
 //           + รองรับ reservation_id ที่ติดมากับ PO items (V.16.0 alert.js)
 //           + deductReservationOnPO ฉลาดขึ้น: ใช้ reservation_id ถ้ามี,
 //             ถ้าไม่มีค่อย fallback ไปหา grade+size
+//  V.15.0 FIX: ย้ายจุดหักยอดจอง (deductReservationOnPO) 
+//           → ออกจาก _doSaveAllPOs และ saveCreatePO
+//           → ไปเรียกใน markPOSaved แทน (หักยอดตอนกด Save เป็น Saved เท่านั้น)
 // ═══════════════════════════════════════════════════════════════
 
 let poCache = [];
@@ -623,6 +624,9 @@ async function verifyAndOpen(po, password, note) {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  🎯 จุดที่แก้ไข: markPOSaved (หักยอดจองตอน Save เป็น Saved)
+// ═══════════════════════════════════════════════════════════════
 async function markPOSaved(poId) {
   const po = poCache.find(p => p.id === poId);
   if (!po) return;
@@ -631,18 +635,37 @@ async function markPOSaved(poId) {
     return;
   }
 
-  if (!confirm(`ยืนยันบันทึก PO ${po.po_no} เป็น Saved?\n\n⚠️ หลังจากนี้จะแก้ไขไม่ได้โดยไม่ต้องใส่รหัสผ่าน`)) return;
+  if (!confirm(`ยืนยันบันทึก PO ${po.po_no} เป็น Saved?\n\n⚠️ หลังจากนี้จะแก้ไขไม่ได้โดยไม่ต้องใส่รหัสผ่าน\n(ยอดจองจะถูกหัก ณ ตอนนี้)`)) return;
 
   try {
+    // 1. อัปเดตสถานะ PO เป็น Saved
     const { error } = await supabase
       .from('purchase_orders')
       .update({ status: 'saved', updated_at: new Date().toISOString() })
       .eq('id', poId);
     if (error) throw error;
 
-    alert(`✅ บันทึก ${po.po_no} เป็น Saved สำเร็จ`);
+    // 2. ดึงรายการ items ของ PO นี้ เพื่อเอา reservation_id ไปหักยอด
+    const { data: detail, error: detailErr } = await supabase.rpc('get_purchase_order_detail', { p_po_id: poId });
+    if (detailErr) throw detailErr;
+    
+    const activeItems = (detail.items || []).filter(it => it.status !== 'cancelled');
+
+    // 3. สั่งหักยอดจอง
+    if (activeItems.length > 0) {
+      await deductReservationOnPO(po.po_no, activeItems);
+    }
+
+    alert(`✅ บันทึก ${po.po_no} เป็น Saved สำเร็จ\n(หักยอดจองเรียบร้อย)`);
+    
     await renderPOList();
+
+    // อัปเดตหน้า Alert (ถ้าเปิดอยู่)
+    if (typeof loadAlertReservations === 'function') {
+      try { await loadAlertReservations(); } catch (e) { console.warn(e); }
+    }
   } catch (e) {
+    console.error('markPOSaved error:', e);
     alert('❌ ' + e.message);
   }
 }
@@ -948,6 +971,9 @@ async function saveAllPOs(btnEl) {
   await _doSaveAllPOs(posList, alertData, btnEl);
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  🎯 จุดที่แก้ไข: _doSaveAllPOs (ลบการหักยอดจองออก)
+// ═══════════════════════════════════════════════════════════════
 async function _doSaveAllPOs(posList, alertData, btnEl) {
   const btn = btnEl || document.querySelector('#modalPOForm .form-actions .primary');
   
@@ -988,7 +1014,6 @@ async function _doSaveAllPOs(posList, alertData, btnEl) {
       const remarkParts = [custLabel, qualLabel, it.note].filter(x => x && x.trim());
       const remarkCombined = remarkParts.join(',');
 
-      // 🔥 V.14: แนบ reservation_id ไปกับ item ด้วย (ถ้ามี)
       return {
         seq: idx + 1,
         pc_code: 'SDPC.01',
@@ -1002,7 +1027,7 @@ async function _doSaveAllPOs(posList, alertData, btnEl) {
         quality_b: it.quality_b || 'normal',
         note: it.note || '',
         remark_combined: remarkCombined,
-        reservation_id: it.reservation_id || it.res_id || null  // 🔥 V.14
+        reservation_id: it.reservation_id || it.res_id || null
       };
     });
 
@@ -1032,15 +1057,8 @@ async function _doSaveAllPOs(posList, alertData, btnEl) {
     }
   }
 
-  if (savedPOs.length > 0) {
-    for (const saved of savedPOs) {
-      try {
-        await deductReservationOnPO(saved.poNo, saved.items);
-      } catch (e) {
-        console.warn('deductReservationOnPO failed for', saved.poNo, e);
-      }
-    }
-  }
+  // ❌ ลบโค้ด deductReservationOnPO ตรงนี้ออกแล้ว 
+  // (จะไปหักยอดตอน markPOSaved แทน)
 
   if (btn) {
     btn.disabled = false;
@@ -1050,7 +1068,7 @@ async function _doSaveAllPOs(posList, alertData, btnEl) {
   if (errorMsg) {
     alert(`✅ สำเร็จ ${successCount}/${posList.length}\n❌ Error: ${errorMsg}`);
   } else {
-    alert(`✅ บันทึกสำเร็จ ${successCount} PO`);
+    alert(`✅ บันทึกสำเร็จ ${successCount} PO\n(สถานะ Draft — ยอดจองจะถูกหักเมื่อกด "บันทึกเป็น Saved" ในหน้า PO)`);
   }
 
   closeModal('modalPOForm');
@@ -1166,7 +1184,7 @@ function renderPOFormContent(header, items) {
     quality_b: it.quality_b || 'normal',
     note: it.note || '',
     removed: false,
-    reservation_id: it.reservation_id || null  // 🔥 V.14
+    reservation_id: it.reservation_id || null
   }));
 
   _editOriginalOrder = _editItemsRows
@@ -1300,7 +1318,6 @@ function renderPOFormTable() {
          </select>`
       : `<b>${row.size}</b>`;
 
-    // 🏷️ ป้ายบอกว่าแถวนี้มาจากยอดจอง (ถ้ามี reservation_id)
     const resTag = row.reservation_id
       ? '<span style="color:#38bdf8;font-weight:600;font-size:10px;margin-left:4px">(Reserved)</span>'
       : '';
@@ -1390,6 +1407,10 @@ async function savePOFormInline(btnEl) {
     await saveEditPOItems(btnEl);
   }
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  🎯 จุดที่แก้ไข: saveCreatePO (ลบการหักยอดจองออก)
+// ═══════════════════════════════════════════════════════════════
 async function saveCreatePO(btnEl) {
   const header = _editPOHeader;
   const activeRows = _editItemsRows.filter(r => !r.removed);
@@ -1467,7 +1488,6 @@ async function saveCreatePO(btnEl) {
       const qualLabel = { normal: '', nc: 'NC' }[row.quality_b] || '';
       const remarkParts = [custLabel, qualLabel, row.note].filter(x => x && String(x).trim());
 
-      // 🔥 V.14: แนบ reservation_id
       return {
         seq: idx + 1,
         pc_code: 'SDPC.01',
@@ -1481,7 +1501,7 @@ async function saveCreatePO(btnEl) {
         quality_b: row.quality_b || 'normal',
         note: row.note || '',
         remark_combined: remarkParts.join(','),
-        reservation_id: row.reservation_id || null  // 🔥 V.14
+        reservation_id: row.reservation_id || null
       };
     });
 
@@ -1503,14 +1523,10 @@ async function saveCreatePO(btnEl) {
     });
     if (error) throw error;
 
-    // 🔽 หักลบยอดจองหลังบันทึกสำเร็จ
-    try {
-      await deductReservationOnPO(poNo, items);
-    } catch (e) {
-      console.warn('deductReservationOnPO failed:', e);
-    }
+    // ❌ ลบโค้ด deductReservationOnPO ตรงนี้ออกแล้ว 
+    // (จะไปหักยอดตอน markPOSaved แทน)
 
-    alert(`✅ สร้าง PO ใหม่สำเร็จ: ${poNo}\n(${items.length} รายการ)`);
+    alert(`✅ สร้าง PO ใหม่สำเร็จ: ${poNo}\n(${items.length} รายการ)\n\n(สถานะ Draft — ยอดจองจะถูกหักเมื่อกด "บันทึกเป็น Saved")`);
 
     closeModal('modalPOForm');
     window._isCreateMode = false;
@@ -2216,7 +2232,6 @@ async function deletePO(poId) {
   if (!confirm(`⚠️ ยืนยันลบ PO ${po.po_no}?\n\n(ไม่สามารถกู้คืนได้ — แต่ยอดจองจะถูกคืนกลับเป็น reserved)`)) return;
 
   try {
-    // 🔥 V.14 STEP 1: ดึงรายการ PO ก่อนลบ เพื่อเอา reservation_id
     let poItems = [];
     try {
       const { data: detail, error: detailErr } = await supabase.rpc('get_purchase_order_detail', { p_po_id: poId });
@@ -2227,7 +2242,6 @@ async function deletePO(poId) {
       console.warn('[Delete PO] ดึงรายการ PO ไม่สำเร็จ:', e);
     }
 
-    // 🔥 V.14 STEP 2: คืนยอดจอง (roll_reservations → reserved)
     if (poItems.length > 0) {
       try {
         await returnReservationOnDeletePO(po.po_no, poItems);
@@ -2236,7 +2250,6 @@ async function deletePO(poId) {
       }
     }
 
-    // 🔥 V.14 STEP 3: ลบ PO (ใช้ RPC เดิมเพื่อให้เก็บ audit log)
     const { error } = await supabase.rpc('delete_purchase_order', {
       p_po_id: poId,
       p_user_id: currentUser?.id,
@@ -2247,7 +2260,6 @@ async function deletePO(poId) {
 
     alert(`✅ ลบ PO ${po.po_no} สำเร็จ\n${poItems.length > 0 ? `(คืนยอดจอง ${poItems.length} รายการ)` : ''}`);
 
-    // 🔥 STEP 4: รีเฟรชตาราง PO + ยอดจอง
     await renderPOList();
 
     if (typeof loadReservations === 'function') {
@@ -2822,24 +2834,17 @@ function closeAddPOItemsModal() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  RESERVATIONS — V.14
+//  RESERVATIONS
 //  - deductReservationOnPO: หักลบเมื่อสร้าง PO
 //    (ใช้ reservation_id ถ้ามี, ถ้าไม่มี fallback ไป grade+size)
 //  - returnReservationOnDeletePO: คืนสถานะ reserved เมื่อลบ PO
 // ═══════════════════════════════════════════════════════════════
 
-/**
- * หักลบยอดจอง (roll_reservations) เมื่อสร้าง PO สำเร็จ
- * V.14: ถ้ามี reservation_id ใช้ ID นั้นตรงๆ, ถ้าไม่มี fallback หา grade+size
- * @param {string} poNo - เลข PO ที่เพิ่งสร้าง
- * @param {Array} items - รายการ PO [{gradegram, size, quantity, reservation_id?, ...}]
- */
 async function deductReservationOnPO(poNo, items) {
   try {
     let deductedCount = 0;
 
     for (const item of items) {
-      // 🔥 V.14: ถ้ามี reservation_id ใช้ตรงๆ
       if (item.reservation_id) {
         try {
           const { data: res, error } = await supabase
@@ -2880,7 +2885,7 @@ async function deductReservationOnPO(poNo, items) {
               if (updErr) console.warn('[Deduct] update qty error:', updErr);
               else deductedCount++;
             }
-            continue; // ✅ ใช้ ID สำเร็จ → ข้าม fallback
+            continue;
           } else {
             console.warn(`[Deduct] reservation_id ${item.reservation_id} not found or not 'reserved' → fallback to grade+size`);
           }
@@ -2889,7 +2894,6 @@ async function deductReservationOnPO(poNo, items) {
         }
       }
 
-      // 🔥 FALLBACK: หาด้วย grade + size (เก่าสุด)
       const { data: reservations, error } = await supabase
         .from('roll_reservations')
         .select('*')
@@ -2945,20 +2949,10 @@ async function deductReservationOnPO(poNo, items) {
   }
 }
 
-/**
- * 🔥 V.14 NEW: คืนยอดจอง (roll_reservations → reserved) เมื่อลบ PO
- * ลำดับ:
- *   1) ถ้ามี reservation_id ใน PO items → UPDATE ตาม id โดยตรง
- *   2) ถ้าไม่มี → FALLBACK หาโดย po_ref_no = poNo และ status = 'used'
- *   3) ถ้ายังไม่เจอ → FALLBACK หาโดย grade+size (กรณี worst case)
- * @param {string} poNo - เลข PO ที่ถูกลบ
- * @param {Array} items - รายการ PO [{gradegram, size, quantity, reservation_id?, ...}]
- */
 async function returnReservationOnDeletePO(poNo, items) {
   try {
     let returnedCount = 0;
 
-    // 🔥 STEP 1: รวม reservation_id จาก items
     const resIds = [...new Set(
       (items || [])
         .map(it => it.reservation_id)
@@ -2974,7 +2968,7 @@ async function returnReservationOnDeletePO(poNo, items) {
           updated_at: new Date().toISOString()
         })
         .in('id', resIds)
-        .eq('status', 'used');   // คืนเฉพาะที่เคยถูก mark used
+        .eq('status', 'used');
 
       if (updErr) {
         console.warn('[Return] update by resIds error:', updErr);
@@ -2984,7 +2978,6 @@ async function returnReservationOnDeletePO(poNo, items) {
       }
     }
 
-    // 🔥 STEP 2: FALLBACK — หา po_ref_no = poNo ที่ status = 'used'
     try {
       const { data: usedRes, error: fetchErr } = await supabase
         .from('roll_reservations')
@@ -3021,7 +3014,6 @@ async function returnReservationOnDeletePO(poNo, items) {
       console.warn('[Return] fallback po_ref_no error:', e);
     }
 
-    // 🔥 STEP 3: WORST-CASE FALLBACK — หา grade+size ที่ used ล่าสุด
     if (returnedCount === 0 && items && items.length > 0) {
       for (const item of items) {
         try {
