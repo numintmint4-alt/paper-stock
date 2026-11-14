@@ -1,12 +1,13 @@
 // ==========================================
 // reservations.js - ระบบจองม้วนกระดาษ (Roll Reservations)
-// แก้ไข: Matrix แสดงจาก Master Data + Supplier เลือกใน Modal
 // + ระบบปรับลด/คืนยอดจอง (Decrease / Return)
-// + Auto-load Master Data (ensureMasterDataLoaded)
-// + Fix: เปลี่ยนตาราง Master เป็น 'paper_specs'
-// + Fix: แสดงค่าติดลบใน Matrix (val !== 0)
-// + NEW: Export / Import Excel
+// + Fix: ใช้ window.fcState แทน fcState ตรงๆ (แก้ ReferenceError)
+// + Fix: ลบ let resState ที่ซ้ำซ้อน
+// + NEW: Export Form / Export Data / Import Excel
 // ==========================================
+
+// 🔽 สร้าง fcState รอไว้เลย ป้องกัน ReferenceError
+window.fcState = window.fcState || { masterData: [] };
 
 let resState = {
     data: [],
@@ -14,27 +15,24 @@ let resState = {
 };
 
 // ==========================================
-// ฟังก์ชันสำหรับโหลด Master Data (ถ้ายังไม่มีในหน่วยความจำ)
+// ฟังก์ชันสำหรับโหลด Master Data
 // ==========================================
 async function ensureMasterDataLoaded() {
     // ถ้ามีข้อมูลอยู่แล้ว ไม่ต้องโหลดซ้ำ
-    if (typeof fcState !== 'undefined' && fcState.masterData && fcState.masterData.length > 0) {
+    if (window.fcState.masterData && window.fcState.masterData.length > 0) {
         return;
     }
 
     try {
         console.log("⏳ กำลังโหลด Master Data สำหรับหน้า Reservations...");
-        // ✅ FIX: เปลี่ยนชื่อตารางจาก 'paper_master' → 'paper_specs'
         const { data, error } = await supabase
             .from('paper_specs')
             .select('*');
 
         if (error) throw error;
 
-        if (typeof fcState !== 'undefined') {
-            fcState.masterData = data || [];
-            console.log("✅ โหลด Master Data สำเร็จ:", fcState.masterData.length, "รายการ");
-        }
+        window.fcState.masterData = data || [];
+        console.log("✅ โหลด Master Data สำเร็จ:", window.fcState.masterData.length, "รายการ");
     } catch (err) {
         console.error("❌ โหลด Master Data ล้มเหลว:", err.message);
         showToast('ไม่สามารถโหลด Master Data ได้', 'err');
@@ -52,7 +50,6 @@ async function loadReservations() {
     tbody.innerHTML = '<tr><td colspan="100%" style="text-align:center;padding:20px;">กำลังโหลด...</td></tr>';
 
     try {
-        // 👇 ให้โหลด Master Data อัตโนมัติก่อนวาดตาราง
         await ensureMasterDataLoaded();
 
         const { data, error } = await supabase
@@ -79,14 +76,15 @@ async function loadReservations() {
 }
 
 // ==========================================
-// 8.2 ฟังก์ชันวาดตาราง Matrix (แบบเดียวกับ Roll Paper Usage)
+// 8.2 ฟังก์ชันวาดตาราง Matrix
 // ==========================================
 function renderReservationsTable() {
     const thead = document.getElementById('res-thead');
     const tbody = document.getElementById('res-tbody');
     if (!thead || !tbody) return;
 
-    if (!fcState.masterData || fcState.masterData.length === 0) {
+    // 🔽 แก้เป็น window.fcState.masterData
+    if (!window.fcState.masterData || window.fcState.masterData.length === 0) {
         thead.innerHTML = '';
         tbody.innerHTML = '<tr><td colspan="100%" style="text-align:center;color:#94a3b8;padding:30px;">กำลังโหลด Master Data...</td></tr>';
         return;
@@ -96,7 +94,7 @@ function renderReservationsTable() {
     const data = resState.data;
 
     // 1. Gradegrams ทั้งหมดจาก Master
-    const masterGrades = [...new Set(fcState.masterData.map(m => m.grade + m.gram))].sort();
+    const masterGrades = [...new Set(window.fcState.masterData.map(m => m.grade + m.gram))].sort();
 
     // 2. กรองตาม Tab
     const filteredGrades = masterGrades.filter(g => {
@@ -107,7 +105,7 @@ function renderReservationsTable() {
     });
 
     // 3. Size ทั้งหมด
-    const allSizes = [...new Set(fcState.masterData.map(m => Number(m.size)))].sort((a, b) => a - b);
+    const allSizes = [...new Set(window.fcState.masterData.map(m => Number(m.size)))].sort((a, b) => a - b);
 
     // 4. Header
     let headerHtml = '<tr><th class="grade-col">Grade</th>';
@@ -133,7 +131,7 @@ function renderReservationsTable() {
         filteredGrades.forEach(grade => {
             // Size ที่มีจริงของเกรดนี้
             const gradeSizes = [...new Set(
-                fcState.masterData
+                window.fcState.masterData
                     .filter(m => (m.grade + m.gram) === grade)
                     .map(m => Number(m.size))
             )].sort((a, b) => a - b);
@@ -153,7 +151,7 @@ function renderReservationsTable() {
 
                 const clickAttr = `onclick="openReservationDetail('${escAttr(grade)}', ${size})" class="clickable" data-tip="Gradegrams ${escHtml(grade)} · Size ${size} · ${val} ม้วน"`;
 
-                // ✅ FIX: แสดงค่าติดลบด้วย (val !== 0 แทน val > 0)
+                // แสดงค่าติดลบด้วย (val !== 0)
                 const valDisplay = val !== 0 ? val : '';
                 const valStyle = val < 0 ? 'color:#dc2626;font-weight:700;' : '';
 
@@ -172,7 +170,6 @@ function renderReservationsTable() {
                 .reduce((s, r) => s + (Number(r.quantity) || 0), 0);
             grandTotal += sizeTotal;
 
-            // ✅ FIX: แสดงค่าติดลบใน Total Row ด้วย
             const sizeTotalDisplay = sizeTotal !== 0 ? sizeTotal : '';
             const sizeTotalStyle = sizeTotal < 0 ? 'color:#dc2626;font-weight:700;' : '';
 
@@ -210,7 +207,7 @@ function filterResByGrade(gradeGroup, btnElement) {
 }
 
 // ==========================================
-// 8.4 ฟังก์ชันเปิด Modal Drill-down (รับแค่ grade, size)
+// 8.4 ฟังก์ชันเปิด Modal Drill-down
 // ==========================================
 async function openReservationDetail(grade, size) {
     const modal = document.getElementById('modalReservationDetail');
@@ -320,7 +317,7 @@ async function openReservationDetail(grade, size) {
 }
 
 // ==========================================
-// 8.5 ฟังก์ชันเปิดฟอร์มเพิ่มรายการจอง (รับแค่ grade, size)
+// 8.5 ฟังก์ชันเปิดฟอร์มเพิ่มรายการจอง
 // ==========================================
 function openAddReservationForm(grade, size) {
     const modalBody = document.getElementById('resDetailBody');
@@ -445,7 +442,7 @@ function toggleResReasonNote() {
 }
 
 // ==========================================
-// 8.7 ฟังก์ชันบันทึกข้อมูล (รับแค่ grade, size — supplier อ่านจาก select)
+// 8.7 ฟังก์ชันบันทึกข้อมูล
 // ==========================================
 async function saveReservation(grade, size) {
     const qty = Number(document.getElementById('addResQty')?.value);
@@ -513,7 +510,6 @@ async function openDecreaseReservationForm(grade, size) {
     modalBody.innerHTML = '<div style="text-align:center;padding:20px;">กำลังโหลดรายการจอง...</div>';
 
     try {
-        // ดึงเฉพาะรายการที่เป็น "บวก" (ยอดจองจริง) เพื่อให้เลือกหักได้
         const { data, error } = await supabase
             .from('roll_reservations')
             .select('*')
@@ -608,7 +604,6 @@ async function openDecreaseReservationForm(grade, size) {
 
         modalBody.innerHTML = html;
 
-        // toggle ช่องเหตุผลอื่นๆ
         const sel = document.getElementById('decAdjustReason');
         if (sel) {
             sel.addEventListener('change', () => {
@@ -646,7 +641,7 @@ function onDecreaseSourceChange() {
 }
 
 // ==========================================
-// 8.10 บันทึกการปรับลด/คืนยอดจอง (insert ยอดติดลบ)
+// 8.10 บันทึกการปรับลด/คืนยอดจอง
 // ==========================================
 async function saveDecreaseReservation(grade, size) {
     const sourceId = document.getElementById('decSourceId')?.value;
@@ -672,7 +667,6 @@ async function saveDecreaseReservation(grade, size) {
     btn.innerHTML = '⏳ กำลังบันทึก...';
 
     try {
-        // ดึงข้อมูลรายการต้นทาง เพื่อ copy supplier/quality/customer_mark
         const { data: srcData, error: srcErr } = await supabase
             .from('roll_reservations')
             .select('*')
@@ -687,7 +681,6 @@ async function saveDecreaseReservation(grade, size) {
             throw new Error(`จำนวนที่ลด (${decQty}) มากกว่ายอดต้นทาง (${srcQty})`);
         }
 
-        // insert รายการใหม่เป็นยอดติดลบ
         const { error } = await supabase.from('roll_reservations').insert({
             reservation_date: getTodayISO(),
             grade: grade,
@@ -727,7 +720,6 @@ async function resetReservations() {
     if (!confirm('⚠️ คุณต้องการลบข้อมูลการจองทั้งหมดและเริ่มนับ 1 ใหม่ใช่หรือไม่?\n\n(ข้อมูลประวัติการจองจะหายไปทั้งหมด และยอดใน Matrix จะกลายเป็น 0)')) return;
 
     try {
-        // ลบข้อมูลทั้งหมดในตาราง roll_reservations
         const { error } = await supabase
             .from('roll_reservations')
             .delete()
@@ -744,92 +736,109 @@ async function resetReservations() {
 }
 
 // ==========================================
-// 8.12 Export ตารางการจองเป็น Excel (มีแถวตัวอย่าง)
+// 8.12 Export ฟอร์มเปล่า (สำหรับกรอกใหม่)
 // ==========================================
-function exportReservations() {
-    // 1. สร้าง Header และแถวตัวอย่าง
+function exportReservationForm() {
     const headers = [
         'วันที่จอง', 'Gradegrams', 'Size', 'Supplier', 
         'จำนวน (ม้วน)', 'คุณภาพ', 'ปั๊มลูกค้า', 'ประเภท', 
         'หมายเหตุ', 'สถานะ', 'การเคลื่อนไหว'
     ];
 
-    // 🔽 แถวตัวอย่าง (Sample Row) สำหรับให้คนกรอกใหม่ดูเป็นแนวทาง
     const sampleRow = [
         '2026-11-14', 'CA125', 44, 'EKP', 
         5, 'A', 'ปั๊ม BT', 'ประมาณการ', 
         'ตัวอย่างการกรอก', 'จองอยู่', 'ปกติ'
     ];
 
-    // 2. ดึงข้อมูลจริง (ถ้ามี)
-    const dataRows = [];
-    if (resState.data && resState.data.length > 0) {
-        resState.data.forEach(r => {
-            let qType = 'ปกติ';
-            if (r.adjust_type === 'decrease') qType = 'ปรับลด/คืน';
-            
-            // แปลงวันที่ให้เป็น YYYY-MM-DD
-            let dateStr = '-';
-            if (r.reservation_date) {
-                const d = new Date(r.reservation_date);
-                dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-            }
-
-            dataRows.push([
-                dateStr,
-                r.grade || '-',
-                r.size || '-',
-                r.supplier || '-',
-                Number(r.quantity) || 0,
-                r.quality === 'B' ? 'B' : 'A',
-                r.customer_mark || '-',
-                r.reason_type === 'forecast' ? 'ประมาณการ' : (r.reason_note || 'อื่นๆ'),
-                r.remark || '-',
-                r.status === 'reserved' ? 'จองอยู่' : 'ปิด/ตัดยอด',
-                qType
-            ]);
-        });
-    }
-
-    // 3. รวมข้อมูลทั้งหมด (Header -> Sample -> Data)
-    const wsData = [headers, sampleRow, ...dataRows];
-
-    // 4. สร้าง Worksheet
+    const wsData = [headers, sampleRow];
     const ws = XLSX.utils.aoa_to_sheet(wsData);
 
-    // 5. ปรับความกว้างคอลัมน์ให้อ่านง่าย
     ws['!cols'] = [
-        {wch: 14}, // วันที่
-        {wch: 12}, // Grade
-        {wch: 8},  // Size
-        {wch: 10}, // Supplier
-        {wch: 12}, // จำนวน
-        {wch: 10}, // คุณภาพ
-        {wch: 15}, // ปั๊มลูกค้า
-        {wch: 18}, // ประเภท
-        {wch: 25}, // หมายเหตุ
-        {wch: 12}, // สถานะ
-        {wch: 15}  // การเคลื่อนไหว
+        {wch: 14}, {wch: 12}, {wch: 8}, {wch: 10}, {wch: 12}, 
+        {wch: 10}, {wch: 15}, {wch: 18}, {wch: 25}, {wch: 12}, {wch: 15}
     ];
 
-    // 6. สร้างไฟล์และดาวน์โหลด
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'RollReservations');
+    XLSX.utils.book_append_sheet(wb, ws, 'ReservationForm');
     
     const today = new Date().toISOString().slice(0, 10);
-    XLSX.writeFile(wb, `roll_reservations_${today}.xlsx`);
+    XLSX.writeFile(wb, `reservation_form_${today}.xlsx`);
     
-    showToast('✅ Export สำเร็จ', 'ok');
+    showToast('✅ Export ฟอร์มสำเร็จ', 'ok');
 }
 
 // ==========================================
-// 8.13 Import ตารางการจองจาก Excel
+// 8.13 Export ข้อมูลจริงตามวันที่ที่เลือก
+// ==========================================
+function exportReservationData() {
+    const filterDate = document.getElementById('reservationDate')?.value || '';
+    
+    let dataToExport = resState.data || [];
+    if (filterDate) {
+        dataToExport = dataToExport.filter(r => r.reservation_date === filterDate);
+    }
+
+    if (dataToExport.length === 0) {
+        return showToast(`ไม่พบข้อมูลการจอง${filterDate ? ' ณ วันที่ ' + filterDate : ''}`, 'warn');
+    }
+
+    const headers = [
+        'วันที่จอง', 'Gradegrams', 'Size', 'Supplier', 
+        'จำนวน (ม้วน)', 'คุณภาพ', 'ปั๊มลูกค้า', 'ประเภท', 
+        'หมายเหตุ', 'สถานะ', 'การเคลื่อนไหว'
+    ];
+
+    const dataRows = dataToExport.map(r => {
+        let qType = 'ปกติ';
+        if (r.adjust_type === 'decrease') qType = 'ปรับลด/คืน';
+        
+        let dateStr = '-';
+        if (r.reservation_date) {
+            const d = new Date(r.reservation_date);
+            dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        }
+
+        return [
+            dateStr,
+            r.grade || '-',
+            r.size || '-',
+            r.supplier || '-',
+            Number(r.quantity) || 0,
+            r.quality === 'B' ? 'B' : 'A',
+            r.customer_mark || '-',
+            r.reason_type === 'forecast' ? 'ประมาณการ' : (r.reason_note || 'อื่นๆ'),
+            r.remark || '-',
+            r.status === 'reserved' ? 'จองอยู่' : 'ปิด/ตัดยอด',
+            qType
+        ];
+    });
+
+    const wsData = [headers, ...dataRows];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    ws['!cols'] = [
+        {wch: 14}, {wch: 12}, {wch: 8}, {wch: 10}, {wch: 12}, 
+        {wch: 10}, {wch: 15}, {wch: 18}, {wch: 25}, {wch: 12}, {wch: 15}
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'ReservationData');
+    
+    const dateLabel = filterDate || 'all';
+    XLSX.writeFile(wb, `reservation_data_${dateLabel}.xlsx`);
+    
+    showToast(`✅ Export ข้อมูล ${dataToExport.length} รายการ สำเร็จ`, 'ok');
+}
+
+// ==========================================
+// 8.14 Import ตารางการจองจาก Excel
 // ==========================================
 async function importReservations(event) {
     const file = event.target.files[0];
     if (!file) return;
 
-    const btn = event.target.previousElementSibling; // ปุ่ม Import
+    const btn = event.target.previousElementSibling;
     const originalText = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '⏳ กำลัง Import...';
@@ -845,9 +854,8 @@ async function importReservations(event) {
         const payload = [];
         const errors = [];
 
-        // ตรวจสอบข้อมูลทีละแถว
         rows.forEach((row, idx) => {
-            const rowNum = idx + 2; // +2 เพราะ Excel เริ่มที่ 1 และมี Header
+            const rowNum = idx + 2;
             const date = String(row['วันที่จอง'] || '').trim();
             const grade = String(row['Gradegrams'] || '').trim().toUpperCase();
             const size = Number(row['Size']);
@@ -858,12 +866,10 @@ async function importReservations(event) {
                 return;
             }
 
-            // จัดรูปแบบวันที่ (ลองแปลงให้เป็น YYYY-MM-DD)
             let isoDate = date;
             if (date.includes('/')) {
                 const parts = date.split('/');
                 if (parts.length === 3) {
-                    // สมมติว่าเป็น DD/MM/YYYY
                     isoDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
                 }
             }
@@ -895,7 +901,6 @@ async function importReservations(event) {
             throw new Error(`ไม่มีข้อมูลที่สามารถ Import ได้\n${errors.slice(0, 3).join('\n')}`);
         }
 
-        // บันทึกทีละ 500 แถว (ป้องกัน payload ใหญ่เกิน)
         const CHUNK_SIZE = 500;
         let successCount = 0;
 
@@ -912,7 +917,6 @@ async function importReservations(event) {
             alert(`Import สำเร็จ ${successCount} รายการ\n\nแต่มีบางแถวที่ข้ามไป (${errors.length} แถว):\n\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? '\n...' : ''}`);
         }
 
-        // โหลดข้อมูลใหม่
         await loadReservations();
 
     } catch (err) {
@@ -921,6 +925,6 @@ async function importReservations(event) {
     } finally {
         btn.disabled = false;
         btn.innerHTML = originalText;
-        event.target.value = ''; // reset input file
+        event.target.value = '';
     }
 }
