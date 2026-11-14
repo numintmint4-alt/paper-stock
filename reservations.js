@@ -15,6 +15,30 @@ let resState = {
 };
 
 // ==========================================
+// Helper: ดึงข้อมูลทั้งหมดจาก Supabase (ข้าม Limit 1000)
+// ==========================================
+async function fetchAllRows(queryBuilder, pageSize = 1000) {
+    let allData = [];
+    let from = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+        const { data, error } = await queryBuilder().range(from, from + pageSize - 1);
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+            allData = allData.concat(data);
+            from += pageSize;
+            // ถ้าดึงมาน้อยกว่า pageSize แสดงว่าหมดแล้ว
+            if (data.length < pageSize) hasMore = false;
+        } else {
+            hasMore = false;
+        }
+    }
+    return allData;
+}
+
+// ==========================================
 // ฟังก์ชันสำหรับโหลด Master Data
 // ==========================================
 async function ensureMasterDataLoaded() {
@@ -25,11 +49,11 @@ async function ensureMasterDataLoaded() {
 
     try {
         console.log("⏳ กำลังโหลด Master Data สำหรับหน้า Reservations...");
-        const { data, error } = await supabase
-            .from('paper_specs')
-            .select('*');
-
-        if (error) throw error;
+        
+        // ✅ ใช้ fetchAllRows เพื่อวนลูปดึงข้อมูลจนครบ (ไม่ติด Limit 1000)
+        const data = await fetchAllRows(() => 
+            supabase.from('paper_specs').select('*')
+        );
 
         window.fcState.masterData = data || [];
         console.log("✅ โหลด Master Data สำเร็จ:", window.fcState.masterData.length, "รายการ");
