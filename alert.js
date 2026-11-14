@@ -1,13 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK V10.1 — alert.js — V.13.10
-//  NEW: Draft PO in-memory (_draftPendingItems) + บล็อกสร้าง PO ถ้ามี Draft ค้าง
-//  - buildReservationHtml หักยอดด้วย Draft ที่ค้าง → ซ่อนปุ่มตะกร้าถ้าเหลือ 0
-//  - confirmCartQty → push Draft + refresh reservation box + fill form
-//  - saveMatrixOrder → UPDATE roll_reservations SET status='completed'
-//  - createPOFromAlert → บล็อกถ้ามี Draft ค้าง
-//  - V.13.10: แถวฟอร์มจำ res_id → ป้าย "(จากยอดจอง - Reserved)"
-//    removeMatrixOrderRow คืนยอดจองเฉพาะแถวที่มี res_id (Stock กลางไม่ยุ่ง)
-//    refreshReservationBox รีเฟรชเฉพาะกล่องเหลือง / cancelDraftOrder ล้างเฉพาะ cell
+//  STOCK V10.1 — alert.js — V.14.0 (DB Sync)
+//  - ย้ายจาก LocalStorage → Supabase (alert_receive_dates, alert_active_inputs)
+//  - Draft PO in-memory (_draftPendingItems) + บล็อกสร้าง PO ถ้ามี Draft ค้าง
+//  - buildReservationHtml หักยอดด้วย Draft + ปุ่ม 🛒 ใส่ตะกร้า
+//  - removeMatrixOrderRow คืนยอดจองเฉพาะแถวที่มี res_id
+//  - refreshReservationBox รีเฟรชเฉพาะกล่องเหลือง
+//  - cancelDraftOrder ล้างเฉพาะ cell + คืนสถานะ reserved
+//  - confirmCreatePO มี lock กันกดซ้ำ (alert_po_locks, 5 นาที)
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -45,8 +44,12 @@ let alertHistoryMeta = null;
 
 let _pendingPOItems = [];
 
-// 🔥 NEW: ตัวแปรเก็บ Draft ที่ถูกดึงไปแต่ยังไม่เซฟ
+// 🔥 Draft in-memory (ยังไม่เซฟ)
 let _draftPendingItems = [];
+
+// 🔥 DB cache
+let _dbAlertInputs = {};      // { "2026-11-14": { "CA125|44": [items] } }
+let _dbReceiveDates = [];
 
 // ═══════════════════════════════════════════════════════════════
 //  CONSTANTS
@@ -97,9 +100,7 @@ const ALERT_QUALITY_B = [
   { value: 'nc',     label: 'NC' }
 ];
 
-const ALERT_LS_KEY_PREFIX = 'stockv8_alert_inputs_v';
 const ALERT_PO_FLAG_KEY = 'stockv8_alert_po_created';
-const ALERT_RECEIVE_DATES_KEY = 'stockv8_alert_receive_dates';
 
 // ═══════════════════════════════════════════════════════════════
 //  DATE HELPERS
@@ -161,34 +162,10 @@ function initFirstReceiveDatePicker() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  CLEAN OLD KEYS
-// ═══════════════════════════════════════════════════════════════
-
-function cleanOldAlertKeys() {
-  try {
-    const toRemove = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && /^stockv8_alert_inputs_v\d+$/.test(key)) {
-        toRemove.push(key);
-      }
-    }
-    toRemove.forEach(k => localStorage.removeItem(k));
-    if (toRemove.length) {
-      console.log(`🧹 ล้าง key เก่า ${toRemove.length} รายการ:`, toRemove);
-    }
-  } catch (e) {
-    console.warn('cleanOldAlertKeys:', e);
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════════════════
 
 async function initAlertTab() {
-  cleanOldAlertKeys();
-
   const today = getTodayISO();
   const currentMonthStr = today.slice(0, 7);
 
@@ -231,7 +208,7 @@ async function initAlertTab() {
 
   await loadAlertGradeFilter();
   loadAlertFilter();
-  initAlertReceiveDates();
+  await initAlertReceiveDates();
   await loadUsagePlanRanges();
   renderUsageRangeDropdown();
 
@@ -401,12 +378,11 @@ async function applyAlertSnapshot(snapshot) {
 
     if (snapshot.receive_dates && Array.isArray(snapshot.receive_dates)) {
       alertReceiveDates = [...snapshot.receive_dates];
-      saveAlertReceiveDates();
       renderAlertDateTabs();
     }
 
     alertCache = snapshot.result_json || [];
-    renderAlertFromCache();
+    await renderAlertFromCache();
   } catch (e) {
     console.error('applyAlertSnapshot:', e);
     $('alertBody').innerHTML = `<div class="msg err">โหลด snapshot ไม่สำเร็จ: ${esc(e.message)}</div>`;
@@ -417,7 +393,7 @@ async function applyAlertSnapshot(snapshot) {
 //  RENDER ALERT FROM CACHE
 // ═══════════════════════════════════════════════════════════════
 
-function renderAlertFromCache() {
+async function renderAlertFromCache() {
   if (!alertCache || !alertCache.length) {
     $('alertBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่มีข้อมูล</p>';
     return;
@@ -437,6 +413,9 @@ function renderAlertFromCache() {
   renderAlertDateTabs();
   renderAllAlertFilters();
   renderAlertReceiveDates();
+
+  // 🔥 โหลด inputs ของวันปัจจุบัน
+  await _loadActiveInputsToMemory();
 
   applyAlertFiltersAndRender();
 }
@@ -1200,7 +1179,7 @@ function renderAlertFlatView(rows) {
   initAlertRowHover();
 }
 
-function onAlertItemInput(gradegram, size, idx, field, value, el) {
+async function onAlertItemInput(gradegram, size, idx, field, value, el) {
   const items = getAlertItems(gradegram, size);
 
   while (items.length <= idx) {
@@ -1208,7 +1187,7 @@ function onAlertItemInput(gradegram, size, idx, field, value, el) {
   }
 
   items[idx][field] = value;
-  saveAlertItems(gradegram, size, items);
+  await saveAlertItems(gradegram, size, items);
 
   if (el) {
     const isFilled = (field === 'customer_roll' || field === 'quality_b')
@@ -1224,14 +1203,14 @@ function onAlertItemInput(gradegram, size, idx, field, value, el) {
   }
 }
 
-function addFlatRow(gradegram, size) {
+async function addFlatRow(gradegram, size) {
   const items = getAlertItems(gradegram, size);
   if (items.length >= 5) {
     alert('⚠️ เพิ่มได้สูงสุด 5 รายการต่อ cell');
     return;
   }
   items.push({ qty: '', sup: '', customer_roll: 'normal', quality_b: 'normal', note: '' });
-  saveAlertItems(gradegram, size, items);
+  await saveAlertItems(gradegram, size, items);
   applyAlertFiltersAndRender();
 }
 
@@ -1530,8 +1509,7 @@ function addMatrixOrderRow(gradegram, size) {
   renumberMatrixOrderRows();
 }
 
-// ✅ FIX: ลบแถว → ถ้าแถวมาจากยอดจอง (มี res_id) ให้คืนยอดจองเฉพาะรายการนั้น
-//         ถ้าเป็นแถวจาก Stock กลาง (ไม่มี res_id) แค่ลบแถว ไม่ยุ่งกับยอดจอง
+// ✅ ลบแถว → ถ้ามี res_id คืนยอดจองเฉพาะรายการนั้น
 async function removeMatrixOrderRow(btn) {
   const row = btn.closest('.matrix-order-row');
   if (!row) return;
@@ -1539,7 +1517,6 @@ async function removeMatrixOrderRow(btn) {
   const rowsBox = document.getElementById('matrixOrderRows');
   if (!rowsBox) return;
 
-  // อ่าน Grade/Size จากฟอร์มโดยตรง (ไม่ใช้ regex จากหัวข้อ Modal แล้ว)
   const form = document.getElementById('matrixOrderForm');
   const gradegram = form?.dataset.gradegram || '';
   const size = Number(form?.dataset.size);
@@ -1564,26 +1541,23 @@ async function removeMatrixOrderRow(btn) {
   // 5. แถวจากยอดจอง → คืนยอด
   const draftIdx = _draftPendingItems.findIndex(d => String(d.resId) === String(resId));
   if (draftIdx >= 0) {
-    // ยังเป็น Draft (ยังไม่กดบันทึก) → ลบ Draft ออกจาก memory
     _draftPendingItems.splice(draftIdx, 1);
   } else {
-    // บันทึกไปแล้ว (DB เป็น completed) → คืนสถานะเป็น reserved + ลบรายการออกจากที่บันทึกไว้
     await _restoreReservations([resId]);
 
     const saved = getAlertItems(gradegram, size);
     const i = saved.findIndex(it => String(it.res_id) === String(resId));
     if (i >= 0) {
       saved.splice(i, 1);
-      saveAlertItems(gradegram, size, saved);
+      await saveAlertItems(gradegram, size, saved);
       applyAlertFiltersAndRender();
     }
   }
 
-  // 6. รีเฟรชเฉพาะกล่องยอดจอง (ไม่โหลด Modal ใหม่ → แถวอื่นที่กรอกค้างไม่หาย)
+  // 6. รีเฟรชเฉพาะกล่องยอดจอง
   await refreshReservationBox(gradegram, size);
 }
 
-// คืนสถานะยอดจองใน DB กลับเป็น reserved
 async function _restoreReservations(ids) {
   const clean = (ids || []).filter(Boolean);
   if (!clean.length) return;
@@ -1603,7 +1577,6 @@ async function _restoreReservations(ids) {
   }
 }
 
-// รีเฟรชเฉพาะกล่องสีเหลือง (ยอดจอง) ใน Modal
 async function refreshReservationBox(gradegram, size) {
   const box = document.getElementById('alertReservationBox');
   if (!box) return;
@@ -1667,7 +1640,6 @@ async function saveMatrixOrder(gradegram, size) {
       quality_b: qual,
       note
     };
-    // 🏷️ จำไว้ว่าแถวนี้มาจากยอดจองรายการไหน (Stock กลางจะไม่มีฟิลด์นี้)
     if (row.dataset.resId) item.res_id = row.dataset.resId;
 
     items.push(item);
@@ -1676,18 +1648,17 @@ async function saveMatrixOrder(gradegram, size) {
   if (!items.length) {
     if (!confirm('⚠️ ไม่มีรายการที่กรอก → ต้องการลบข้อมูลของ cell นี้ทั้งหมดหรือไม่?')) return;
 
-    // คืนยอดจองของรายการที่เคยบันทึกไว้ + ล้าง Draft ของ cell นี้
     const oldResIds = getAlertItems(gradegram, size).map(i => i.res_id).filter(Boolean);
     _draftPendingItems = _draftPendingItems.filter(d => !(d.gradegram === gradegram && Number(d.size) === Number(size)));
     await _restoreReservations(oldResIds);
 
-    saveAlertItems(gradegram, size, []);
+    await saveAlertItems(gradegram, size, []);
     closeModal('modalAlertMatrixCell');
     applyAlertFiltersAndRender();
     return;
   }
 
-  // 🔥 NEW: อัปเดต Database (roll_reservations) + ล้าง Draft ของ cell นี้
+  // อัปเดต roll_reservations → completed
   try {
     const draftsToSave = _draftPendingItems.filter(d => d.gradegram === gradegram && Number(d.size) === Number(size));
     if (draftsToSave.length > 0) {
@@ -1703,10 +1674,8 @@ async function saveMatrixOrder(gradegram, size) {
         console.log(`✅ mark completed ${resIds.length} draft refs`);
       }
 
-      // ล้าง Draft ที่เซฟแล้วออกจาก array
       _draftPendingItems = _draftPendingItems.filter(d => !(d.gradegram === gradegram && Number(d.size) === Number(size)));
 
-      // รีเฟรช Matrix หลัก (ถ้ามี)
       if (typeof loadReservations === 'function') {
         try { await loadReservations(); } catch (e) { console.warn(e); }
       }
@@ -1715,7 +1684,7 @@ async function saveMatrixOrder(gradegram, size) {
     console.error('Error updating reservation status:', err);
   }
 
-  saveAlertItems(gradegram, size, items);
+  await saveAlertItems(gradegram, size, items);
 
   closeModal('modalAlertMatrixCell');
   applyAlertFiltersAndRender();
@@ -1761,78 +1730,84 @@ function _attachAlertDropdown(btnId, dropdownId, boxId, docKey) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  LOCALSTORAGE (ISO Date)
+//  DATABASE SYNC (แทนที่ LocalStorage)
 // ═══════════════════════════════════════════════════════════════
 
-function alertLS_Key(gradegram, size) {
-  return `${gradegram}|${size}`;
+// ─── RECEIVE DATES ──────────────────────────────────────────────
+async function fetchAlertReceiveDatesFromDB() {
+  try {
+    const { data, error } = await supabase
+      .from('alert_receive_dates')
+      .select('date_value')
+      .order('date_value');
+    if (error) throw error;
+    _dbReceiveDates = (data || []).map(d => d.date_value);
+    return _dbReceiveDates;
+  } catch (err) {
+    console.error('fetchAlertReceiveDatesFromDB:', err);
+    return [];
+  }
 }
 
-function loadAlertInputs(dateOrIdx) {
+async function addAlertReceiveDateToDB(dateVal) {
+  const { error } = await supabase
+    .from('alert_receive_dates')
+    .insert({ date_value: dateVal });
+  if (error && error.code !== '23505') throw error;
+  await fetchAlertReceiveDatesFromDB();
+}
+
+async function removeAlertReceiveDateFromDB(dateVal) {
+  await supabase.from('alert_receive_dates').delete().eq('date_value', dateVal);
+  await fetchAlertReceiveDatesFromDB();
+}
+
+// ─── ACTIVE INPUTS ──────────────────────────────────────────────
+async function fetchAlertInputsFromDB(dateIso) {
+  if (!dateIso) return [];
   try {
-    let isoDate;
-    if (typeof dateOrIdx === 'string') {
-      isoDate = dateOrIdx;
-    } else {
-      const idx = (typeof dateOrIdx === 'number') ? dateOrIdx : alertActiveDateIdx;
-      isoDate = alertReceiveDates[idx];
-    }
+    const { data, error } = await supabase
+      .from('alert_active_inputs')
+      .select('*')
+      .eq('receive_date', dateIso);
+    if (error) throw error;
+    return data || [];
+  } catch (err) {
+    console.error('fetchAlertInputsFromDB:', err);
+    return [];
+  }
+}
 
-    if (!isoDate) return {};
-
-    const raw = localStorage.getItem(`${ALERT_LS_KEY_PREFIX}${isoDate}`);
-    const data = raw ? JSON.parse(raw) : {};
-
-    Object.keys(data).forEach(key => {
-      const v = data[key];
-      if (v && !v.items && (v.qty !== undefined || v.sup || v.customer_roll || v.quality_b || v.note)) {
-        data[key] = {
-          items: [{
-            qty: v.qty || '',
-            sup: v.sup || '',
-            customer_roll: v.customer_roll || 'normal',
-            quality_b: v.quality_b || 'normal',
-            note: v.note || ''
-          }]
-        };
-      }
-      if (data[key] && !data[key].items) {
-        data[key] = { items: [] };
-      }
+async function _loadActiveInputsToMemory() {
+  const activeIso = alertReceiveDates[alertActiveDateIdx];
+  if (!activeIso) return;
+  const dbInputs = await fetchAlertInputsFromDB(activeIso);
+  _dbAlertInputs[activeIso] = {};
+  dbInputs.forEach(row => {
+    const key = `${row.gradegram}|${row.size}`;
+    if (!_dbAlertInputs[activeIso][key]) _dbAlertInputs[activeIso][key] = [];
+    _dbAlertInputs[activeIso][key].push({
+      qty: row.qty,
+      sup: row.sup,
+      customer_roll: row.customer_roll,
+      quality_b: row.quality_b,
+      note: row.note,
+      res_id: row.res_id || ''
     });
-
-    return data;
-  } catch { return {}; }
+  });
 }
 
 function getAlertItems(gradegram, size, dateOrIdx) {
-  const data = loadAlertInputs(dateOrIdx);
-  const cell = data[alertLS_Key(gradegram, size)];
-  return (cell?.items || []).filter(it => it.qty && Number(it.qty) > 0);
-}
-
-function saveAlertItems(gradegram, size, items, dateOrIdx) {
-  const data = loadAlertInputs(dateOrIdx);
-  const key = alertLS_Key(gradegram, size);
-
-  if (!items || !items.length) {
-    delete data[key];
-  } else {
-    data[key] = { items: items };
-  }
-
-  let isoDate;
+  let isoDate = '';
   if (typeof dateOrIdx === 'string') isoDate = dateOrIdx;
   else if (typeof dateOrIdx === 'number') isoDate = alertReceiveDates[dateOrIdx];
   else isoDate = alertReceiveDates[alertActiveDateIdx];
 
-  if (isoDate) {
-    localStorage.setItem(`${ALERT_LS_KEY_PREFIX}${isoDate}`, JSON.stringify(data));
-  }
+  if (!isoDate) return [];
 
-  if (items && items.length && hasPOCreated()) {
-    markAlertPOEdited();
-  }
+  const dayData = _dbAlertInputs[isoDate] || {};
+  const cell = dayData[`${gradegram}|${size}`];
+  return (cell || []).filter(it => it.qty && Number(it.qty) > 0);
 }
 
 function getAlertQtyTotal(gradegram, size, dateOrIdx) {
@@ -1840,45 +1815,50 @@ function getAlertQtyTotal(gradegram, size, dateOrIdx) {
   return items.reduce((sum, it) => sum + (Number(it.qty) || 0), 0);
 }
 
-function getAlertInput(keyOrGradegram, dateOrIdx) {
-  let gradegram, size;
+async function saveAlertItems(gradegram, size, items, dateOrIdx) {
+  let isoDate = '';
+  if (typeof dateOrIdx === 'string') isoDate = dateOrIdx;
+  else if (typeof dateOrIdx === 'number') isoDate = alertReceiveDates[dateOrIdx];
+  else isoDate = alertReceiveDates[alertActiveDateIdx];
 
-  if (typeof keyOrGradegram === 'string' && keyOrGradegram.includes('|')) {
-    [gradegram, size] = keyOrGradegram.split('|');
-    size = Number(size);
-  } else {
-    gradegram = keyOrGradegram;
-    size = dateOrIdx;
-    dateOrIdx = undefined;
-  }
+  if (!isoDate) return;
 
-  const items = getAlertItems(gradegram, size, dateOrIdx);
-  return items.length > 0 ? items[0] : {};
-}
+  // อัปเดต Memory ก่อน
+  if (!_dbAlertInputs[isoDate]) _dbAlertInputs[isoDate] = {};
+  _dbAlertInputs[isoDate][`${gradegram}|${size}`] = items;
 
-function saveAlertInput(key, field, value) {
-  const data = loadAlertInputs();
-  if (!data[key]) data[key] = { items: [] };
-  if (!data[key].items) data[key].items = [];
+  try {
+    await supabase.from('alert_active_inputs')
+      .delete()
+      .eq('receive_date', isoDate)
+      .eq('gradegram', gradegram)
+      .eq('size', size);
 
-  if (data[key].items.length === 0) {
-    data[key].items.push({ qty: '', sup: '', customer_roll: 'normal', quality_b: 'normal', note: '' });
-  }
-  data[key].items[0][field] = value;
-
-  const isoDate = alertReceiveDates[alertActiveDateIdx];
-  if (isoDate) {
-    localStorage.setItem(`${ALERT_LS_KEY_PREFIX}${isoDate}`, JSON.stringify(data));
-  }
-
-  const MARK_FIELDS = ['qty', 'sup', 'customer_roll', 'quality_b', 'note'];
-  if (MARK_FIELDS.includes(field) && hasPOCreated()) {
-    markAlertPOEdited();
+    if (items && items.length > 0) {
+      const payload = items.map(it => ({
+        receive_date: isoDate,
+        gradegram: gradegram,
+        size: size,
+        qty: Number(it.qty) || 0,
+        sup: it.sup || '',
+        customer_roll: it.customer_roll || 'normal',
+        quality_b: it.quality_b || 'normal',
+        note: it.note || '',
+        updated_by: currentUser?.id || null
+      }));
+      const { error } = await supabase.from('alert_active_inputs').insert(payload);
+      if (error) throw error;
+    }
+  } catch (err) {
+    console.error('Autosave Error:', err);
+    if (typeof showToast === 'function') {
+      showToast('⚠️ บันทึกอัตโนมัติไม่สำเร็จ: ' + err.message, 'err');
+    }
   }
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  PO FLAG
+//  PO FLAG (LocalStorage — flag ขนาดเล็ก ยังใช้ได้)
 // ═══════════════════════════════════════════════════════════════
 
 function loadPOFlag() {
@@ -1926,7 +1906,7 @@ function clearPOFlags() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  RECEIVE DATES
+//  RECEIVE DATES (DB)
 // ═══════════════════════════════════════════════════════════════
 
 function getNextWorkingDay(baseDate = new Date()) {
@@ -1936,101 +1916,67 @@ function getNextWorkingDay(baseDate = new Date()) {
   return toISODate(d);
 }
 
-function loadAlertReceiveDates() {
-  try {
-    const raw = localStorage.getItem(ALERT_RECEIVE_DATES_KEY);
-    const arr = raw ? JSON.parse(raw) : [];
-    return Array.isArray(arr) ? arr : [];
-  } catch { return []; }
-}
-
-function saveAlertReceiveDates() {
-  localStorage.setItem(ALERT_RECEIVE_DATES_KEY, JSON.stringify(alertReceiveDates));
-}
-
-function setFirstAlertDate(dateValue) {
+async function setFirstAlertDate(dateValue) {
   if (!dateValue) {
     alert('กรุณาเลือกวันที่');
     return;
   }
-  alertReceiveDates = [dateValue];
+  await addAlertReceiveDateToDB(dateValue);
+  alertReceiveDates = [..._dbReceiveDates];
   alertActiveDateIdx = 0;
-  saveAlertReceiveDates();
   renderAlertDateTabs();
-  renderAlert();
+  await renderAlert();
 }
 
-function addAlertReceiveDate() {
+async function addAlertReceiveDate() {
   const analyzedDate = getISODateFromInput('alertDate');
-  if (!analyzedDate) {
-    alert('กรุณาเลือกวันที่วิเคราะห์ก่อน');
-    return;
-  }
+  if (!analyzedDate) return alert('กรุณาเลือกวันที่วิเคราะห์ก่อน');
 
   const tomorrow = new Date(analyzedDate);
   tomorrow.setDate(tomorrow.getDate() + 1);
-  if (tomorrow.getDay() === 0) {
-    tomorrow.setDate(tomorrow.getDate() + 1);
-  }
+  if (tomorrow.getDay() === 0) tomorrow.setDate(tomorrow.getDate() + 1);
   const defaultNextDate = toISODate(tomorrow);
 
   if (alertReceiveDates.length === 0) {
-    alertReceiveDates.push(defaultNextDate);
-    saveAlertReceiveDates();
+    await addAlertReceiveDateToDB(defaultNextDate);
+    alertReceiveDates = [..._dbReceiveDates];
     renderAlertDateTabs();
-    renderAlert();
+    await renderAlert();
     return;
   }
 
-  const sorted = [...alertReceiveDates]
-    .map(_parseLocalDate)
-    .filter(Boolean)
-    .sort((a, b) => a - b);
-
+  const sorted = [...alertReceiveDates].map(_parseLocalDate).filter(Boolean).sort((a, b) => a - b);
   const existing = new Set(alertReceiveDates);
   const lastD = sorted[sorted.length - 1];
-
   const nextD = _nextWorkingDay(lastD);
   while (nextD.getDay() === 0) nextD.setDate(nextD.getDate() + 1);
-
   const nextISO = toISODate(nextD);
-  if (existing.has(nextISO)) {
-    alert('⚠️ ไม่มีวันว่างให้เพิ่ม');
-    return;
-  }
+  if (existing.has(nextISO)) return alert('⚠️ ไม่มีวันว่างให้เพิ่ม');
 
-  alertReceiveDates.push(nextISO);
-  alertReceiveDates.sort((a, b) => _parseLocalDate(a) - _parseLocalDate(b));
-  saveAlertReceiveDates();
+  await addAlertReceiveDateToDB(nextISO);
+  alertReceiveDates = [..._dbReceiveDates];
   renderAlertDateTabs();
-  renderAlert();
+  await renderAlert();
 }
 
-function removeAlertReceiveDate(idx) {
+async function removeAlertReceiveDate(idx) {
   if (!confirm('ลบวันที่นี้? ข้อมูลที่กรอกในวันนี้จะหายไปด้วย')) return;
-
   const dateToRemove = alertReceiveDates[idx];
   if (dateToRemove) {
-    localStorage.removeItem(`${ALERT_LS_KEY_PREFIX}${dateToRemove}`);
+    await removeAlertReceiveDateFromDB(dateToRemove);
+    await supabase.from('alert_active_inputs').delete().eq('receive_date', dateToRemove);
+    delete _dbAlertInputs[dateToRemove];
   }
-
-  // 🔥 ล้าง Draft ที่ค้างอยู่ทั้งหมด เพราะลบวันทิ้งแล้ว
-  _draftPendingItems = []; 
-
-  if (alertActiveDateIdx >= idx) {
-    alertActiveDateIdx = Math.max(0, alertActiveDateIdx - 1);
-  }
-
-  alertReceiveDates.splice(idx, 1);
-  saveAlertReceiveDates();
+  _draftPendingItems = [];
+  if (alertActiveDateIdx >= idx) alertActiveDateIdx = Math.max(0, alertActiveDateIdx - 1);
+  alertReceiveDates = [..._dbReceiveDates];
   renderAlertDateTabs();
-  renderAlert();
+  await renderAlert();
 }
 
 function onAlertReceiveDateChange(idx, value) {
   if (!value) return;
   alertReceiveDates[idx] = value;
-  saveAlertReceiveDates();
   renderAlertDateTabs();
 }
 
@@ -2038,16 +1984,20 @@ function renderAlertReceiveDates() {
   renderAlertDateTabs();
 }
 
-function switchAlertDate(idx) {
+async function switchAlertDate(idx) {
   if (idx < 0 || idx >= alertReceiveDates.length) return;
   alertActiveDateIdx = idx;
-  
-  // 🔥 ล้าง Draft ที่ค้างอยู่ทั้งหมด เพราะเปลี่ยนวันแล้ว
-  _draftPendingItems = []; 
-  
+
+  // 🔥 โหลดข้อมูลของวันใหม่ (ถ้ายังไม่มีใน memory)
+  const activeIso = alertReceiveDates[idx];
+  if (activeIso && !_dbAlertInputs[activeIso]) {
+    await _loadActiveInputsToMemory();
+  }
+
   renderAlertDateTabs();
-  renderAlert();
+  await renderAlert();
 }
+
 function renderAlertDateTabs() {
   const box = $('alertDateTabsBox');
   if (!box) return;
@@ -2077,14 +2027,9 @@ function renderAlertDateTabs() {
   box.innerHTML = html;
 }
 
-function initAlertReceiveDates() {
-  alertReceiveDates = loadAlertReceiveDates();
-
-  alertReceiveDates = alertReceiveDates.filter(d => {
-    const dt = _parseLocalDate(d);
-    return dt && dt.getDay() !== 0;
-  });
-
+async function initAlertReceiveDates() {
+  await fetchAlertReceiveDatesFromDB();
+  alertReceiveDates = [..._dbReceiveDates];
   alertActiveDateIdx = 0;
   renderAlertDateTabs();
 }
@@ -2224,6 +2169,9 @@ async function renderAlert() {
 
     alertCache = display;
 
+    // 🔥 โหลด inputs ของวันปัจจุบันจาก DB
+    await _loadActiveInputsToMemory();
+
     alertAllSupsInData = [...new Set(
       display.map(r => {
         const items = getAlertItems(r.gradegram, r.size);
@@ -2282,12 +2230,16 @@ function dismissPOWarning() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  INPUT
+//  INPUT (legacy alias)
 // ═══════════════════════════════════════════════════════════════
 
-function onAlertInput(gradegram, size, field, value, el) {
-  const key = alertLS_Key(gradegram, size);
-  saveAlertInput(key, field, value);
+async function onAlertInput(gradegram, size, field, value, el) {
+  const items = getAlertItems(gradegram, size);
+  if (items.length === 0) {
+    items.push({ qty: '', sup: '', customer_roll: 'normal', quality_b: 'normal', note: '' });
+  }
+  items[0][field] = value;
+  await saveAlertItems(gradegram, size, items);
 
   if (el) {
     const isFilled = (field === 'customer_roll' || field === 'quality_b')
@@ -2313,15 +2265,16 @@ function onAlertInput(gradegram, size, field, value, el) {
 //  CLEAR
 // ═══════════════════════════════════════════════════════════════
 
-function clearAlertInputs() {
+async function clearAlertInputs() {
   if (!confirm('⚠️ ล้างค่าที่กรอกของวันนี้ (สั่งซื้อ / Sup. / ม้วนลูกค้า / คุณภาพ B / หมายเหตุ)?')) return;
 
   const activeDate = alertReceiveDates[alertActiveDateIdx];
   if (activeDate) {
-    localStorage.removeItem(`${ALERT_LS_KEY_PREFIX}${activeDate}`);
+    await supabase.from('alert_active_inputs').delete().eq('receive_date', activeDate);
+    delete _dbAlertInputs[activeDate];
   }
 
-  renderAlert();
+  await renderAlert();
 
   const msg = document.createElement('div');
   msg.className = 'msg ok';
@@ -2329,12 +2282,6 @@ function clearAlertInputs() {
   msg.textContent = '✅ ล้างค่าของวันนี้แล้ว';
   document.body.appendChild(msg);
   setTimeout(() => msg.remove(), 2000);
-}
-
-function clearAllAlertInputsAllDates() {
-  alertReceiveDates.forEach(date => {
-    localStorage.removeItem(`${ALERT_LS_KEY_PREFIX}${date}`);
-  });
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2345,7 +2292,7 @@ async function createPOFromAlert() {
   // 🔥 1. เช็ก Draft ค้างก่อน
   if (_draftPendingItems && _draftPendingItems.length > 0) {
     const draftNames = _draftPendingItems.map(d => `${d.gradegram}-${d.size} (${d.qty} ม้วน)`).join(', ');
-    alert(`⚠️ คุณมีรายการ Draft PO ที่ยังไม่ได้ทำการบันทึก\n\nรายการ: ${draftNames}\n\nกรุณากลับไปกด "บันทึก" หรือ "ยกเลิก" ที่ฟอร์มด้านล่างก่อน เพื่อให้จำนวนม้วนกระดาษเพียงพอต่อการสั่งซื้อ`);
+    alert(`⚠️ คุณมีรายการ Draft PO ที่ยังไม่ได้ทำการบันทึก\n\nรายการ: ${draftNames}\n\nกรุณากลับไปกด "บันทึก" หรือ "ยกเลิก" ที่ฟอร์มด้านล่างก่อน`);
     return;
   }
 
@@ -2354,6 +2301,7 @@ async function createPOFromAlert() {
     return;
   }
 
+  // 🔥 โหลด inputs ของทุกวันที่กรอกไว้ (ถ้ามีหลายวัน)
   const allItems = [];
   const processedCells = new Set();
 
@@ -2365,6 +2313,24 @@ async function createPOFromAlert() {
 
   for (let dateIdx = 0; dateIdx < uniqueDates.length; dateIdx++) {
     const dateKey = uniqueDates[dateIdx];
+
+    // โหลดจาก DB ก่อนถ้ายังไม่มีใน memory
+    if (!_dbAlertInputs[dateKey]) {
+      const dbInputs = await fetchAlertInputsFromDB(dateKey);
+      _dbAlertInputs[dateKey] = {};
+      dbInputs.forEach(row => {
+        const key = `${row.gradegram}|${row.size}`;
+        if (!_dbAlertInputs[dateKey][key]) _dbAlertInputs[dateKey][key] = [];
+        _dbAlertInputs[dateKey][key].push({
+          qty: row.qty,
+          sup: row.sup,
+          customer_roll: row.customer_roll,
+          quality_b: row.quality_b,
+          note: row.note,
+          res_id: row.res_id || ''
+        });
+      });
+    }
 
     for (const r of alertCache) {
       const cellKey = `${r.gradegram}|${Number(r.size)}|${dateKey}`;
@@ -2497,21 +2463,53 @@ function renderAlertPODetail(items) {
   $('alertPODetailBody').innerHTML = html;
 }
 
-function confirmCreatePO() {
+async function confirmCreatePO() {
   if (!_pendingPOItems || !_pendingPOItems.length) return;
 
   const confirmBtn = document.querySelector('#modalAlertPODetail .form-actions .primary');
   if (confirmBtn && confirmBtn.disabled) return;
+
+  // ตรวจ Sup. ให้ครบก่อน
+  const missingSup = _pendingPOItems.filter(it => !it.sup || String(it.sup).trim() === '');
+  if (missingSup.length > 0) {
+    alert(`⚠️ ไม่สามารถสร้าง PO ได้\n\nมี ${missingSup.length} รายการที่ยังไม่ได้ระบุผู้ขาย (Sup.)\nกรุณาตรวจสอบและเลือก Sup. ให้ครบก่อน`);
+    return;
+  }
+
   if (confirmBtn) {
     confirmBtn.disabled = true;
     confirmBtn.textContent = '⏳ กำลังสร้าง PO...';
   }
 
-  const missingSup = _pendingPOItems.filter(it => !it.sup || String(it.sup).trim() === '');
-  if (missingSup.length > 0) {
-    alert(`⚠️ ไม่สามารถสร้าง PO ได้\n\nมี ${missingSup.length} รายการที่ยังไม่ได้ระบุผู้ขาย (Sup.)\nกรุณาตรวจสอบและเลือก Sup. ให้ครบก่อน`);
-    if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = '✅ ยืนยันสร้าง PO'; }
-    return;
+  // 🔥 ระบบ lock กันกดซ้ำ/กันคนอื่นสร้างพร้อมกัน
+  try {
+    const fiveMinsAgo = new Date(Date.now() - 5 * 60000).toISOString();
+
+    // 1. ลบ lock เก่าเกิน 5 นาที
+    await supabase.from('alert_po_locks').delete().lt('created_at', fiveMinsAgo);
+
+    // 2. เช็ก lock ค้าง
+    const { data: existingLocks, error: checkErr } = await supabase
+      .from('alert_po_locks')
+      .select('*')
+      .gte('created_at', fiveMinsAgo);
+
+    if (!checkErr && existingLocks && existingLocks.length > 0) {
+      alert('⚠️ มีผู้ใช้อื่นกำลังสร้าง PO อยู่ กรุณารอสักครู่แล้วลองใหม่');
+      if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = '✅ ยืนยันสร้าง PO'; }
+      return;
+    }
+
+    // 3. สร้าง lock
+    const lockKey = `po_lock_${Date.now()}_${currentUser?.id || 'anon'}`;
+    await supabase.from('alert_po_locks').insert({
+      lock_key: lockKey,
+      user_id: currentUser?.id || null
+    });
+  } catch (lockErr) {
+    if (lockErr?.code !== '42P01') {
+      console.warn('Lock error:', lockErr);
+    }
   }
 
   const analyzedDate = getISODateFromInput('alertDate') || toISODate(new Date());
@@ -2851,11 +2849,12 @@ async function confirmUsagePlanImport() {
 
     closeModal('modalUsagePlanImport');
 
-    showToast(
-      `✅ Import สำเร็จ ${data.inserted} รายการ` +
-      (skipped.length ? ` · ข้าม ${skipped.length}` : ''),
-      'ok', 4000
-    );
+    if (typeof showToast === 'function') {
+      showToast(
+        `✅ Import สำเร็จ ${data.inserted} รายการ` + (skipped.length ? ` · ข้าม ${skipped.length}` : ''),
+        'ok', 4000
+      );
+    }
 
     await loadUsagePlanRanges();
     renderUsageRangeDropdown();
@@ -2881,7 +2880,9 @@ async function clearUsagePlan() {
     });
     if (error) throw error;
 
-    showToast(`✅ ลบ ${data?.deleted || 0} รายการ`, 'ok', 3000);
+    if (typeof showToast === 'function') {
+      showToast(`✅ ลบ ${data?.deleted || 0} รายการ`, 'ok', 3000);
+    }
 
     alertUsageSelected = null;
     await loadUsagePlanRanges();
@@ -3393,13 +3394,9 @@ function renderAllAlertFilters() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  RESERVATIONS (ยอดจองม้วน) — V.13.10 (Draft in-memory + res_id tracking)
+//  RESERVATIONS (ยอดจองม้วน)
 // ═══════════════════════════════════════════════════════════════
 
-/**
- * ดึงยอดจอง (Reserved) จากตาราง roll_reservations
- * คืนค่าเป็น map: { "GRADE|SIZE": [ {..}, {..} ] }
- */
 async function loadAlertReservations() {
   try {
     const { data, error } = await supabase
@@ -3429,12 +3426,6 @@ function getAlertReservedTotal(resMap, gradegram, size) {
   return list.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0);
 }
 
-/**
- * แสดง HTML ของยอดจอง — Card UI
- * - หักยอดที่ถูก Draft ไปแล้ว (จาก _draftPendingItems)
- * - ซ่อนปุ่มตะกร้าถ้ายอดเหลือ 0
- * - ปุ่มเป็นแบบข้อความ+emoji (แก้บั๊ก SVG โดน CSS ตีจนหาย)
- */
 function buildReservationHtml(list) {
   if (!list || !list.length) {
     return '<p style="color:#94a3b8;margin:8px 0;text-align:center;">ไม่มีรายการจอง</p>';
@@ -3456,7 +3447,6 @@ function buildReservationHtml(list) {
     const safeQuality = escAttr(r.quality || 'A');
     const safeId = r.id;
 
-    // 🔍 คำนวณยอดที่เหลือ (ลบด้วย Draft ที่ค้างอยู่)
     const totalQty = Number(r.quantity) || 0;
     const pendingDraftQty = _draftPendingItems
         .filter(d => d.resId === safeId)
@@ -3502,9 +3492,6 @@ function buildReservationHtml(list) {
   return html;
 }
 
-// ==========================================
-// NEW: ฟังก์ชันเมื่อกดปุ่มตะกร้าในยอดจอง
-// ==========================================
 function onReservationCartClick(resId, gradegram, size, maxQty, supplier, quality) {
   let modal = document.getElementById('modalCartQty');
   if (!modal) {
@@ -3533,7 +3520,6 @@ function onReservationCartClick(resId, gradegram, size, maxQty, supplier, qualit
     `;
     document.body.appendChild(modal);
   } else {
-    // อัปเดตเนื้อหาถ้ามี modal อยู่แล้ว
     const infoDiv = modal.querySelector('.modal div[style*="background:#f8fafc"]');
     if (infoDiv) {
       infoDiv.innerHTML = `
@@ -3558,29 +3544,19 @@ function onReservationCartClick(resId, gradegram, size, maxQty, supplier, qualit
   }, 100);
 }
 
-// ==========================================
-// NEW: ยืนยันจำนวน → push Draft + refresh reservation box + fill form
-// ==========================================
 async function confirmCartQty(resId, gradegram, size, supplier, quality) {
   const qty = Number(document.getElementById('cartQtyInput').value);
   if (!qty || qty <= 0) return alert('กรุณาระบุจำนวนมากกว่า 0');
 
-  // 🔍 1. บันทึก Draft ลงตัวแปรชั่วคราว
   _draftPendingItems.push({ resId, gradegram, size, qty, supplier, quality });
 
   closeModal('modalCartQty');
 
-  // 🔍 2. เติมข้อมูลลงฟอร์มด้านล่าง (พร้อมจำ resId)
   fillOrderForm(gradegram, size, qty, supplier, quality, resId);
 
-  // 🔍 3. รีเฟรชเฉพาะกล่องยอดจอง (ไม่โหลด Modal ใหม่ เพื่อไม่ให้แถวที่กรอกค้างหาย)
   await refreshReservationBox(gradegram, size);
 }
 
-// ==========================================
-// NEW: เติมแถวลงฟอร์ม (ไม่ต้องมี Draft ref แล้ว)
-// ✅ FIX #2: ล้างแถวว่างก่อนเพิ่มแถวใหม่ (กันไปโผล่รายการที่ 2)
-// ==========================================
 function fillOrderForm(gradegram, size, qty, supplier, quality, resId) {
   let form = document.getElementById('matrixOrderForm');
   if (!form) {
@@ -3591,12 +3567,11 @@ function fillOrderForm(gradegram, size, qty, supplier, quality, resId) {
 
   const rowsBox = document.getElementById('matrixOrderRows');
   if (rowsBox) {
-    // 🔽 1. ล้างแถวว่างที่ไม่มีการกรอกข้อมูลออกก่อน (ถ้ามี)
     const existingRows = rowsBox.querySelectorAll('.matrix-order-row');
     if (existingRows.length === 1) {
       const firstRowQty = existingRows[0].querySelector('.matrix-row-qty')?.value;
       if (!firstRowQty || Number(firstRowQty) === 0) {
-        rowsBox.innerHTML = ''; // ลบแถวว่างทิ้ง
+        rowsBox.innerHTML = '';
       }
     }
 
@@ -3627,26 +3602,18 @@ function fillOrderForm(gradegram, size, qty, supplier, quality, resId) {
   }
 }
 
-// ==========================================
-// NEW: ยกเลิก Draft (ถ้าต้องการรีเซ็ต)
-// ล้างเฉพาะ Draft ของ cell นี้ + คืนสถานะยอดจองที่บันทึกไว้ + รีเฟรช Modal
-// ==========================================
 async function cancelDraftOrder(gradegram, size) {
   if (gradegram !== undefined && size !== undefined) {
-    // ล้างเฉพาะ Draft ของ cell นี้
     _draftPendingItems = _draftPendingItems.filter(d => !(d.gradegram === gradegram && Number(d.size) === Number(size)));
 
-    // ถ้ามีการบันทึกไปแล้ว (ใน localStorage) ให้คืนสถานะกลับเป็น reserved
     const savedItems = getAlertItems(gradegram, size);
     const oldResIds = savedItems.map(i => i.res_id).filter(Boolean);
     if (oldResIds.length > 0) {
       await _restoreReservations(oldResIds);
     }
 
-    // ล้างรายการที่เคยเซฟไว้ (ถ้าผู้ใช้กดยกเลิก = ไม่เอาทั้ง cell)
-    saveAlertItems(gradegram, size, []);
+    await saveAlertItems(gradegram, size, []);
 
-    // รีเฟรช Modal ใหม่ทั้งหมดเพื่อให้ยอดจองเด้งกลับมา
     await openAlertMatrixCell(gradegram, size);
     applyAlertFiltersAndRender();
   } else {
@@ -3654,3 +3621,7 @@ async function cancelDraftOrder(gradegram, size) {
     closeModal('modalAlertMatrixCell');
   }
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  END
+// ═══════════════════════════════════════════════════════════════
