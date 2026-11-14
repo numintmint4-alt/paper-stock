@@ -517,82 +517,78 @@
 
         <div id="pivot-monthly-container">
 
-        <div class="filters no-print">
-          <label>📅 Filter Month:
-            <input type="month" id="pivot-month" class="form-control">
-          </label>
+          <div class="filters no-print">
+            <label>📅 Filter Month:
+              <input type="month" id="pivot-month" class="form-control">
+            </label>
 
-          <label class="grade-filter-wrap">
-            👤 ลูกค้า
-            <div class="grade-filter-box" id="pivotCustomerFilterBox">
-              <button type="button" class="grade-filter-btn" id="pivotCustomerFilterBtn">
-                <span id="pivotCustomerFilterLabel">ทั้งหมด</span>
-                <span class="arrow">▼</span>
-              </button>
-              <div class="grade-dropdown hidden" id="pivotCustomerDropdown">
-                <div class="grade-actions">
-                  <button type="button" onclick="selectAllPivotCustomers()">✓ เลือกทั้งหมด</button>
-                  <button type="button" onclick="clearAllPivotCustomers()">✗ ล้างทั้งหมด</button>
+            <label class="grade-filter-wrap">
+              👤 ลูกค้า
+              <div class="grade-filter-box" id="pivotCustomerFilterBox">
+                <button type="button" class="grade-filter-btn" id="pivotCustomerFilterBtn">
+                  <span id="pivotCustomerFilterLabel">ทั้งหมด</span>
+                  <span class="arrow">▼</span>
+                </button>
+                <div class="grade-dropdown hidden" id="pivotCustomerDropdown">
+                  <div class="grade-actions">
+                    <button type="button" onclick="selectAllPivotCustomers()">✓ เลือกทั้งหมด</button>
+                    <button type="button" onclick="clearAllPivotCustomers()">✗ ล้างทั้งหมด</button>
+                  </div>
+                  <div style="padding: 8px; border-bottom: 1px solid #e2e8f0;">
+                      <input type="text" placeholder="🔍 ค้นหาลูกค้า..." oninput="filterCustomerList(this.value, 'monthly')" style="width: 100%; padding: 6px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px;">
+                  </div>
+                  <div class="grade-list" id="pivotCustomerList"></div>
                 </div>
-                <div style="padding: 8px; border-bottom: 1px solid #e2e8f0;">
-                    <input type="text" placeholder="🔍 ค้นหาลูกค้า..." oninput="filterCustomerList(this.value, 'monthly')" style="width: 100%; padding: 6px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px;">
-                </div>
-                <div class="grade-list" id="pivotCustomerList"></div>
               </div>
-            </div>
-          </label>
+            </label>
 
-          <button class="btn-import-stock" onclick="document.getElementById('pivot-file-upload').click()">📥 Import Excel</button>
-          <input type="file" id="pivot-file-upload" accept=".xlsx, .xls" class="hidden" onchange="handleUsageImport(event)">
+            <button class="btn-import-stock" onclick="document.getElementById('pivot-file-upload').click()">📥 Import Excel</button>
+            <input type="file" id="pivot-file-upload" accept=".xlsx, .xls" class="hidden" onchange="handleUsageImport(event)">
 
-          <button class="primary" onclick="loadUsagePivot()">🔍 โหลดข้อมูล Pivot</button>
+            <button class="primary" onclick="loadUsagePivot()">🔍 โหลดข้อมูล Pivot</button>
 
-          <button class="primary" onclick="saveUsageSnapshot()" style="background:var(--green); border-color:var(--green);">
-            💾 บันทึก
-          </button>
-        </div>
+            <button class="primary" onclick="saveUsageSnapshot()" style="background:var(--green); border-color:var(--green);">
+              💾 บันทึก
+            </button>
+          </div>
 
-        <!-- ✅ ปรับปรุงส่วนหัวข้อและ Tabs -->
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
-            
-            <!-- ข้อความบอกเดือน (ชิดซ้าย) -->
-            <div id="pivotCurrentMonthLabel" style="font-size: 16px; font-weight: 700; margin: 0; color: #1e293b;">
-                ตารางแสดงผลการใช้งานม้วนกระดาษเดือน : -
-            </div>
+          <!-- ✅ ส่วนหัวข้อและ Tabs -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+              <div id="pivotCurrentMonthLabel" style="font-size: 16px; font-weight: 700; margin: 0; color: #1e293b;">
+                  ตารางแสดงผลการใช้งานม้วนกระดาษเดือน : -
+              </div>
 
-            <!-- ปุ่ม Tabs (ชิดขวา) -->
-            <div id="pivot-sub-tabs" class="sub-tabs" style="display: flex; gap: 8px; flex-wrap: wrap; margin: 0;">
-                <button type="button" class="sub-tab active" onclick="filterPivotByGrade('ALL', this)">ALL</button>
-                <button type="button" class="sub-tab" onclick="filterPivotByGrade('CA', this)">CA</button>
-                <button type="button" class="sub-tab" onclick="filterPivotByGrade('KA', this)">KA</button>
-                <button type="button" class="sub-tab" onclick="filterPivotByGrade('KI', this)">KI</button>
-                <button type="button" class="sub-tab" onclick="filterPivotByGrade('KK', this)">KK</button>
-                <button type="button" class="sub-tab" onclick="filterPivotByGrade('KW', this)">KW</button>
-                <button type="button" class="sub-tab" onclick="filterPivotByGrade('FSC', this)" id="btn-tab-fsc" style="border-color: var(--green); color: var(--green-dark);">FSC</button>
-            </div>
+              <div id="pivot-sub-tabs" class="sub-tabs" style="display: flex; gap: 8px; flex-wrap: wrap; margin: 0;">
+                  <button type="button" class="sub-tab active" onclick="filterPivotByGrade('ALL', this)">ALL</button>
+                  <button type="button" class="sub-tab" onclick="filterPivotByGrade('CA', this)">CA</button>
+                  <button type="button" class="sub-tab" onclick="filterPivotByGrade('KA', this)">KA</button>
+                  <button type="button" class="sub-tab" onclick="filterPivotByGrade('KI', this)">KI</button>
+                  <button type="button" class="sub-tab" onclick="filterPivotByGrade('KK', this)">KK</button>
+                  <button type="button" class="sub-tab" onclick="filterPivotByGrade('KW', this)">KW</button>
+                  <button type="button" class="sub-tab" onclick="filterPivotByGrade('FSC', this)" id="btn-tab-fsc" style="border-color: var(--green); color: var(--green-dark);">FSC</button>
+              </div>
+          </div>
 
-        </div>
-          
-        <div id="pivotBody" class="report-wrap" style="max-height: 50vh;">
-          <table class="data-table" id="pivot-table">
-              <thead id="pivot-thead"></thead>
-              <tbody id="pivot-tbody"></tbody>
-          </table>
-        </div>
+          <div id="pivotBody" class="report-wrap" style="max-height: 50vh;">
+            <table class="data-table" id="pivot-table">
+                <thead id="pivot-thead"></thead>
+                <tbody id="pivot-tbody"></tbody>
+            </table>
+          </div>
 
-        <div style="display: flex; justify-content: space-between; align-items: center; margin: 20px 0 10px; border-bottom: 2px solid var(--primary); padding-bottom: 8px;">
-            <h3 style="margin: 0; font-size: 16px;">📋 ประวัติการบันทึกล่าสุด</h3>
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <label style="font-size: 14px; font-weight: 600; color: var(--text-muted);">เลือกปี:</label>
-                <select id="snapshotYearFilter" onchange="renderSnapshotHistory(this.value)" style="padding: 4px 10px; font-weight: 600; border-radius: 6px; border: 1px solid var(--border-strong);">
-                    <!-- ตัวเลือกปีจะถูกสร้างด้วย JavaScript -->
-                </select>
-            </div>
-        </div>
-        <div id="snapshot-history-list" style="max-height: 400px; overflow-y: auto;"></div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin: 20px 0 10px; border-bottom: 2px solid var(--primary); padding-bottom: 8px;">
+              <h3 style="margin: 0; font-size: 16px;">📋 ประวัติการบันทึกล่าสุด</h3>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                  <label style="font-size: 14px; font-weight: 600; color: var(--text-muted);">เลือกปี:</label>
+                  <select id="snapshotYearFilter" onchange="renderSnapshotHistory(this.value)" style="padding: 4px 10px; font-weight: 600; border-radius: 6px; border: 1px solid var(--border-strong);">
+                  </select>
+              </div>
+          </div>
+          <div id="snapshot-history-list" style="max-height: 400px; overflow-y: auto;"></div>
 
         </div><!-- /pivot-monthly-container -->
 
+        <!-- ===== Yearly Pivot ===== -->
         <div id="pivot-yearly-container" class="hidden">
           <div class="filters no-print" style="margin-bottom: 15px; background: var(--surface-soft, #f8fafc); padding: 10px; border-radius: var(--radius-md, 8px);">
             <label>เลือกปี:
@@ -622,15 +618,11 @@
             <button type="button" class="primary" onclick="loadYearlyPivot()" id="btnLoadYearlyPivot">🔍 โหลดข้อมูล Pivot รายปี</button>
           </div>
 
-          <!-- ✅ ปรับปรุงส่วนหัวข้อและ Tabs หน้ารายปี -->
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
-              
-              <!-- ข้อความหัวข้อ (ซ้าย) -->
               <div id="yearlyPivotTitle" style="font-size: 16px; font-weight: 700; margin: 0; color: #1e293b;">
                   ตารางแสดงผลการใช้งานม้วนกระดาษปี : -
               </div>
 
-              <!-- ปุ่ม Tabs (ขวา) -->
               <div id="yearly-grade-tabs-container" class="sub-tabs hidden" style="display: flex; gap: 8px; flex-wrap: wrap; margin: 0;">
                   <button class="sub-tab active" onclick="filterYearlyPivot('CA', this)">CA</button>
                   <button class="sub-tab" onclick="filterYearlyPivot('KA', this)">KA</button>
@@ -639,11 +631,11 @@
                   <button class="sub-tab" onclick="filterYearlyPivot('KW', this)">KW</button>
                   <button class="sub-tab" onclick="filterYearlyPivot('FSC', this)" id="btn-tab-fsc-yearly" style="border-color: var(--green); color: var(--green-dark);">FSC</button>
               </div>
-
           </div>
 
           <div id="yearly-pivot-result" class="report-wrap" style="overflow-x: auto; padding-bottom: 20px;"></div>
         </div>
+
       </div>
     </div>
 
@@ -656,7 +648,8 @@
           <div></div>
         </div>
 
-                <div class="filters no-print">
+        <!-- 🌟 Filters (เฉพาะหน้า Reservations) -->
+        <div class="filters no-print">
           <label>📅 วันที่จอง:
             <input type="text" id="reservationDate" name="no_autofill_res" autocomplete="new-password" readonly>
           </label>
@@ -678,22 +671,24 @@
             </div>
           </label>
 
-          <!-- ปุ่มทั้งหมด -->
+          <!-- ปุ่มโหลดข้อมูล -->
           <button class="primary" onclick="loadReservations()">🔍 โหลดข้อมูล</button>
 
+          <!-- 📤 Export Excel -->
           <button onclick="exportReservations()" style="background:#f0fdf4; color:#166534; border-color:#86efac; margin-left:8px;">
               📤 Export Excel
           </button>
-          
+
+          <!-- 📥 Import Excel -->
           <button onclick="document.getElementById('fileResImport').click()" style="background:#eff6ff; color:#1e40af; border-color:#93c5fd; margin-left:8px;">
               📥 Import Excel
           </button>
         </div>
 
-        <!-- ซ่อน Input file ไว้ข้างนอกกรอบ Filter จะปลอดภัยที่สุดครับ -->
+        <!-- ซ่อน Input file ไว้ข้างนอกกรอบ Filter -->
         <input type="file" id="fileResImport" accept=".xlsx,.xls" class="hidden" onchange="importReservations(event)">
 
-        <!-- ส่วนหัว: ข้อความและ Tabs (เหมือน Usage Pivot) -->
+        <!-- 🌟 ส่วนหัวข้อและ Tabs -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
           <div id="resCurrentDateLabel" style="font-size: 16px; font-weight: 700; margin: 0; color: #1e293b;">
             ตารางการจองม้วนกระดาษ ณ วันที่ : -
@@ -718,10 +713,13 @@
           </table>
         </div>
 
-        <!-- 🔄 ปุ่มรีเซ็ตการจอง (ย้ายมาด้านล่างขวาของตาราง) -->
-        <div class="no-print" style="display:flex; justify-content:flex-end; margin-top:12px;">
-          <button class="danger" onclick="resetReservations()">🔄 รีเซ็ตการจอง</button>
+        <!-- 🔄 ปุ่มรีเซ็ตการจอง (ล่างขวา) -->
+        <div class="no-print" style="display:flex; justify-content:flex-end; margin-top:16px; padding-top:16px; border-top:1px dashed var(--border-strong);">
+            <button onclick="resetReservations()" class="danger" style="padding:8px 20px; font-weight:700;">
+                🔄 รีเซ็ตการจอง
+            </button>
         </div>
+
       </div>
     </div>
 
