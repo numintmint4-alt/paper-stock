@@ -5,6 +5,7 @@
 // + Auto-load Master Data (ensureMasterDataLoaded)
 // + Fix: เปลี่ยนตาราง Master เป็น 'paper_specs'
 // + Fix: แสดงค่าติดลบใน Matrix (val !== 0)
+// + NEW: Export / Import Excel
 // ==========================================
 
 let resState = {
@@ -739,5 +740,187 @@ async function resetReservations() {
     } catch (err) {
         console.error('Reset reservations error:', err);
         showToast('รีเซ็ตไม่สำเร็จ: ' + err.message, 'err');
+    }
+}
+
+// ==========================================
+// 8.12 Export ตารางการจองเป็น Excel (มีแถวตัวอย่าง)
+// ==========================================
+function exportReservations() {
+    // 1. สร้าง Header และแถวตัวอย่าง
+    const headers = [
+        'วันที่จอง', 'Gradegrams', 'Size', 'Supplier', 
+        'จำนวน (ม้วน)', 'คุณภาพ', 'ปั๊มลูกค้า', 'ประเภท', 
+        'หมายเหตุ', 'สถานะ', 'การเคลื่อนไหว'
+    ];
+
+    // 🔽 แถวตัวอย่าง (Sample Row) สำหรับให้คนกรอกใหม่ดูเป็นแนวทาง
+    const sampleRow = [
+        '2026-11-14', 'CA125', 44, 'EKP', 
+        5, 'A', 'ปั๊ม BT', 'ประมาณการ', 
+        'ตัวอย่างการกรอก', 'จองอยู่', 'ปกติ'
+    ];
+
+    // 2. ดึงข้อมูลจริง (ถ้ามี)
+    const dataRows = [];
+    if (resState.data && resState.data.length > 0) {
+        resState.data.forEach(r => {
+            let qType = 'ปกติ';
+            if (r.adjust_type === 'decrease') qType = 'ปรับลด/คืน';
+            
+            // แปลงวันที่ให้เป็น YYYY-MM-DD
+            let dateStr = '-';
+            if (r.reservation_date) {
+                const d = new Date(r.reservation_date);
+                dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+            }
+
+            dataRows.push([
+                dateStr,
+                r.grade || '-',
+                r.size || '-',
+                r.supplier || '-',
+                Number(r.quantity) || 0,
+                r.quality === 'B' ? 'B' : 'A',
+                r.customer_mark || '-',
+                r.reason_type === 'forecast' ? 'ประมาณการ' : (r.reason_note || 'อื่นๆ'),
+                r.remark || '-',
+                r.status === 'reserved' ? 'จองอยู่' : 'ปิด/ตัดยอด',
+                qType
+            ]);
+        });
+    }
+
+    // 3. รวมข้อมูลทั้งหมด (Header -> Sample -> Data)
+    const wsData = [headers, sampleRow, ...dataRows];
+
+    // 4. สร้าง Worksheet
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // 5. ปรับความกว้างคอลัมน์ให้อ่านง่าย
+    ws['!cols'] = [
+        {wch: 14}, // วันที่
+        {wch: 12}, // Grade
+        {wch: 8},  // Size
+        {wch: 10}, // Supplier
+        {wch: 12}, // จำนวน
+        {wch: 10}, // คุณภาพ
+        {wch: 15}, // ปั๊มลูกค้า
+        {wch: 18}, // ประเภท
+        {wch: 25}, // หมายเหตุ
+        {wch: 12}, // สถานะ
+        {wch: 15}  // การเคลื่อนไหว
+    ];
+
+    // 6. สร้างไฟล์และดาวน์โหลด
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'RollReservations');
+    
+    const today = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `roll_reservations_${today}.xlsx`);
+    
+    showToast('✅ Export สำเร็จ', 'ok');
+}
+
+// ==========================================
+// 8.13 Import ตารางการจองจาก Excel
+// ==========================================
+async function importReservations(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const btn = event.target.previousElementSibling; // ปุ่ม Import
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '⏳ กำลัง Import...';
+
+    try {
+        const data = await file.arrayBuffer();
+        const wb = XLSX.read(data, { type: 'array' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+        if (!rows.length) throw new Error('ไฟล์ไม่มีข้อมูล');
+
+        const payload = [];
+        const errors = [];
+
+        // ตรวจสอบข้อมูลทีละแถว
+        rows.forEach((row, idx) => {
+            const rowNum = idx + 2; // +2 เพราะ Excel เริ่มที่ 1 และมี Header
+            const date = String(row['วันที่จอง'] || '').trim();
+            const grade = String(row['Gradegrams'] || '').trim().toUpperCase();
+            const size = Number(row['Size']);
+            const qty = Number(row['จำนวน (ม้วน)']);
+            
+            if (!date || !grade || !size || isNaN(qty) || qty === 0) {
+                errors.push(`แถว ${rowNum}: ข้อมูลไม่ครบ (วันที่/Grade/Size/จำนวน)`);
+                return;
+            }
+
+            // จัดรูปแบบวันที่ (ลองแปลงให้เป็น YYYY-MM-DD)
+            let isoDate = date;
+            if (date.includes('/')) {
+                const parts = date.split('/');
+                if (parts.length === 3) {
+                    // สมมติว่าเป็น DD/MM/YYYY
+                    isoDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                }
+            }
+
+            const qualityStr = String(row['คุณภาพ'] || 'A').trim().toUpperCase();
+            const quality = qualityStr.includes('B') ? 'B' : 'A';
+
+            const reasonTypeStr = String(row['ประเภท'] || '').trim();
+            const reasonType = reasonTypeStr === 'ประมาณการ' ? 'forecast' : 'other';
+
+            payload.push({
+                reservation_date: isoDate,
+                grade: grade,
+                size: size,
+                supplier: String(row['Supplier'] || '').trim() || null,
+                quantity: qty,
+                quality: quality,
+                customer_mark: String(row['ปั๊มลูกค้า'] || '-').trim(),
+                reason_type: reasonType,
+                reason_note: reasonType === 'other' ? reasonTypeStr : null,
+                remark: String(row['หมายเหตุ'] || '').trim(),
+                adjust_type: 'increase',
+                status: 'reserved',
+                created_by: currentUser?.id || null
+            });
+        });
+
+        if (payload.length === 0) {
+            throw new Error(`ไม่มีข้อมูลที่สามารถ Import ได้\n${errors.slice(0, 3).join('\n')}`);
+        }
+
+        // บันทึกทีละ 500 แถว (ป้องกัน payload ใหญ่เกิน)
+        const CHUNK_SIZE = 500;
+        let successCount = 0;
+
+        for (let i = 0; i < payload.length; i += CHUNK_SIZE) {
+            const chunk = payload.slice(i, i + CHUNK_SIZE);
+            const { error } = await supabase.from('roll_reservations').insert(chunk);
+            if (error) throw error;
+            successCount += chunk.length;
+        }
+
+        showToast(`✅ Import สำเร็จ ${successCount} รายการ`, 'ok', 4000);
+        if (errors.length > 0) {
+            console.warn('Import errors:', errors);
+            alert(`Import สำเร็จ ${successCount} รายการ\n\nแต่มีบางแถวที่ข้ามไป (${errors.length} แถว):\n\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? '\n...' : ''}`);
+        }
+
+        // โหลดข้อมูลใหม่
+        await loadReservations();
+
+    } catch (err) {
+        console.error('importReservations error:', err);
+        alert('Import ไม่สำเร็จ: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+        event.target.value = ''; // reset input file
     }
 }
