@@ -5,7 +5,9 @@
 //  - confirmCartQty → push Draft + refresh modal + fill form
 //  - saveMatrixOrder → UPDATE roll_reservations SET status='completed'
 //  - createPOFromAlert → บล็อกถ้ามี Draft ค้าง
-//  - removeMatrixOrderRow → ลบแถว + คืนยอดจอง (ล้าง Draft + refresh modal)
+//  - V.13.10: แถวฟอร์มจำ res_id → ป้าย "(จากยอดจอง - Reserved)"
+//    removeMatrixOrderRow คืนยอดจองเฉพาะแถวที่มี res_id (Stock กลางไม่ยุ่ง)
+//    refreshReservationBox รีเฟรชเฉพาะกล่องเหลือง / cancelDraftOrder ล้างเฉพาะ cell
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -1384,11 +1386,11 @@ async function openAlertMatrixCell(gradegram, size) {
     <div class="matrix-cell-summary" style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border-color:#fcd34d;margin-top:12px">
       <div class="matrix-cell-summary-title" style="color:#92400e">
         🔖 ยอดจอง (Reserved)
-        <span class="alert-status-badge" style="background:#fbbf24;color:#fff">
+        <span class="alert-status-badge" id="alertReservedBadge" style="background:#fbbf24;color:#fff">
           ${reservedTotal > 0 ? reservedTotal + ' ม้วน' : 'ไม่มี'}
         </span>
       </div>
-      <div style="margin-top:8px">
+      <div style="margin-top:8px" id="alertReservationBox">
         ${buildReservationHtml(reservations)}
       </div>
     </div>
@@ -1442,7 +1444,7 @@ function renderMatrixOrderForm(gradegram, size, items) {
         ${rowsHtml}
       </div>
       <div class="form-actions">
-        <button type="button" onclick="closeModal('modalAlertMatrixCell')">ยกเลิก</button>
+        <button type="button" onclick="cancelDraftOrder('${esc(gradegram)}', ${size})">ยกเลิก</button>
         <button type="button" class="primary" onclick="saveMatrixOrder('${esc(gradegram)}', ${size})">
           💾 บันทึก
         </button>
@@ -1464,10 +1466,15 @@ function renderMatrixOrderRow(idx, it) {
     `<option value="${q.value}" ${it.quality_b === q.value ? 'selected' : ''}>${q.label}</option>`
   ).join('');
 
+  // 🏷️ ป้ายบอกว่าแถวนี้มาจากยอดจอง (ถ้ามี res_id)
+  const resTag = it.res_id
+    ? '<span class="row-res-tag" style="color:#38bdf8;font-weight:600;font-size:12px;margin-left:6px">(จากยอดจอง - Reserved)</span>'
+    : '';
+
   return `
-    <div class="matrix-order-row" data-row-idx="${idx}">
+    <div class="matrix-order-row" data-row-idx="${idx}" data-res-id="${esc(String(it.res_id || ''))}">
       <div class="matrix-order-row-head">
-        <span class="row-label">รายการที่ ${idx + 1}</span>
+        <span class="row-label"><span class="row-num">รายการที่ ${idx + 1}</span>${resTag}</span>
         <button type="button" class="row-remove-btn" onclick="removeMatrixOrderRow(this)" title="ลบรายการนี้">✕</button>
       </div>
 
@@ -1523,50 +1530,100 @@ function addMatrixOrderRow(gradegram, size) {
   renumberMatrixOrderRows();
 }
 
-// ✅ FIX: ลบแถวแล้วคืนยอดจอง (ล้าง Draft + รีเฟรช Modal)
-function removeMatrixOrderRow(btn) {
-  // 🔍 1. หาแถวที่ถูกกดลบ
+// ✅ FIX: ลบแถว → ถ้าแถวมาจากยอดจอง (มี res_id) ให้คืนยอดจองเฉพาะรายการนั้น
+//         ถ้าเป็นแถวจาก Stock กลาง (ไม่มี res_id) แค่ลบแถว ไม่ยุ่งกับยอดจอง
+async function removeMatrixOrderRow(btn) {
   const row = btn.closest('.matrix-order-row');
   if (!row) return;
 
-  // 🔍 2. หา Container หลัก
   const rowsBox = document.getElementById('matrixOrderRows');
   if (!rowsBox) return;
 
-  // 🔽 3. ลบแถวนี้ออก
+  // อ่าน Grade/Size จากฟอร์มโดยตรง (ไม่ใช้ regex จากหัวข้อ Modal แล้ว)
+  const form = document.getElementById('matrixOrderForm');
+  const gradegram = form?.dataset.gradegram || '';
+  const size = Number(form?.dataset.size);
+  const resId = row.dataset.resId || '';
+
+  // 1. ลบแถว
   row.remove();
 
-  // 🔽 4. ถ้าลบจนไม่เหลือแถวเลย ให้สร้างแถวว่างมา 1 แถว
-  const remaining = rowsBox.querySelectorAll('.matrix-order-row').length;
-  if (remaining === 0) {
+  // 2. ถ้าไม่เหลือแถวเลย ให้สร้างแถวว่าง 1 แถว
+  if (rowsBox.querySelectorAll('.matrix-order-row').length === 0) {
     const wrapper = document.createElement('div');
     wrapper.innerHTML = renderMatrixOrderRow(0, { qty: '', sup: '', customer_roll: 'normal', quality_b: 'normal', note: '' });
     rowsBox.appendChild(wrapper.firstElementChild);
   }
 
-  // 🔽 5. จัดเรียงเลขรายการใหม่
+  // 3. จัดเลขใหม่
   renumberMatrixOrderRows();
 
-  // 🔽 6. สำคัญมาก: คืนยอดจองกลับเข้าระบบ (ล้าง Draft)
-  if (typeof _draftPendingItems !== 'undefined') {
-    _draftPendingItems = []; // ล้าง Draft ที่ค้างอยู่ทั้งหมด
+  // 4. แถวจาก Stock กลาง → จบแค่นี้
+  if (!resId) return;
 
-    // ดึง Grade/Size จากชื่อหัวข้อ Modal เพื่อสั่งรีเฟรช
-    const titleStr = document.getElementById('alertMatrixCellTitle')?.innerText || '';
-    const match = titleStr.match(/([A-Za-z0-9]+)-(\d+)/);
+  // 5. แถวจากยอดจอง → คืนยอด
+  const draftIdx = _draftPendingItems.findIndex(d => String(d.resId) === String(resId));
+  if (draftIdx >= 0) {
+    // ยังเป็น Draft (ยังไม่กดบันทึก) → ลบ Draft ออกจาก memory
+    _draftPendingItems.splice(draftIdx, 1);
+  } else {
+    // บันทึกไปแล้ว (DB เป็น completed) → คืนสถานะเป็น reserved + ลบรายการออกจากที่บันทึกไว้
+    await _restoreReservations([resId]);
 
-    if (match) {
-      // สั่งรีเฟรช Modal ทันที (ยอดจองจะเด้งกลับมา)
-      openAlertMatrixCell(match[1], Number(match[2]));
+    const saved = getAlertItems(gradegram, size);
+    const i = saved.findIndex(it => String(it.res_id) === String(resId));
+    if (i >= 0) {
+      saved.splice(i, 1);
+      saveAlertItems(gradegram, size, saved);
+      applyAlertFiltersAndRender();
     }
+  }
+
+  // 6. รีเฟรชเฉพาะกล่องยอดจอง (ไม่โหลด Modal ใหม่ → แถวอื่นที่กรอกค้างไม่หาย)
+  await refreshReservationBox(gradegram, size);
+}
+
+// คืนสถานะยอดจองใน DB กลับเป็น reserved
+async function _restoreReservations(ids) {
+  const clean = (ids || []).filter(Boolean);
+  if (!clean.length) return;
+  try {
+    const { error } = await supabase
+      .from('roll_reservations')
+      .update({ status: 'reserved' })
+      .in('id', clean);
+    if (error) throw error;
+
+    if (typeof loadReservations === 'function') {
+      try { await loadReservations(); } catch (e) { console.warn(e); }
+    }
+  } catch (err) {
+    console.error('_restoreReservations error:', err);
+    alert('⚠️ คืนยอดจองไม่สำเร็จ: ' + err.message);
+  }
+}
+
+// รีเฟรชเฉพาะกล่องสีเหลือง (ยอดจอง) ใน Modal
+async function refreshReservationBox(gradegram, size) {
+  const box = document.getElementById('alertReservationBox');
+  if (!box) return;
+
+  const resMap = await loadAlertReservations();
+  const list = resMap[`${gradegram}|${size}`] || [];
+  box.innerHTML = buildReservationHtml(list);
+
+  const badge = document.getElementById('alertReservedBadge');
+  if (badge) {
+    const total = list.reduce((s, x) => s + (Number(x.quantity) || 0), 0);
+    badge.textContent = total > 0 ? `${total} ม้วน` : 'ไม่มี';
   }
 }
 
 function renumberMatrixOrderRows() {
   const rows = document.querySelectorAll('#matrixOrderRows .matrix-order-row');
   rows.forEach((row, idx) => {
-    const label = row.querySelector('.row-label');
-    if (label) label.textContent = `รายการที่ ${idx + 1}`;
+    const num = row.querySelector('.row-num');
+    if (num) num.textContent = `รายการที่ ${idx + 1}`;
     row.dataset.rowIdx = idx;
   });
 }
@@ -1603,17 +1660,27 @@ async function saveMatrixOrder(gradegram, size) {
 
     if (!qty || Number(qty) <= 0) continue;
 
-    items.push({
+    const item = {
       qty: String(Number(qty)),
       sup,
       customer_roll: cust,
       quality_b: qual,
       note
-    });
+    };
+    // 🏷️ จำไว้ว่าแถวนี้มาจากยอดจองรายการไหน (Stock กลางจะไม่มีฟิลด์นี้)
+    if (row.dataset.resId) item.res_id = row.dataset.resId;
+
+    items.push(item);
   }
 
   if (!items.length) {
     if (!confirm('⚠️ ไม่มีรายการที่กรอก → ต้องการลบข้อมูลของ cell นี้ทั้งหมดหรือไม่?')) return;
+
+    // คืนยอดจองของรายการที่เคยบันทึกไว้ + ล้าง Draft ของ cell นี้
+    const oldResIds = getAlertItems(gradegram, size).map(i => i.res_id).filter(Boolean);
+    _draftPendingItems = _draftPendingItems.filter(d => !(d.gradegram === gradegram && Number(d.size) === Number(size)));
+    await _restoreReservations(oldResIds);
+
     saveAlertItems(gradegram, size, []);
     closeModal('modalAlertMatrixCell');
     applyAlertFiltersAndRender();
@@ -3497,22 +3564,18 @@ async function confirmCartQty(resId, gradegram, size, supplier, quality) {
 
   closeModal('modalCartQty');
 
-  // 🔍 2. รีเฟรช Modal Alert (เพื่อให้ยอดบนการ์ดลดลงทันที)
-  const titleStr = document.getElementById('alertMatrixCellTitle')?.innerText || '';
-  const match = titleStr.match(/([A-Za-z0-9]+)-(\d+)/);
-  if (match) {
-    await openAlertMatrixCell(match[1], Number(match[2]));
-  }
+  // 🔍 2. เติมข้อมูลลงฟอร์มด้านล่าง (พร้อมจำ resId)
+  fillOrderForm(gradegram, size, qty, supplier, quality, resId);
 
-  // 🔍 3. เติมข้อมูลลงฟอร์มด้านล่าง
-  fillOrderForm(gradegram, size, qty, supplier, quality);
+  // 🔍 3. รีเฟรชเฉพาะกล่องยอดจอง (ไม่โหลด Modal ใหม่ เพื่อไม่ให้แถวที่กรอกค้างหาย)
+  await refreshReservationBox(gradegram, size);
 }
 
 // ==========================================
 // NEW: เติมแถวลงฟอร์ม (ไม่ต้องมี Draft ref แล้ว)
 // ✅ FIX #2: ล้างแถวว่างก่อนเพิ่มแถวใหม่ (กันไปโผล่รายการที่ 2)
 // ==========================================
-function fillOrderForm(gradegram, size, qty, supplier, quality) {
+function fillOrderForm(gradegram, size, qty, supplier, quality, resId) {
   let form = document.getElementById('matrixOrderForm');
   if (!form) {
     const prompt = document.getElementById('matrixOrderPrompt');
@@ -3537,7 +3600,8 @@ function fillOrderForm(gradegram, size, qty, supplier, quality) {
       sup: supplier,
       customer_roll: 'normal',
       quality_b: quality === 'B' ? 'nc' : 'normal',
-      note: ''
+      note: '',
+      res_id: resId || ''
     };
 
     const wrapper = document.createElement('div');
@@ -3560,7 +3624,12 @@ function fillOrderForm(gradegram, size, qty, supplier, quality) {
 // ==========================================
 // NEW: ยกเลิก Draft (ถ้าต้องการรีเซ็ต)
 // ==========================================
-function cancelDraftOrder() {
-  _draftPendingItems = [];
+function cancelDraftOrder(gradegram, size) {
+  if (gradegram !== undefined) {
+    // ล้างเฉพาะ Draft ของ cell นี้
+    _draftPendingItems = _draftPendingItems.filter(d => !(d.gradegram === gradegram && Number(d.size) === Number(size)));
+  } else {
+    _draftPendingItems = [];
+  }
   closeModal('modalAlertMatrixCell');
 }
