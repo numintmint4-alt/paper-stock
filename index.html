@@ -680,9 +680,6 @@
           </label>
 
           <button class="primary" onclick="loadReservations()">🔍 โหลดข้อมูล</button>
-
-          <!-- 🔄 ปุ่มรีเซ็ตการจอง (NEW) -->
-          <button class="danger" onclick="resetReservations()" style="margin-left:auto;">🔄 รีเซ็ตการจอง</button>
         </div>
 
         <!-- ส่วนหัว: ข้อความและ Tabs (เหมือน Usage Pivot) -->
@@ -708,6 +705,11 @@
             <thead id="res-thead"></thead>
             <tbody id="res-tbody"></tbody>
           </table>
+        </div>
+
+        <!-- 🔄 ปุ่มรีเซ็ตการจอง (ย้ายมาด้านล่างขวาของตาราง) -->
+        <div class="no-print" style="display:flex; justify-content:flex-end; margin-top:12px;">
+          <button class="danger" onclick="resetReservations()">🔄 รีเซ็ตการจอง</button>
         </div>
       </div>
     </div>
