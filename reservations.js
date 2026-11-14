@@ -4,6 +4,7 @@
 // + Fix: ใช้ window.fcState แทน fcState ตรงๆ (แก้ ReferenceError)
 // + Fix: ลบ let resState ที่ซ้ำซ้อน
 // + NEW: Export Form / Export Data / Import Excel
+// + NEW (V.2): openReservationDetail — แสดงหน้ารายละเอียดว่างก่อน ถ้าไม่มีข้อมูล
 // ==========================================
 
 // 🔽 สร้าง fcState รอไว้เลย ป้องกัน ReferenceError
@@ -254,8 +255,19 @@ async function openReservationDetail(grade, size) {
 
         if (error) throw error;
 
+        // 🔥 V.2: เปลี่ยนจากเด้งไปฟอร์มเพิ่มทันที เป็นโชว์หน้ารายละเอียดว่างๆ ก่อน
         if (!data || data.length === 0) {
-            openAddReservationForm(grade, size);
+            let html = `
+                <div style="text-align:center; padding:30px; color:#94a3b8;">
+                    <p style="font-size:16px; margin-bottom:10px;">ไม่พบประวัติการจองสำหรับรายการนี้</p>
+                    <p style="font-size:13px;">คุณสามารถเพิ่มรายการจองใหม่ได้โดยกดปุ่มด้านล่าง</p>
+                </div>
+                <div class="form-actions" style="margin-top:20px; display:flex; gap:8px; justify-content:center;">
+                    <button type="button" class="primary" onclick="openAddReservationForm('${escAttr(grade)}', ${size})">➕ เพิ่มรายการจอง</button>
+                    <button type="button" onclick="closeModal('modalReservationDetail')">ปิด</button>
+                </div>
+            `;
+            body.innerHTML = html;
             return;
         }
 
