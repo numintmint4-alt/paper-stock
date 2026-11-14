@@ -1,14 +1,15 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK V10.1 — alert.js — V.14.1 (DB Sync + Fix)
+//  STOCK V10.1 — alert.js — V.15.0 (Confirm PO ไม่หักยอดจอง)
 //  - ย้ายจาก LocalStorage → Supabase (alert_receive_dates, alert_active_inputs)
 //  - Draft PO in-memory (_draftPendingItems) + บล็อกสร้าง PO ถ้ามี Draft ค้าง
 //  - buildReservationHtml หักยอดด้วย Draft + ปุ่ม 🛒 ใส่ตะกร้า
 //  - removeMatrixOrderRow คืนยอดจองเฉพาะแถวที่มี res_id
 //  - refreshReservationBox รีเฟรชเฉพาะกล่องเหลือง
 //  - cancelDraftOrder ล้างเฉพาะ cell + คืนสถานะ reserved
-//  - clearAlertInputs: async + คืนยอดจองจาก Draft + ลบ DB + Toast (V.14.1)
-//  - confirmCreatePO: try/catch + คืนค่าปุ่มเมื่อ error (V.14.1)
-//  - confirmCartQty: ไม่แตะ DB (reserved ต่อไป) — เฉพาะ refresh box (V.14.1)
+//  - clearAlertInputs: async + คืนยอดจองจาก Draft + ลบ DB + Toast
+//  - confirmCreatePO: ไม่ UPDATE roll_reservations (V.15.0)
+//      → ยอดจองจะถูกหักตอนกด "Save" ใน saveMatrixOrder แทน
+//  - confirmCartQty: ไม่แตะ DB (reserved ต่อไป) — เฉพาะ refresh box
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -1400,7 +1401,6 @@ async function openAlertMatrixCell(gradegram, size) {
   bodyEl.innerHTML = html;
   openModal('modalAlertMatrixCell');
 }
-
 // ═══════════════════════════════════════════════════════════════
 //  MATRIX ORDER FORM
 // ═══════════════════════════════════════════════════════════════
@@ -1659,7 +1659,7 @@ async function saveMatrixOrder(gradegram, size) {
     return;
   }
 
-  // อัปเดต roll_reservations → completed
+  // 🔥 อัปเดต roll_reservations → completed (ที่นี่ที่เดียวเท่านั้นที่หักยอดจอง)
   try {
     const draftsToSave = _draftPendingItems.filter(d => d.gradegram === gradegram && Number(d.size) === Number(size));
     if (draftsToSave.length > 0) {
@@ -2262,7 +2262,7 @@ async function onAlertInput(gradegram, size, field, value, el) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  CLEAR (V.14.1 — async + คืนยอดจอง + ลบ DB + Toast)
+//  CLEAR
 // ═══════════════════════════════════════════════════════════════
 
 async function clearAlertInputs() {
@@ -2279,7 +2279,6 @@ async function clearAlertInputs() {
     const resIds = draftsToRestore.map(d => d.resId);
     await _restoreReservations(resIds);
 
-    // ลบ Draft ที่คืนไปแล้วออกจาก Memory
     _draftPendingItems = _draftPendingItems.filter(d => !draftsToRestore.includes(d));
   }
 
@@ -2304,7 +2303,6 @@ async function clearAlertInputs() {
   document.body.appendChild(msg);
   setTimeout(() => msg.remove(), 2000);
 }
-
 // ═══════════════════════════════════════════════════════════════
 //  CREATE PO
 // ═══════════════════════════════════════════════════════════════
@@ -2482,63 +2480,31 @@ function renderAlertPODetail(items) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  CONFIRM CREATE PO (V.14.1 — try/catch + คืนค่าปุ่ม + lock)
+//  CONFIRM CREATE PO (V.15.0 — ไม่ UPDATE roll_reservations)
 // ═══════════════════════════════════════════════════════════════
 
 async function confirmCreatePO() {
   if (!_pendingPOItems || !_pendingPOItems.length) return;
 
   const confirmBtn = document.querySelector('#modalAlertPODetail .form-actions .primary');
-
-  // 🔥 1. ดักไว้เลยว่า ถ้าปุ่มถูก disable อยู่ (กำลังทำงาน) ห้ามกดซ้ำ
   if (confirmBtn && confirmBtn.disabled) return;
-
-  // 🔥 2. เปลี่ยนสถานะปุ่มเป็นกำลังโหลด
   if (confirmBtn) {
     confirmBtn.disabled = true;
     confirmBtn.textContent = '⏳ กำลังสร้าง PO...';
   }
 
+  const missingSup = _pendingPOItems.filter(it => !it.sup || String(it.sup).trim() === '');
+  if (missingSup.length > 0) {
+    alert(`⚠️ ไม่สามารถสร้าง PO ได้\n\nมี ${missingSup.length} รายการที่ยังไม่ได้ระบุผู้ขาย (Sup.)\nกรุณาตรวจสอบและเลือก Sup. ให้ครบก่อน`);
+    if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = '✅ ยืนยันสร้าง PO'; }
+    return;
+  }
+
   try {
-    // --- ตรวจสอบข้อมูลก่อนสร้าง ---
-    const missingSup = _pendingPOItems.filter(it => !it.sup || String(it.sup).trim() === '');
-    if (missingSup.length > 0) {
-      throw new Error(`มี ${missingSup.length} รายการที่ยังไม่ได้ระบุผู้ขาย (Sup.)`);
-    }
-
-    // --- ล็อคการทำงาน (ระบบ Lock กันกดซ้ำ / กันคนอื่นสร้างพร้อมกัน) ---
-    try {
-      const fiveMinsAgo = new Date(Date.now() - 5 * 60000).toISOString();
-      await supabase.from('alert_po_locks').delete().lt('created_at', fiveMinsAgo);
-
-      const { data: existingLocks, error: checkErr } = await supabase
-        .from('alert_po_locks')
-        .select('*')
-        .gte('created_at', fiveMinsAgo);
-
-      if (!checkErr && existingLocks && existingLocks.length > 0) {
-        throw new Error('มีผู้ใช้อื่นกำลังสร้าง PO อยู่ กรุณารอสักครู่แล้วลองใหม่');
-      }
-
-      const lockKey = `po_lock_${Date.now()}_${currentUser?.id || 'anon'}`;
-      await supabase.from('alert_po_locks').insert({
-        lock_key: lockKey,
-        user_id: currentUser?.id || null
-      });
-    } catch (lockErr) {
-      if (lockErr?.code !== '42P01') {
-        // ถ้า error จากการ lock และไม่ใช่ตารางไม่มี → throw ต่อ
-        if (lockErr.message && lockErr.message.includes('มีผู้ใช้อื่น')) {
-          throw lockErr;
-        }
-        console.warn('Lock error:', lockErr);
-      }
-    }
-
-    // --- ดำเนินการสร้าง PO ---
     const analyzedDate = getISODateFromInput('alertDate') || toISODate(new Date());
     const uniqueDates = [...new Set(alertReceiveDates)].filter(Boolean);
 
+    // ส่งข้อมูลไปหน้า PO
     sessionStorage.setItem('alert_to_po', JSON.stringify({
       items: _pendingPOItems,
       analyzed_date: analyzedDate,
@@ -2550,9 +2516,13 @@ async function confirmCreatePO() {
 
     markAlertPOCreated(`ref_${Date.now()}`);
 
+    // บันทึกประวัติ (Snapshot)
     saveAlertSnapshot(uniqueDates).then(res => {
       if (res.ok) console.log('✅ Alert snapshot saved:', res.data);
     });
+
+    // 🔥 สำคัญ: ไม่มีการ UPDATE roll_reservations ตรงนี้แล้ว
+    // ยอดจองจะถูกหักตอนกด "Save" ในฟังก์ชัน saveMatrixOrder แทน
 
     setTimeout(() => {
       closeModal('modalAlertPODetail');
@@ -2562,7 +2532,6 @@ async function confirmCreatePO() {
       if (poBtn) poBtn.click();
       else alert('ยังไม่ได้เพิ่ม Tab Purchase Order');
 
-      // 🔥 คืนค่าปุ่ม (เผื่อกรณีที่ Modal ไม่ถูกปิด)
       if (confirmBtn) {
         confirmBtn.disabled = false;
         confirmBtn.textContent = '✅ ยืนยันสร้าง PO';
@@ -2570,10 +2539,8 @@ async function confirmCreatePO() {
     }, 300);
 
   } catch (err) {
-    // 🔥 3. ถ้าเกิด Error ให้แจ้งเตือน และ "คืนค่าปุ่ม" กลับมาให้กดได้ใหม่
     console.error('Create PO Error:', err);
-    alert(`⚠️ ไม่สามารถสร้าง PO ได้\n\n${err.message}\n\nกรุณาตรวจสอบและเลือก Sup. ให้ครบก่อน`);
-
+    alert(`⚠️ ไม่สามารถสร้าง PO ได้\n\n${err.message}\n\nกรุณาตรวจสอบและลองใหม่อีกครั้ง`);
     if (confirmBtn) {
       confirmBtn.disabled = false;
       confirmBtn.textContent = '✅ ยืนยันสร้าง PO';
@@ -3586,7 +3553,7 @@ function onReservationCartClick(resId, gradegram, size, maxQty, supplier, qualit
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  CONFIRM CART QTY (V.14.1 — ไม่แตะ DB, DB ยังเป็น reserved)
+//  CONFIRM CART QTY (ไม่แตะ DB, DB ยังเป็น reserved)
 // ═══════════════════════════════════════════════════════════════
 
 async function confirmCartQty(resId, gradegram, size, supplier, quality) {
