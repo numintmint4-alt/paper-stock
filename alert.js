@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK V10.1 — alert.js — V.13.9
+//  STOCK V10.1 — alert.js — V.13.10
 //  NEW: Draft PO in-memory (_draftPendingItems) + บล็อกสร้าง PO ถ้ามี Draft ค้าง
 //  - buildReservationHtml หักยอดด้วย Draft ที่ค้าง → ซ่อนปุ่มตะกร้าถ้าเหลือ 0
-//  - confirmCartQty → push Draft + refresh modal + fill form
+//  - confirmCartQty → push Draft + refresh reservation box + fill form
 //  - saveMatrixOrder → UPDATE roll_reservations SET status='completed'
 //  - createPOFromAlert → บล็อกถ้ามี Draft ค้าง
 //  - V.13.10: แถวฟอร์มจำ res_id → ป้าย "(จากยอดจอง - Reserved)"
@@ -3387,7 +3387,7 @@ function renderAllAlertFilters() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  RESERVATIONS (ยอดจองม้วน) — V.13.9 (Draft in-memory)
+//  RESERVATIONS (ยอดจองม้วน) — V.13.10 (Draft in-memory + res_id tracking)
 // ═══════════════════════════════════════════════════════════════
 
 /**
@@ -3553,7 +3553,7 @@ function onReservationCartClick(resId, gradegram, size, maxQty, supplier, qualit
 }
 
 // ==========================================
-// NEW: ยืนยันจำนวน → push Draft + refresh modal + fill form
+// NEW: ยืนยันจำนวน → push Draft + refresh reservation box + fill form
 // ==========================================
 async function confirmCartQty(resId, gradegram, size, supplier, quality) {
   const qty = Number(document.getElementById('cartQtyInput').value);
@@ -3623,13 +3623,28 @@ function fillOrderForm(gradegram, size, qty, supplier, quality, resId) {
 
 // ==========================================
 // NEW: ยกเลิก Draft (ถ้าต้องการรีเซ็ต)
+// ล้างเฉพาะ Draft ของ cell นี้ + คืนสถานะยอดจองที่บันทึกไว้ + รีเฟรช Modal
 // ==========================================
-function cancelDraftOrder(gradegram, size) {
-  if (gradegram !== undefined) {
+async function cancelDraftOrder(gradegram, size) {
+  if (gradegram !== undefined && size !== undefined) {
     // ล้างเฉพาะ Draft ของ cell นี้
     _draftPendingItems = _draftPendingItems.filter(d => !(d.gradegram === gradegram && Number(d.size) === Number(size)));
+
+    // ถ้ามีการบันทึกไปแล้ว (ใน localStorage) ให้คืนสถานะกลับเป็น reserved
+    const savedItems = getAlertItems(gradegram, size);
+    const oldResIds = savedItems.map(i => i.res_id).filter(Boolean);
+    if (oldResIds.length > 0) {
+      await _restoreReservations(oldResIds);
+    }
+
+    // ล้างรายการที่เคยเซฟไว้ (ถ้าผู้ใช้กดยกเลิก = ไม่เอาทั้ง cell)
+    saveAlertItems(gradegram, size, []);
+
+    // รีเฟรช Modal ใหม่ทั้งหมดเพื่อให้ยอดจองเด้งกลับมา
+    await openAlertMatrixCell(gradegram, size);
+    applyAlertFiltersAndRender();
   } else {
     _draftPendingItems = [];
+    closeModal('modalAlertMatrixCell');
   }
-  closeModal('modalAlertMatrixCell');
 }
