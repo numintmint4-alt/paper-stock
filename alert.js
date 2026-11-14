@@ -1522,6 +1522,7 @@ function addMatrixOrderRow(gradegram, size) {
   renumberMatrixOrderRows();
 }
 
+// ✅ FIX #3: ลบแถวแล้วคืนยอดจอง (clear draft + refresh modal)
 function removeMatrixOrderRow(btn) {
   const rowsBox = document.getElementById('matrixOrderRows');
   if (!rowsBox) return;
@@ -1537,6 +1538,17 @@ function removeMatrixOrderRow(btn) {
   }
 
   renumberMatrixOrderRows();
+
+  // 🔽 ล้างค่า Draft ค้างในหน่วยความจำ แล้วรีเฟรช Modal เพื่อดึงยอดจองกลับมา
+  if (typeof _draftPendingItems !== 'undefined') {
+    _draftPendingItems = []; // ล้าง draft ทั้งหมด
+    // หา ID ของ Grade/Size จาก Title
+    const titleStr = document.getElementById('alertMatrixCellTitle')?.innerText || '';
+    const match = titleStr.match(/([A-Za-z0-9]+)-(\d+)/);
+    if (match) {
+      openAlertMatrixCell(match[1], Number(match[2])); // รีเฟรช Modal
+    }
+  }
 }
 
 function renumberMatrixOrderRows() {
@@ -3337,6 +3349,7 @@ function getAlertReservedTotal(resMap, gradegram, size) {
  * แสดง HTML ของยอดจอง — Card UI
  * - หักยอดที่ถูก Draft ไปแล้ว (จาก _draftPendingItems)
  * - ซ่อนปุ่มตะกร้าถ้ายอดเหลือ 0
+ * - ปุ่มเป็นแบบข้อความ+emoji (แก้บั๊ก SVG โดน CSS ตีจนหาย)
  */
 function buildReservationHtml(list) {
   if (!list || !list.length) {
@@ -3388,11 +3401,11 @@ function buildReservationHtml(list) {
           ${remainingQty > 0
             ? `<button type="button" 
                       onclick="onReservationCartClick('${safeId}', '${safeGrade}', ${safeSize}, ${remainingQty}, '${safeSup}', '${safeQuality}')"
-                      style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; width:32px; height:32px; border-radius:8px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s;"
+                      style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; padding:6px 12px; border-radius:6px; cursor:pointer; font-weight:700; font-size:12px; display:flex; align-items:center; gap:6px; transition:all 0.2s;"
                       onmouseover="this.style.background='#bae6fd'"
                       onmouseout="this.style.background='#e0f2fe'"
                       title="นำไปสั่งซื้อ">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                🛒 ใส่ตะกร้า
               </button>`
             : `<div style="color:#166534; font-size:12px; font-weight:700; padding:6px 10px; background:#dcfce7; border-radius:6px;">✅ ใช้ครบแล้ว</div>`
           }
@@ -3430,11 +3443,28 @@ function onReservationCartClick(resId, gradegram, size, maxQty, supplier, qualit
         
         <div style="display:flex; gap:10px;">
           <button type="button" onclick="closeModal('modalCartQty')" style="flex:1; padding:10px; border-radius:6px; border:1px solid #cbd5e1; background:#f8fafc; cursor:pointer;">ยกเลิก</button>
-          <button type="button" class="primary" id="cartConfirmBtn" onclick="confirmCartQty('${escAttr(resId)}', '${escAttr(gradegram)}', ${size}, '${escAttr(supplier)}', '${escAttr(quality)}')" style="flex:1; padding:10px; border-radius:6px; cursor:pointer;">ย้ายไป Draft</button>
+          <button type="button" class="primary" id="cartConfirmBtn" onclick="confirmCartQty('${escAttr(resId)}', '${escAttr(gradegram)}', ${size}, '${escAttr(supplier)}', '${escAttr(quality)}')" style="flex:1; padding:10px; border-radius:6px; cursor:pointer;">🛒 ใส่ตะกร้า</button>
         </div>
       </div>
     `;
     document.body.appendChild(modal);
+  } else {
+    // อัปเดตเนื้อหาถ้ามี modal อยู่แล้ว
+    const infoDiv = modal.querySelector('.modal div[style*="background:#f8fafc"]');
+    if (infoDiv) {
+      infoDiv.innerHTML = `
+        <div style="margin-bottom:4px;"><b>Gradegram:</b> ${esc(gradegram)} (Size ${size})</div>
+        <div style="margin-bottom:4px;"><b>Supplier:</b> ${esc(supplier || '-')}</div>
+        <div><b>คุณภาพ:</b> ${quality === 'B' ? 'B (NC)' : 'A'}</div>
+      `;
+    }
+    const qtyInput = modal.querySelector('#cartQtyInput');
+    if (qtyInput) qtyInput.value = maxQty;
+    const confirmBtn = modal.querySelector('#cartConfirmBtn');
+    if (confirmBtn) {
+      confirmBtn.setAttribute('onclick', `confirmCartQty('${escAttr(resId)}', '${escAttr(gradegram)}', ${size}, '${escAttr(supplier)}', '${escAttr(quality)}')`);
+      confirmBtn.textContent = '🛒 ใส่ตะกร้า';
+    }
   }
 
   modal.classList.add('show');
@@ -3469,6 +3499,7 @@ async function confirmCartQty(resId, gradegram, size, supplier, quality) {
 
 // ==========================================
 // NEW: เติมแถวลงฟอร์ม (ไม่ต้องมี Draft ref แล้ว)
+// ✅ FIX #2: ล้างแถวว่างก่อนเพิ่มแถวใหม่ (กันไปโผล่รายการที่ 2)
 // ==========================================
 function fillOrderForm(gradegram, size, qty, supplier, quality) {
   let form = document.getElementById('matrixOrderForm');
@@ -3480,6 +3511,15 @@ function fillOrderForm(gradegram, size, qty, supplier, quality) {
 
   const rowsBox = document.getElementById('matrixOrderRows');
   if (rowsBox) {
+    // 🔽 1. ล้างแถวว่างที่ไม่มีการกรอกข้อมูลออกก่อน (ถ้ามี)
+    const existingRows = rowsBox.querySelectorAll('.matrix-order-row');
+    if (existingRows.length === 1) {
+      const firstRowQty = existingRows[0].querySelector('.matrix-row-qty')?.value;
+      if (!firstRowQty || Number(firstRowQty) === 0) {
+        rowsBox.innerHTML = ''; // ลบแถวว่างทิ้ง
+      }
+    }
+
     const currentCount = rowsBox.querySelectorAll('.matrix-order-row').length;
     const newRow = {
       qty: qty,
