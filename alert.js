@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK V10.1 — alert.js — V.15.0 (Confirm PO ไม่หักยอดจอง)
+//  STOCK V10.1 — alert.js — V.16.0 (แนบ reservation_id ครบทุกจุด)
 //  - ย้ายจาก LocalStorage → Supabase (alert_receive_dates, alert_active_inputs)
 //  - Draft PO in-memory (_draftPendingItems) + บล็อกสร้าง PO ถ้ามี Draft ค้าง
 //  - buildReservationHtml หักยอดด้วย Draft + ปุ่ม 🛒 ใส่ตะกร้า
@@ -10,6 +10,8 @@
 //  - confirmCreatePO: ไม่ UPDATE roll_reservations (V.15.0)
 //      → ยอดจองจะถูกหักตอนกด "Save" ใน saveMatrixOrder แทน
 //  - confirmCartQty: ไม่แตะ DB (reserved ต่อไป) — เฉพาะ refresh box
+//  - V.16.0: แนบ reservation_id ครบ 3 จุด
+//      (saveMatrixOrder / createPOFromAlert / saveAlertItems)
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -1642,6 +1644,8 @@ async function saveMatrixOrder(gradegram, size) {
       note
     };
     if (row.dataset.resId) item.res_id = row.dataset.resId;
+    // 🔥 V.16.0: แนบ reservation_id เพื่อส่งต่อไปหน้า PO
+    if (row.dataset.resId) item.reservation_id = row.dataset.resId;
 
     items.push(item);
   }
@@ -1816,6 +1820,7 @@ function getAlertQtyTotal(gradegram, size, dateOrIdx) {
   return items.reduce((sum, it) => sum + (Number(it.qty) || 0), 0);
 }
 
+// 🔥 V.16.0: บันทึก res_id ลง DB ด้วย
 async function saveAlertItems(gradegram, size, items, dateOrIdx) {
   let isoDate = '';
   if (typeof dateOrIdx === 'string') isoDate = dateOrIdx;
@@ -1845,7 +1850,9 @@ async function saveAlertItems(gradegram, size, items, dateOrIdx) {
         customer_roll: it.customer_roll || 'normal',
         quality_b: it.quality_b || 'normal',
         note: it.note || '',
-        updated_by: currentUser?.id || null
+        updated_by: currentUser?.id || null,
+        // 🔥 V.16.0: บันทึก res_id ลง DB (สำคัญมาก — ต้องมีคอลัมน์ res_id ในตาราง)
+        res_id: it.res_id || it.reservation_id || null
       }));
       const { error } = await supabase.from('alert_active_inputs').insert(payload);
       if (error) throw error;
@@ -2371,7 +2378,9 @@ async function createPOFromAlert() {
           sup: it.sup || '',
           customer_roll: it.customer_roll || 'normal',
           quality_b: it.quality_b || 'normal',
-          note: it.note || ''
+          note: it.note || '',
+          // 🔥 V.16.0: ส่ง reservation_id ต่อไปยังหน้า PO
+          reservation_id: it.reservation_id || it.res_id || null
         });
       }
     }
@@ -2504,7 +2513,7 @@ async function confirmCreatePO() {
     const analyzedDate = getISODateFromInput('alertDate') || toISODate(new Date());
     const uniqueDates = [...new Set(alertReceiveDates)].filter(Boolean);
 
-    // ส่งข้อมูลไปหน้า PO
+    // ส่งข้อมูลไปหน้า PO (มี reservation_id ติดไปด้วยแล้ว)
     sessionStorage.setItem('alert_to_po', JSON.stringify({
       items: _pendingPOItems,
       analyzed_date: analyzedDate,
