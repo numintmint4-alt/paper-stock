@@ -1262,3 +1262,86 @@ table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
     z-index: 9999 !important;
     pointer-events: none;
 }
+/* ================= ROLL RESERVATIONS (MATCHING USAGE PIVOT) ================= */
+#res-table th, #res-table td {
+    border: 1px solid var(--border);
+    padding: 6px 10px;
+    font-size: 12px;
+    text-align: center;
+}
+
+#res-table thead th {
+    background: var(--primary);
+    color: white;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+/* คอลัมน์ Gradegram (ซ้ายสุด) */
+#res-table tbody .grade-col {
+    font-weight: 700;
+    background: var(--primary-soft) !important; /* สีฟ้าอ่อน */
+    color: var(--primary-dark) !important;
+    text-align: left;
+    position: sticky;
+    left: 0;
+    z-index: 5;
+    border-right: 2px solid var(--border-strong);
+}
+
+/* คอลัมน์ TOTAL (ขวาสุด) */
+#res-table .total-col {
+    background: var(--primary-soft) !important;
+    color: var(--primary-dark) !important;
+    font-weight: 700;
+    position: sticky;
+    right: 0;
+    z-index: 5;
+    border-left: 2px solid var(--border-strong);
+}
+
+/* แถว TOTAL (ล่างสุด) */
+#res-table .total-row td {
+    background: var(--primary-soft) !important;
+    color: var(--primary-dark) !important;
+    font-weight: 700;
+    border-top: 2px solid var(--border-strong);
+}
+
+/* Tooltip สำหรับ Reservations */
+#res-table td.clickable {
+    cursor: pointer;
+    position: relative;
+}
+
+#res-table td.clickable[data-tip]:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--primary-dark);
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: var(--radius-md);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(37,99,235,.35);
+    pointer-events: none;
+    animation: tipFadeIn .15s ease;
+}
+
+#res-table td.clickable[data-tip]:hover::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: var(--primary-dark);
+    z-index: 1000;
+    pointer-events: none;
+}
