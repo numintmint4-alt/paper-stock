@@ -3,6 +3,8 @@
 // แก้ไข: Matrix แสดงจาก Master Data + Supplier เลือกใน Modal
 // + ระบบปรับลด/คืนยอดจอง (Decrease / Return)
 // + Auto-load Master Data (ensureMasterDataLoaded)
+// + Fix: เปลี่ยนตาราง Master เป็น 'paper_specs'
+// + Fix: แสดงค่าติดลบใน Matrix (val !== 0)
 // ==========================================
 
 let resState = {
@@ -21,9 +23,9 @@ async function ensureMasterDataLoaded() {
 
     try {
         console.log("⏳ กำลังโหลด Master Data สำหรับหน้า Reservations...");
-        // ⚠️ ตรงนี้คือชื่อตาราง Master Data ของคุณ (ถ้าไม่ใช่ 'paper_master' รบกวนเปลี่ยนชื่อให้ตรงกับ DB ครับ)
+        // ✅ FIX: เปลี่ยนชื่อตารางจาก 'paper_master' → 'paper_specs'
         const { data, error } = await supabase
-            .from('paper_master')
+            .from('paper_specs')
             .select('*');
 
         if (error) throw error;
@@ -150,10 +152,14 @@ function renderReservationsTable() {
 
                 const clickAttr = `onclick="openReservationDetail('${escAttr(grade)}', ${size})" class="clickable" data-tip="Gradegrams ${escHtml(grade)} · Size ${size} · ${val} ม้วน"`;
 
-                bodyHtml += `<td ${clickAttr}>${val > 0 ? val : ''}</td>`;
+                // ✅ FIX: แสดงค่าติดลบด้วย (val !== 0 แทน val > 0)
+                const valDisplay = val !== 0 ? val : '';
+                const valStyle = val < 0 ? 'color:#dc2626;font-weight:700;' : '';
+
+                bodyHtml += `<td ${clickAttr} style="${valStyle}">${valDisplay}</td>`;
             });
 
-            bodyHtml += `<td style="font-weight:700;background:#f1f5f9;">${rowTotal > 0 ? rowTotal : ''}</td>`;
+            bodyHtml += `<td style="font-weight:700;background:#f1f5f9;">${rowTotal !== 0 ? rowTotal : ''}</td>`;
             bodyHtml += '</tr>';
         });
 
@@ -164,9 +170,14 @@ function renderReservationsTable() {
                 .filter(r => Number(r.size) === size)
                 .reduce((s, r) => s + (Number(r.quantity) || 0), 0);
             grandTotal += sizeTotal;
-            bodyHtml += `<td>${sizeTotal > 0 ? sizeTotal : ''}</td>`;
+
+            // ✅ FIX: แสดงค่าติดลบใน Total Row ด้วย
+            const sizeTotalDisplay = sizeTotal !== 0 ? sizeTotal : '';
+            const sizeTotalStyle = sizeTotal < 0 ? 'color:#dc2626;font-weight:700;' : '';
+
+            bodyHtml += `<td style="${sizeTotalStyle}">${sizeTotalDisplay}</td>`;
         });
-        bodyHtml += `<td style="font-weight:700;background:#cbd5e1;">${grandTotal > 0 ? grandTotal : ''}</td></tr>`;
+        bodyHtml += `<td style="font-weight:700;background:#cbd5e1;">${grandTotal !== 0 ? grandTotal : ''}</td></tr>`;
     }
 
     tbody.innerHTML = bodyHtml;
@@ -467,7 +478,7 @@ async function saveReservation(grade, size) {
             reason_type: reasonType,
             reason_note: reasonNote,
             remark: remark,
-            adjust_type: 'increase',   // 👈 เพิ่มบรรทัดนี้
+            adjust_type: 'increase',
             status: 'reserved',
             created_by: currentUser?.id || null
         });
@@ -705,5 +716,28 @@ async function saveDecreaseReservation(grade, size) {
         showToast('บันทึกไม่สำเร็จ: ' + err.message, 'err');
         btn.disabled = false;
         btn.innerHTML = originalText;
+    }
+}
+
+// ==========================================
+// 8.11 รีเซ็ตข้อมูลการจองทั้งหมด
+// ==========================================
+async function resetReservations() {
+    if (!confirm('⚠️ คุณต้องการลบข้อมูลการจองทั้งหมดและเริ่มนับ 1 ใหม่ใช่หรือไม่?\n\n(ข้อมูลประวัติการจองจะหายไปทั้งหมด และยอดใน Matrix จะกลายเป็น 0)')) return;
+
+    try {
+        // ลบข้อมูลทั้งหมดในตาราง roll_reservations
+        const { error } = await supabase
+            .from('roll_reservations')
+            .delete()
+            .neq('id', '00000000-0000-0000-0000-000000000000');
+
+        if (error) throw error;
+
+        showToast('✅ รีเซ็ตข้อมูลการจองเรียบร้อยแล้ว', 'ok');
+        await loadReservations();
+    } catch (err) {
+        console.error('Reset reservations error:', err);
+        showToast('รีเซ็ตไม่สำเร็จ: ' + err.message, 'err');
     }
 }
