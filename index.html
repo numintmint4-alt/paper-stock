@@ -674,14 +674,19 @@
           <!-- ปุ่มโหลดข้อมูล -->
           <button class="primary" onclick="loadReservations()">🔍 โหลดข้อมูล</button>
 
-          <!-- 📤 Export Excel -->
-          <button onclick="exportReservations()" style="background:#f0fdf4; color:#166534; border-color:#86efac; margin-left:8px;">
-              📤 Export Excel
+          <!-- 1. Export Data -->
+          <button onclick="exportReservationData()" style="background:#fffbeb; color:#b45309; border-color:#fcd34d; margin-left:8px;">
+              📤 Export Data
           </button>
 
-          <!-- 📥 Import Excel -->
+          <!-- 2. Import Excel -->
           <button onclick="document.getElementById('fileResImport').click()" style="background:#eff6ff; color:#1e40af; border-color:#93c5fd; margin-left:8px;">
               📥 Import Excel
+          </button>
+
+          <!-- 3. Export Form -->
+          <button onclick="exportReservationForm()" style="background:#f0fdf4; color:#166534; border-color:#86efac; margin-left:8px;">
+              📤 Export Form
           </button>
         </div>
 
