@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK V10.1 — alert.js — V.16.0 (แนบ reservation_id ครบทุกจุด)
+//  STOCK V10.1 — alert.js — V.17.0 (ไม่หักยอดจองใน saveMatrixOrder)
 //  - ย้ายจาก LocalStorage → Supabase (alert_receive_dates, alert_active_inputs)
 //  - Draft PO in-memory (_draftPendingItems) + บล็อกสร้าง PO ถ้ามี Draft ค้าง
 //  - buildReservationHtml หักยอดด้วย Draft + ปุ่ม 🛒 ใส่ตะกร้า
@@ -8,7 +8,8 @@
 //  - cancelDraftOrder ล้างเฉพาะ cell + คืนสถานะ reserved
 //  - clearAlertInputs: async + คืนยอดจองจาก Draft + ลบ DB + Toast
 //  - confirmCreatePO: ไม่ UPDATE roll_reservations (V.15.0)
-//      → ยอดจองจะถูกหักตอนกด "Save" ใน saveMatrixOrder แทน
+//  - saveMatrixOrder (V.17.0): ไม่ UPDATE roll_reservations → completed แล้ว
+//      → เก็บสถานะ reserved ไว้ — ยอดจองจะถูกหักที่หน้า PO เท่านั้น
 //  - confirmCartQty: ไม่แตะ DB (reserved ต่อไป) — เฉพาะ refresh box
 //  - V.16.0: แนบ reservation_id ครบ 3 จุด
 //      (saveMatrixOrder / createPOFromAlert / saveAlertItems)
@@ -504,7 +505,6 @@ async function loadSnapshotMonths() {
     console.warn('loadSnapshotMonths:', e);
   }
 }
-
 // ═══════════════════════════════════════════════════════════════
 //  FILTERS
 // ═══════════════════════════════════════════════════════════════
@@ -1217,7 +1217,6 @@ async function addFlatRow(gradegram, size) {
   await saveAlertItems(gradegram, size, items);
   applyAlertFiltersAndRender();
 }
-
 // ═══════════════════════════════════════════════════════════════
 //  MATRIX VIEW
 // ═══════════════════════════════════════════════════════════════
@@ -1403,6 +1402,7 @@ async function openAlertMatrixCell(gradegram, size) {
   bodyEl.innerHTML = html;
   openModal('modalAlertMatrixCell');
 }
+
 // ═══════════════════════════════════════════════════════════════
 //  MATRIX ORDER FORM
 // ═══════════════════════════════════════════════════════════════
@@ -1618,6 +1618,10 @@ function showMatrixOrderForm(gradegram, size) {
   setTimeout(() => document.querySelector('#matrixOrderRows .matrix-row-qty')?.focus(), 100);
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  ✅ saveMatrixOrder — V.17.0 (ไม่ UPDATE roll_reservations แล้ว)
+// ═══════════════════════════════════════════════════════════════
+
 async function saveMatrixOrder(gradegram, size) {
   const rows = document.querySelectorAll('#matrixOrderRows .matrix-order-row');
   if (!rows.length) {
@@ -1663,32 +1667,16 @@ async function saveMatrixOrder(gradegram, size) {
     return;
   }
 
-  // 🔥 อัปเดต roll_reservations → completed (ที่นี่ที่เดียวเท่านั้นที่หักยอดจอง)
-  try {
-    const draftsToSave = _draftPendingItems.filter(d => d.gradegram === gradegram && Number(d.size) === Number(size));
-    if (draftsToSave.length > 0) {
-      const resIds = draftsToSave.map(d => d.resId);
-      const { error: updErr } = await supabase
-        .from('roll_reservations')
-        .update({ status: 'completed' })
-        .in('id', resIds);
+  // ✅ V.17.0: ไม่ UPDATE roll_reservations → completed แล้ว
+  //    เก็บสถานะ reserved ไว้ — ยอดจองจะถูกหักที่หน้า PO เท่านั้น
+  //    (ลบบล็อก try/catch เดิมที่ UPDATE DB ออกทั้งหมด)
 
-      if (updErr) {
-        console.warn('⚠️ อัปเดต roll_reservations เป็น completed ไม่สำเร็จ:', updErr);
-      } else {
-        console.log(`✅ mark completed ${resIds.length} draft refs`);
-      }
+  // ✅ แค่ล้าง Draft ในหน่วยความจำ (เพื่อไม่ให้ปุ่มสร้าง PO บล็อก)
+  _draftPendingItems = _draftPendingItems.filter(
+    d => !(d.gradegram === gradegram && Number(d.size) === Number(size))
+  );
 
-      _draftPendingItems = _draftPendingItems.filter(d => !(d.gradegram === gradegram && Number(d.size) === Number(size)));
-
-      if (typeof loadReservations === 'function') {
-        try { await loadReservations(); } catch (e) { console.warn(e); }
-      }
-    }
-  } catch (err) {
-    console.error('Error updating reservation status:', err);
-  }
-
+  // ✅ บันทึกข้อมูลลงตาราง alert_active_inputs
   await saveAlertItems(gradegram, size, items);
 
   closeModal('modalAlertMatrixCell');
@@ -1698,7 +1686,7 @@ async function saveMatrixOrder(gradegram, size) {
   const msg = document.createElement('div');
   msg.className = 'msg ok';
   msg.style.cssText = 'position:fixed;top:80px;right:20px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.15)';
-  msg.textContent = `✅ บันทึก ${items.length} รายการ (${gradegram}-${size}) รวม ${total} ม้วน`;
+  msg.textContent = `✅ บันทึก Draft ${items.length} รายการ (${gradegram}-${size}) รวม ${total} ม้วน`;
   document.body.appendChild(msg);
   setTimeout(() => msg.remove(), 2000);
 }
@@ -1733,7 +1721,6 @@ function _attachAlertDropdown(btnId, dropdownId, boxId, docKey) {
     document.addEventListener('click', window['_' + docKey + 'DocClick']);
   }
 }
-
 // ═══════════════════════════════════════════════════════════════
 //  DATABASE SYNC
 // ═══════════════════════════════════════════════════════════════
@@ -2531,7 +2518,7 @@ async function confirmCreatePO() {
     });
 
     // 🔥 สำคัญ: ไม่มีการ UPDATE roll_reservations ตรงนี้แล้ว
-    // ยอดจองจะถูกหักตอนกด "Save" ในฟังก์ชัน saveMatrixOrder แทน
+    // ยอดจองจะถูกหักตอนสร้าง PO จริงในหน้า PO (V.17.0)
 
     setTimeout(() => {
       closeModal('modalAlertPODetail');
@@ -2909,7 +2896,6 @@ async function clearUsagePlan() {
     alert('❌ ' + e.message);
   }
 }
-
 // ═══════════════════════════════════════════════════════════════
 //  ALERT HISTORY
 // ═══════════════════════════════════════════════════════════════
