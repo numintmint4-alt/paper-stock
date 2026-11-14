@@ -5,6 +5,7 @@
 //  - confirmCartQty → push Draft + refresh modal + fill form
 //  - saveMatrixOrder → UPDATE roll_reservations SET status='completed'
 //  - createPOFromAlert → บล็อกถ้ามี Draft ค้าง
+//  - removeMatrixOrderRow → ลบแถว + คืนยอดจอง (ล้าง Draft + refresh modal)
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -1522,14 +1523,20 @@ function addMatrixOrderRow(gradegram, size) {
   renumberMatrixOrderRows();
 }
 
-// ✅ FIX #3: ลบแถวแล้วคืนยอดจอง (clear draft + refresh modal)
+// ✅ FIX: ลบแถวแล้วคืนยอดจอง (ล้าง Draft + รีเฟรช Modal)
 function removeMatrixOrderRow(btn) {
+  // 🔍 1. หาแถวที่ถูกกดลบ
+  const row = btn.closest('.matrix-order-row');
+  if (!row) return;
+
+  // 🔍 2. หา Container หลัก
   const rowsBox = document.getElementById('matrixOrderRows');
   if (!rowsBox) return;
 
-  const row = btn.closest('.matrix-order-row');
-  if (row) row.remove();
+  // 🔽 3. ลบแถวนี้ออก
+  row.remove();
 
+  // 🔽 4. ถ้าลบจนไม่เหลือแถวเลย ให้สร้างแถวว่างมา 1 แถว
   const remaining = rowsBox.querySelectorAll('.matrix-order-row').length;
   if (remaining === 0) {
     const wrapper = document.createElement('div');
@@ -1537,16 +1544,20 @@ function removeMatrixOrderRow(btn) {
     rowsBox.appendChild(wrapper.firstElementChild);
   }
 
+  // 🔽 5. จัดเรียงเลขรายการใหม่
   renumberMatrixOrderRows();
 
-  // 🔽 ล้างค่า Draft ค้างในหน่วยความจำ แล้วรีเฟรช Modal เพื่อดึงยอดจองกลับมา
+  // 🔽 6. สำคัญมาก: คืนยอดจองกลับเข้าระบบ (ล้าง Draft)
   if (typeof _draftPendingItems !== 'undefined') {
-    _draftPendingItems = []; // ล้าง draft ทั้งหมด
-    // หา ID ของ Grade/Size จาก Title
+    _draftPendingItems = []; // ล้าง Draft ที่ค้างอยู่ทั้งหมด
+
+    // ดึง Grade/Size จากชื่อหัวข้อ Modal เพื่อสั่งรีเฟรช
     const titleStr = document.getElementById('alertMatrixCellTitle')?.innerText || '';
     const match = titleStr.match(/([A-Za-z0-9]+)-(\d+)/);
+
     if (match) {
-      openAlertMatrixCell(match[1], Number(match[2])); // รีเฟรช Modal
+      // สั่งรีเฟรช Modal ทันที (ยอดจองจะเด้งกลับมา)
+      openAlertMatrixCell(match[1], Number(match[2]));
     }
   }
 }
