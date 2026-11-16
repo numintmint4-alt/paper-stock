@@ -3369,18 +3369,67 @@ function renderAllAlertFilters() {
 
 async function loadAlertReservations() {
   try {
-    const { data, error } = await supabase
+    // ─────────────────────────────────────
+    // ขั้นที่ 1: ดึงข้อมูลการจอง (reserved)
+    // ─────────────────────────────────────
+    const { data: resData, error: resErr } = await supabase
       .from('roll_reservations')
       .select('*')
       .eq('status', 'reserved');
+    if (resErr) throw resErr;
 
-    if (error) throw error;
+    // ─────────────────────────────────────
+    // ขั้นที่ 2: ดึง Audit Log (complete) เท่านั้น
+    //   ทำไมต้องกรอง action_type='complete'?
+    //   เพราะ log ประเภท 'reserve' และ 'decrease' มีอยู่ใน
+    //   roll_reservations แล้ว (เป็นแถว + และแถว -)
+    //   ถ้าดึงมาหักซ้ำจะทำให้หักสองรอบ!
+    // ─────────────────────────────────────
+    const { data: logData, error: logErr } = await supabase
+      .from('roll_reservation_logs')
+      .select('*')
+      .eq('action_type', 'complete');
+    if (logErr) throw logErr;
 
+    // ─────────────────────────────────────
+    // ขั้นที่ 3: จัดกลุ่มข้อมูลตาม grade|size
+    //   ใช้ spread {...r} เพื่อ copy object
+    //   ไม่ให้ mutate ข้อมูลต้นฉบับใน resData
+    // ─────────────────────────────────────
     const resMap = {};
-    (data || []).forEach(r => {
+    (resData || []).forEach(r => {
       const key = `${r.grade}|${r.size}`;
       if (!resMap[key]) resMap[key] = [];
-      resMap[key].push(r);
+      resMap[key].push({ ...r });
+    });
+
+    // ─────────────────────────────────────
+    // ขั้นที่ 4: หักลบยอดจาก Log
+    //   หา parent reservation → หา target ใน resMap → บวก qty_change
+    //   (qty_change เป็นค่าลบอยู่แล้ว เช่น -2)
+    // ─────────────────────────────────────
+    if (logData && logData.length > 0) {
+      logData.forEach(log => {
+        const parent = (resData || []).find(r => r.id === log.reservation_id);
+        if (parent) {
+          const key = `${parent.grade}|${parent.size}`;
+          if (resMap[key]) {
+            const target = resMap[key].find(r => r.id === parent.id);
+            if (target) {
+              target.quantity = (Number(target.quantity) || 0) + (Number(log.qty_change) || 0);
+            }
+          }
+        }
+      });
+    }
+
+    // ─────────────────────────────────────
+    // ขั้นที่ 5: กรองเฉพาะ quantity > 0
+    //   ถ้าจอง 8 ตัด 8 → เหลือ 0 → ไม่ต้องแสดงใน Alert
+    //   (เพราะไม่มีอะไรต้องเตือนแล้ว)
+    // ─────────────────────────────────────
+    Object.keys(resMap).forEach(key => {
+      resMap[key] = resMap[key].filter(r => Number(r.quantity) > 0);
     });
 
     return resMap;
