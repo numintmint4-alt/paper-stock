@@ -1,8 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK V10.1 — alert.js — V.17.0 (ไม่หักยอดจองใน saveMatrixOrder)
+//  STOCK V10.1 — alert.js — V.17.1 (buildReservationHtml จัดกลุ่มตาม Supplier+Quality+ลูกค้า)
 //  - ย้ายจาก LocalStorage → Supabase (alert_receive_dates, alert_active_inputs)
 //  - Draft PO in-memory (_draftPendingItems) + บล็อกสร้าง PO ถ้ามี Draft ค้าง
 //  - buildReservationHtml หักยอดด้วย Draft + ปุ่ม 🛒 ใส่ตะกร้า
+//  - V.17.1: buildReservationHtml รวมรายการจองเป็นกลุ่ม (Supplier | Quality | Customer Mark)
+//      → แสดงยอดรวมต่อกลุ่ม (รวมแถวปรับลดที่ติดลบแล้ว) และไม่แสดงวันที่
+//      → ปุ่ม 🛒 ผูกกับรายการจองแรกที่ยอดเป็นบวกในกลุ่ม
 //  - removeMatrixOrderRow คืนยอดจองเฉพาะแถวที่มี res_id
 //  - refreshReservationBox รีเฟรชเฉพาะกล่องเหลือง
 //  - cancelDraftOrder ล้างเฉพาะ cell + คืนสถานะ reserved
@@ -3429,55 +3432,83 @@ function getAlertReservedTotal(resMap, gradegram, size) {
   return list.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0);
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  buildReservationHtml — V.17.1
+//  จัดกลุ่มตาม Supplier + Quality + Customer Mark
+//  - ยอดรวมต่อกลุ่ม (รวมแถวปรับลดที่ติดลบแล้ว)
+//  - หักยอดที่อยู่ใน Draft (ตะกร้า) ของทุกรายการในกลุ่ม
+//  - ปุ่ม 🛒 ผูกกับรายการจองแรกที่ยอดเป็นบวกในกลุ่ม
+// ═══════════════════════════════════════════════════════════════
+
 function buildReservationHtml(list) {
   if (!list || !list.length) {
     return '<p style="color:#94a3b8;margin:8px 0;text-align:center;">ไม่มีรายการจอง</p>';
   }
 
+  // 🔥 จัดกลุ่มตาม Supplier + Quality + Customer Mark
+  const groupedMap = {};
+
+  list.forEach(r => {
+    const key = `${r.supplier || '-'}|${r.quality || 'A'}|${r.customer_mark || '-'}`;
+
+    if (!groupedMap[key]) {
+      groupedMap[key] = {
+        supplier: r.supplier || '-',
+        quality: r.quality || 'A',
+        customer_mark: r.customer_mark || '-',
+        total_qty: 0,
+        items: []
+      };
+    }
+
+    groupedMap[key].total_qty += (Number(r.quantity) || 0);
+    groupedMap[key].items.push(r);
+  });
+
+  const groupedList = Object.values(groupedMap);
+
   let html = '<div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">';
 
-  list.forEach((r) => {
-    const dateStr = r.reservation_date
-      ? new Date(r.reservation_date).toLocaleDateString('th-TH')
-      : '-';
-    const qualityTxt = r.quality === 'B' ? 'B' : 'A';
-    const qualityColor = r.quality === 'B' ? '#dc2626' : '#166534';
-    const qualityBg = r.quality === 'B' ? '#fee2e2' : '#dcfce7';
+  groupedList.forEach((g) => {
+    const qualityTxt = g.quality === 'B' ? 'B' : 'A';
+    const qualityColor = g.quality === 'B' ? '#dc2626' : '#166534';
+    const qualityBg = g.quality === 'B' ? '#fee2e2' : '#dcfce7';
 
-    const safeGrade = escAttr(r.grade || '');
-    const safeSize = Number(r.size) || 0;
-    const safeSup = escAttr(r.supplier || '');
-    const safeQuality = escAttr(r.quality || 'A');
-    const safeId = r.id;
+    // ยอดที่ถูกใส่ตะกร้า (Draft) ของทุกรายการในกลุ่มนี้
+    const totalPendingDraft = g.items.reduce((sum, r) => {
+      const pending = _draftPendingItems
+        .filter(d => String(d.resId) === String(r.id))
+        .reduce((s, d) => s + (Number(d.qty) || 0), 0);
+      return sum + pending;
+    }, 0);
 
-    const totalQty = Number(r.quantity) || 0;
-    const pendingDraftQty = _draftPendingItems
-        .filter(d => d.resId === safeId)
-        .reduce((sum, d) => sum + d.qty, 0);
+    const remainingQty = g.total_qty - totalPendingDraft;
 
-    const remainingQty = totalQty - pendingDraftQty;
+    // ใช้รายการแรกที่ยอดเป็นบวกในกลุ่มเป็นตัวแทน (ไม่ใช้แถวปรับลดที่ติดลบ)
+    const firstItem = g.items.find(r => (Number(r.quantity) || 0) > 0) || g.items[0];
+    const safeId = firstItem.id;
 
     html += `
       <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; display:flex; justify-content:space-between; align-items:center; box-shadow:0 1px 2px rgba(0,0,0,0.02);">
         <div style="display:flex; flex-direction:column; gap:4px;">
           <div style="font-size:13px; font-weight:600; color:#1e293b;">
-            📅 ${dateStr} <span style="color:#cbd5e1; margin:0 4px;">|</span> 🏢 ${esc(r.supplier || '-')}
+            🏢 ${esc(g.supplier)}
           </div>
           <div style="font-size:12px; color:#64748b; display:flex; align-items:center; gap:6px;">
-            <span>ลูกค้า: ${esc(r.customer_mark || '-')}</span>
+            <span>ลูกค้า: ${esc(g.customer_mark)}</span>
             <span style="background:${qualityBg}; color:${qualityColor}; padding:2px 6px; border-radius:4px; font-weight:700; font-size:11px;">คุณภาพ ${qualityTxt}</span>
           </div>
         </div>
-        
+
         <div style="display:flex; align-items:center; gap:12px;">
           <div style="text-align:right;">
-            <div style="font-size:16px; font-weight:700; color:${remainingQty === 0 ? '#94a3b8' : '#b45309'};">${remainingQty}</div>
+            <div style="font-size:16px; font-weight:700; color:${remainingQty <= 0 ? '#94a3b8' : '#b45309'};">${remainingQty}</div>
             <div style="font-size:10px; color:#94a3b8;">ม้วน</div>
           </div>
-          
+
           ${remainingQty > 0
-            ? `<button type="button" 
-                      onclick="onReservationCartClick('${safeId}', '${safeGrade}', ${safeSize}, ${remainingQty}, '${safeSup}', '${safeQuality}')"
+            ? `<button type="button"
+                      onclick="onReservationCartClick('${safeId}', '${escAttr(firstItem.grade)}', ${Number(firstItem.size) || 0}, ${remainingQty}, '${escAttr(g.supplier)}', '${escAttr(g.quality)}')"
                       style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; padding:6px 12px; border-radius:6px; cursor:pointer; font-weight:700; font-size:12px; display:flex; align-items:center; gap:6px; transition:all 0.2s;"
                       onmouseover="this.style.background='#bae6fd'"
                       onmouseout="this.style.background='#e0f2fe'"
