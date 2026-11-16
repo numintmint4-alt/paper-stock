@@ -1,13 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK V10.1 — alert.js — V.17.2 (รวมไฟล์ครบ + แก้บั๊ก)
-//  - ย้ายจาก LocalStorage → Supabase (alert_receive_dates, alert_active_inputs)
-//  - Draft PO in-memory (_draftPendingItems) + บล็อกสร้าง PO ถ้ามี Draft ค้าง
-//  - buildReservationHtml หักยอดด้วย Draft + ปุ่ม 🛒 ใส่ตะกร้า
-//  - V.17.1: buildReservationHtml รวมรายการจองเป็นกลุ่ม
-//      (Supplier | Quality | Customer Mark)
-//  - V.17.2: แก้บั๊ก saveMatrixOrder (ลบ reservation_id ซ้ำ)
-//      → switchAlertDate กรอง Draft ตามวันที่
-//      → cancelDraftOrder ไม่เรียก openAlertMatrixCell ซ้ำ
+//  STOCK V10.1 — alert.js — V.17.2 (Full File - Part 1/4)
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -502,40 +494,451 @@ async function loadSnapshotMonths() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  FILTERS — GRADE / SIZE / ALERT / ORDER / SUP / STOCK / RECEIVE / USAGE
-//  (รายละเอียดตามไฟล์เดิม — ไม่มีการแก้ไข)
+//  FILTERS (ส่วนที่เคยหายไป)
 // ═══════════════════════════════════════════════════════════════
 
-// [ฟังก์ชัน Grade filter ทั้งหมด — ตามไฟล์เดิม]
-// loadAlertGradeFilter, renderAlertGradeList, updateAlertGradeLabel,
-// selectAllAlertGrades, clearAllAlertGrades
+// ─── GRADE ──────────────────────────────────────────────────────
+async function loadAlertGradeFilter() {
+  alertAllGrades = [...new Set(
+    masterCache.map(m => normalizeGrade(m.grade) + m.gram)
+  )].sort();
+  renderAlertGradeList();
+  updateAlertGradeLabel();
+}
 
-// [ฟังก์ชัน Size filter ทั้งหมด — ตามไฟล์เดิม]
-// renderAlertSizeList, updateAlertSizeLabel, selectAllAlertSizes, clearAllAlertSizes
+function renderAlertGradeList() {
+  const list = $('alertGradeList');
+  if (!list) return;
+  if (!alertAllGrades.length) {
+    list.innerHTML = '<div style="padding:10px;text-align:center;color:#94a3b8;font-size:13px">ไม่มีข้อมูล</div>';
+    return;
+  }
+  list.innerHTML = alertAllGrades.map(g => {
+    const checked = alertSelectedGrades.includes(g);
+    return `<label class="item ${checked ? 'checked' : ''}" data-grade="${esc(g)}">
+      <input type="checkbox" ${checked ? 'checked' : ''}>
+      <span>${esc(g)}</span>
+    </label>`;
+  }).join('');
+  list.querySelectorAll('.item').forEach(el => {
+    const cb = el.querySelector('input[type="checkbox"]');
+    cb.addEventListener('change', () => {
+      const grade = el.dataset.grade;
+      if (cb.checked) {
+        if (!alertSelectedGrades.includes(grade)) alertSelectedGrades.push(grade);
+      } else {
+        alertSelectedGrades = alertSelectedGrades.filter(g => g !== grade);
+      }
+      el.classList.toggle('checked', cb.checked);
+      updateAlertGradeLabel();
+      applyAlertFiltersAndRender();
+    });
+  });
+}
 
-// [ฟังก์ชัน Alert filter ทั้งหมด — ตามไฟล์เดิม]
-// loadAlertFilter, renderAlertFilterList, updateAlertFilterLabel,
-// selectAllAlertFilters, clearAllAlertFilters
+function updateAlertGradeLabel() {
+  const label = $('alertGradeFilterLabel');
+  if (!label) return;
+  if (alertSelectedGrades.length === 0) {
+    label.textContent = 'Gradegrams';
+  } else if (alertSelectedGrades.length === 1) {
+    label.textContent = alertSelectedGrades[0];
+  } else {
+    label.textContent = `Gradegrams (${alertSelectedGrades.length})`;
+  }
+}
 
-// [ฟังก์ชัน Order filter ทั้งหมด — ตามไฟล์เดิม]
-// renderAlertOrderFilterList, updateAlertOrderFilterLabel,
-// selectAllAlertOrderFilters, clearAllAlertOrderFilters
+function selectAllAlertGrades() {
+  alertSelectedGrades = [...alertAllGrades];
+  renderAlertGradeList(); updateAlertGradeLabel();
+  applyAlertFiltersAndRender();
+}
 
-// [ฟังก์ชัน Sup filter ทั้งหมด — ตามไฟล์เดิม]
-// renderAlertSupFilterList, updateAlertSupFilterLabel,
-// selectAllAlertSupFilters, clearAllAlertSupFilters
+function clearAllAlertGrades() {
+  alertSelectedGrades = [];
+  renderAlertGradeList(); updateAlertGradeLabel();
+  applyAlertFiltersAndRender();
+}
 
-// [ฟังก์ชัน Stock filter ทั้งหมด — ตามไฟล์เดิม]
-// renderAlertStockFilterList, updateAlertStockFilterLabel,
-// selectAllAlertStockFilters, clearAllAlertStockFilters
+// ─── SIZE ───────────────────────────────────────────────────────
+function renderAlertSizeList() {
+  const list = $('alertSizeList');
+  if (!list) return;
+  if (!alertAllSizes.length) {
+    list.innerHTML = '<div style="padding:10px;text-align:center;color:#94a3b8;font-size:13px">ไม่มีข้อมูล</div>';
+    return;
+  }
+  list.innerHTML = alertAllSizes.map(s => {
+    const checked = alertSelectedSizes.includes(s);
+    return `<label class="item ${checked ? 'checked' : ''}" data-size="${s}">
+      <input type="checkbox" ${checked ? 'checked' : ''}>
+      <span>${s}</span>
+    </label>`;
+  }).join('');
+  list.querySelectorAll('.item').forEach(el => {
+    const cb = el.querySelector('input[type="checkbox"]');
+    cb.addEventListener('change', () => {
+      const size = Number(el.dataset.size);
+      if (cb.checked) {
+        if (!alertSelectedSizes.includes(size)) alertSelectedSizes.push(size);
+      } else {
+        alertSelectedSizes = alertSelectedSizes.filter(x => x !== size);
+      }
+      el.classList.toggle('checked', cb.checked);
+      updateAlertSizeLabel();
+      applyAlertFiltersAndRender();
+    });
+  });
+}
 
-// [ฟังก์ชัน Receive filter ทั้งหมด — ตามไฟล์เดิม]
-// renderAlertReceiveFilterList, updateAlertReceiveFilterLabel,
-// selectAllAlertReceiveFilters, clearAllAlertReceiveFilters
+function updateAlertSizeLabel() {
+  const label = $('alertSizeLabel');
+  if (!label) return;
+  if (alertSelectedSizes.length === 0) {
+    label.textContent = 'Size';
+    label.style.color = '#fff';
+  } else if (alertSelectedSizes.length === 1) {
+    label.textContent = `Size ${alertSelectedSizes[0]}`;
+    label.style.color = '#fbbf24';
+  } else {
+    label.textContent = `Size (${alertSelectedSizes.length})`;
+    label.style.color = '#fbbf24';
+  }
+}
 
-// [ฟังก์ชัน Usage filter ทั้งหมด — ตามไฟล์เดิม]
-// renderAlertUsageFilterList, updateAlertUsageFilterLabel,
-// selectAllAlertUsageFilters, clearAllAlertUsageFilters
+function selectAllAlertSizes() {
+  alertSelectedSizes = [...alertAllSizes];
+  renderAlertSizeList(); updateAlertSizeLabel();
+  applyAlertFiltersAndRender();
+}
+
+function clearAllAlertSizes() {
+  alertSelectedSizes = [];
+  renderAlertSizeList(); updateAlertSizeLabel();
+  applyAlertFiltersAndRender();
+}
+
+// ─── ALERT ──────────────────────────────────────────────────────
+function loadAlertFilter() {
+  renderAlertFilterList();
+  updateAlertFilterLabel();
+}
+
+function renderAlertFilterList() {
+  const list = $('alertFilterList');
+  if (!list) return;
+  list.innerHTML = ALERT_ALL_FILTERS.map(f => {
+    const checked = alertSelectedFilters.includes(f.value);
+    return `<label class="item ${checked ? 'checked' : ''}" data-filter="${f.value}">
+      <input type="checkbox" ${checked ? 'checked' : ''}>
+      <span>${f.label}</span>
+    </label>`;
+  }).join('');
+  list.querySelectorAll('.item').forEach(el => {
+    const cb = el.querySelector('input[type="checkbox"]');
+    cb.addEventListener('change', () => {
+      const val = el.dataset.filter;
+      if (cb.checked) {
+        if (!alertSelectedFilters.includes(val)) alertSelectedFilters.push(val);
+      } else {
+        alertSelectedFilters = alertSelectedFilters.filter(x => x !== val);
+      }
+      el.classList.toggle('checked', cb.checked);
+      updateAlertFilterLabel();
+      applyAlertFiltersAndRender();
+    });
+  });
+}
+
+function updateAlertFilterLabel() {
+  const label = $('alertFilterLabel');
+  if (!label) return;
+  if (alertSelectedFilters.length === 0 || alertSelectedFilters.includes('all')) {
+    label.textContent = 'Alert';
+  } else if (alertSelectedFilters.length === 1) {
+    const f = ALERT_ALL_FILTERS.find(x => x.value === alertSelectedFilters[0]);
+    label.textContent = f ? f.label : alertSelectedFilters[0];
+  } else {
+    label.textContent = `Alert (${alertSelectedFilters.length})`;
+  }
+}
+
+function selectAllAlertFilters() {
+  alertSelectedFilters = ['all'];
+  renderAlertFilterList(); updateAlertFilterLabel();
+  applyAlertFiltersAndRender();
+}
+
+function clearAllAlertFilters() {
+  alertSelectedFilters = [];
+  renderAlertFilterList(); updateAlertFilterLabel();
+  applyAlertFiltersAndRender();
+}
+
+// ─── ORDER ──────────────────────────────────────────────────────
+function renderAlertOrderFilterList() {
+  const list = $('alertOrderFilterList');
+  if (!list) return;
+  list.innerHTML = ALERT_ORDER_FILTERS.map(f => {
+    const checked = alertSelectedOrderFilters.includes(f.value);
+    return `<label class="item ${checked ? 'checked' : ''}" data-order-filter="${f.value}">
+      <input type="checkbox" ${checked ? 'checked' : ''}>
+      <span>${f.label}</span>
+    </label>`;
+  }).join('');
+  list.querySelectorAll('.item').forEach(el => {
+    const cb = el.querySelector('input[type="checkbox"]');
+    cb.addEventListener('change', () => {
+      const val = el.dataset.orderFilter;
+      if (cb.checked) {
+        if (!alertSelectedOrderFilters.includes(val)) alertSelectedOrderFilters.push(val);
+      } else {
+        alertSelectedOrderFilters = alertSelectedOrderFilters.filter(x => x !== val);
+      }
+      el.classList.toggle('checked', cb.checked);
+      updateAlertOrderFilterLabel();
+      applyAlertFiltersAndRender();
+    });
+  });
+}
+
+function updateAlertOrderFilterLabel() {
+  const label = $('alertOrderFilterLabel');
+  if (!label) return;
+  if (alertSelectedOrderFilters.length === 0 || alertSelectedOrderFilters.includes('all')) {
+    label.textContent = 'สั่งซื้อ';
+  } else if (alertSelectedOrderFilters.length === 1) {
+    const f = ALERT_ORDER_FILTERS.find(x => x.value === alertSelectedOrderFilters[0]);
+    label.textContent = f ? f.label : alertSelectedOrderFilters[0];
+  } else {
+    label.textContent = `สั่งซื้อ (${alertSelectedOrderFilters.length})`;
+  }
+}
+
+function selectAllAlertOrderFilters() {
+  alertSelectedOrderFilters = ['all'];
+  renderAlertOrderFilterList(); updateAlertOrderFilterLabel();
+  applyAlertFiltersAndRender();
+}
+
+function clearAllAlertOrderFilters() {
+  alertSelectedOrderFilters = [];
+  renderAlertOrderFilterList(); updateAlertOrderFilterLabel();
+  applyAlertFiltersAndRender();
+}
+
+// ─── SUP ────────────────────────────────────────────────────────
+function renderAlertSupFilterList() {
+  const list = $('alertSupFilterList');
+  if (!list) return;
+  if (!alertAllSupsInData.length) {
+    list.innerHTML = '<div style="padding:10px;text-align:center;color:#94a3b8;font-size:13px">ไม่มีข้อมูล</div>';
+    return;
+  }
+  const displayList = ['__NONE__', ...alertAllSupsInData];
+  list.innerHTML = displayList.map(s => {
+    const checked = alertSelectedSupFilters.includes(s);
+    const label = s === '__NONE__' ? '— ยังไม่ระบุ —' : s;
+    return `<label class="item ${checked ? 'checked' : ''}" data-sup="${esc(s)}">
+      <input type="checkbox" ${checked ? 'checked' : ''}>
+      <span>${esc(label)}</span>
+    </label>`;
+  }).join('');
+  list.querySelectorAll('.item').forEach(el => {
+    const cb = el.querySelector('input[type="checkbox"]');
+    cb.addEventListener('change', () => {
+      const val = el.dataset.sup;
+      if (cb.checked) {
+        if (!alertSelectedSupFilters.includes(val)) alertSelectedSupFilters.push(val);
+      } else {
+        alertSelectedSupFilters = alertSelectedSupFilters.filter(x => x !== val);
+      }
+      el.classList.toggle('checked', cb.checked);
+      updateAlertSupFilterLabel();
+      applyAlertFiltersAndRender();
+    });
+  });
+}
+
+function updateAlertSupFilterLabel() {
+  const label = $('alertSupFilterLabel');
+  if (!label) return;
+  if (alertSelectedSupFilters.length === 0) {
+    label.textContent = 'Sup.';
+  } else if (alertSelectedSupFilters.length === 1) {
+    label.textContent = alertSelectedSupFilters[0] === '__NONE__' ? 'ยังไม่ระบุ' : alertSelectedSupFilters[0];
+  } else {
+    label.textContent = `Sup. (${alertSelectedSupFilters.length})`;
+  }
+}
+
+function selectAllAlertSupFilters() {
+  alertSelectedSupFilters = [...alertAllSupsInData];
+  renderAlertSupFilterList(); updateAlertSupFilterLabel();
+  applyAlertFiltersAndRender();
+}
+
+function clearAllAlertSupFilters() {
+  alertSelectedSupFilters = [];
+  renderAlertSupFilterList(); updateAlertSupFilterLabel();
+  applyAlertFiltersAndRender();
+}
+
+// ─── STOCK ──────────────────────────────────────────────────────
+function renderAlertStockFilterList() {
+  const list = $('alertStockFilterList');
+  if (!list) return;
+  list.innerHTML = ALERT_STOCK_FILTERS.map(f => {
+    const checked = alertSelectedStockFilters.includes(f.value);
+    return `<label class="item ${checked ? 'checked' : ''}" data-stock-filter="${f.value}">
+      <input type="checkbox" ${checked ? 'checked' : ''}>
+      <span>${f.label}</span>
+    </label>`;
+  }).join('');
+  list.querySelectorAll('.item').forEach(el => {
+    const cb = el.querySelector('input[type="checkbox"]');
+    cb.addEventListener('change', () => {
+      const val = el.dataset.stockFilter;
+      if (cb.checked) {
+        if (!alertSelectedStockFilters.includes(val)) alertSelectedStockFilters.push(val);
+      } else {
+        alertSelectedStockFilters = alertSelectedStockFilters.filter(x => x !== val);
+      }
+      el.classList.toggle('checked', cb.checked);
+      updateAlertStockFilterLabel();
+      applyAlertFiltersAndRender();
+    });
+  });
+}
+
+function updateAlertStockFilterLabel() {
+  const label = $('alertStockFilterLabel');
+  if (!label) return;
+  if (alertSelectedStockFilters.length === 0 || alertSelectedStockFilters.includes('all')) {
+    label.textContent = 'Stock';
+  } else if (alertSelectedStockFilters.length === 1) {
+    const f = ALERT_STOCK_FILTERS.find(x => x.value === alertSelectedStockFilters[0]);
+    label.textContent = f ? f.label : alertSelectedStockFilters[0];
+  } else {
+    label.textContent = `Stock (${alertSelectedStockFilters.length})`;
+  }
+}
+
+function selectAllAlertStockFilters() {
+  alertSelectedStockFilters = ['all'];
+  renderAlertStockFilterList(); updateAlertStockFilterLabel();
+  applyAlertFiltersAndRender();
+}
+
+function clearAllAlertStockFilters() {
+  alertSelectedStockFilters = [];
+  renderAlertStockFilterList(); updateAlertStockFilterLabel();
+  applyAlertFiltersAndRender();
+}
+
+// ─── RECEIVE ────────────────────────────────────────────────────
+function renderAlertReceiveFilterList() {
+  const list = $('alertReceiveFilterList');
+  if (!list) return;
+  list.innerHTML = ALERT_RECEIVE_FILTERS.map(f => {
+    const checked = alertSelectedReceiveFilters.includes(f.value);
+    return `<label class="item ${checked ? 'checked' : ''}" data-receive-filter="${f.value}">
+      <input type="checkbox" ${checked ? 'checked' : ''}>
+      <span>${f.label}</span>
+    </label>`;
+  }).join('');
+  list.querySelectorAll('.item').forEach(el => {
+    const cb = el.querySelector('input[type="checkbox"]');
+    cb.addEventListener('change', () => {
+      const val = el.dataset.receiveFilter;
+      if (cb.checked) {
+        if (!alertSelectedReceiveFilters.includes(val)) alertSelectedReceiveFilters.push(val);
+      } else {
+        alertSelectedReceiveFilters = alertSelectedReceiveFilters.filter(x => x !== val);
+      }
+      el.classList.toggle('checked', cb.checked);
+      updateAlertReceiveFilterLabel();
+      applyAlertFiltersAndRender();
+    });
+  });
+}
+
+function updateAlertReceiveFilterLabel() {
+  const label = $('alertReceiveFilterLabel');
+  if (!label) return;
+  if (alertSelectedReceiveFilters.length === 0 || alertSelectedReceiveFilters.includes('all')) {
+    label.textContent = 'Receive';
+  } else if (alertSelectedReceiveFilters.length === 1) {
+    const f = ALERT_RECEIVE_FILTERS.find(x => x.value === alertSelectedReceiveFilters[0]);
+    label.textContent = f ? f.label : alertSelectedReceiveFilters[0];
+  } else {
+    label.textContent = `Receive (${alertSelectedReceiveFilters.length})`;
+  }
+}
+
+function selectAllAlertReceiveFilters() {
+  alertSelectedReceiveFilters = ['all'];
+  renderAlertReceiveFilterList(); updateAlertReceiveFilterLabel();
+  applyAlertFiltersAndRender();
+}
+
+function clearAllAlertReceiveFilters() {
+  alertSelectedReceiveFilters = [];
+  renderAlertReceiveFilterList(); updateAlertReceiveFilterLabel();
+  applyAlertFiltersAndRender();
+}
+
+// ─── USAGE PLAN ─────────────────────────────────────────────────
+function renderAlertUsageFilterList() {
+  const list = $('alertUsageFilterList');
+  if (!list) return;
+  list.innerHTML = ALERT_USAGE_FILTERS.map(f => {
+    const checked = alertSelectedUsageFilters.includes(f.value);
+    return `<label class="item ${checked ? 'checked' : ''}" data-usage-filter="${f.value}">
+      <input type="checkbox" ${checked ? 'checked' : ''}>
+      <span>${f.label}</span>
+    </label>`;
+  }).join('');
+  list.querySelectorAll('.item').forEach(el => {
+    const cb = el.querySelector('input[type="checkbox"]');
+    cb.addEventListener('change', () => {
+      const val = el.dataset.usageFilter;
+      if (cb.checked) {
+        if (!alertSelectedUsageFilters.includes(val)) alertSelectedUsageFilters.push(val);
+      } else {
+        alertSelectedUsageFilters = alertSelectedUsageFilters.filter(x => x !== val);
+      }
+      el.classList.toggle('checked', cb.checked);
+      updateAlertUsageFilterLabel();
+      applyAlertFiltersAndRender();
+    });
+  });
+}
+
+function updateAlertUsageFilterLabel() {
+  const label = $('alertUsageFilterLabel');
+  if (!label) return;
+  if (alertSelectedUsageFilters.length === 0 || alertSelectedUsageFilters.includes('all')) {
+    label.textContent = 'Usage Plan';
+  } else if (alertSelectedUsageFilters.length === 1) {
+    const f = ALERT_USAGE_FILTERS.find(x => x.value === alertSelectedUsageFilters[0]);
+    label.textContent = f ? f.label : alertSelectedUsageFilters[0];
+  } else {
+    label.textContent = `Usage (${alertSelectedUsageFilters.length})`;
+  }
+}
+
+function selectAllAlertUsageFilters() {
+  alertSelectedUsageFilters = ['all'];
+  renderAlertUsageFilterList(); updateAlertUsageFilterLabel();
+  applyAlertFiltersAndRender();
+}
+
+function clearAllAlertUsageFilters() {
+  alertSelectedUsageFilters = [];
+  renderAlertUsageFilterList(); updateAlertUsageFilterLabel();
+  applyAlertFiltersAndRender();
+}
 
 // ═══════════════════════════════════════════════════════════════
 //  APPLY FILTERS
@@ -1196,7 +1599,7 @@ function showMatrixOrderForm(gradegram, size) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  ✅ saveMatrixOrder — V.17.2 (แก้บั๊ก: ลบ reservation_id ซ้ำ)
+//  ✅ saveMatrixOrder — V.17.2 (ไม่ UPDATE roll_reservations)
 // ═══════════════════════════════════════════════════════════════
 
 async function saveMatrixOrder(gradegram, size) {
@@ -1224,7 +1627,6 @@ async function saveMatrixOrder(gradegram, size) {
       quality_b: qual,
       note
     };
-    // 🔥 V.17.2: เก็บแค่ res_id (ตัด reservation_id ที่ซ้ำซ้อนออก)
     if (row.dataset.resId) item.res_id = row.dataset.resId;
 
     items.push(item);
@@ -1243,15 +1645,10 @@ async function saveMatrixOrder(gradegram, size) {
     return;
   }
 
-  // ✅ V.17.0: ไม่ UPDATE roll_reservations → completed แล้ว
-  //    เก็บสถานะ reserved ไว้ — ยอดจองจะถูกหักที่หน้า PO เท่านั้น
-
-  // ✅ แค่ล้าง Draft ในหน่วยความจำ (เพื่อไม่ให้ปุ่มสร้าง PO บล็อก)
   _draftPendingItems = _draftPendingItems.filter(
     d => !(d.gradegram === gradegram && Number(d.size) === Number(size))
   );
 
-  // ✅ บันทึกข้อมูลลงตาราง alert_active_inputs
   await saveAlertItems(gradegram, size, items);
 
   closeModal('modalAlertMatrixCell');
@@ -1412,7 +1809,6 @@ async function saveAlertItems(gradegram, size, items, dateOrIdx) {
         quality_b: it.quality_b || 'normal',
         note: it.note || '',
         updated_by: currentUser?.id || null,
-        // 🔥 V.16.0: บันทึก res_id ลง DB
         res_id: it.res_id || it.reservation_id || null
       }));
       const { error } = await supabase.from('alert_active_inputs').insert(payload);
@@ -1553,7 +1949,6 @@ function renderAlertReceiveDates() {
   renderAlertDateTabs();
 }
 
-// ✅ V.17.2: กรอง Draft ตามวันที่เมื่อ switch
 async function switchAlertDate(idx) {
   if (idx < 0 || idx >= alertReceiveDates.length) return;
   alertActiveDateIdx = idx;
@@ -2092,9 +2487,6 @@ async function confirmCreatePO() {
     saveAlertSnapshot(uniqueDates).then(res => {
       if (res.ok) console.log('✅ Alert snapshot saved:', res.data);
     });
-
-    // 🔥 สำคัญ: ไม่มีการ UPDATE roll_reservations ตรงนี้แล้ว
-    // ยอดจองจะถูกหักตอนสร้าง PO จริงในหน้า PO (V.17.0)
 
     setTimeout(() => {
       closeModal('modalAlertPODetail');
