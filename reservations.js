@@ -6,6 +6,9 @@
 // + NEW: Export Form / Export Data / Import Excel
 // + NEW (V.2): openReservationDetail — แสดงหน้ารายละเอียดว่างก่อน ถ้าไม่มีข้อมูล
 // + NEW (V.3): Audit Log — logReservationAction + Timeline ใน openReservationDetail
+// + NEW (V.4): openReservationDetail — รวมประวัติการเคลื่อนไหวไว้ในตารางเดียว
+//              (แถวจอง/ปรับลด จาก roll_reservations + แถวตัดยอด/คืนยอด จาก Audit Log)
+//              ยอดสุทธิ = ผลรวมของแถวจองทั้งหมด − ยอดตัดสร้าง PO (complete)
 // ==========================================
 
 // 🔽 สร้าง fcState รอไว้เลย ป้องกัน ReferenceError
@@ -70,9 +73,9 @@ async function ensureMasterDataLoaded() {
 
     try {
         console.log("⏳ กำลังโหลด Master Data สำหรับหน้า Reservations...");
-        
+
         // ✅ ใช้ fetchAllRows เพื่อวนลูปดึงข้อมูลจนครบ (ไม่ติด Limit 1000)
-        const data = await fetchAllRows(() => 
+        const data = await fetchAllRows(() =>
             supabase.from('paper_specs').select('*')
         );
 
@@ -252,7 +255,9 @@ function filterResByGrade(gradeGroup, btnElement) {
 }
 
 // ==========================================
-// 8.4 ฟังก์ชันเปิด Modal Drill-down
+// 8.4 ฟังก์ชันเปิด Modal Drill-down (V.4)
+//     - ตารางเดียว: แถวจอง/ปรับลด + แถว Audit Log (ตัดยอด PO / คืนยอด)
+//     - ยอดสุทธิ = ผลรวมแถวจองทั้งหมด − ยอดตัด PO (complete)
 // ==========================================
 async function openReservationDetail(grade, size) {
     const modal = document.getElementById('modalReservationDetail');
@@ -265,26 +270,21 @@ async function openReservationDetail(grade, size) {
     modal.classList.add('show');
 
     try {
-        const { data, error } = await supabase
+        // 1. ดึงข้อมูลการจอง (reserved)
+        const { data: reservations, error: resErr } = await supabase
             .from('roll_reservations')
             .select('*')
             .eq('grade', grade)
             .eq('size', size)
             .eq('status', 'reserved')
             .order('created_at', { ascending: false });
+        if (resErr) throw resErr;
 
-        if (error) throw error;
+        const resList = reservations || [];
 
-        // 🔥 ดึงประวัติการเคลื่อนไหวจาก Log
-        const { data: logs } = await supabase
-            .from('roll_reservation_logs')
-            .select('*')
-            .in('reservation_id', (data || []).map(d => d.id))
-            .order('created_at', { ascending: false });
-
-        // 🔥 V.2: เปลี่ยนจากเด้งไปฟอร์มเพิ่มทันที เป็นโชว์หน้ารายละเอียดว่างๆ ก่อน
-        if (!data || data.length === 0) {
-            let html = `
+        // 🔥 V.2: ถ้าไม่มีข้อมูล → โชว์หน้ารายละเอียดว่าง + ปุ่มเพิ่มรายการจอง
+        if (resList.length === 0) {
+            body.innerHTML = `
                 <div style="text-align:center; padding:30px; color:#94a3b8;">
                     <p style="font-size:16px; margin-bottom:10px;">ไม่พบประวัติการจองสำหรับรายการนี้</p>
                     <p style="font-size:13px;">คุณสามารถเพิ่มรายการจองใหม่ได้โดยกดปุ่มด้านล่าง</p>
@@ -294,30 +294,53 @@ async function openReservationDetail(grade, size) {
                     <button type="button" onclick="closeModal('modalReservationDetail')">ปิด</button>
                 </div>
             `;
-            body.innerHTML = html;
             return;
         }
 
-        // คำนวณยอด
-        const totalIncrease = data
+        // 2. ดึง Audit Log (เฉพาะรายการที่อยู่ในกลุ่มนี้)
+        let logs = [];
+        const resIds = resList.map(d => d.id);
+        const { data: logData, error: logErr } = await supabase
+            .from('roll_reservation_logs')
+            .select('*')
+            .in('reservation_id', resIds)
+            .order('created_at', { ascending: false });
+        if (logErr) console.warn('load logs error:', logErr);
+        logs = logData || [];
+
+        // ✅ แถวจอง (reserve) และแถวปรับลด (decrease) มีอยู่ในตารางจองแล้ว
+        //    จึงแสดงจาก Log เฉพาะ "ตัดยอดสร้าง PO" (complete) และ "คืนยอด" (restore)
+        //    เพื่อไม่ให้ซ้ำซ้อนกับแถวด้านบน
+        const extraLogs = logs.filter(l => l.action_type === 'complete' || l.action_type === 'restore');
+
+        // 3. คำนวณยอด
+        //    - ยอดจองรวม  = ผลรวมแถวที่เป็น + (จอง)
+        //    - ปรับลด/คืน = ผลรวมแถวที่เป็น − (decrease ในตารางจอง)
+        //    - ตัดสร้าง PO = Log 'complete' ที่ qty_change < 0
+        const totalIncrease = resList
             .filter(r => (Number(r.quantity) || 0) > 0)
             .reduce((s, r) => s + Number(r.quantity), 0);
-        const totalDecrease = data
+        const totalDecrease = resList
             .filter(r => (Number(r.quantity) || 0) < 0)
             .reduce((s, r) => s + Math.abs(Number(r.quantity)), 0);
-        const totalQty = totalIncrease - totalDecrease;
+        const totalPOCut = extraLogs
+            .filter(l => l.action_type === 'complete' && (Number(l.qty_change) || 0) < 0)
+            .reduce((s, l) => s + Math.abs(Number(l.qty_change)), 0);
+        const netTotal = totalIncrease - totalDecrease - totalPOCut;
 
+        // 4. สร้าง HTML
         let html = `
             <div style="background:#f0f9ff; padding:16px; border-radius:8px; margin-bottom:16px; border:1px solid #bae6fd;">
                 <h4 style="margin:0 0 8px; font-size:15px; color:#0369a1;">📦 สรุปยอดจอง: ${escHtml(grade)} (Size ${size})</h4>
                 <div style="font-size:14px; color:#0c4a6e; line-height:1.9;">
                     ยอดจองรวม: <b style="color:#0284c7;">${totalIncrease} ม้วน</b><br>
                     ${totalDecrease > 0 ? `ปรับลด/คืน: <b style="color:#dc2626;">-${totalDecrease} ม้วน</b><br>` : ''}
-                    <span style="font-size:15px;">ยอดสุทธิ: <b style="font-size:20px; color:#0284c7;">${totalQty} ม้วน</b></span>
+                    ${totalPOCut > 0 ? `ตัดจ่าย (สร้าง PO): <b style="color:#dc2626;">-${totalPOCut} ม้วน</b><br>` : ''}
+                    <span style="font-size:15px;">ยอดสุทธิ: <b style="font-size:20px; color:#0284c7;">${netTotal} ม้วน</b></span>
                 </div>
             </div>
 
-            <h4 style="margin:0 0 10px; font-size:14px; color:#475569;">📜 ประวัติการจอง</h4>
+            <h4 style="margin:0 0 10px; font-size:14px; color:#475569;">📜 ประวัติการเคลื่อนไหว</h4>
             <table class="data-table" style="width:100%; font-size:13px;">
                 <thead>
                     <tr>
@@ -332,7 +355,8 @@ async function openReservationDetail(grade, size) {
                 </thead>
                 <tbody>`;
 
-        data.forEach(r => {
+        // 4.1 แถวการจอง / ปรับลด (จาก roll_reservations)
+        resList.forEach(r => {
             const dateStr = r.reservation_date
                 ? new Date(r.reservation_date).toLocaleDateString('th-TH')
                 : '-';
@@ -344,7 +368,7 @@ async function openReservationDetail(grade, size) {
             const isDecrease = qty < 0;
             const qtyDisplay = isDecrease
                 ? `<span style="color:#dc2626; font-weight:700;">${qty}</span>`
-                : `<span style="color:#0284c7; font-weight:700;">${qty}</span>`;
+                : `<span style="color:#0284c7; font-weight:700;">+${qty}</span>`;
             const rowStyle = isDecrease ? 'background:#fef2f2;' : '';
             const adjustNote = isDecrease && r.adjust_reason
                 ? `<br><small style="color:#dc2626;">เหตุผล: ${escHtml(r.adjust_reason)}</small>`
@@ -361,42 +385,29 @@ async function openReservationDetail(grade, size) {
             </tr>`;
         });
 
-        html += `</tbody></table>`;
+        // 4.2 แถวจาก Audit Log (ตัดยอดสร้าง PO / คืนยอด)
+        extraLogs.forEach(log => {
+            const dateStr = new Date(log.created_at).toLocaleDateString('th-TH');
+            const qty = Number(log.qty_change) || 0;
+            const isDec = qty < 0;
+            const actionLabel = log.action_type === 'complete' ? '📄 ตัดยอดสร้าง PO' : '🔄 คืนยอดจอง';
+            const refPo = log.reference_po ? ` (Ref: ${escHtml(log.reference_po)})` : '';
 
-        // 🔥 แสดง Timeline ประวัติการเคลื่อนไหว
-        if (logs && logs.length > 0) {
-            html += `
-            <h4 style="margin:20px 0 10px; font-size:14px; color:#475569;">🕒 ประวัติการเคลื่อนไหว (Audit Log)</h4>
-            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px; font-size:13px;">
-                <ul style="list-style:none; padding:0; margin:0;">
-            `;
-            logs.forEach(log => {
-                const dateStr = new Date(log.created_at).toLocaleString('th-TH');
-                const actionMap = {
-                    'reserve': '📥 จองม้วน',
-                    'decrease': '➖ ปรับลด/คืน',
-                    'complete': '📄 ตัดยอดสร้าง PO',
-                    'restore': '🔄 คืนยอดจอง'
-                };
-                const actionLabel = actionMap[log.action_type] || log.action_type;
-                const qtyCls = log.qty_change < 0 ? 'color:#dc2626;' : 'color:#166534;';
-                const refPo = log.reference_po ? ` (Ref: ${log.reference_po})` : '';
-                
-                html += `
-                    <li style="padding:8px 0; border-bottom:1px dashed #cbd5e1;">
-                        <span style="color:#64748b; font-size:12px;">${dateStr}</span>
-                        <br>
-                        <b>${actionLabel}</b> 
-                        <span style="font-weight:700; ${qtyCls}">${log.qty_change > 0 ? '+' : ''}${log.qty_change} ม้วน</span>
-                        ${refPo}
-                        ${log.reason ? `<br><small style="color:#64748b;">หมายเหตุ: ${escHtml(log.reason)}</small>` : ''}
-                    </li>
-                `;
-            });
-            html += `</ul></div>`;
-        }
+            // หา Supplier / คุณภาพ / ปั๊มลูกค้า จากรายการจองต้นทาง
+            const src = resList.find(r => String(r.id) === String(log.reservation_id));
 
-        html += `
+            html += `<tr style="background:#fff7ed;">
+                <td>${dateStr}</td>
+                <td style="font-weight:600;color:#475569;">${escHtml(src?.supplier || '-')}</td>
+                <td style="text-align:right; color:${isDec ? '#dc2626' : '#166534'}; font-weight:700;">${isDec ? '' : '+'}${qty}</td>
+                <td>${src ? (src.quality === 'B' ? 'B (NC)' : 'A') : '-'}</td>
+                <td>${escHtml(src?.customer_mark || '-')}</td>
+                <td>${actionLabel}${refPo}</td>
+                <td>${escHtml(log.reason || '-')}</td>
+            </tr>`;
+        });
+
+        html += `</tbody></table>
             <div class="form-actions" style="margin-top:20px; display:flex; gap:8px; flex-wrap:wrap;">
                 <button type="button" class="primary" onclick="openAddReservationForm('${escAttr(grade)}', ${size})">➕ เพิ่มรายการจอง</button>
                 <button type="button" onclick="openDecreaseReservationForm('${escAttr(grade)}', ${size})"
@@ -872,14 +883,14 @@ async function resetReservations() {
 // ==========================================
 function exportReservationForm() {
     const headers = [
-        'วันที่จอง', 'Gradegrams', 'Size', 'Supplier', 
-        'จำนวน (ม้วน)', 'คุณภาพ', 'ปั๊มลูกค้า', 'ประเภท', 
+        'วันที่จอง', 'Gradegrams', 'Size', 'Supplier',
+        'จำนวน (ม้วน)', 'คุณภาพ', 'ปั๊มลูกค้า', 'ประเภท',
         'หมายเหตุ', 'สถานะ', 'การเคลื่อนไหว'
     ];
 
     const sampleRow = [
-        '2026-11-14', 'CA125', 44, 'EKP', 
-        5, 'A', 'ปั๊ม BT', 'ประมาณการ', 
+        '2026-11-14', 'CA125', 44, 'EKP',
+        5, 'A', 'ปั๊ม BT', 'ประมาณการ',
         'ตัวอย่างการกรอก', 'จองอยู่', 'ปกติ'
     ];
 
@@ -887,16 +898,16 @@ function exportReservationForm() {
     const ws = XLSX.utils.aoa_to_sheet(wsData);
 
     ws['!cols'] = [
-        {wch: 14}, {wch: 12}, {wch: 8}, {wch: 10}, {wch: 12}, 
+        {wch: 14}, {wch: 12}, {wch: 8}, {wch: 10}, {wch: 12},
         {wch: 10}, {wch: 15}, {wch: 18}, {wch: 25}, {wch: 12}, {wch: 15}
     ];
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'ReservationForm');
-    
+
     const today = new Date().toISOString().slice(0, 10);
     XLSX.writeFile(wb, `reservation_form_${today}.xlsx`);
-    
+
     showToast('✅ Export ฟอร์มสำเร็จ', 'ok');
 }
 
@@ -905,7 +916,7 @@ function exportReservationForm() {
 // ==========================================
 function exportReservationData() {
     const filterDate = document.getElementById('reservationDate')?.value || '';
-    
+
     let dataToExport = resState.data || [];
     if (filterDate) {
         dataToExport = dataToExport.filter(r => r.reservation_date === filterDate);
@@ -916,15 +927,15 @@ function exportReservationData() {
     }
 
     const headers = [
-        'วันที่จอง', 'Gradegrams', 'Size', 'Supplier', 
-        'จำนวน (ม้วน)', 'คุณภาพ', 'ปั๊มลูกค้า', 'ประเภท', 
+        'วันที่จอง', 'Gradegrams', 'Size', 'Supplier',
+        'จำนวน (ม้วน)', 'คุณภาพ', 'ปั๊มลูกค้า', 'ประเภท',
         'หมายเหตุ', 'สถานะ', 'การเคลื่อนไหว'
     ];
 
     const dataRows = dataToExport.map(r => {
         let qType = 'ปกติ';
         if (r.adjust_type === 'decrease') qType = 'ปรับลด/คืน';
-        
+
         let dateStr = '-';
         if (r.reservation_date) {
             const d = new Date(r.reservation_date);
@@ -950,16 +961,16 @@ function exportReservationData() {
     const ws = XLSX.utils.aoa_to_sheet(wsData);
 
     ws['!cols'] = [
-        {wch: 14}, {wch: 12}, {wch: 8}, {wch: 10}, {wch: 12}, 
+        {wch: 14}, {wch: 12}, {wch: 8}, {wch: 10}, {wch: 12},
         {wch: 10}, {wch: 15}, {wch: 18}, {wch: 25}, {wch: 12}, {wch: 15}
     ];
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'ReservationData');
-    
+
     const dateLabel = filterDate || 'all';
     XLSX.writeFile(wb, `reservation_data_${dateLabel}.xlsx`);
-    
+
     showToast(`✅ Export ข้อมูล ${dataToExport.length} รายการ สำเร็จ`, 'ok');
 }
 
@@ -992,7 +1003,7 @@ async function importReservations(event) {
             const grade = String(row['Gradegrams'] || '').trim().toUpperCase();
             const size = Number(row['Size']);
             const qty = Number(row['จำนวน (ม้วน)']);
-            
+
             if (!date || !grade || !size || isNaN(qty) || qty === 0) {
                 errors.push(`แถว ${rowNum}: ข้อมูลไม่ครบ (วันที่/Grade/Size/จำนวน)`);
                 return;
