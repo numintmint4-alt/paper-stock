@@ -5,6 +5,7 @@
 // + Fix: ลบ let resState ที่ซ้ำซ้อน
 // + NEW: Export Form / Export Data / Import Excel
 // + NEW (V.2): openReservationDetail — แสดงหน้ารายละเอียดว่างก่อน ถ้าไม่มีข้อมูล
+// + NEW (V.3): Audit Log — logReservationAction + Timeline ใน openReservationDetail
 // ==========================================
 
 // 🔽 สร้าง fcState รอไว้เลย ป้องกัน ReferenceError
@@ -14,6 +15,25 @@ let resState = {
     data: [],
     gradeFilter: 'ALL'
 };
+
+// ==========================================
+// ฟังก์ชันบันทึกประวัติการเคลื่อนไหว (Audit Log)
+// ==========================================
+async function logReservationAction(reservationId, actionType, qtyChange, referencePo, reason) {
+    try {
+        const { error } = await supabase.from('roll_reservation_logs').insert({
+            reservation_id: reservationId,
+            action_type: actionType,    // 'reserve', 'decrease', 'complete', 'restore'
+            qty_change: qtyChange,      // +6, -2, etc.
+            reference_po: referencePo || null,
+            reason: reason || null,
+            created_by: currentUser?.id || null
+        });
+        if (error) console.warn('Log Error:', error);
+    } catch (err) {
+        console.error('logReservationAction Exception:', err);
+    }
+}
 
 // ==========================================
 // Helper: ดึงข้อมูลทั้งหมดจาก Supabase (ข้าม Limit 1000)
@@ -255,6 +275,13 @@ async function openReservationDetail(grade, size) {
 
         if (error) throw error;
 
+        // 🔥 ดึงประวัติการเคลื่อนไหวจาก Log
+        const { data: logs } = await supabase
+            .from('roll_reservation_logs')
+            .select('*')
+            .in('reservation_id', (data || []).map(d => d.id))
+            .order('created_at', { ascending: false });
+
         // 🔥 V.2: เปลี่ยนจากเด้งไปฟอร์มเพิ่มทันที เป็นโชว์หน้ารายละเอียดว่างๆ ก่อน
         if (!data || data.length === 0) {
             let html = `
@@ -334,7 +361,42 @@ async function openReservationDetail(grade, size) {
             </tr>`;
         });
 
-        html += `</tbody></table>
+        html += `</tbody></table>`;
+
+        // 🔥 แสดง Timeline ประวัติการเคลื่อนไหว
+        if (logs && logs.length > 0) {
+            html += `
+            <h4 style="margin:20px 0 10px; font-size:14px; color:#475569;">🕒 ประวัติการเคลื่อนไหว (Audit Log)</h4>
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px; font-size:13px;">
+                <ul style="list-style:none; padding:0; margin:0;">
+            `;
+            logs.forEach(log => {
+                const dateStr = new Date(log.created_at).toLocaleString('th-TH');
+                const actionMap = {
+                    'reserve': '📥 จองม้วน',
+                    'decrease': '➖ ปรับลด/คืน',
+                    'complete': '📄 ตัดยอดสร้าง PO',
+                    'restore': '🔄 คืนยอดจอง'
+                };
+                const actionLabel = actionMap[log.action_type] || log.action_type;
+                const qtyCls = log.qty_change < 0 ? 'color:#dc2626;' : 'color:#166534;';
+                const refPo = log.reference_po ? ` (Ref: ${log.reference_po})` : '';
+                
+                html += `
+                    <li style="padding:8px 0; border-bottom:1px dashed #cbd5e1;">
+                        <span style="color:#64748b; font-size:12px;">${dateStr}</span>
+                        <br>
+                        <b>${actionLabel}</b> 
+                        <span style="font-weight:700; ${qtyCls}">${log.qty_change > 0 ? '+' : ''}${log.qty_change} ม้วน</span>
+                        ${refPo}
+                        ${log.reason ? `<br><small style="color:#64748b;">หมายเหตุ: ${escHtml(log.reason)}</small>` : ''}
+                    </li>
+                `;
+            });
+            html += `</ul></div>`;
+        }
+
+        html += `
             <div class="form-actions" style="margin-top:20px; display:flex; gap:8px; flex-wrap:wrap;">
                 <button type="button" class="primary" onclick="openAddReservationForm('${escAttr(grade)}', ${size})">➕ เพิ่มรายการจอง</button>
                 <button type="button" onclick="openDecreaseReservationForm('${escAttr(grade)}', ${size})"
@@ -518,6 +580,23 @@ async function saveReservation(grade, size) {
         });
 
         if (error) throw error;
+
+        // 🔥 บันทึก Log
+        // ต้องดึง ID ของแถวที่เพิ่ง Insert กลับมาก่อน
+        const { data: newData } = await supabase
+            .from('roll_reservations')
+            .select('id')
+            .eq('reservation_date', resDate)
+            .eq('grade', grade)
+            .eq('size', size)
+            .eq('supplier', supplier)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+        if (newData) {
+            await logReservationAction(newData.id, 'reserve', qty, null, 'สร้างรายการจองใหม่');
+        }
 
         showToast('✅ บันทึกการจองสำเร็จ', 'ok');
         await loadReservations();
@@ -736,6 +815,23 @@ async function saveDecreaseReservation(grade, size) {
         });
 
         if (error) throw error;
+
+        // 🔥 บันทึก Log (ใช้ ID ของรายการต้นทาง หรือ ID ของแถวใหม่)
+        const { data: newDecData } = await supabase
+            .from('roll_reservations')
+            .select('id')
+            .eq('reservation_date', getTodayISO())
+            .eq('grade', grade)
+            .eq('size', size)
+            .eq('supplier', srcData.supplier)
+            .eq('adjust_type', 'decrease')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+        if (newDecData) {
+            await logReservationAction(newDecData.id, 'decrease', -Math.abs(decQty), null, adjustReason);
+        }
 
         showToast(`✅ ปรับลด ${decQty} ม้วน สำเร็จ`, 'ok');
         await loadReservations();
