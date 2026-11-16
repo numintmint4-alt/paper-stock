@@ -625,7 +625,7 @@ async function verifyAndOpen(po, password, note) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  🎯 จุดที่แก้ไข: markPOSaved (หักยอดจองตอน Save เป็น Saved)
+//  🎯 markPOSaved — หักยอดจอง + บันทึก Audit Log (ป้องกันซ้ำ)
 // ═══════════════════════════════════════════════════════════════
 async function markPOSaved(poId) {
   const po = poCache.find(p => p.id === poId);
@@ -648,16 +648,54 @@ async function markPOSaved(poId) {
     // 2. ดึงรายการ items ของ PO นี้ เพื่อเอา reservation_id ไปหักยอด
     const { data: detail, error: detailErr } = await supabase.rpc('get_purchase_order_detail', { p_po_id: poId });
     if (detailErr) throw detailErr;
-    
+
     const activeItems = (detail.items || []).filter(it => it.status !== 'cancelled');
 
-    // 3. สั่งหักยอดจอง
+    // 3. สั่งหักยอดจอง + บันทึก Audit Log
     if (activeItems.length > 0) {
       await deductReservationOnPO(po.po_no, activeItems);
+
+      // 🔥 บันทึก Audit Log ว่าถูกตัดยอดไปสร้าง PO (ป้องกันซ้ำทีละรายการ)
+      for (const item of activeItems) {
+        if (!item.reservation_id) continue; // ข้ามถ้าไม่มี ID จอง (Stock กลาง)
+
+        const qty = Number(item.quantity) || 0;
+        if (qty <= 0) continue; // ข้ามถ้าไม่มีจำนวน
+
+        try {
+          // 🔒 เช็กทีละตัวว่ามี Log ของ PO นี้ + reservation_id นี้แล้วหรือยัง
+          const { data: existing } = await supabase
+            .from('roll_reservation_logs')
+            .select('id')
+            .eq('reservation_id', item.reservation_id)
+            .eq('reference_po', po.po_no)
+            .eq('action_type', 'complete')
+            .maybeSingle();
+
+          if (existing) {
+            console.log(`[markPOSaved] Log มีอยู่แล้ว: res=${item.reservation_id} po=${po.po_no} — ข้าม`);
+            continue;
+          }
+
+          // ยังไม่มี → Insert Log
+          const { error: logErr } = await supabase.from('roll_reservation_logs').insert({
+            reservation_id: item.reservation_id,
+            action_type: 'complete',
+            qty_change: -Math.abs(qty),
+            reference_po: po.po_no,
+            reason: `ตัดยอดเพื่อสร้าง PO ${po.po_no}`,
+            created_by: currentUser?.id || null
+          });
+          if (logErr) console.warn('[markPOSaved] log insert failed:', logErr);
+
+        } catch (logErr) {
+          console.warn('[markPOSaved] log exception:', logErr);
+        }
+      }
     }
 
     alert(`✅ บันทึก ${po.po_no} เป็น Saved สำเร็จ\n(หักยอดจองเรียบร้อย)`);
-    
+
     await renderPOList();
 
     // อัปเดตหน้า Alert (ถ้าเปิดอยู่)
@@ -669,7 +707,6 @@ async function markPOSaved(poId) {
     alert('❌ ' + e.message);
   }
 }
-
 function openVerifyModal({ username, title, message, onConfirm }) {
   $('verifyPasswordTitle').textContent = title || '🔒 ยืนยันรหัสผ่าน';
   $('verifyPasswordMessage').textContent = message || '';
