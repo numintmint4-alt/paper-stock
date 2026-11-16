@@ -9,6 +9,9 @@
 // + NEW (V.4): openReservationDetail — รวมประวัติการเคลื่อนไหวไว้ในตารางเดียว
 //              (แถวจอง/ปรับลด จาก roll_reservations + แถวตัดยอด/คืนยอด จาก Audit Log)
 //              ยอดสุทธิ = ผลรวมของแถวจองทั้งหมด − ยอดตัดสร้าง PO (complete)
+// + NEW (V.5): loadReservations ดึง Audit Log (complete) มาหักลบยอดใน Matrix
+//              renderReservationsTable หัก log.qty_change ออกจาก cellMap
+//              Total Row คำนวณจาก cellMap เพื่อให้ตรงกับเซลล์
 // ==========================================
 
 // 🔽 สร้าง fcState รอไว้เลย ป้องกัน ReferenceError
@@ -16,6 +19,7 @@ window.fcState = window.fcState || { masterData: [] };
 
 let resState = {
     data: [],
+    logs: [],          // 🔥 NEW: เก็บ Audit Log (complete) เพื่อหักลบยอดใน Matrix
     gradeFilter: 'ALL'
 };
 
@@ -88,7 +92,7 @@ async function ensureMasterDataLoaded() {
 }
 
 // ==========================================
-// 8.1 ฟังก์ชันโหลดข้อมูลหลัก
+// 8.1 ฟังก์ชันโหลดข้อมูลหลัก (🔥 แก้ไข: ดึง Audit Log มาด้วย)
 // ==========================================
 async function loadReservations() {
     const tbody = document.getElementById('res-tbody');
@@ -100,15 +104,28 @@ async function loadReservations() {
     try {
         await ensureMasterDataLoaded();
 
-        const { data, error } = await supabase
+        // 1. ดึงข้อมูลการจอง (reserved)
+        const { data: resData, error: resErr } = await supabase
             .from('roll_reservations')
             .select('*')
             .eq('status', 'reserved');
 
-        if (error) throw error;
+        if (resErr) throw resErr;
 
-        resState.data = data || [];
+        // 2. ดึง Audit Log (เพื่อเอามาหักลบยอด)
+        const { data: logData, error: logErr } = await supabase
+            .from('roll_reservation_logs')
+            .select('*')
+            .eq('action_type', 'complete'); // 🔥 ดึงเฉพาะที่ถูกตัดยอด (Complete)
 
+        if (logErr) throw logErr;
+
+        // 3. เก็บข้อมูลลง State
+        //    เราเก็บ Log ไว้ใน state เพื่อเอาไปคำนวณใน renderReservationsTable
+        resState.data = resData || [];
+        resState.logs = logData || []; // 🔥 เพิ่มตัวแปรเก็บ Log
+
+        // อัปเดตวันที่
         const dateLabel = document.getElementById('resCurrentDateLabel');
         if (dateLabel) {
             const today = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -124,7 +141,7 @@ async function loadReservations() {
 }
 
 // ==========================================
-// 8.2 ฟังก์ชันวาดตาราง Matrix
+// 8.2 ฟังก์ชันวาดตาราง Matrix (🔥 แก้ไข: หักลบยอดจาก Log)
 // ==========================================
 function renderReservationsTable() {
     const thead = document.getElementById('res-thead');
@@ -163,11 +180,28 @@ function renderReservationsTable() {
 
     // 5. รวมยอดจอง: Grade|Size -> Total Qty
     const cellMap = {};
+
+    // 5.1 บวกยอดจากการจองปกติ (reserved)
     data.forEach(r => {
         const key = `${r.grade}|${r.size}`;
         if (!cellMap[key]) cellMap[key] = 0;
         cellMap[key] += Number(r.quantity) || 0;
     });
+
+    // 5.2 🔥 หักลบยอดจาก Audit Log (ที่ถูกตัดยอดไปแล้ว)
+    if (resState.logs && resState.logs.length > 0) {
+        resState.logs.forEach(log => {
+            // หาข้อมูลการจองต้นทางเพื่อเอา grade และ size
+            const parentRes = data.find(r => r.id === log.reservation_id);
+
+            if (parentRes) {
+                const key = `${parentRes.grade}|${parentRes.size}`;
+                if (!cellMap[key]) cellMap[key] = 0;
+                // log.qty_change เป็นค่าติดลบ (เช่น -2) อยู่แล้ว
+                cellMap[key] += Number(log.qty_change) || 0;
+            }
+        });
+    }
 
     // 6. Body
     let bodyHtml = '';
@@ -210,12 +244,13 @@ function renderReservationsTable() {
             bodyHtml += '</tr>';
         });
 
-        // Total Row
+        // Total Row (🔥 แก้ไข: คำนวณจาก cellMap เพื่อให้ตรงกับยอดในเซลล์)
         bodyHtml += '<tr class="total-row"><td class="grade-col" style="text-align:right;">รวมทั้งหมด</td>';
         allSizes.forEach(size => {
-            const sizeTotal = data
-                .filter(r => Number(r.size) === size)
-                .reduce((s, r) => s + (Number(r.quantity) || 0), 0);
+            let sizeTotal = 0;
+            filteredGrades.forEach(g => {
+                sizeTotal += cellMap[`${g}|${size}`] || 0;
+            });
             grandTotal += sizeTotal;
 
             const sizeTotalDisplay = sizeTotal !== 0 ? sizeTotal : '';
