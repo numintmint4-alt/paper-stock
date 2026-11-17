@@ -1,8 +1,9 @@
 // ═══════════════════════════════════════════════════════════════
-//  ALERT.JS — V.18.0 (Part 2/3)
+//  ALERT.JS — V.18.1 (Part 2/3)
 //  RENDER TABLE + FLAT VIEW + MATRIX VIEW + DRAFT FORM
-//  ✅ แก้: saveMatrixOrder (สร้าง log complete)
-//  ✅ แก้: removeMatrixOrderRow (ลบ log DRAFT)
+//  ✅ แก้: saveMatrixOrder (ไม่หักยอดจองตอน Save Draft แล้ว)
+//  ✅ แก้: removeMatrixOrderRow (ไม่ลบ log DRAFT แล้ว)
+//  ✅ ลบ: _deleteDraftLogs()
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -481,7 +482,7 @@ function addMatrixOrderRow(gradegram, size) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  ✅ V.18.0: removeMatrixOrderRow — ลบ log DRAFT ตอนลบแถว
+//  ✅ V.18.1: removeMatrixOrderRow — ไม่ลบ log DRAFT แล้ว
 // ═══════════════════════════════════════════════════════════════
 
 async function removeMatrixOrderRow(btn) {
@@ -515,23 +516,10 @@ async function removeMatrixOrderRow(btn) {
   // 5. แถวจากยอดจอง → คืนยอด
   const draftIdx = _draftPendingItems.findIndex(d => String(d.resId) === String(resId));
   if (draftIdx >= 0) {
-    // 🔥 กรณีที่ 1: draft ยังไม่ save → แค่ลบออกจาก memory
+    // กรณีที่ 1: draft ยังไม่ save → แค่ลบออกจาก memory
     _draftPendingItems.splice(draftIdx, 1);
   } else {
-    // 🔥 กรณีที่ 2: draft save แล้ว → ลบ log DRAFT + คืนสถานะ
-    try {
-      const { error } = await supabase
-        .from('roll_reservation_logs')
-        .delete()
-        .eq('reservation_id', resId)
-        .eq('action_type', 'complete')
-        .like('reason', `DRAFT:${gradegram}-${size}`);
-      
-      if (error) throw error;
-    } catch (err) {
-      console.warn('ลบ log DRAFT ไม่สำเร็จ:', err);
-    }
-
+    // กรณีที่ 2: draft save แล้ว → คืนสถานะยอดจอง + ลบออกจาก items ที่บันทึกไว้
     await _restoreReservations([resId]);
 
     const saved = getAlertItems(gradegram, size);
@@ -605,7 +593,7 @@ function showMatrixOrderForm(gradegram, size) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  ✅ V.18.0: saveMatrixOrder — สร้าง log complete ตอน Save Draft
+//  ✅ V.18.1: saveMatrixOrder — Save Draft แล้ว "ไม่หักยอดจอง"
 // ═══════════════════════════════════════════════════════════════
 
 async function saveMatrixOrder(gradegram, size) {
@@ -643,10 +631,7 @@ async function saveMatrixOrder(gradegram, size) {
 
     const oldResIds = getAlertItems(gradegram, size).map(i => i.res_id).filter(Boolean);
     _draftPendingItems = _draftPendingItems.filter(d => !(d.gradegram === gradegram && Number(d.size) === Number(size)));
-    
-    // 🔥 ลบ log DRAFT เก่าด้วย (ถ้ามี)
-    await _deleteDraftLogs(gradegram, size);
-    
+
     await _restoreReservations(oldResIds);
     await saveAlertItems(gradegram, size, []);
     closeModal('modalAlertMatrixCell');
@@ -658,24 +643,8 @@ async function saveMatrixOrder(gradegram, size) {
     d => !(d.gradegram === gradegram && Number(d.size) === Number(size))
   );
 
-  // 🔥 ขั้นที่ 1: ลบ log DRAFT เก่าของ cell นี้ก่อน (ถ้ากด Save ซ้ำ)
-  await _deleteDraftLogs(gradegram, size);
-
-  // 🔥 ขั้นที่ 2: บันทึก draft ใหม่
+  // บันทึก draft เท่านั้น (ไม่สร้าง log complete / ไม่หักยอดจองตอน Draft)
   await saveAlertItems(gradegram, size, items);
-
-  // 🔥 ขั้นที่ 3: สร้าง log complete เพื่อหักยอดจองจริง
-  for (const item of items) {
-    if (item.res_id && Number(item.qty) > 0) {
-      await logReservationAction(
-        item.res_id,
-        'complete',
-        -Number(item.qty),
-        null,
-        `DRAFT:${gradegram}-${size}`
-      );
-    }
-  }
 
   closeModal('modalAlertMatrixCell');
   applyAlertFiltersAndRender();
@@ -687,34 +656,6 @@ async function saveMatrixOrder(gradegram, size) {
   msg.textContent = `✅ บันทึก Draft ${items.length} รายการ (${gradegram}-${size}) รวม ${total} ม้วน`;
   document.body.appendChild(msg);
   setTimeout(() => msg.remove(), 2000);
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  🔥 NEW: _deleteDraftLogs — ลบ log DRAFT ของ cell
-// ═══════════════════════════════════════════════════════════════
-
-async function _deleteDraftLogs(gradegram, size) {
-  try {
-    const { data: logs, error } = await supabase
-      .from('roll_reservation_logs')
-      .select('id, reservation_id, reason')
-      .eq('action_type', 'complete')
-      .like('reason', `DRAFT:${gradegram}-${size}`);
-    
-    if (error) throw error;
-    if (!logs || logs.length === 0) return;
-
-    const ids = logs.map(l => l.id);
-    const { error: delErr } = await supabase
-      .from('roll_reservation_logs')
-      .delete()
-      .in('id', ids);
-    
-    if (delErr) throw delErr;
-    console.log(`🗑 ลบ log DRAFT ${ids.length} รายการ (${gradegram}-${size})`);
-  } catch (err) {
-    console.error('_deleteDraftLogs error:', err);
-  }
 }
 
 // ═══════════════════════════════════════════════════════════════
