@@ -9,6 +9,8 @@
 // + V.6.2: แก้ไข Timezone ของ log ให้ดึงตามเวลาประเทศไทย (+07:00)
 // + V.6.3: แก้ไข openReservationDetail ให้ดึงประวัติทั้งหมด (ไม่ติด status='reserved')
 //          และแก้ปัญหา Size Type Mismatch เพื่อให้แสดงประวัติที่ถูกตัดยอดสร้าง PO แล้วได้
+// + V.6.4: loadReservations ดึงทุกสถานะ (เอา status='reserved' ออก)
+//          เพื่อให้ย้อนดูอดีตได้ถูกต้องตามหลัก Historical State
 // ==========================================
 
 // 🔽 สร้าง fcState รอไว้เลย ป้องกัน ReferenceError
@@ -118,7 +120,7 @@ async function ensureMasterDataLoaded() {
 
 // ==========================================
 // 8.1 ฟังก์ชันโหลดข้อมูลหลัก
-// 🔥 CUMULATIVE: ดึงข้อมูลสะสมตั้งแต่อดีตถึงวันที่เลือก
+// 🔥 CUMULATIVE: ดึงข้อมูลสะสมตั้งแต่อดีตถึงวันที่เลือก (ทุกสถานะ)
 // ==========================================
 async function loadReservations() {
     const tbody = document.getElementById('res-tbody');
@@ -144,12 +146,11 @@ async function loadReservations() {
         d.setDate(d.getDate() + 1);
         const nextDayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-        // 3. ดึงข้อมูลการจอง (reserved) แบบสะสม
+        // 3. 🔥 ดึงข้อมูลการจองแบบสะสม "ทุกสถานะ" (เอา status='reserved' ออก เพื่อดูย้อนหลังได้)
         const { data: resData, error: resErr } = await supabase
             .from('roll_reservations')
             .select('*')
-            .eq('status', 'reserved')
-            .lte('reservation_date', filterDate);
+            .lte('reservation_date', filterDate); // เอาเฉพาะที่จองก่อนหรือในวันที่เลือก
 
         if (resErr) throw resErr;
 
@@ -223,7 +224,7 @@ function renderReservationsTable() {
     // 5. รวมยอดจอง: Grade|Size -> Total Qty
     const cellMap = {};
 
-    // 5.1 บวกยอดจากการจองปกติ (reserved)
+    // 5.1 🔥 บวกยอดจากการจองปกติ (ทุกสถานะ) — resState.data ถูกกรองมาถึงวันที่เลือกแล้ว
     data.forEach(r => {
         const key = `${r.grade}|${r.size}`;
         if (!cellMap[key]) cellMap[key] = 0;
@@ -231,6 +232,8 @@ function renderReservationsTable() {
     });
 
     // 5.2 🔥 หักลบยอดจาก Audit Log (ที่ถูกตัดยอดไปแล้ว)
+    //     resState.logs ถูกกรองมาเฉพาะ log ที่เกิดก่อนหรือเท่ากับวันที่เลือกแล้ว
+    //     (created_at < nextDayStr) จึงหักลบได้ตรงตาม Historical State
     if (resState.logs && resState.logs.length > 0) {
         resState.logs.forEach(log => {
             const parentRes = data.find(r => r.id === log.reservation_id);
