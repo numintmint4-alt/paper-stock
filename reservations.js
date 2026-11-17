@@ -5,11 +5,10 @@
 // + Audit Log — logReservationAction + Timeline ใน openReservationDetail
 // + openReservationDetail — รวมประวัติการเคลื่อนไหวไว้ในตารางเดียว
 // + V.6: loadReservations ดึงแบบ CUMULATIVE (สะสมตั้งแต่อดีตถึงวันที่เลือก)
-//        - ดึง resData ด้วย .lte('reservation_date', filterDate)
-//        - ดึง logData (complete) ด้วย .lte('created_at', filterDate 23:59:59)
-//        - renderReservationsTable หัก log.qty_change ออกจาก cellMap
 // + V.6.1: เปลี่ยนชื่อ fetchAllRows → fetchAllRowsResv (กันชนกับ app.js)
-//          เพิ่ม fallback escHtml / escAttr (ถ้าโปรเจกต์ยังไม่มี)
+// + V.6.2: แก้ไข Timezone ของ log ให้ดึงตามเวลาประเทศไทย (+07:00)
+// + V.6.3: แก้ไข openReservationDetail ให้ดึงประวัติทั้งหมด (ไม่ติด status='reserved')
+//          และแก้ปัญหา Size Type Mismatch เพื่อให้แสดงประวัติที่ถูกตัดยอดสร้าง PO แล้วได้
 // ==========================================
 
 // 🔽 สร้าง fcState รอไว้เลย ป้องกัน ReferenceError
@@ -140,8 +139,12 @@ async function loadReservations() {
             if (dateInput) dateInput.value = filterDate;
         }
 
-        // 🔥 2. ดึงข้อมูลการจอง (reserved) แบบสะสม (Cumulative)
-        // ใช้ .lte (Less Than or Equal) เพื่อดึงข้อมูลตั้งแต่อดีตจนถึงวันที่เลือก
+        // 🔥 2. คำนวณวันถัดไป (สำหรับใช้เป็นขอบเขตเวลา)
+        const d = new Date(filterDate + 'T00:00:00');
+        d.setDate(d.getDate() + 1);
+        const nextDayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+        // 3. ดึงข้อมูลการจอง (reserved) แบบสะสม
         const { data: resData, error: resErr } = await supabase
             .from('roll_reservations')
             .select('*')
@@ -150,28 +153,25 @@ async function loadReservations() {
 
         if (resErr) throw resErr;
 
-        // 🔥 3. ดึง Audit Log (การตัดยอดสร้าง PO) แบบสะสม
-        // ดึงเฉพาะ Log ที่เกิดขึ้นก่อนหรือในวันที่เลือก
+        // 🔥 4. ดึง Audit Log (complete) แบบสะสม (แก้ปัญหา Timezone)
+        // ใช้ .lt (Less Than) กับเวลา 00:00 ของ "วันถัดไป" ตามเวลาไทย (+07:00)
         const { data: logData, error: logErr } = await supabase
             .from('roll_reservation_logs')
             .select('*')
             .eq('action_type', 'complete')
-            .lte('created_at', `${filterDate}T23:59:59`);
+            .lt('created_at', `${nextDayStr}T00:00:00+07:00`);
 
         if (logErr) throw logErr;
 
-        // 4. เก็บข้อมูลลง State
-        // (นำไปหักลบกันในฟังก์ชัน renderReservationsTable)
+        // 5. เก็บข้อมูลลง State
         resState.data = resData || [];
         resState.logs = logData || [];
 
-        // 5. อัปเดตข้อความบรรทัดใหญ่กลางจอ
+        // 6. อัปเดตข้อความบรรทัดใหญ่กลางจอ
         const dateLabel = document.getElementById('resCurrentDateLabel');
         if (dateLabel) {
-            const d = new Date(filterDate + 'T00:00:00');
-            const dateStr = d.toLocaleDateString('th-TH', {
-                year: 'numeric', month: 'long', day: 'numeric'
-            });
+            const dLabel = new Date(filterDate + 'T00:00:00');
+            const dateStr = dLabel.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
             dateLabel.innerHTML = `ตารางการจองม้วนกระดาษ ณ วันที่ : <span style="color: var(--primary);">${dateStr}</span>`;
         }
 
@@ -330,8 +330,8 @@ function filterResByGrade(gradeGroup, btnElement) {
 
 // ==========================================
 // 8.4 ฟังก์ชันเปิด Modal Drill-down
-//     - ตารางเดียว: แถวจอง/ปรับลด + แถว Audit Log (ตัดยอด PO / คืนยอด)
-//     - ยอดสุทธิ = ผลรวมแถวจองทั้งหมด − ยอดตัด PO (complete)
+// 🔥 อัปเดต: แสดงประวัติทั้งหมด (ไม่เช็คแค่ status='reserved') 
+//           เพื่อให้เห็นรายการที่ถูกตัดยอดสร้าง PO ไปแล้วด้วย
 // ==========================================
 async function openReservationDetail(grade, size) {
     const modal = document.getElementById('modalReservationDetail');
@@ -339,28 +339,46 @@ async function openReservationDetail(grade, size) {
     const body = document.getElementById('resDetailBody');
     if (!modal || !body) return;
 
+    // แสดง Loading ก่อน
     title.innerHTML = `📋 รายละเอียดการจอง: ${escHtml(grade)} (Size ${size})`;
-    body.innerHTML = '<div style="text-align:center;padding:20px;">กำลังโหลด...</div>';
+    body.innerHTML = '<div style="text-align:center;padding:20px;">กำลังโหลดประวัติ...</div>';
     modal.classList.add('show');
 
     try {
-        // 1. ดึงข้อมูลการจอง (reserved)
-        const { data: reservations, error: resErr } = await supabase
-            .from('roll_reservations')
-            .select('*')
-            .eq('grade', grade)
-            .eq('size', size)
-            .eq('status', 'reserved')
-            .order('created_at', { ascending: false });
-        if (resErr) throw resErr;
+        // 1. ดึงข้อมูลการจอง (🔥 เอาเงื่อนไข status='reserved' ออก 
+        //    เพื่อดึงประวัติทั้งหมดของเกรดและขนาดนี้)
+        const reservations = await fetchAllRowsResv(() =>
+            supabase
+                .from('roll_reservations')
+                .select('*')
+                .eq('grade', grade)
+                .eq('size', size) 
+                // .eq('status', 'reserved') // ❌ ลบหรือคอมเมนต์บรรทัดนี้ทิ้ง
+                .order('created_at', { ascending: false })
+        );
 
         const resList = reservations || [];
 
-        // ถ้าไม่มีข้อมูล → โชว์หน้ารายละเอียดว่าง + ปุ่มเพิ่มรายการจอง
+        // ถ้าดึงจาก DB แล้วไม่มีข้อมูลจริงๆ (หรือ Type ไม่ตรง)
+        if (resList.length === 0) {
+            // ลองค้นหาเฉพาะ grade แล้วเอามากรอง size ใน JS (ป้องกันกรณี size เป็น String)
+            const fallbackSearch = await fetchAllRowsResv(() =>
+                supabase
+                    .from('roll_reservations')
+                    .select('*')
+                    .eq('grade', grade)
+            );
+            
+            const filteredFallback = fallbackSearch.filter(r => Number(r.size) === Number(size));
+            if (filteredFallback.length > 0) {
+                resList.push(...filteredFallback);
+            }
+        }
+
         if (resList.length === 0) {
             body.innerHTML = `
                 <div style="text-align:center; padding:30px; color:#94a3b8;">
-                    <p style="font-size:16px; margin-bottom:10px;">ไม่พบประวัติการจองสำหรับรายการนี้</p>
+                    <p style="font-size:16px; margin-bottom:10px;">ไม่พบประวัติการจองในฐานข้อมูล</p>
                     <p style="font-size:13px;">คุณสามารถเพิ่มรายการจองใหม่ได้โดยกดปุ่มด้านล่าง</p>
                 </div>
                 <div class="form-actions" style="margin-top:20px; display:flex; gap:8px; justify-content:center;">
@@ -371,21 +389,22 @@ async function openReservationDetail(grade, size) {
             return;
         }
 
-        // 2. ดึง Audit Log (เฉพาะรายการที่อยู่ในกลุ่มนี้)
+        // 2. ดึง Audit Log (เช่น ประวัติการตัดยอดสร้าง PO)
         let logs = [];
         const resIds = resList.map(d => d.id);
-        const { data: logData, error: logErr } = await supabase
-            .from('roll_reservation_logs')
-            .select('*')
-            .in('reservation_id', resIds)
-            .order('created_at', { ascending: false });
-        if (logErr) console.warn('load logs error:', logErr);
+        const logData = await fetchAllRowsResv(() =>
+            supabase
+                .from('roll_reservation_logs')
+                .select('*')
+                .in('reservation_id', resIds)
+                .order('created_at', { ascending: false })
+        );
         logs = logData || [];
 
-        // แสดงจาก Log เฉพาะ "ตัดยอดสร้าง PO" (complete) และ "คืนยอด" (restore)
+        // เอาเฉพาะ log ที่เป็นการตัดยอด (complete) หรือคืนยอด (restore)
         const extraLogs = logs.filter(l => l.action_type === 'complete' || l.action_type === 'restore');
 
-        // 3. คำนวณยอด
+        // 3. คำนวณยอดรวม
         const totalIncrease = resList
             .filter(r => (Number(r.quantity) || 0) > 0)
             .reduce((s, r) => s + Number(r.quantity), 0);
@@ -395,40 +414,49 @@ async function openReservationDetail(grade, size) {
         const totalPOCut = extraLogs
             .filter(l => l.action_type === 'complete' && (Number(l.qty_change) || 0) < 0)
             .reduce((s, l) => s + Math.abs(Number(l.qty_change)), 0);
+        
         const netTotal = totalIncrease - totalDecrease - totalPOCut;
 
         // 4. สร้าง HTML
         let html = `
             <div style="background:#f0f9ff; padding:16px; border-radius:8px; margin-bottom:16px; border:1px solid #bae6fd;">
-                <h4 style="margin:0 0 8px; font-size:15px; color:#0369a1;">📦 สรุปยอดจอง: ${escHtml(grade)} (Size ${size})</h4>
+                <h4 style="margin:0 0 8px; font-size:15px; color:#0369a1;">📦 สรุปยอด: ${escHtml(grade)} (Size ${size})</h4>
                 <div style="font-size:14px; color:#0c4a6e; line-height:1.9;">
                     ยอดจองรวม: <b style="color:#0284c7;">${totalIncrease} ม้วน</b><br>
                     ${totalDecrease > 0 ? `ปรับลด/คืน: <b style="color:#dc2626;">-${totalDecrease} ม้วน</b><br>` : ''}
                     ${totalPOCut > 0 ? `ตัดจ่าย (สร้าง PO): <b style="color:#dc2626;">-${totalPOCut} ม้วน</b><br>` : ''}
-                    <span style="font-size:15px;">ยอดสุทธิ: <b style="font-size:20px; color:#0284c7;">${netTotal} ม้วน</b></span>
+                    <span style="font-size:15px;">ยอดคงเหลือสุทธิ: <b style="font-size:20px; color:#0284c7;">${netTotal} ม้วน</b></span>
                 </div>
             </div>
 
             <h4 style="margin:0 0 10px; font-size:14px; color:#475569;">📜 ประวัติการเคลื่อนไหว</h4>
-            <table class="data-table" style="width:100%; font-size:13px;">
-                <thead>
-                    <tr>
-                        <th>วันที่</th>
-                        <th>Supplier</th>
-                        <th>จำนวน</th>
-                        <th>คุณภาพ</th>
-                        <th>ปั๊มลูกค้า</th>
-                        <th>ประเภท</th>
-                        <th>หมายเหตุ</th>
-                    </tr>
-                </thead>
-                <tbody>`;
+            <div style="max-height: 400px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 6px;">
+                <table class="data-table" style="width:100%; font-size:13px; margin:0;">
+                    <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 1; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                        <tr>
+                            <th style="padding: 10px;">วันที่</th>
+                            <th style="padding: 10px;">Supplier</th>
+                            <th style="padding: 10px; text-align:right;">จำนวน</th>
+                            <th style="padding: 10px;">คุณภาพ</th>
+                            <th style="padding: 10px;">ปั๊มลูกค้า</th>
+                            <th style="padding: 10px;">ประเภท/สถานะ</th>
+                            <th style="padding: 10px;">หมายเหตุ</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
 
-        // 4.1 แถวการจอง / ปรับลด (จาก roll_reservations)
+        // 4.1 แสดงแถวการจอง (ทั้งที่ยัง reserved และที่ถูกเปลี่ยน status แล้ว)
         resList.forEach(r => {
             const dateStr = r.reservation_date
                 ? new Date(r.reservation_date).toLocaleDateString('th-TH')
                 : '-';
+            
+            // ถ้าสถานะไม่ใช่ reserved แสดงป้ายกำกับ
+            let statusBadge = '';
+            if (r.status !== 'reserved') {
+                statusBadge = `<span style="background:#e2e8f0; color:#475569; padding:2px 6px; border-radius:4px; font-size:11px;">${r.status}</span>`;
+            }
+            
             const reason = r.reason_type === 'forecast'
                 ? 'ประมาณการสั่งซื้อ'
                 : (r.reason_note || 'อื่นๆ');
@@ -449,12 +477,12 @@ async function openReservationDetail(grade, size) {
                 <td style="text-align:right;">${qtyDisplay}</td>
                 <td>${r.quality === 'B' ? 'B (NC)' : 'A'}</td>
                 <td>${escHtml(r.customer_mark || '-')}</td>
-                <td>${escHtml(reason)}</td>
+                <td>${escHtml(reason)} ${statusBadge}</td>
                 <td>${escHtml(r.remark || '-')}${adjustNote}</td>
             </tr>`;
         });
 
-        // 4.2 แถวจาก Audit Log (ตัดยอดสร้าง PO / คืนยอด)
+        // 4.2 แสดงแถวจาก Audit Log (ตัดยอดสร้าง PO)
         extraLogs.forEach(log => {
             const dateStr = new Date(log.created_at).toLocaleDateString('th-TH');
             const qty = Number(log.qty_change) || 0;
@@ -475,7 +503,7 @@ async function openReservationDetail(grade, size) {
             </tr>`;
         });
 
-        html += `</tbody></table>
+        html += `</tbody></table></div>
             <div class="form-actions" style="margin-top:20px; display:flex; gap:8px; flex-wrap:wrap;">
                 <button type="button" class="primary" onclick="openAddReservationForm('${escAttr(grade)}', ${size})">➕ เพิ่มรายการจอง</button>
                 <button type="button" onclick="openDecreaseReservationForm('${escAttr(grade)}', ${size})"
