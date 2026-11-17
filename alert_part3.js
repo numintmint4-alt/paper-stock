@@ -1,10 +1,10 @@
 // ═══════════════════════════════════════════════════════════════
-//  ALERT.JS — V.18.0 (Part 3/3)
+//  ALERT.JS — V.18.1 (Part 3/3)
 //  DATABASE SYNC + PO + DETAIL + RESERVATIONS
-//  ✅ แก้: loadAlertReservations (หัก draft)
+//  ✅ แก้: loadAlertReservations (หัก draft ใน memory)
 //  ✅ แก้: buildReservationHtml (ลบ logic หักซ้ำ)
-//  ✅ แก้: clearAlertInputs (ลบ log DRAFT)
-//  ✅ แก้: cancelDraftOrder (ลบ log DRAFT)
+//  ✅ แก้: clearAlertInputs (ไม่ลบ log DRAFT แล้ว)
+//  ✅ แก้: cancelDraftOrder (ไม่ลบ log DRAFT แล้ว)
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -593,15 +593,9 @@ async function clearAlertInputs() {
     _draftPendingItems = _draftPendingItems.filter(d => !draftsToRestore.includes(d));
   }
 
-  // 🔥 ลบ log DRAFT ทั้งหมดของวันนี้ (ที่ Save ไปแล้ว)
+  // ลบ inputs ของวันนี้ (ไม่ยุ่งกับ roll_reservation_logs แล้ว)
   if (activeDate) {
     try {
-      await supabase
-        .from('roll_reservation_logs')
-        .delete()
-        .eq('action_type', 'complete')
-        .like('reason', 'DRAFT:%');
-
       await supabase.from('alert_active_inputs').delete().eq('receive_date', activeDate);
       if (_dbAlertInputs[activeDate]) {
         _dbAlertInputs[activeDate] = {};
@@ -1966,13 +1960,10 @@ function fillOrderForm(gradegram, size, qty, supplier, quality, resId) {
   }
 }
 
-// ✅ V.18.0: cancelDraftOrder ลบ log DRAFT ด้วย
+// ✅ V.18.1: cancelDraftOrder — ไม่ลบ log DRAFT แล้ว (ไม่มี log ตอน Draft)
 async function cancelDraftOrder(gradegram, size) {
   if (gradegram !== undefined && size !== undefined) {
     _draftPendingItems = _draftPendingItems.filter(d => !(d.gradegram === gradegram && Number(d.size) === Number(size)));
-
-    // 🔥 ลบ log DRAFT ที่เคย Save ไว้
-    await _deleteDraftLogs(gradegram, size);
 
     const savedItems = getAlertItems(gradegram, size);
     const oldResIds = savedItems.map(i => i.res_id).filter(Boolean);
@@ -1991,5 +1982,5 @@ async function cancelDraftOrder(gradegram, size) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  END OF FILE — alert_part3.js V.18.0
+//  END OF FILE — alert_part3.js V.18.1
 // ═══════════════════════════════════════════════════════════════
