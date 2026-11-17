@@ -1,14 +1,15 @@
 // ==========================================
 // reservations.js - ระบบจองม้วนกระดาษ (Roll Reservations)
 // + ระบบปรับลด/คืนยอดจอง (Decrease / Return)
-// + Fix: ใช้ window.fcState แทน fcState ตรงๆ (แก้ ReferenceError)
-// + Fix: ลบ let resState ที่ซ้ำซ้อน
-// + NEW: Export Form / Export Data / Import Excel
-// + NEW (V.2): openReservationDetail — แสดงหน้ารายละเอียดว่างก่อน ถ้าไม่มีข้อมูล
-// + NEW (V.3): Audit Log — logReservationAction + Timeline ใน openReservationDetail
-// + NEW (V.4): openReservationDetail — รวมประวัติการเคลื่อนไหวไว้ในตารางเดียว
-// + NEW (V.5): loadReservations ดึง Audit Log (complete) มาหักลบยอดใน Matrix
-// + NEW (V.6): 🔥 loadReservations ดึงเฉพาะวันปัจจุบัน (Daily) + onchange โหลดใหม่
+// + Export Form / Export Data / Import Excel
+// + Audit Log — logReservationAction + Timeline ใน openReservationDetail
+// + openReservationDetail — รวมประวัติการเคลื่อนไหวไว้ในตารางเดียว
+// + V.6: loadReservations ดึงแบบ CUMULATIVE (สะสมตั้งแต่อดีตถึงวันที่เลือก)
+//        - ดึง resData ด้วย .lte('reservation_date', filterDate)
+//        - ดึง logData (complete) ด้วย .lte('created_at', filterDate 23:59:59)
+//        - renderReservationsTable หัก log.qty_change ออกจาก cellMap
+// + V.6.1: เปลี่ยนชื่อ fetchAllRows → fetchAllRowsResv (กันชนกับ app.js)
+//          เพิ่ม fallback escHtml / escAttr (ถ้าโปรเจกต์ยังไม่มี)
 // ==========================================
 
 // 🔽 สร้าง fcState รอไว้เลย ป้องกัน ReferenceError
@@ -16,14 +17,31 @@ window.fcState = window.fcState || { masterData: [] };
 
 let resState = {
     data: [],
-    logs: [],
+    logs: [],          // เก็บ Audit Log (complete) เพื่อหักลบยอดใน Matrix
     gradeFilter: 'ALL'
 };
 
 // ==========================================
-// Helper: วันที่วันนี้ (YYYY-MM-DD) — fallback ถ้า app.js ไม่มี
+// Fallback helpers (ถ้าโปรเจกต์ยังไม่มี escHtml/escAttr)
 // ==========================================
-if (typeof getTodayISO !== 'function') {
+if (typeof window.escHtml !== 'function') {
+    window.escHtml = function (s) {
+        if (s == null) return '';
+        return String(s).replace(/[&<>"']/g, c => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[c]));
+    };
+}
+if (typeof window.escAttr !== 'function') {
+    window.escAttr = function (s) {
+        return window.escHtml(s).replace(/`/g, '&#96;');
+    };
+}
+
+// ==========================================
+// Fallback getTodayISO (ถ้า app.js ไม่มี)
+// ==========================================
+if (typeof window.getTodayISO !== 'function') {
     window.getTodayISO = function () {
         const d = new Date();
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -37,8 +55,8 @@ async function logReservationAction(reservationId, actionType, qtyChange, refere
     try {
         const { error } = await supabase.from('roll_reservation_logs').insert({
             reservation_id: reservationId,
-            action_type: actionType,
-            qty_change: qtyChange,
+            action_type: actionType,    // 'reserve', 'decrease', 'complete', 'restore'
+            qty_change: qtyChange,      // +6, -2, etc.
             reference_po: referencePo || null,
             reason: reason || null,
             created_by: currentUser?.id || null
@@ -51,8 +69,9 @@ async function logReservationAction(reservationId, actionType, qtyChange, refere
 
 // ==========================================
 // Helper: ดึงข้อมูลทั้งหมดจาก Supabase (ข้าม Limit 1000)
+// 🔥 เปลี่ยนชื่อเป็น fetchAllRowsResv เพื่อไม่ให้ชนกับ app.js
 // ==========================================
-async function fetchAllRows(queryBuilder, pageSize = 1000) {
+async function fetchAllRowsResv(queryBuilder, pageSize = 1000) {
     let allData = [];
     let from = 0;
     let hasMore = true;
@@ -76,6 +95,7 @@ async function fetchAllRows(queryBuilder, pageSize = 1000) {
 // ฟังก์ชันสำหรับโหลด Master Data
 // ==========================================
 async function ensureMasterDataLoaded() {
+    // ถ้ามีข้อมูลอยู่แล้ว ไม่ต้องโหลดซ้ำ
     if (window.fcState.masterData && window.fcState.masterData.length > 0) {
         return;
     }
@@ -83,7 +103,7 @@ async function ensureMasterDataLoaded() {
     try {
         console.log("⏳ กำลังโหลด Master Data สำหรับหน้า Reservations...");
 
-        const data = await fetchAllRows(() =>
+        const data = await fetchAllRowsResv(() =>
             supabase.from('paper_specs').select('*')
         );
 
@@ -91,12 +111,15 @@ async function ensureMasterDataLoaded() {
         console.log("✅ โหลด Master Data สำเร็จ:", window.fcState.masterData.length, "รายการ");
     } catch (err) {
         console.error("❌ โหลด Master Data ล้มเหลว:", err.message);
-        showToast('ไม่สามารถโหลด Master Data ได้', 'err');
+        if (typeof showToast === 'function') {
+            showToast('ไม่สามารถโหลด Master Data ได้', 'err');
+        }
     }
 }
 
 // ==========================================
-// 8.1 ฟังก์ชันโหลดข้อมูลหลัก (🔥 V.6: ดีฟอลต์วันปัจจุบัน + ดึงเฉพาะวันนั้น)
+// 8.1 ฟังก์ชันโหลดข้อมูลหลัก
+// 🔥 CUMULATIVE: ดึงข้อมูลสะสมตั้งแต่อดีตถึงวันที่เลือก
 // ==========================================
 async function loadReservations() {
     const tbody = document.getElementById('res-tbody');
@@ -110,23 +133,25 @@ async function loadReservations() {
     try {
         await ensureMasterDataLoaded();
 
-        // 🔥 1. จัดการเรื่องวันที่: ถ้า Input ว่าง ให้ดีฟอลต์เป็น "วันปัจจุบัน"
+        // 1. จัดการเรื่องวันที่: ถ้า Input ว่าง ให้ดีฟอลต์เป็น "วันปัจจุบัน"
         let filterDate = dateInput?.value;
         if (!filterDate) {
             filterDate = getTodayISO();
             if (dateInput) dateInput.value = filterDate;
         }
 
-        // 🔥 2. ดึงข้อมูลการจอง (reserved) เฉพาะวันนั้นวันเดียว (Daily)
+        // 🔥 2. ดึงข้อมูลการจอง (reserved) แบบสะสม (Cumulative)
+        // ใช้ .lte (Less Than or Equal) เพื่อดึงข้อมูลตั้งแต่อดีตจนถึงวันที่เลือก
         const { data: resData, error: resErr } = await supabase
             .from('roll_reservations')
             .select('*')
             .eq('status', 'reserved')
-            .eq('reservation_date', filterDate);
+            .lte('reservation_date', filterDate);
 
         if (resErr) throw resErr;
 
-        // 3. ดึง Audit Log (complete) เฉพาะที่เกิดก่อน/ในวันนั้น
+        // 🔥 3. ดึง Audit Log (การตัดยอดสร้าง PO) แบบสะสม
+        // ดึงเฉพาะ Log ที่เกิดขึ้นก่อนหรือในวันที่เลือก
         const { data: logData, error: logErr } = await supabase
             .from('roll_reservation_logs')
             .select('*')
@@ -136,10 +161,11 @@ async function loadReservations() {
         if (logErr) throw logErr;
 
         // 4. เก็บข้อมูลลง State
+        // (นำไปหักลบกันในฟังก์ชัน renderReservationsTable)
         resState.data = resData || [];
         resState.logs = logData || [];
 
-        // 5. อัปเดตข้อความกลางจอ
+        // 5. อัปเดตข้อความบรรทัดใหญ่กลางจอ
         const dateLabel = document.getElementById('resCurrentDateLabel');
         if (dateLabel) {
             const d = new Date(filterDate + 'T00:00:00');
@@ -174,8 +200,10 @@ function renderReservationsTable() {
     const group = resState.gradeFilter;
     const data = resState.data;
 
+    // 1. Gradegrams ทั้งหมดจาก Master
     const masterGrades = [...new Set(window.fcState.masterData.map(m => m.grade + m.gram))].sort();
 
+    // 2. กรองตาม Tab
     const filteredGrades = masterGrades.filter(g => {
         const gn = String(g).toUpperCase();
         if (group === 'ALL') return true;
@@ -183,21 +211,26 @@ function renderReservationsTable() {
         return gn.startsWith(group) && !gn.includes('F');
     });
 
+    // 3. Size ทั้งหมด
     const allSizes = [...new Set(window.fcState.masterData.map(m => Number(m.size)))].sort((a, b) => a - b);
 
+    // 4. Header
     let headerHtml = '<tr><th class="grade-col">Grade</th>';
     allSizes.forEach(s => headerHtml += `<th>${s}</th>`);
     headerHtml += '<th>Total</th></tr>';
     thead.innerHTML = headerHtml;
 
+    // 5. รวมยอดจอง: Grade|Size -> Total Qty
     const cellMap = {};
 
+    // 5.1 บวกยอดจากการจองปกติ (reserved)
     data.forEach(r => {
         const key = `${r.grade}|${r.size}`;
         if (!cellMap[key]) cellMap[key] = 0;
         cellMap[key] += Number(r.quantity) || 0;
     });
 
+    // 5.2 🔥 หักลบยอดจาก Audit Log (ที่ถูกตัดยอดไปแล้ว)
     if (resState.logs && resState.logs.length > 0) {
         resState.logs.forEach(log => {
             const parentRes = data.find(r => r.id === log.reservation_id);
@@ -209,6 +242,7 @@ function renderReservationsTable() {
         });
     }
 
+    // 6. Body
     let bodyHtml = '';
     let grandTotal = 0;
 
@@ -216,6 +250,7 @@ function renderReservationsTable() {
         bodyHtml = `<tr><td colspan="${allSizes.length + 2}" style="text-align:center;color:#94a3b8;padding:30px;">ไม่พบข้อมูลใน Master Data</td></tr>`;
     } else {
         filteredGrades.forEach(grade => {
+            // Size ที่มีจริงของเกรดนี้
             const gradeSizes = [...new Set(
                 window.fcState.masterData
                     .filter(m => (m.grade + m.gram) === grade)
@@ -236,6 +271,8 @@ function renderReservationsTable() {
                 rowTotal += val;
 
                 const clickAttr = `onclick="openReservationDetail('${escAttr(grade)}', ${size})" class="clickable" data-tip="Gradegrams ${escHtml(grade)} · Size ${size} · ${val} ม้วน"`;
+
+                // แสดงค่าติดลบด้วย (val !== 0)
                 const valDisplay = val !== 0 ? val : '';
                 const valStyle = val < 0 ? 'color:#dc2626;font-weight:700;' : '';
 
@@ -246,6 +283,7 @@ function renderReservationsTable() {
             bodyHtml += '</tr>';
         });
 
+        // Total Row (🔥 คำนวณจาก cellMap เพื่อให้ตรงกับยอดในเซลล์)
         bodyHtml += '<tr class="total-row"><td class="grade-col" style="text-align:right;">รวมทั้งหมด</td>';
         allSizes.forEach(size => {
             let sizeTotal = 0;
@@ -291,7 +329,9 @@ function filterResByGrade(gradeGroup, btnElement) {
 }
 
 // ==========================================
-// 8.4 ฟังก์ชันเปิด Modal Drill-down (V.4)
+// 8.4 ฟังก์ชันเปิด Modal Drill-down
+//     - ตารางเดียว: แถวจอง/ปรับลด + แถว Audit Log (ตัดยอด PO / คืนยอด)
+//     - ยอดสุทธิ = ผลรวมแถวจองทั้งหมด − ยอดตัด PO (complete)
 // ==========================================
 async function openReservationDetail(grade, size) {
     const modal = document.getElementById('modalReservationDetail');
@@ -304,6 +344,7 @@ async function openReservationDetail(grade, size) {
     modal.classList.add('show');
 
     try {
+        // 1. ดึงข้อมูลการจอง (reserved)
         const { data: reservations, error: resErr } = await supabase
             .from('roll_reservations')
             .select('*')
@@ -315,6 +356,7 @@ async function openReservationDetail(grade, size) {
 
         const resList = reservations || [];
 
+        // ถ้าไม่มีข้อมูล → โชว์หน้ารายละเอียดว่าง + ปุ่มเพิ่มรายการจอง
         if (resList.length === 0) {
             body.innerHTML = `
                 <div style="text-align:center; padding:30px; color:#94a3b8;">
@@ -329,6 +371,7 @@ async function openReservationDetail(grade, size) {
             return;
         }
 
+        // 2. ดึง Audit Log (เฉพาะรายการที่อยู่ในกลุ่มนี้)
         let logs = [];
         const resIds = resList.map(d => d.id);
         const { data: logData, error: logErr } = await supabase
@@ -339,8 +382,10 @@ async function openReservationDetail(grade, size) {
         if (logErr) console.warn('load logs error:', logErr);
         logs = logData || [];
 
+        // แสดงจาก Log เฉพาะ "ตัดยอดสร้าง PO" (complete) และ "คืนยอด" (restore)
         const extraLogs = logs.filter(l => l.action_type === 'complete' || l.action_type === 'restore');
 
+        // 3. คำนวณยอด
         const totalIncrease = resList
             .filter(r => (Number(r.quantity) || 0) > 0)
             .reduce((s, r) => s + Number(r.quantity), 0);
@@ -352,6 +397,7 @@ async function openReservationDetail(grade, size) {
             .reduce((s, l) => s + Math.abs(Number(l.qty_change)), 0);
         const netTotal = totalIncrease - totalDecrease - totalPOCut;
 
+        // 4. สร้าง HTML
         let html = `
             <div style="background:#f0f9ff; padding:16px; border-radius:8px; margin-bottom:16px; border:1px solid #bae6fd;">
                 <h4 style="margin:0 0 8px; font-size:15px; color:#0369a1;">📦 สรุปยอดจอง: ${escHtml(grade)} (Size ${size})</h4>
@@ -378,6 +424,7 @@ async function openReservationDetail(grade, size) {
                 </thead>
                 <tbody>`;
 
+        // 4.1 แถวการจอง / ปรับลด (จาก roll_reservations)
         resList.forEach(r => {
             const dateStr = r.reservation_date
                 ? new Date(r.reservation_date).toLocaleDateString('th-TH')
@@ -407,12 +454,14 @@ async function openReservationDetail(grade, size) {
             </tr>`;
         });
 
+        // 4.2 แถวจาก Audit Log (ตัดยอดสร้าง PO / คืนยอด)
         extraLogs.forEach(log => {
             const dateStr = new Date(log.created_at).toLocaleDateString('th-TH');
             const qty = Number(log.qty_change) || 0;
             const isDec = qty < 0;
             const actionLabel = log.action_type === 'complete' ? '📄 ตัดยอดสร้าง PO' : '🔄 คืนยอดจอง';
             const refPo = log.reference_po ? ` (Ref: ${escHtml(log.reference_po)})` : '';
+
             const src = resList.find(r => String(r.id) === String(log.reservation_id));
 
             html += `<tr style="background:#fff7ed;">
@@ -456,6 +505,7 @@ function openAddReservationForm(grade, size) {
         modalTitle.innerHTML = `➕ เพิ่มรายการจอง: ${escHtml(grade)} (Size ${size})`;
     }
 
+    // ดึงรายชื่อ Supplier
     const supList = (typeof alertSupplierCache !== 'undefined' && alertSupplierCache.length > 0)
         ? alertSupplierCache
         : ['EKP', 'MKP', 'SCK'];
@@ -542,6 +592,7 @@ function openAddReservationForm(grade, size) {
 
     modalBody.innerHTML = html;
 
+    // ตั้งค่าวันที่ + Flatpickr
     const dateInput = document.getElementById('addResDate');
     if (dateInput) {
         dateInput.value = getTodayISO();
@@ -609,6 +660,7 @@ async function saveReservation(grade, size) {
 
         if (error) throw error;
 
+        // บันทึก Log
         const { data: newData } = await supabase
             .from('roll_reservations')
             .select('id')
@@ -841,6 +893,7 @@ async function saveDecreaseReservation(grade, size) {
 
         if (error) throw error;
 
+        // บันทึก Log
         const { data: newDecData } = await supabase
             .from('roll_reservations')
             .select('id')
