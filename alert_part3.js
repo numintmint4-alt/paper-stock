@@ -1,8 +1,10 @@
 // ═══════════════════════════════════════════════════════════════
-//  ALERT.JS — V.18.1 (Part 3/3)
+//  ALERT.JS — V.18.2 (Part 3/3)
 //  DATABASE SYNC + PO + DETAIL + RESERVATIONS
-//  ✅ แก้: loadAlertReservations (หัก draft ใน memory)
-//  ✅ แก้: buildReservationHtml (ลบ logic หักซ้ำ)
+//  ✅ แก้: loadAlertReservations (หักยอดที่ใช้ใน alert_active_inputs ทุกวัน)
+//  ✅ เพิ่ม: _getUsedReservationQtyMap()
+//  ✅ แก้: buildReservationHtml (แสดงยอดสุทธิ + ใช้แล้ว)
+//  ✅ แก้: getAlertReservedTotal (ใช้ยอดสุทธิ)
 //  ✅ แก้: clearAlertInputs (ไม่ลบ log DRAFT แล้ว)
 //  ✅ แก้: cancelDraftOrder (ไม่ลบ log DRAFT แล้ว)
 // ═══════════════════════════════════════════════════════════════
@@ -1686,6 +1688,65 @@ function renderAllAlertFilters() {
 //  RESERVATIONS (ยอดจองม้วน)
 // ═══════════════════════════════════════════════════════════════
 
+// ───────────────────────────────────────────────────────────────
+//  _getUsedReservationQtyMap — V.18.2
+//  รวมยอด qty ที่ถูกใช้ใน alert_active_inputs (ทุกวัน) แยกตาม res_id
+//  • วันที่โหลดอยู่ใน memory → ใช้ memory (ใหม่กว่า DB)
+//  • วันที่ไม่ได้อยู่ใน memory → ใช้ข้อมูลจาก DB
+//  • Draft ที่ยังไม่ได้บันทึกลง alert_active_inputs → บวกเพิ่ม (กันนับซ้ำ)
+// ───────────────────────────────────────────────────────────────
+async function _getUsedReservationQtyMap() {
+  const usedMap = {};
+  const add = (resId, qty) => {
+    const q = Number(qty) || 0;
+    if (!resId || q <= 0) return;
+    const k = String(resId);
+    usedMap[k] = (usedMap[k] || 0) + q;
+  };
+
+  const memDates = new Set(Object.keys(_dbAlertInputs || {}));
+  const memResIds = new Set();
+
+  // 1. จาก memory (ทุกวันที่โหลดไว้แล้ว)
+  Object.values(_dbAlertInputs || {}).forEach(dayData => {
+    Object.values(dayData || {}).forEach(items => {
+      (items || []).forEach(it => {
+        if (it.res_id && Number(it.qty) > 0) {
+          add(it.res_id, it.qty);
+          memResIds.add(String(it.res_id));
+        }
+      });
+    });
+  });
+
+  // 2. จาก DB เฉพาะวันที่ยังไม่อยู่ใน memory
+  try {
+    const { data, error } = await supabase
+      .from('alert_active_inputs')
+      .select('res_id, qty, receive_date')
+      .not('res_id', 'is', null);
+    if (error) throw error;
+
+    (data || []).forEach(row => {
+      if (memDates.has(row.receive_date)) return; // memory เป็นตัวแทนวันนั้นแล้ว
+      add(row.res_id, row.qty);
+    });
+  } catch (e) {
+    console.warn('_getUsedReservationQtyMap DB:', e);
+  }
+
+  // 3. Draft ที่ยังค้างอยู่ใน memory และยังไม่ถูกบันทึกลงช่องกรอก
+  if (typeof _draftPendingItems !== 'undefined' && _draftPendingItems.length > 0) {
+    _draftPendingItems.forEach(d => {
+      if (!d.resId) return;
+      if (memResIds.has(String(d.resId))) return; // บันทึกแล้ว → นับไปแล้ว
+      add(d.resId, d.qty);
+    });
+  }
+
+  return usedMap;
+}
+
 async function loadAlertReservations() {
   try {
     // 1. ดึงข้อมูลการจอง (reserved)
@@ -1710,7 +1771,7 @@ async function loadAlertReservations() {
       resMap[key].push({ ...r });
     });
 
-    // 4. หักลบยอดจาก Log
+    // 4. หักลบยอดจาก Log (complete)
     if (logData && logData.length > 0) {
       logData.forEach(log => {
         const parent = (resData || []).find(r => r.id === log.reservation_id);
@@ -1726,22 +1787,19 @@ async function loadAlertReservations() {
       });
     }
 
-    // 5. 🔥 หักลบ Draft ที่ค้างอยู่ใน Memory (ยังไม่ Save)
-    if (typeof _draftPendingItems !== 'undefined' && _draftPendingItems.length > 0) {
-      _draftPendingItems.forEach(draft => {
-        if (!draft.resId) return; 
-        Object.keys(resMap).forEach(key => {
-          const target = resMap[key].find(r => String(r.id) === String(draft.resId));
-          if (target) {
-            target.quantity = (Number(target.quantity) || 0) - Number(draft.qty || 0);
-          }
-        });
-      });
-    }
+    // 5. 🔥 หักยอดที่ถูกใช้ใน alert_active_inputs ของทุกวัน (+ Draft ที่ค้างอยู่)
+    const usedMap = await _getUsedReservationQtyMap();
 
-    // 6. กรองเฉพาะ quantity > 0
     Object.keys(resMap).forEach(key => {
-      resMap[key] = resMap[key].filter(r => Number(r.quantity) > 0);
+      resMap[key] = resMap[key].map(r => {
+        const used = usedMap[String(r.id)] || 0;
+        const netQty = Math.max(0, (Number(r.quantity) || 0) - used);
+        return {
+          ...r,
+          _used_qty: used,
+          _net_qty: netQty
+        };
+      }).filter(r => r._net_qty > 0); // ซ่อนรายการที่ใช้หมดแล้ว
     });
 
     return resMap;
@@ -1754,12 +1812,12 @@ async function loadAlertReservations() {
 function getAlertReservedTotal(resMap, gradegram, size) {
   if (!resMap) return 0;
   const list = resMap[`${gradegram}|${size}`] || [];
-  return list.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0);
+  return list.reduce((sum, r) => sum + (Number(r._net_qty ?? r.quantity) || 0), 0);
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  buildReservationHtml — V.18.0
-//  ✅ แก้: ไม่หัก draft ใน HTML แล้ว (เพราะ loadAlertReservations หักให้แล้ว)
+//  buildReservationHtml — V.18.2
+//  ✅ แสดงยอดสุทธิ (_net_qty) + ยอดที่ใช้แล้ว (_used_qty)
 // ═══════════════════════════════════════════════════════════════
 
 function buildReservationHtml(list) {
@@ -1778,11 +1836,13 @@ function buildReservationHtml(list) {
         quality: r.quality || 'A',
         customer_mark: r.customer_mark || '-',
         total_qty: 0,
+        used_qty: 0,
         items: []
       };
     }
 
-    groupedMap[key].total_qty += (Number(r.quantity) || 0);
+    groupedMap[key].total_qty += (Number(r._net_qty ?? r.quantity) || 0);
+    groupedMap[key].used_qty  += (Number(r._used_qty) || 0);
     groupedMap[key].items.push(r);
   });
 
@@ -1795,17 +1855,21 @@ function buildReservationHtml(list) {
     const qualityColor = g.quality === 'B' ? '#dc2626' : '#166534';
     const qualityBg = g.quality === 'B' ? '#fee2e2' : '#dcfce7';
 
-    // 🔥 V.18.0: ใช้ g.total_qty โดยตรง (ถูกหัก draft แล้วจาก loadAlertReservations)
+    // 🔥 V.18.2: ใช้ยอดสุทธิที่ loadAlertReservations หักให้แล้ว
     const remainingQty = g.total_qty;
 
-    const firstItem = g.items.find(r => (Number(r.quantity) || 0) > 0) || g.items[0];
+    const usedTag = g.used_qty > 0
+      ? `<span style="color:#f59e0b; font-size:11px;">(ใช้แล้ว ${g.used_qty})</span>`
+      : '';
+
+    const firstItem = g.items.find(r => (Number(r._net_qty ?? r.quantity) || 0) > 0) || g.items[0];
     const safeId = firstItem.id;
 
     html += `
       <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; display:flex; justify-content:space-between; align-items:center; box-shadow:0 1px 2px rgba(0,0,0,0.02);">
         <div style="display:flex; flex-direction:column; gap:4px;">
           <div style="font-size:13px; font-weight:600; color:#1e293b;">
-            🏢 ${esc(g.supplier)}
+            🏢 ${esc(g.supplier)} ${usedTag}
           </div>
           <div style="font-size:12px; color:#64748b; display:flex; align-items:center; gap:6px;">
             <span>ลูกค้า: ${esc(g.customer_mark)}</span>
@@ -1982,5 +2046,5 @@ async function cancelDraftOrder(gradegram, size) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  END OF FILE — alert_part3.js V.18.1
+//  END OF FILE — alert_part3.js V.18.2
 // ═══════════════════════════════════════════════════════════════
