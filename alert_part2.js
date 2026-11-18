@@ -1,9 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
-//  ALERT.JS — V.18.1 (Part 2/3)
+//  ALERT.JS — V.18.2 (Part 2/3)
 //  RENDER TABLE + FLAT VIEW + MATRIX VIEW + DRAFT FORM
 //  ✅ แก้: saveMatrixOrder (ไม่หักยอดจองตอน Save Draft แล้ว)
 //  ✅ แก้: removeMatrixOrderRow (ไม่ลบ log DRAFT แล้ว)
 //  ✅ ลบ: _deleteDraftLogs()
+//  ✅ NEW V.18.2: openAlertMatrixCell คำนวณ reservedTotal จากยอดสุทธิ (_net_qty)
+//  ✅ NEW V.18.2: refreshReservationBox badge ใช้ยอดสุทธิ (_net_qty)
 // ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
@@ -279,6 +281,7 @@ function renderAlertMatrixView(rows) {
 
 // ═══════════════════════════════════════════════════════════════
 //  MODAL CELL
+//  ✅ V.18.2 (จุดที่ 4): reservedTotal คำนวณจาก _net_qty
 // ═══════════════════════════════════════════════════════════════
 
 async function openAlertMatrixCell(gradegram, size) {
@@ -287,7 +290,10 @@ async function openAlertMatrixCell(gradegram, size) {
 
   const resMap = await loadAlertReservations();
   const reservations = resMap[`${gradegram}|${size}`] || [];
-  const reservedTotal = reservations.reduce((s, x) => s + (Number(x.quantity) || 0), 0);
+  // 🔥 จุดที่ 4: ใช้ยอดสุทธิ _net_qty (หัก draft/used แล้ว)
+  const reservedTotal = reservations.reduce(
+    (s, x) => s + (Number(x._net_qty ?? x.quantity) || 0), 0
+  );
 
   const a = Number(r.alert) || 0;
   let alertCls, alertTxt, alertIcon;
@@ -554,6 +560,11 @@ async function _restoreReservations(ids) {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  refreshReservationBox
+//  ✅ V.18.2 (จุดที่ 5): badge ใช้ยอดสุทธิ _net_qty
+// ═══════════════════════════════════════════════════════════════
+
 async function refreshReservationBox(gradegram, size) {
   const box = document.getElementById('alertReservationBox');
   if (!box) return;
@@ -564,7 +575,8 @@ async function refreshReservationBox(gradegram, size) {
 
   const badge = document.getElementById('alertReservedBadge');
   if (badge) {
-    const total = list.reduce((s, x) => s + (Number(x.quantity) || 0), 0);
+    // 🔥 จุดที่ 5: ใช้ยอดสุทธิ _net_qty
+    const total = list.reduce((s, x) => s + (Number(x._net_qty ?? x.quantity) || 0), 0);
     badge.textContent = total > 0 ? `${total} ม้วน` : 'ไม่มี';
   }
 }
