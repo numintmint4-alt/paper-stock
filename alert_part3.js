@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
-//  ALERT.JS — V.18.2 (Part 3/3)
+//  ALERT.JS — V.18.3 (Part 3/3)
 //  DATABASE SYNC + PO + DETAIL + RESERVATIONS
+//  ✅ แก้: loadAlertReservations หักยอด Log ประเภท 'decrease' ด้วย (เดิมหักแค่ 'complete')
 //  ✅ แก้: loadAlertReservations (หักยอดที่ใช้ใน alert_active_inputs ทุกวัน)
 //  ✅ เพิ่ม: _getUsedReservationQtyMap()
 //  ✅ แก้: buildReservationHtml (แสดงยอดสุทธิ + ใช้แล้ว)
@@ -1756,11 +1757,11 @@ async function loadAlertReservations() {
       .eq('status', 'reserved');
     if (resErr) throw resErr;
 
-    // 2. ดึง Audit Log (complete) เท่านั้น
+    // 2. ดึง Audit Log ที่กระทบยอดคงเหลือ (complete = ใช้ครบ, decrease = ปรับลด/คืนยอด)
     const { data: logData, error: logErr } = await supabase
       .from('roll_reservation_logs')
       .select('*')
-      .eq('action_type', 'complete');
+      .in('action_type', ['complete', 'decrease']);
     if (logErr) throw logErr;
 
     // 3. จัดกลุ่มข้อมูลตาม grade|size
@@ -2046,5 +2047,5 @@ async function cancelDraftOrder(gradegram, size) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  END OF FILE — alert_part3.js V.18.2
+//  END OF FILE — alert_part3.js V.18.3
 // ═══════════════════════════════════════════════════════════════
