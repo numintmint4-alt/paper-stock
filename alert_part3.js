@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
-//  ALERT.JS — V.18.3 (Part 3/3)
+//  ALERT.JS — V.18.5 (Part 3/3)
 //  DATABASE SYNC + PO + DETAIL + RESERVATIONS
-//  ✅ แก้: loadAlertReservations หักยอด Log ประเภท 'decrease' ด้วย (เดิมหักแค่ 'complete')
+//  ✅ แก้ V.18.5: loadAlertReservations คำนวณยอดสุทธิให้ตรงหน้า Reservations (ทุก status, หักแถวปรับลดตาม parent_reservation_id, หัก complete log)
 //  ✅ แก้: loadAlertReservations (หักยอดที่ใช้ใน alert_active_inputs ทุกวัน)
 //  ✅ เพิ่ม: _getUsedReservationQtyMap()
 //  ✅ แก้: buildReservationHtml (แสดงยอดสุทธิ + ใช้แล้ว)
@@ -1750,18 +1750,20 @@ async function _getUsedReservationQtyMap() {
 
 async function loadAlertReservations() {
   try {
-    // 1. ดึงข้อมูลการจอง (reserved)
+    // 1. ดึงข้อมูลการจอง "ทุกสถานะ" (ให้ตรงกับหน้า Reservations ที่ไม่กรอง status)
+    //    เพื่อให้แถวปรับลดหาแถวต้นทางเจอเสมอ แม้ต้นทางจะเปลี่ยนสถานะไปแล้ว
     const { data: resData, error: resErr } = await supabase
       .from('roll_reservations')
-      .select('*')
-      .eq('status', 'reserved');
+      .select('*');
     if (resErr) throw resErr;
 
-    // 2. ดึง Audit Log ที่กระทบยอดคงเหลือ (complete = ใช้ครบ, decrease = ปรับลด/คืนยอด)
+    // 2. ดึง Audit Log (complete) เท่านั้น
+    //    หมายเหตุ: การปรับลด (decrease) ถูกเก็บเป็น "แถวจองจำนวนติดลบ" ใน roll_reservations
+    //    ซึ่งจัดการในขั้นที่ 4.5 แล้ว จึงไม่ต้องหักจาก Log ซ้ำ
     const { data: logData, error: logErr } = await supabase
       .from('roll_reservation_logs')
       .select('*')
-      .in('action_type', ['complete', 'decrease']);
+      .eq('action_type', 'complete');
     if (logErr) throw logErr;
 
     // 3. จัดกลุ่มข้อมูลตาม grade|size
@@ -1787,6 +1789,50 @@ async function loadAlertReservations() {
         }
       });
     }
+
+    // 4.5 🔥 หักแถวปรับลด (quantity ติดลบ) ออกจากแถวจองที่เป็นบวก
+    //      ลำดับ: parent_reservation_id → กลุ่มเดียวกัน (supplier|quality|customer_mark) → แถวบวกอื่นใน grade|size
+    //      ใช้แถวเก่าสุดก่อน (FIFO) แล้วลบแถวติดลบออกจากรายการแสดงผล
+    Object.keys(resMap).forEach(key => {
+      const rows = resMap[key];
+      const negatives = rows.filter(r => Number(r.quantity) < 0);
+      if (!negatives.length) return;
+
+      const byAge = (a, b) =>
+        String(a.reservation_date || a.created_at || '').localeCompare(String(b.reservation_date || b.created_at || ''));
+      const positives = rows.filter(r => Number(r.quantity) > 0).sort(byAge);
+      const rowById = {};
+      rows.forEach(r => { rowById[String(r.id)] = r; });
+      const groupOf = r => `${r.supplier || '-'}|${r.quality || 'A'}|${r.customer_mark || '-'}`;
+
+      const applyTo = (neg, candidates) => {
+        let remain = Math.abs(Number(neg.quantity) || 0);
+        for (const p of candidates) {
+          if (remain <= 0) break;
+          const have = Number(p.quantity) || 0;
+          if (have <= 0) continue;
+          const take = Math.min(have, remain);
+          p.quantity = have - take;
+          remain -= take;
+        }
+        neg.quantity = -remain; // ส่วนที่หักไม่หมด (ถ้ามี)
+      };
+
+      negatives.forEach(neg => {
+        // มีแถวต้นทาง (parent_reservation_id) → หักจากต้นทางเท่านั้น ส่วนเกินทิ้ง ไม่ไปหักแถวอื่น
+        const parent = neg.parent_reservation_id ? rowById[String(neg.parent_reservation_id)] : null;
+        if (parent) {
+          applyTo(neg, [parent]);
+          return;
+        }
+        // ไม่มีต้นทาง (ข้อมูลเก่า) → กลุ่มเดียวกันก่อน แล้วค่อยแถวบวกอื่น (เก่าสุดก่อน)
+        applyTo(neg, positives.filter(p => groupOf(p) === groupOf(neg)));
+        if (Number(neg.quantity) < 0) applyTo(neg, positives);
+      });
+
+      // ตัดแถวติดลบออก (ผลของมันถูกหักเข้าแถวบวกแล้ว)
+      resMap[key] = rows.filter(r => Number(r.quantity) > 0);
+    });
 
     // 5. 🔥 หักยอดที่ถูกใช้ใน alert_active_inputs ของทุกวัน (+ Draft ที่ค้างอยู่)
     const usedMap = await _getUsedReservationQtyMap();
@@ -2047,5 +2093,5 @@ async function cancelDraftOrder(gradegram, size) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  END OF FILE — alert_part3.js V.18.3
+//  END OF FILE — alert_part3.js V.18.5
 // ═══════════════════════════════════════════════════════════════
