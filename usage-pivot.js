@@ -130,7 +130,7 @@ async function loadUsageMasterData() {
 // ==========================================
 // 0. Date helpers
 // ==========================================
-function fcLastDayOfMonth(y, mo) {
+function usageLastDayOfMonth(y, mo) {
     const last = new Date(y, mo, 0).getDate();
     return `${y}-${String(mo).padStart(2, '0')}-${String(last).padStart(2, '0')}`;
 }
@@ -423,7 +423,7 @@ async function _loadUsagePivotImpl() {
 
     const [y, mo] = month.split('-').map(Number);
     const firstDay = `${month}-01`;
-    const lastDay  = fcLastDayOfMonth(y, mo);
+    const lastDay  = usageLastDayOfMonth(y, mo);
 
     try {
         if (!usagePivotState.masterData || usagePivotState.masterData.length === 0) {
@@ -959,7 +959,7 @@ async function handleUsageImport(event) {
                 for (const m of monthsToDelete) {
                     const [yy, mo2] = m.split('-').map(Number);
                     const firstDay = `${m}-01`;
-                    const lastDay  = fcLastDayOfMonth(yy, mo2);
+                    const lastDay  = usageLastDayOfMonth(yy, mo2);
 
                     const { error: delError } = await supabase
                         .from('usage_records_raw')
