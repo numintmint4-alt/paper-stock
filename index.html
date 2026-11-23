@@ -438,66 +438,77 @@
       </div>
     </div>
 
-    <!-- ==================== หน้า Forecast ==================== -->
-    <div id="tab-forecast" class="hidden">
-        <div class="card">
-            <div class="report-title">Production Forecast (ประมาณการสั่งผลิต)</div>
+    <!-- ========================================== -->
+    <!-- TAB: FORECAST (PURCHASE FORECAST V2)       -->
+    <!-- ========================================== -->
+    <div id="tab-forecast" class="tab-content hidden">
 
-            <div class="filters">
-                <label>Stock Date:
-                    <input type="text" id="fc-stock-date" name="no_autofill_fc" autocomplete="new-password" readonly>
-                </label>
-                <label>Forecast Month:
-                    <input type="month" id="fc-month" class="form-control">
-                </label>
-                <label>M1 (Month 1):
-                    <input type="month" id="fc-m1" class="form-control">
-                </label>
-                <label>M2 (Month 2):
-                    <input type="month" id="fc-m2" class="form-control">
-                </label>
-                <label>M3 (Month 3):
-                    <input type="month" id="fc-m3" class="form-control">
-                </label>
-                <label>Prev Actual Month:
-                    <input type="month" id="fc-prev-month" class="form-control">
-                </label>
+        <!-- Header & Filter -->
+        <div class="page-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h2>Production Forecast (ประมาณการสั่งซื้อ)</h2>
+            <button class="btn primary" onclick="openCreateForecastModal()">➕ เพิ่มประมาณการ</button>
+        </div>
+
+        <!-- Main Tabs (Grade) -->
+        <div class="sub-tabs" id="pf-grade-tabs" style="margin-bottom: 10px; border-bottom: 2px solid #ddd;">
+            <!-- จะถูก Render ด้วย JS -->
+        </div>
+
+        <!-- Sub Tabs (Rev.) & Action Bar -->
+        <div style="display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 10px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div class="sub-tabs" id="pf-rev-tabs" style="margin: 0;">
+                <!-- Rev. Tabs จะถูก Render ด้วย JS -->
             </div>
-
-            <div class="sub-tabs" id="fc-grade-tabs" style="margin-bottom: 15px; display: flex; gap: 10px;"></div>
-
-            <div class="table-container" style="overflow-x: auto;">
-                <table class="data-table" id="forecast-matrix">
-                    <thead>
-                        <tr>
-                            <th>Grade</th>
-                            <th>Width</th>
-                            <th>M1</th>
-                            <th>M2</th>
-                            <th>M3</th>
-                            <th>Avg 3 Mths</th>
-                            <th>Forecast (NEN)</th>
-                            <th>Forecast (NEA)</th>
-                            <th>Forecast (ไทยฟู้ด)</th>
-                            <th>Forecast (KTP)</th>
-                            <th>ใช้จริง (Actual)</th>
-                            <th>ใช้จริง (ก่อนหน้า)</th>
-                            <th>Stock (ณ วันที่เลือก)</th>
-                            <th>ยอดจองคงเหลือ</th>
-                            <th>Roll S&D คงเหลือ</th>
-                            <th>คาดการณ์ว่าจะต้องใช้</th>
-                            <th>Stock Level</th>
-                            <th>Stock Level 50%</th>
-                            <th>ยอดที่ต้องสั่งซื้อ (คำนวณ)</th>
-                            <th>ยอดที่ต้องสั่งซื้อ (ROUNDUP)</th>
-                            <th>ปรับเพิ่ม/ลด</th>
-                            <th>หมายเหตุ</th>
-                        </tr>
-                    </thead>
-                    <tbody id="forecast-tbody"></tbody>
-                </table>
+            <div class="action-buttons" style="display: flex; gap: 10px;">
+                <span id="pf-status-badge" class="badge" style="background: #f59e0b; color: white; padding: 5px 10px; border-radius: 4px;">สถานะ: Draft</span>
+                <button class="btn" id="pf-btn-edit" onclick="unlockForecast()" disabled style="background: #f59e0b; color: white;">🔓 แก้ไข (ใส่รหัส)</button>
+                <button class="btn primary" id="pf-btn-save" onclick="savePurchaseForecast()">💾 บันทึก & Lock</button>
+                <button class="btn" id="pf-btn-attach" onclick="document.getElementById('pf-file-upload').click()" style="background: #3b82f6; color: white;">📎 แนบไฟล์</button>
+                <input type="file" id="pf-file-upload" hidden accept="image/*,application/pdf" multiple onchange="handleFileUpload(event)">
+                <button class="btn" id="pf-btn-revise" onclick="createRevision()" style="background: #8b5cf6; color: white; display: none;">🔄 สร้าง Revise</button>
             </div>
-            <button class="primary" onclick="saveForecastData()" style="margin-top: 15px;">Save Forecast</button>
+        </div>
+
+        <!-- ตาราง 22 แถว -->
+        <div class="table-responsive" style="overflow-x: auto; max-height: 70vh; background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <table class="data-table" id="pf-table" style="min-width: 1200px; border-collapse: collapse;">
+                <thead id="pf-thead" style="position: sticky; top: 0; z-index: 10; background: #2b4b9b; color: white;">
+                    <!-- Header จะถูก Render ด้วย JS -->
+                </thead>
+                <tbody id="pf-tbody">
+                    <!-- ข้อมูล 22 แถว จะถูก Render ด้วย JS -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- หมายเหตุ -->
+        <div style="margin-top: 15px; background: #fff; padding: 15px; border-radius: 8px;">
+            <label style="font-weight: bold;">หมายเหตุ:</label>
+            <textarea id="pf-remark" class="form-control" rows="2" placeholder="ระบุหมายเหตุ..." style="width: 100%; margin-top: 5px;"></textarea>
+        </div>
+
+        <!-- Modal สร้าง Forecast ใหม่ -->
+        <div id="modal-create-forecast" class="modal" style="display: none;">
+            <div class="modal-content" style="max-width: 400px;">
+                <div class="modal-header">
+                    <h3>สร้างประมาณการใหม่</h3>
+                    <button class="close-btn" onclick="closeModal('modal-create-forecast')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <label>เกรดแกรม (เช่น CA125):</label>
+                    <input type="text" id="new-fc-grade" class="form-control" placeholder="ระบุเกรดแกรม" style="width: 100%; margin-bottom: 10px;">
+
+                    <label>เดือน/ปี ที่จัดทำ:</label>
+                    <input type="month" id="new-fc-month" class="form-control" style="width: 100%; margin-bottom: 10px;">
+
+                    <label>เลขที่เอกสาร:</label>
+                    <input type="text" id="new-fc-docno" class="form-control" placeholder="เช่น 0001" style="width: 100%; margin-bottom: 10px;">
+                </div>
+                <div class="modal-footer" style="text-align: right; margin-top: 15px;">
+                    <button class="btn" onclick="closeModal('modal-create-forecast')">ยกเลิก</button>
+                    <button class="btn primary" onclick="confirmCreateForecast()">สร้าง</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1242,6 +1253,7 @@
 <script src="purchase-order.js"></script>
 <script src="forecast.js"></script>
 <script src="usage-pivot.js"></script>
+<script src="purchase-forecast.js"></script> <!-- เพิ่มใหม่: Purchase Forecast V2 -->
 <script src="reservations.js"></script>
 <script src="price-master.js"></script>
 
