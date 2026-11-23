@@ -1,12 +1,131 @@
 // ==========================================
-// usage-pivot.js - Roll Paper Usage (Pivot รายเดือน / รายปี / Snapshot / Import / Drill-down)
-// แยกออกมาจาก forecast.js (v25)
-// ------------------------------------------
-// ⚠️ ลำดับการโหลดใน index.html ต้องเป็น:
-//    app.js → ... → forecast.js → usage-pivot.js
-// พึ่งพาจาก forecast.js: fcState, fcCurrentMonthStr, loadForecastMasterData, escHtml, escAttr
-// พึ่งพาจาก app.js: supabase, fetchAllRows, showToast, normalizeGrade, toISODate, currentUser, currentProfile
+// usage-pivot.js - Roll Paper Usage
+// Pivot รายเดือน / รายปี / Snapshot / Import / Drill-down
+// Standalone: ไม่พึ่งพา forecast.js
+//
+// พึ่งพาจาก app.js:
+// supabase, fetchAllRows, showToast, normalizeGrade,
+// toISODate, currentUser, currentProfile
+//
+// พึ่งพา XLSX สำหรับ Import Excel
 // ==========================================
+
+// State เฉพาะของ Roll Paper Usage
+const usagePivotState = {
+    masterData: [],
+    pivotData: null,
+    pivotWidths: [],
+    pivotMonth: '',
+    pivotCustomer: 'ALL',
+    pivotCustomers: [],
+    pivotGradeFilter: 'ALL',
+    _loadingPivot: false,
+    _savingSnapshot: false
+};
+
+// เดือนปัจจุบัน
+function usageCurrentMonthStr() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+// Escape HTML เฉพาะใน Usage Pivot
+function usageEscHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c =>
+        ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        }[c])
+    );
+}
+
+function usageEscAttr(s) {
+    return usageEscHtml(s);
+}
+
+// โหลด Master Data สำหรับคำนวณจำนวน Rolls
+async function loadUsageMasterData() {
+    const buildQuery = (cols) => () => supabase
+        .from('paper_specs')
+        .select(cols)
+        .order('item_code', { ascending: true })
+        .order('size', { ascending: true });
+
+    let rows = null;
+
+    try {
+        rows = await fetchAllRows(
+            buildQuery('grade, size, gram, item_code, std_weight_kg')
+        );
+    } catch (err) {
+        console.warn(
+            'loadUsageMasterData (with gram) error:',
+            err?.message,
+            '→ retry without gram'
+        );
+
+        try {
+            rows = await fetchAllRows(
+                buildQuery('grade, size, item_code, std_weight_kg')
+            );
+        } catch (err2) {
+            console.error('loadUsageMasterData error:', err2);
+        }
+    }
+
+    if (!rows || rows.length === 0) {
+        console.warn('ไม่พบ Master Data จาก paper_specs');
+        showToast('ไม่พบข้อมูล Master Data', 'err');
+        return;
+    }
+
+    const seen = new Map();
+    const unique = [];
+    const conflicts = new Set();
+
+    for (const item of rows) {
+        const key = (
+            item.item_code
+                ? String(item.item_code)
+                : `${item.grade || ''}|${item.gram || ''}|${item.size || ''}`
+        ).toUpperCase().replace(/\s+/g, '');
+
+        const exist = seen.get(key);
+
+        if (!exist) {
+            seen.set(key, item);
+            unique.push(item);
+        } else if (
+            Number(exist.std_weight_kg) !== Number(item.std_weight_kg)
+        ) {
+            conflicts.add(item.item_code || `${item.grade}-${item.size}`);
+        }
+    }
+
+    if (conflicts.size > 0) {
+        const list = Array.from(conflicts).slice(0, 5).join(', ');
+
+        console.warn(
+            'paper_specs มีรายการซ้ำที่ std_weight_kg ไม่เท่ากัน:',
+            Array.from(conflicts)
+        );
+
+        showToast(
+            `Master มีรายการซ้ำที่น้ำหนักไม่เท่ากัน เช่น ${list}`,
+            'warn',
+            6000
+        );
+    }
+
+    usagePivotState.masterData = unique;
+
+    console.log(
+        `โหลด Usage Master Data สำเร็จ: ${rows.length} แถว → ${unique.length} รายการ`
+    );
+}
 
 // ==========================================
 // 0. Date helpers
@@ -26,13 +145,13 @@ async function getLatestMonthWithData() {
             .limit(1);
 
         if (error || !data || data.length === 0) {
-            return fcCurrentMonthStr();
+            return usageCurrentMonthStr();
         }
 
         return data[0].usage_date.slice(0, 7);
     } catch (e) {
         console.warn('getLatestMonthWithData error:', e);
-        return fcCurrentMonthStr();
+        return usageCurrentMonthStr();
     }
 }
 
@@ -63,11 +182,11 @@ async function initUsagePivotTab() {
         monthInput.value = latestMonth;
     }
 
-    await loadForecastMasterData();
+    await loadUsageMasterData();
 
     // แสดงรายชื่อลูกค้าในหน้ารายเดือนเป็น Code (Name)
     const list = document.getElementById('pivotCustomerList');
-    if (list && fcState.pivotCustomers.length === 0) {
+    if (list && usagePivotState.pivotCustomers.length === 0) {
         try {
             const data = await fetchAllRows(() =>
                 supabase.from('usage_records_raw').select('customer_code, customer_name')
@@ -87,12 +206,12 @@ async function initUsagePivotTab() {
             });
 
             const unique = [...uniqueSet].sort();
-            fcState.pivotCustomers = unique;
+            usagePivotState.pivotCustomers = unique;
 
             list.innerHTML = unique.map(c => `
-                <label class="item" data-customer="${escAttr(c)}">
-                    <input type="checkbox" value="${escAttr(c)}">
-                    <span>${escHtml(c)}</span>
+                <label class="item" data-customer="${usageEscAttr(c)}">
+                    <input type="checkbox" value="${usageEscAttr(c)}">
+                    <span>${usageEscHtml(c)}</span>
                 </label>
             `).join('');
 
@@ -156,7 +275,7 @@ document.addEventListener('click', (e) => {
 });
 
 function findMasterForUsageRow(rowGrade, rowSize, rowItemCode) {
-    const master = fcState.masterData;
+    const master = usagePivotState.masterData;
     const clean = (v) => String(v ?? '').replace(/[\s\-_]/g, '').toUpperCase();
 
     const rCode  = clean(rowItemCode);
@@ -204,20 +323,20 @@ function pivotGradeMatches(grade, group) {
 function renderUsagePivotTable() {
     const tbody = document.getElementById('pivot-tbody');
     const thead = document.getElementById('pivot-thead');
-    const pivotData = fcState.pivotData;
+    const pivotData = usagePivotState.pivotData;
     if (!tbody || !thead || !pivotData) return;
 
-    const group  = fcState.pivotGradeFilter || 'ALL';
+    const group  = usagePivotState.pivotGradeFilter || 'ALL';
     const grades = Object.keys(pivotData)
         .filter(g => pivotGradeMatches(g, group))
         .sort();
 
     const widths = group === 'ALL'
-        ? fcState.pivotWidths
-        : fcState.pivotWidths.filter(w => grades.some(g => pivotData[g][w] !== undefined));
+        ? usagePivotState.pivotWidths
+        : usagePivotState.pivotWidths.filter(w => grades.some(g => pivotData[g][w] !== undefined));
 
     let headerHtml = '<tr><th>Grade</th>';
-    widths.forEach(w => headerHtml += `<th>${escHtml(w)}</th>`);
+    widths.forEach(w => headerHtml += `<th>${usageEscHtml(w)}</th>`);
     headerHtml += '<th>Grand Total</th></tr>';
     thead.innerHTML = headerHtml;
 
@@ -225,15 +344,15 @@ function renderUsagePivotTable() {
     if (grades.length === 0) {
         const msg = Object.keys(pivotData).length === 0
             ? 'ไม่มีข้อมูลในเดือนนี้'
-            : `ไม่มีข้อมูลเกรดกลุ่ม ${escHtml(group)} ในเดือนนี้`;
+            : `ไม่มีข้อมูลเกรดกลุ่ม ${usageEscHtml(group)} ในเดือนนี้`;
         bodyHtml = `<tr><td colspan="${widths.length + 2}" style="text-align:center;">${msg}</td></tr>`;
     } else {
         grades.forEach(grade => {
             const row = pivotData[grade];
-            bodyHtml += `<tr><td><strong>${escHtml(grade)}</strong></td>`;
+            bodyHtml += `<tr><td><strong>${usageEscHtml(grade)}</strong></td>`;
             widths.forEach(w => {
                 const val = row[w] || 0;
-                const tipAttr = val > 0 ? `class="clickable" data-tip="Gradegrams ${escAttr(grade)} · Size ${escAttr(w)}"` : '';
+                const tipAttr = val > 0 ? `class="clickable" data-tip="Gradegrams ${usageEscAttr(grade)} · Size ${usageEscAttr(w)}"` : '';
                 bodyHtml += `<td ${tipAttr}>${val > 0 ? val.toFixed(2) : ''}</td>`;
             });
             bodyHtml += `<td style="background:#e6f2ff;font-weight:bold;">${row.total > 0 ? row.total.toFixed(2) : '0.00'}</td></tr>`;
@@ -243,7 +362,7 @@ function renderUsagePivotTable() {
 }
 
 function filterPivotByGrade(gradeGroup, btnElement) {
-    fcState.pivotGradeFilter = gradeGroup;
+    usagePivotState.pivotGradeFilter = gradeGroup;
 
     document.querySelectorAll('#pivot-sub-tabs .sub-tab').forEach(btn => {
         btn.classList.remove('active');
@@ -263,14 +382,14 @@ function filterPivotByGrade(gradeGroup, btnElement) {
 }
 
 async function loadUsagePivot() {
-    if (fcState._loadingPivot) return;
+    if (usagePivotState._loadingPivot) return;
 
     const btnLoad = document.querySelector('button[onclick="loadUsagePivot()"]')
                  || document.getElementById('btnLoadPivot');
 
     if (btnLoad && btnLoad.disabled) return;
 
-    fcState._loadingPivot = true;
+    usagePivotState._loadingPivot = true;
 
     const originalBtnText = btnLoad ? btnLoad.innerHTML : '';
     if (btnLoad) {
@@ -281,7 +400,7 @@ async function loadUsagePivot() {
     try {
         await _loadUsagePivotImpl();
     } finally {
-        fcState._loadingPivot = false;
+        usagePivotState._loadingPivot = false;
         if (btnLoad) {
             btnLoad.disabled = false;
             btnLoad.innerHTML = originalBtnText || '🔍 โหลดข้อมูล Pivot';
@@ -307,11 +426,11 @@ async function _loadUsagePivotImpl() {
     const lastDay  = fcLastDayOfMonth(y, mo);
 
     try {
-        if (!fcState.masterData || fcState.masterData.length === 0) {
-            await loadForecastMasterData();
+        if (!usagePivotState.masterData || usagePivotState.masterData.length === 0) {
+            await loadUsageMasterData();
         }
 
-        if (!fcState.masterData || fcState.masterData.length === 0) {
+        if (!usagePivotState.masterData || usagePivotState.masterData.length === 0) {
             tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:red;">ไม่พบข้อมูล Master Data กรุณารีเฟรชหน้าเว็บ</td></tr>`;
             return showToast('ไม่พบ Master Data', 'err');
         }
@@ -378,7 +497,7 @@ async function _loadUsagePivotImpl() {
 
         if (historyHeader) {
             if (missingMasterSet.size > 0) {
-                const missingList = Array.from(missingMasterSet).sort().map(escHtml).join(', ');
+                const missingList = Array.from(missingMasterSet).sort().map(usageEscHtml).join(', ');
                 const alertHtml = `<div id="pivot-missing-alert" class="msg err" style="margin-bottom: 10px; border-left: 4px solid #dc2626; background: #fee2e2; color: #991b1b; padding: 10px; border-radius: 4px; font-size: 14px;">
                     ❌ <b>พบรายการที่ไม่มีใน Master Data (ไม่สามารถคำนวณได้):</b><br>
                     <span style="word-break: break-all;">${missingList}</span>
@@ -394,10 +513,10 @@ async function _loadUsagePivotImpl() {
             }
         }
 
-        fcState.pivotData     = pivotData;
-        fcState.pivotWidths   = Array.from(allWidths).sort((a, b) => a - b);
-        fcState.pivotMonth    = month;
-        fcState.pivotCustomer = selectedCustomers.length === 0 ? 'ALL' : selectedCustomers.join(',');
+        usagePivotState.pivotData     = pivotData;
+        usagePivotState.pivotWidths   = Array.from(allWidths).sort((a, b) => a - b);
+        usagePivotState.pivotMonth    = month;
+        usagePivotState.pivotCustomer = selectedCustomers.length === 0 ? 'ALL' : selectedCustomers.join(',');
 
         renderUsagePivotTable();
 
@@ -418,27 +537,27 @@ async function _loadUsagePivotImpl() {
 
     } catch (err) {
         console.error(err);
-        tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:red;">Error: ${escHtml(err.message)}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:red;">Error: ${usageEscHtml(err.message)}</td></tr>`;
         showToast('Error loading pivot', 'err');
     }
 }
 
 async function saveUsageSnapshot() {
-    if (fcState._savingSnapshot) return;
-    fcState._savingSnapshot = true;
+    if (usagePivotState._savingSnapshot) return;
+    usagePivotState._savingSnapshot = true;
     try {
         await _saveUsageSnapshotImpl();
     } finally {
-        fcState._savingSnapshot = false;
+        usagePivotState._savingSnapshot = false;
     }
 }
 
-// ดึงเดือนจาก input จริง (ไม่ใช้ fcState.pivotMonth ที่อาจค้าง)
+// ดึงเดือนจาก input จริง (ไม่ใช้ usagePivotState.pivotMonth ที่อาจค้าง)
 async function _saveUsageSnapshotImpl() {
     const month = document.getElementById('pivot-month')?.value;
     if (!month) return showToast('กรุณาเลือกเดือนก่อนบันทึก', 'warn');
 
-    if (!fcState.pivotData) {
+    if (!usagePivotState.pivotData) {
         return showToast('กรุณากดโหลดข้อมูล Pivot ก่อนบันทึก', 'warn');
     }
 
@@ -473,12 +592,12 @@ async function _saveUsageSnapshotImpl() {
         createdBy = currentUser.email;
     }
 
-    const pivotData = fcState.pivotData;
+    const pivotData = usagePivotState.pivotData;
     const payloads = [];
 
     Object.keys(pivotData).forEach(grade => {
         const row = pivotData[grade];
-        fcState.pivotWidths.forEach(width => {
+        usagePivotState.pivotWidths.forEach(width => {
             const rolls = row[width] || 0;
             if (rolls > 0) {
                 payloads.push({
@@ -607,26 +726,26 @@ async function renderSnapshotHistory(selectedYear = null) {
         data.forEach(g => {
             const cfLabel = g.customer_filter === 'ALL'
                 ? '<span style="color:#1e40af;font-weight:600;">ALL</span>'
-                : escHtml(g.customer_filter);
+                : usageEscHtml(g.customer_filter);
 
             const dateStr = g.created_at ? new Date(g.created_at).toLocaleString('th-TH') : '';
 
             html += `<tr>
-                <td><strong>${escHtml(g.snapshot_month)}</strong></td>
+                <td><strong>${usageEscHtml(g.snapshot_month)}</strong></td>
                 <td>${cfLabel}</td>
                 <td style="text-align:right">${g.item_count}</td>
                 <td style="text-align:right;font-weight:600;">${Number(g.total_rolls).toFixed(2)}</td>
-                <td style="font-size:12px; color:#64748b;">${escHtml(g.created_by || '-')}${dateStr ? `<br><span style="font-size:10px;">${dateStr}</span>` : ''}</td>
+                <td style="font-size:12px; color:#64748b;">${usageEscHtml(g.created_by || '-')}${dateStr ? `<br><span style="font-size:10px;">${dateStr}</span>` : ''}</td>
                 <td style="text-align:center; white-space:nowrap;">
                     <button type="button" class="btn-view-snapshot"
-                        data-month="${escAttr(g.snapshot_month)}"
-                        data-customer="${escAttr(g.customer_filter)}"
+                        data-month="${usageEscAttr(g.snapshot_month)}"
+                        data-customer="${usageEscAttr(g.customer_filter)}"
                         style="padding:4px 10px;border-radius:6px;border:1px solid #cbd5e1;background:#f8fafc;cursor:pointer;margin-right:4px;">
                         👁 ดู
                     </button>
                     <button type="button" class="btn-delete-snapshot"
-                        data-month="${escAttr(g.snapshot_month)}"
-                        data-customer="${escAttr(g.customer_filter)}"
+                        data-month="${usageEscAttr(g.snapshot_month)}"
+                        data-customer="${usageEscAttr(g.customer_filter)}"
                         style="padding:4px 10px;border-radius:6px;border:1px solid #fca5a5;background:#fee2e2;color:#dc2626;cursor:pointer;">
                         ❌ ยกเลิก
                     </button>
@@ -671,7 +790,7 @@ async function renderSnapshotHistory(selectedYear = null) {
 
     } catch (err) {
         console.error('renderSnapshotHistory error:', err);
-        wrap.innerHTML = `<div style="text-align:center; padding: 20px; color: red;">โหลดประวัติไม่สำเร็จ: ${escHtml(err.message)}</div>`;
+        wrap.innerHTML = `<div style="text-align:center; padding: 20px; color: red;">โหลดประวัติไม่สำเร็จ: ${usageEscHtml(err.message)}</div>`;
     }
 }
 
@@ -723,7 +842,7 @@ async function viewSnapshotDetail(month, customer) {
 
         grades.forEach(g => {
             let total = 0;
-            html += `<tr><td><strong>${escHtml(g)}</strong></td>`;
+            html += `<tr><td><strong>${usageEscHtml(g)}</strong></td>`;
             sortedWidths.forEach(w => {
                 const v = map.get(g)[w] || 0;
                 total += v;
@@ -737,7 +856,7 @@ async function viewSnapshotDetail(month, customer) {
 
     } catch (err) {
         console.error('viewSnapshotDetail error:', err);
-        modalBody.innerHTML = `<div style="text-align:center; padding: 20px; color: red;">${escHtml(err.message)}</div>`;
+        modalBody.innerHTML = `<div style="text-align:center; padding: 20px; color: red;">${usageEscHtml(err.message)}</div>`;
     }
 }
 
@@ -786,8 +905,8 @@ async function handleUsageImport(event) {
             const uniqueJobsCount = Object.keys(sbjobCounts).length;
             showToast(`✅ ไฟล์ปกติ: พบ ${rows.length} แถว (มี ${uniqueJobsCount} sbjob_no) กำลังเตรียมบันทึก...`, 'info', 4000);
 
-            if (!fcState.masterData || fcState.masterData.length === 0) {
-                await loadForecastMasterData();
+            if (!usagePivotState.masterData || usagePivotState.masterData.length === 0) {
+                await loadUsageMasterData();
             }
 
             const batchId = crypto.randomUUID();
@@ -973,9 +1092,9 @@ async function loadYearlyCustomers() {
         const list = document.getElementById('yearlyCustomerList');
         if (!list) return;
         list.innerHTML = unique.map(c => `
-            <label class="item" data-customer="${escAttr(c)}">
-                <input type="checkbox" value="${escAttr(c)}">
-                <span>${escHtml(c)}</span>
+            <label class="item" data-customer="${usageEscAttr(c)}">
+                <input type="checkbox" value="${usageEscAttr(c)}">
+                <span>${usageEscHtml(c)}</span>
             </label>
         `).join('');
 
@@ -1047,10 +1166,6 @@ async function loadYearlyPivot() {
     container.innerHTML = '<div style="text-align:center; padding: 20px; color: var(--primary);">กำลังประมวลผลข้อมูล...</div>';
 
     try {
-        if (!fcState.masterData || fcState.masterData.length === 0) {
-            await loadForecastMasterData();
-        }
-
         const firstMonth = `${year}-01`;
         const lastMonth = `${year}-12`;
 
@@ -1143,7 +1258,7 @@ async function loadYearlyPivot() {
 
     } catch (err) {
         console.error(err);
-        container.innerHTML = `<div style="text-align:center; padding: 20px; color: red;">เกิดข้อผิดพลาด: ${escHtml(err.message)}</div>`;
+        container.innerHTML = `<div style="text-align:center; padding: 20px; color: red;">เกิดข้อผิดพลาด: ${usageEscHtml(err.message)}</div>`;
     } finally {
         if (btn) {
             btn.disabled = false;
@@ -1176,7 +1291,7 @@ function renderYearlyPivotTable(gradeGroup) {
         .sort();
 
     if (filteredGrades.length === 0) {
-        container.innerHTML = `<div style="text-align:center; padding: 20px; color: var(--text-muted);">ไม่พบข้อมูลเกรดกลุ่ม ${escHtml(gradeGroup)} ในปีนี้</div>`;
+        container.innerHTML = `<div style="text-align:center; padding: 20px; color: var(--text-muted);">ไม่พบข้อมูลเกรดกลุ่ม ${usageEscHtml(gradeGroup)} ในปีนี้</div>`;
         return;
     }
 
@@ -1187,7 +1302,7 @@ function renderYearlyPivotTable(gradeGroup) {
         html += `<table class="yearly-pivot-table">
             <thead>
                 <tr>
-                    <th class="yearly-pivot-header-grade" colspan="${sortedSizes.length + 2}">${escHtml(grade)}</th>
+                    <th class="yearly-pivot-header-grade" colspan="${sortedSizes.length + 2}">${usageEscHtml(grade)}</th>
                 </tr>
                 <tr>
                     <th class="yearly-pivot-month-col">เดือน / Size</th>
@@ -1207,7 +1322,7 @@ function renderYearlyPivotTable(gradeGroup) {
                 const val = monthData[size] || 0;
                 monthTotal += val;
                 const cellAttr = val > 0
-                    ? `onclick="openCustomerDrillDown('${escAttr(grade)}', ${size}, ${m + 1})" class="clickable" data-tip="Gradegrams ${escAttr(grade)} · Size ${size}"`
+                    ? `onclick="openCustomerDrillDown('${usageEscAttr(grade)}', ${size}, ${m + 1})" class="clickable" data-tip="Gradegrams ${usageEscAttr(grade)} · Size ${size}"`
                     : '';
                 html += `<td ${cellAttr}>${val > 0 ? val.toFixed(2) : ''}</td>`;
             });
@@ -1384,7 +1499,7 @@ async function openCustomerDrillDown(grade, size, monthNum) {
             else if (rank === 2) rankClass = 'rank-2';
             else if (rank === 3) rankClass = 'rank-3';
 
-            const displayStr = c.name ? `${escHtml(c.code)} (${escHtml(c.name)})` : escHtml(c.code);
+            const displayStr = c.name ? `${usageEscHtml(c.code)} (${usageEscHtml(c.name)})` : usageEscHtml(c.code);
 
             html += `<tr>
                 <td style="text-align:center;"><span class="rank-badge ${rankClass}">${rank}</span></td>
@@ -1420,7 +1535,7 @@ async function openCustomerDrillDown(grade, size, monthNum) {
 
         sortedProducts.slice(0, 10).forEach(p => {
             html += `<tr>
-                <td style="font-size:12.5px; color:#334155;">${escHtml(p.name)}</td>
+                <td style="font-size:12.5px; color:#334155;">${usageEscHtml(p.name)}</td>
                 <td style="text-align:right; font-weight:600; color:#2563eb;">${p.rolls.toFixed(2)}</td>
                 <td style="text-align:right; color:#64748b;">${p.kgs.toLocaleString('th-TH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
             </tr>`;
@@ -1456,6 +1571,6 @@ async function openCustomerDrillDown(grade, size, monthNum) {
 
     } catch (err) {
         console.error('openCustomerDrillDown error:', err);
-        modalBody.innerHTML = `<div style="text-align:center; padding: 40px; color:#ef4444;">เกิดข้อผิดพลาด: ${escHtml(err.message)}</div>`;
+        modalBody.innerHTML = `<div style="text-align:center; padding: 40px; color:#ef4444;">เกิดข้อผิดพลาด: ${usageEscHtml(err.message)}</div>`;
     }
 }
