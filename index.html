@@ -439,74 +439,79 @@
     </div>
 
     <!-- ========================================== -->
-    <!-- TAB: FORECAST (PURCHASE FORECAST V2)       -->
+    <!-- TAB: FORECAST (ประมาณการสั่งซื้อ) V3        -->
     <!-- ========================================== -->
     <div id="tab-forecast" class="tab-content hidden">
-
-        <!-- Header & Filter -->
-        <div class="page-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-            <h2>Production Forecast (ประมาณการสั่งซื้อ)</h2>
-            <button class="btn primary" onclick="openCreateForecastModal()">➕ เพิ่มประมาณการ</button>
-        </div>
-
-        <!-- Main Tabs (Grade) -->
-        <div class="sub-tabs" id="pf-grade-tabs" style="margin-bottom: 10px; border-bottom: 2px solid #ddd;">
-            <!-- จะถูก Render ด้วย JS -->
-        </div>
-
-        <!-- Sub Tabs (Rev.) & Action Bar -->
-        <div style="display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 10px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-            <div class="sub-tabs" id="pf-rev-tabs" style="margin: 0;">
-                <!-- Rev. Tabs จะถูก Render ด้วย JS -->
-            </div>
-            <div class="action-buttons" style="display: flex; gap: 10px;">
-                <span id="pf-status-badge" class="badge" style="background: #f59e0b; color: white; padding: 5px 10px; border-radius: 4px;">สถานะ: Draft</span>
-                <button class="btn" id="pf-btn-edit" onclick="unlockForecast()" disabled style="background: #f59e0b; color: white;">🔓 แก้ไข (ใส่รหัส)</button>
-                <button class="btn primary" id="pf-btn-save" onclick="savePurchaseForecast()">💾 บันทึก & Lock</button>
-                <button class="btn" id="pf-btn-attach" onclick="document.getElementById('pf-file-upload').click()" style="background: #3b82f6; color: white;">📎 แนบไฟล์</button>
-                <input type="file" id="pf-file-upload" hidden accept="image/*,application/pdf" multiple onchange="handleFileUpload(event)">
-                <button class="btn" id="pf-btn-revise" onclick="createRevision()" style="background: #8b5cf6; color: white; display: none;">🔄 สร้าง Revise</button>
-            </div>
-        </div>
-
-        <!-- ตาราง 22 แถว -->
-        <div class="table-responsive" style="overflow-x: auto; max-height: 70vh; background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-            <table class="data-table" id="pf-table" style="min-width: 1200px; border-collapse: collapse;">
-                <thead id="pf-thead" style="position: sticky; top: 0; z-index: 10; background: #2b4b9b; color: white;">
-                    <!-- Header จะถูก Render ด้วย JS -->
-                </thead>
-                <tbody id="pf-tbody">
-                    <!-- ข้อมูล 22 แถว จะถูก Render ด้วย JS -->
-                </tbody>
-            </table>
-        </div>
-
-        <!-- หมายเหตุ -->
-        <div style="margin-top: 15px; background: #fff; padding: 15px; border-radius: 8px;">
-            <label style="font-weight: bold;">หมายเหตุ:</label>
-            <textarea id="pf-remark" class="form-control" rows="2" placeholder="ระบุหมายเหตุ..." style="width: 100%; margin-top: 5px;"></textarea>
-        </div>
-
-        <!-- Modal สร้าง Forecast ใหม่ -->
-        <div id="modal-create-forecast" class="modal" style="display: none;">
-            <div class="modal-content" style="max-width: 400px;">
-                <div class="modal-header">
-                    <h3>สร้างประมาณการใหม่</h3>
-                    <button class="close-btn" onclick="closeModal('modal-create-forecast')">&times;</button>
+        <div class="pf-container">
+            <!-- Header -->
+            <div class="pf-header">
+                <h2>ประมาณการสั่งซื้อม้วนกระดาษ</h2>
+                <div class="pf-header-actions">
+                    <div class="pf-month-picker">
+                        <label>เดือนที่จัดทำประมาณการ:</label>
+                        <input type="month" id="pf-main-month" class="form-control">
+                    </div>
+                    <button class="btn primary" onclick="openCreateForecastModal()">📝 จัดทำประมาณการสั่งซื้อ</button>
+                    <button class="btn" onclick="window.print()">🖨 พิมพ์</button>
                 </div>
-                <div class="modal-body">
-                    <label>เกรดแกรม (เช่น CA125):</label>
-                    <input type="text" id="new-fc-grade" class="form-control" placeholder="ระบุเกรดแกรม" style="width: 100%; margin-bottom: 10px;">
+            </div>
 
-                    <label>เดือน/ปี ที่จัดทำ:</label>
-                    <input type="month" id="new-fc-month" class="form-control" style="width: 100%; margin-bottom: 10px;">
+            <!-- Grade Tabs -->
+            <div class="pf-tabs" id="pf-grade-tabs">
+                <!-- Render ด้วย JS -->
+            </div>
 
-                    <label>เลขที่เอกสาร:</label>
-                    <input type="text" id="new-fc-docno" class="form-control" placeholder="เช่น 0001" style="width: 100%; margin-bottom: 10px;">
+            <!-- Main Layout (Sidebar + Table) -->
+            <div class="pf-main-layout">
+                <!-- Sidebar Rev -->
+                <div class="pf-sidebar" id="pf-rev-sidebar">
+                    <!-- Render ด้วย JS -->
                 </div>
-                <div class="modal-footer" style="text-align: right; margin-top: 15px;">
-                    <button class="btn" onclick="closeModal('modal-create-forecast')">ยกเลิก</button>
-                    <button class="btn primary" onclick="confirmCreateForecast()">สร้าง</button>
+
+                <!-- Table Area -->
+                <div class="pf-table-area">
+                    <div class="pf-table-header-info">
+                        <div id="pf-current-grade-label">KK125</div>
+                        <div id="pf-status-badge" class="badge">สถานะ: -</div>
+                        <div style="margin-left: auto; display: flex; gap: 10px;">
+                            <button class="btn" id="pf-btn-attach" onclick="document.getElementById('pf-file-upload').click()" style="display: none;">📎 แนบเอกสาร</button>
+                            <input type="file" id="pf-file-upload" hidden accept="image/*,application/pdf" multiple onchange="handleFileUpload(event)">
+                            <button class="btn primary" id="pf-btn-save" onclick="savePurchaseForecast()">💾 บันทึก & ล็อค</button>
+                            <button class="btn" id="pf-btn-revise" onclick="createRevision()" style="display: none;">🔄 สร้าง Revise</button>
+                        </div>
+                    </div>
+
+                    <div class="pf-table-wrapper" id="pf-table-wrapper">
+                        <table class="pf-table" id="pf-table">
+                            <thead id="pf-thead"></thead>
+                            <tbody id="pf-tbody"></tbody>
+                        </table>
+                    </div>
+
+                    <!-- Footer / Remark -->
+                    <div class="pf-footer">
+                        <label>หมายเหตุ:</label>
+                        <textarea id="pf-remark" class="form-control" rows="2" placeholder="ระบุหมายเหตุ..."></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal สร้าง Forecast -->
+        <div id="modal-create-forecast" class="modal-bg">
+            <div class="modal" style="max-width: 450px;">
+                <div class="modal-head">
+                    <h3>จัดทำประมาณการใหม่</h3>
+                    <button onclick="closeModal('modal-create-forecast')">ปิด</button>
+                </div>
+                <div class="form-grid" style="grid-template-columns: 1fr;">
+                    <label>เกรดแกรม (เช่น KK125): <input type="text" id="new-fc-grade" placeholder="ระบุเกรดแกรม"></label>
+                    <label>เดือน/ปี: <input type="month" id="new-fc-month"></label>
+                    <label>เลขที่เอกสาร: <input type="text" id="new-fc-docno" placeholder="เช่น 0001"></label>
+                </div>
+                <div class="form-actions">
+                    <button onclick="closeModal('modal-create-forecast')">ยกเลิก</button>
+                    <button class="primary" onclick="confirmCreateForecast()">สร้าง</button>
                 </div>
             </div>
         </div>
@@ -1253,7 +1258,7 @@
 <script src="purchase-order.js"></script>
 <script src="forecast.js"></script>
 <script src="usage-pivot.js"></script>
-<script src="purchase-forecast.js"></script> <!-- เพิ่มใหม่: Purchase Forecast V2 -->
+<script src="purchase-forecast.js"></script> <!-- Purchase Forecast V3 -->
 <script src="reservations.js"></script>
 <script src="price-master.js"></script>
 
