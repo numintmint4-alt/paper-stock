@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-//  STOCK ม้วนกระดาษ V6 — app.js (Core) — V.13.7 (Reservations tab)
+//  STOCK ม้วนกระดาษ V6 — app.js (Core) — V.13.8 (Purchase Forecast V2)
 // ═══════════════════════════════════════════════════════════════
 const SUPABASE_URL      = 'https://gwwgycbqzdjlijsuxahx.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_rMoUE6tUsQZHnJu2ULDxFg_4NAiw6wg';
@@ -184,7 +184,6 @@ function showToast(message, type = 'info', duration = 3000) {
 }
 
 // ================= PAGINATION =================
-// ✅ เปลี่ยน default เป็น 1000 แล้ววนลูปเองจนครบ
 async function fetchAllRows(buildQuery, pageSize = 1000, onProgress = null) {
   const all = [];
   let from = 0;
@@ -197,10 +196,9 @@ async function fetchAllRows(buildQuery, pageSize = 1000, onProgress = null) {
     all.push(...data);
     if (onProgress) onProgress(all.length);
     
-    // ถ้าดึงมาได้น้อยกว่า pageSize แสดงว่าครบแล้วให้หยุด
     if (data.length < pageSize) break; 
     
-    from += pageSize; // วนไปดึง 1,000 แถวถัดไป
+    from += pageSize; 
   }
   return all;
 }
@@ -360,7 +358,8 @@ document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
     if (t === 'alert' && typeof initAlertTab === 'function') initAlertTab();
     if (t === 'purchase-order' && typeof initPurchaseOrderTab === 'function') initPurchaseOrderTab();
     if (t === 'summary' && typeof initSummaryTab === 'function') initSummaryTab();
-    if (t === 'forecast' && typeof initForecastTab === 'function') initForecastTab();
+    // ✅ แก้ไขตรงนี้: เปลี่ยนจาก initForecastTab เป็น initPurchaseForecastTab
+    if (t === 'forecast' && typeof initPurchaseForecastTab === 'function') initPurchaseForecastTab();
     if (t === 'usage-pivot' && typeof initUsagePivotTab === 'function') initUsagePivotTab();
     if (t === 'reservations' && typeof loadReservations === 'function') loadReservations();
     if (t === 'data') renderData();
@@ -369,7 +368,6 @@ document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
 
 // ================= MASTER =================
 async function loadMaster(onProgress = null) {
-  // ✅ ลบ 5000 ออก — ใช้ default 1000 วนลูปเอง
   masterCache = await fetchAllRows(
     () => supabase.from('paper_specs').select('*').order('grade').order('gram').order('size'),
     undefined, onProgress
@@ -1223,7 +1221,7 @@ async function delUser(id, username) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  INIT  — V.13.7
+//  INIT  — V.13.8
 // ═══════════════════════════════════════════════════════════════
 
 (function init() {
