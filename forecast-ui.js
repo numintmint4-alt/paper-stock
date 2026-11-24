@@ -7,13 +7,13 @@
 // ═══════════════════════════════════════════════════════════════
 (function () {
   'use strict';
-  const { GROUPS, DEFAULT_PARAMS, SRC_OF, CALC_ROWS, NEG_MSG, pad2, num, thMonth, nextMonthStr, errText,
+  const { GROUPS, GROUP_DEFS, groupLabel, DEFAULT_PARAMS, SRC_OF, CALC_ROWS, NEG_MSG, pad2, num, thMonth, nextMonthStr, errText,
           fmtCell, fmtTot, shortTitle, buildTables, getV, fcCalcCell, toast, api } = window.FC;
 
   const S = {
-    month: '', group: 'CA',
+    month: '', group: 'CA_THIN',
     orders: {}, selId: {}, hasOrders: false,
-    W: null, gram: 'ALL',
+    W: null, grams: [],
     snaps: null, savedMonths: [],
     customers: [], custLoading: false,
     fp: [], seq: 0, saving: false, bound: false, pwResolve: null
@@ -102,7 +102,7 @@
       return;
     }
     if (seq !== S.seq) return;
-    S.W = W; S.gram = 'ALL';
+    S.W = W; S.grams = [];
     paintHeader(); renderToolbar(); renderTables(); renderFooter();
     ensureCustomers();
   }
@@ -113,10 +113,10 @@
     const cb = $id('fcCreateBtn'); if (cb) { cb.disabled = S.hasOrders; cb.title = S.hasOrders ? 'เดือนนี้จัดทำประมาณการแล้ว' : ''; }
     // แท็บเกรด
     const gt = $id('fcGradeTabs');
-    if (gt) gt.innerHTML = GROUPS.map(g => {
-      const arr = S.orders[g] || [], last = arr[arr.length - 1];
+    if (gt) gt.innerHTML = GROUP_DEFS.map(d => {
+      const g = d.key, arr = S.orders[g] || [], last = arr[arr.length - 1];
       const badge = !last ? '' : (last.status === 'approved' ? ' ✅' : (last.status === 'saved' ? ' 🔒' : ''));
-      return `<button type="button" class="sub-tab ${g === 'FSC' ? 'fc-fsc' : ''} ${g === S.group ? 'active' : ''}" onclick="fcSelectGroup('${g}')">${g}${badge}</button>`;
+      return `<button type="button" class="sub-tab ${g === 'FSC' ? 'fc-fsc' : ''} ${g === S.group ? 'active' : ''}" title="${esc(d.hint || d.label)}" onclick="fcSelectGroup('${g}')">${esc(d.label)}${badge}</button>`;
     }).join('');
     // แท็บ Rev ซ้อนด้านข้าง
     const rt = $id('fcRevTabs');
@@ -141,7 +141,7 @@
     if (box) box.innerHTML = `<div class="fc-empty">
         <div style="font-size:42px">📝</div>
         <div>ยังไม่ได้จัดทำประมาณการสั่งซื้อ เดือน <b>${esc(thMonth(S.month))}</b></div>
-        <div class="fc-empty-sub">กดปุ่ม <b>“จัดทำประมาณการสั่งซื้อ”</b> ด้านบน ระบบจะสร้างตารางเปล่า Rev.00 ให้ทุกเกรด (CA KA KI KK KW FSC)</div>
+        <div class="fc-empty-sub">กดปุ่ม <b>“จัดทำประมาณการสั่งซื้อ”</b> ด้านบน ระบบจะสร้างตารางเปล่า Rev.00 ให้ทุกกลุ่ม (CA บาง, CA หนา, KA, KI, KK, KW, FSC)</div>
       </div>`;
     ['fcToolbar', 'fcFooter'].forEach(id => { const el = $id(id); if (el) el.innerHTML = ''; });
   }
@@ -152,10 +152,15 @@
     return '<span class="fc-chip draft">✏️ ร่าง — กำลังจัดทำ</span>';
   }
 
+  function gramLabel() {
+    const n = S.grams.length;
+    return n === 0 ? 'ทั้งหมด' : (n === 1 ? S.grams[0] : `เลือก ${n} แกรม`);
+  }
   function renderToolbar() {
     const el = $id('fcToolbar'), W = S.W; if (!el || !W) return;
     const o = W.o;
-    const gramOpts = ['<option value="ALL">ทั้งหมด</option>'].concat(W.names.map(n => `<option value="${esc(n)}" ${S.gram === n ? 'selected' : ''}>${esc(n)}</option>`)).join('');
+    const gramItems = W.names.map(n => { const on = S.grams.includes(n);
+      return `<label class="item ${on ? 'checked' : ''}"><input type="checkbox" value="${esc(n)}" ${on ? 'checked' : ''} onchange="fcGramChange(this)"><span>${esc(n)}</span></label>`; }).join('');
     let btns = '';
     if (o.status === 'draft') {
       btns = `<button type="button" onclick="fcSave(false)">💾 บันทึกร่าง</button>
@@ -167,16 +172,27 @@
       btns = `<button type="button" class="primary" onclick="fcViewDoc()">📄 ดูเอกสารอนุมัติ${o.doc_name ? ' (' + esc(o.doc_name) + ')' : ''}</button>`;
     }
     const saved = o.saved_at ? ` · บันทึกเมื่อ ${new Date(o.saved_at).toLocaleString('th-TH')}` : '';
-    el.innerHTML = `<div class="fc-tb-left"><b>${esc(S.group)} · Rev.${pad2(o.rev)}</b> ${statusChip(o)}<span class="fc-muted">${saved}</span></div>
+    el.innerHTML = `<div class="fc-tb-left"><b>${esc(groupLabel(S.group))} · Rev.${pad2(o.rev)}</b> ${statusChip(o)}<span class="fc-muted">${saved}</span></div>
       <div class="fc-tb-right">
-        <label class="fc-inline">แสดงแกรม <select onchange="fcSetGram(this.value)">${gramOpts}</select></label>
+        <div class="fc-inline">แสดงแกรม
+          <div class="grade-filter-box" id="fcGramBox">
+            <button type="button" class="grade-filter-btn" onclick="fcGramToggle(event)"><span id="fcGramLabel">${esc(gramLabel())}</span><span class="arrow">▼</span></button>
+            <div class="grade-dropdown fc-gram-drop hidden" id="fcGramDrop">
+              <div class="grade-actions">
+                <button type="button" onclick="fcGramAll()">✓ เลือกทั้งหมด</button>
+                <button type="button" onclick="fcGramClear()">✗ ล้างทั้งหมด</button>
+              </div>
+              <div class="grade-list" id="fcGramList">${gramItems}</div>
+            </div>
+          </div>
+        </div>
         ${btns}
       </div>`;
   }
 
   function renderFooter() {
     const el = $id('fcFooter'), W = S.W; if (!el || !W) return;
-    el.innerHTML = `<label class="fc-remark-lbl">📝 หมายเหตุประมาณการ (${esc(S.group)} Rev.${pad2(W.o.rev)})</label>
+    el.innerHTML = `<label class="fc-remark-lbl">📝 หมายเหตุประมาณการ (${esc(groupLabel(S.group))} Rev.${pad2(W.o.rev)})</label>
       <textarea id="fcRemark" rows="2" placeholder="ระบุหมายเหตุ (ถ้ามี) ก่อนกดบันทึกและล็อก" ${W.locked ? 'disabled' : ''}>${esc(W.remark)}</textarea>`;
     $id('fcRemark').addEventListener('input', e => { if (S.W) S.W.remark = e.target.value; });
   }
@@ -264,11 +280,12 @@
 
   function renderTables() {
     const box = $id('fcTables'), W = S.W; if (!box || !W) return;
-    const sx = box.scrollLeft, sy = box.scrollTop;
+    const sxs = {}; box.querySelectorAll('.fc-tbl-wrap').forEach(w => { sxs[w.dataset.gw] = w.scrollLeft; });
+    const wy = window.scrollY;
     S.fp.forEach(f => { try { f.destroy(); } catch (e) { /* ignore */ } }); S.fp = [];
-    const names = S.gram === 'ALL' ? W.names : W.names.filter(n => n === S.gram);
+    const names = S.grams.length ? W.names.filter(n => S.grams.includes(n)) : W.names;
     if (!names.length) { box.innerHTML = '<div class="fc-empty"><div>ไม่พบ Gradegram ของกลุ่มนี้ใน Master Data</div></div>'; return; }
-    box.innerHTML = names.map(n => tableHTML(W, W.tables[n])).join('');
+    box.innerHTML = names.map(n => `<div class="fc-tbl-wrap" data-gw="${esc(n)}">${tableHTML(W, W.tables[n])}</div>`).join('');
     // วันที่ (flatpickr เหมือนหน้าอื่น)
     box.querySelectorAll('input.fc-date:not([disabled])').forEach(el => {
       const p = el.dataset.p;
@@ -282,7 +299,8 @@
       tbl._el = el;
       recalcTable(tbl, true);
     });
-    box.scrollLeft = sx; box.scrollTop = sy;
+    box.querySelectorAll('.fc-tbl-wrap').forEach(w => { if (sxs[w.dataset.gw]) w.scrollLeft = sxs[w.dataset.gw]; });
+    if (Math.abs(window.scrollY - wy) > 1) window.scrollTo(0, wy);
   }
 
   function recalcTable(tbl, silent) {
@@ -422,6 +440,9 @@
       }
     });
 
+    document.addEventListener('click', e => {
+      const d = $id('fcGramDrop'); if (d && !d.classList.contains('hidden') && !e.target.closest('#fcGramBox')) d.classList.add('hidden');
+    });
     $id('fcPdfInput').addEventListener('change', fcAttachUpload);
     ['fcPwInput', 'fcPwNote'].forEach(id => $id(id)?.addEventListener('keypress', e => { if (e.key === 'Enter') window.fcPwConfirm(); }));
   }
@@ -449,7 +470,7 @@
       if (!P.stockDate) miss.push('Stock ณ วันที่');
       if (!P.recvDate) miss.push('รับม้วนกระดาษ ณ วันที่');
       if (!P.resvDate) miss.push('ยอดจองคงเหลือ ณ วันที่');
-      let msg = `ยืนยัน "บันทึกและล็อก" ${S.group} Rev.${pad2(W.o.rev)} เดือน ${thMonth(S.month)} ?\n\nหลังล็อกจะแก้ไขไม่ได้ (ต้องใส่รหัสผ่านก่อน)`;
+      let msg = `ยืนยัน "บันทึกและล็อก" ${groupLabel(S.group)} Rev.${pad2(W.o.rev)} เดือน ${thMonth(S.month)} ?\n\nหลังล็อกจะแก้ไขไม่ได้ (ต้องใส่รหัสผ่านก่อน)`;
       if (miss.length) msg = `⚠️ ยังไม่ได้เลือก: ${miss.join(', ')}\n\n` + msg;
       if (!confirm(msg)) return;
     }
@@ -486,7 +507,7 @@
   window.fcUnlock = async function () {
     const W = S.W; if (!W || W.o.status !== 'saved') return;
     const r = await askPassword('🔒 ยืนยันรหัสผ่านเพื่อแก้ไข',
-      `ปลดล็อก <b>${esc(S.group)} Rev.${pad2(W.o.rev)}</b> เดือน ${esc(thMonth(S.month))}<br>กรอกรหัสผ่านประมาณการสั่งซื้อ และระบุเหตุผลที่แก้ไข`);
+      `ปลดล็อก <b>${esc(groupLabel(S.group))} Rev.${pad2(W.o.rev)}</b> เดือน ${esc(thMonth(S.month))}<br>กรอกรหัสผ่านประมาณการสั่งซื้อ และระบุเหตุผลที่แก้ไข`);
     if (!r) return;
     try {
       await api.unlockOrder(W.o.id, r.password, r.note);
@@ -504,7 +525,7 @@
     if (!f || !W || W.o.status !== 'saved') return;
     if (!(f.type === 'application/pdf' || /\.pdf$/i.test(f.name))) { toast('กรุณาเลือกไฟล์ PDF เท่านั้น', 'warn'); return; }
     if (f.size > 15 * 1024 * 1024) { toast('ไฟล์ใหญ่เกิน 15 MB', 'warn'); return; }
-    if (!confirm(`แนบเอกสารอนุมัติ "${f.name}" ให้ ${S.group} Rev.${pad2(W.o.rev)} ?\n\nหลังแนบ จะล็อกทั้งหมด แก้ไขไม่ได้ (ทำได้เฉพาะ + เพิ่ม Rev)`)) return;
+    if (!confirm(`แนบเอกสารอนุมัติ "${f.name}" ให้ ${groupLabel(S.group)} Rev.${pad2(W.o.rev)} ?\n\nหลังแนบ จะล็อกทั้งหมด แก้ไขไม่ได้ (ทำได้เฉพาะ + เพิ่ม Rev)`)) return;
     toast('กำลังอัปโหลด PDF…', 'info', 8000);
     try {
       await api.attachDoc(W.o.id, S.month, S.group, W.o.rev, f);
@@ -521,7 +542,7 @@
   window.fcAddRev = async function () {
     const arr = S.orders[S.group] || [], last = arr[arr.length - 1];
     if (!last || last.status !== 'approved') return;
-    if (!confirm(`เพิ่ม Rev.${pad2(last.rev + 1)} ของ ${S.group} เดือน ${thMonth(S.month)} ?\n\nระบบจะคัดลอกข้อมูลจาก Rev.${pad2(last.rev)} มาให้แก้ไขต่อ`)) return;
+    if (!confirm(`เพิ่ม Rev.${pad2(last.rev + 1)} ของ ${groupLabel(S.group)} เดือน ${thMonth(S.month)} ?\n\nระบบจะคัดลอกข้อมูลจาก Rev.${pad2(last.rev)} มาให้แก้ไขต่อ`)) return;
     try {
       const data = await api.addRev(S.month, S.group);
       toast(`➕ เพิ่ม Rev.${pad2(data.rev)} แล้ว`, 'ok');
@@ -532,7 +553,7 @@
   window.fcCreateOrders = async function () {
     if (!S.month) return toast('กรุณาเลือกเดือนที่จะจัดทำประมาณการ', 'warn');
     if (S.hasOrders) return;
-    if (!confirm(`จัดทำประมาณการสั่งซื้อ เดือน ${thMonth(S.month)} ?\n\nระบบจะสร้างตารางเปล่า Rev.00 ให้ทุกเกรด (CA KA KI KK KW FSC)`)) return;
+    if (!confirm(`จัดทำประมาณการสั่งซื้อ เดือน ${thMonth(S.month)} ?\n\nระบบจะสร้างตารางเปล่า Rev.00 ให้ทุกกลุ่ม (CA บาง, CA หนา, KA, KI, KK, KW, FSC)`)) return;
     try {
       await api.createOrders(S.month);
       toast('🆕 สร้างตารางประมาณการเรียบร้อย', 'ok');
@@ -543,9 +564,24 @@
   window.fcPickForecastMonth = function (anchor) {
     openMonthPicker(anchor, { value: S.month, onPick: ym => { if (ym && ym !== S.month) { S.month = ym; S.selId = {}; loadMonth(); } } });
   };
-  window.fcSelectGroup = function (g) { S.group = g; S.gram = 'ALL'; paintHeader(); const o = curOrder(); if (o) openOrder(o); else { S.W = null; renderEmpty(); } };
+  window.fcSelectGroup = function (g) { S.group = g; S.grams = []; paintHeader(); const o = curOrder(); if (o) openOrder(o); else { S.W = null; renderEmpty(); } };
   window.fcSelectRev = function (id) { S.selId[S.group] = id; const o = curOrder(); paintHeader(); if (o) openOrder(o); };
-  window.fcSetGram = function (v) { S.gram = v; renderTables(); };
+  // เลือกแกรมที่จะแสดง (ติ๊กได้หลายตัว · ไม่ติ๊กเลย = ทั้งหมด)
+  function gramRefresh() {
+    const lb = $id('fcGramLabel'); if (lb) lb.textContent = gramLabel();
+    document.querySelectorAll('#fcGramList .item').forEach(el => {
+      const cb = el.querySelector('input'); cb.checked = S.grams.includes(cb.value); el.classList.toggle('checked', cb.checked);
+    });
+    renderTables();
+  }
+  window.fcGramToggle = function (ev) { ev.stopPropagation(); const d = $id('fcGramDrop'); if (d) d.classList.toggle('hidden'); };
+  window.fcGramChange = function (cb) {
+    const v = cb.value;
+    S.grams = cb.checked ? (S.grams.includes(v) ? S.grams : S.grams.concat([v])) : S.grams.filter(x => x !== v);
+    gramRefresh();
+  };
+  window.fcGramAll = function () { S.grams = S.W ? S.W.names.slice() : []; gramRefresh(); };
+  window.fcGramClear = function () { S.grams = []; gramRefresh(); };
 
   // ═════════════ ตั้งค่ารหัสผ่าน (หน้า ตั้งค่า — Admin) ═════════════
   window.initForecastPwSettings = async function () {
