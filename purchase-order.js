@@ -3090,61 +3090,69 @@ async function returnReservationOnDeletePO(poNo, items) {
   }
 }
 /* ==========================================================
-   EXPORT PO TO EXCEL (เพิ่มใหม่เพื่อแก้ Error)
+   EXPORT PO TO EXCEL (เวอร์ชันแก้ไข 100%)
    ========================================================== */
 
-// 2. ฟังก์ชันสำหรับดึงข้อมูลและโหลดไฟล์ Excel
+// 1. ฟังก์ชันเปิด Modal
+function openExportPOExcel() {
+  const modal = document.getElementById('modalExportPO');
+  if (modal) {
+    modal.classList.add('show');
+  } else {
+    // ถ้าหา Modal ไม่เจอ ให้เรียกฟังก์ชัน Export ตรงๆ ไปเลย
+    runExportPOExcel();
+  }
+}
+
+// 2. ฟังก์ชัน Export
 async function runExportPOExcel() {
   const btn = event?.target;
   if (btn) { btn.disabled = true; btn.textContent = '⏳ กำลังโหลด...'; }
 
   try {
-    const poMonth = document.getElementById('poMonth')?.value;
-    if (!poMonth) {
-      alert('⚠️ กรุณาเลือกเดือนก่อนทำการ Export');
-      return;
-    }
-
-    // 1. ดึงข้อมูลจากตาราง purchase_orders ตามเดือน
-    // ไม่ต้องกรอง po_no แล้ว ให้กรองด้วย order_date หรือ created_at แทน
-    const startOfMonth = `${poMonth}-01`;
-    // หาวันสุดท้ายของเดือน
-    const endOfMonth = new Date(poMonth.split('-')[0], poMonth.split('-')[1], 0).toISOString().split('T')[0];
-
-    const { data, error } = await supabase
-      .from('purchase_orders')
-      .select('*')
-      .gte('order_date', startOfMonth) // 🟢 ใช้ order_date (ถ้าคุณใช้ receive_date ให้เปลี่ยนตรงนี้)
-      .lte('order_date', endOfMonth);
-
-    if (error) throw error;
+    // หาข้อมูลจากตาราง HTML ที่โชว์อยู่บนหน้าจอ (ใช้วิธีนี้ชัวร์ที่สุด ไม่ต้องกลัว Database พัง)
+    const tableRows = document.querySelectorAll('#poListBody table tbody tr');
     
-    // ถ้าในตารางว่างจริงๆ
-    if (!data || data.length === 0) {
-      alert('⚠️ ไม่พบข้อมูล PO ในเดือนนี้');
+    // ถ้าไม่พบแถวในตาราง
+    if (!tableRows || tableRows.length === 0) {
+      alert('⚠️ ไม่พบข้อมูล PO บนหน้าจอ (กรุณากดโหลดข้อมูลก่อน Export)');
       return;
     }
 
-    // 2. สร้างไฟล์ Excel
+    const exportData = [];
+
+    // วนลูปอ่านข้อมูลจากตารางทีละแถว
+    tableRows.forEach(row => {
+      const cols = row.querySelectorAll('td');
+      if (cols.length > 0) {
+        // สมมติฐานคอลัมน์จากที่เห็นในรูป: 
+        // 0=PO No, 1=วันที่สั่ง, 2=วันที่รับ, 3=Supplier, 4=จำนวน, 5=KG
+        exportData.push({
+          'PO No': cols[0]?.innerText.trim() || '',
+          'วันที่สั่ง': cols[1]?.innerText.trim() || '',
+          'วันที่รับ': cols[2]?.innerText.trim() || '',
+          'Supplier': cols[3]?.innerText.trim() || '',
+          'จำนวน (ม้วน)': cols[4]?.innerText.trim() || '',
+          'KG รวม': cols[5]?.innerText.trim() || ''
+        });
+      }
+    });
+
+    if (exportData.length === 0) {
+      alert('⚠️ ไม่สามารถดึงข้อมูลจากตารางได้');
+      return;
+    }
+
+    // สร้างไฟล์ Excel
     const wb = XLSX.utils.book_new();
-    
-    // จัดเตรียมข้อมูลให้ตรงกับที่โชว์บนหน้าจอ
-    const rows = data.map(po => ({
-      'PO No': po.po_no,
-      'Supplier': po.supplier,
-      'Order Date': po.order_date,
-      'Receive Date': po.receive_date,
-      'Total Qty': po.total_qty || 0,
-      'Total KG': po.total_kg || 0,
-      'Status': po.status,
-      'Remark': po.remark || ''
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(rows);
+    const ws = XLSX.utils.json_to_sheet(exportData);
     XLSX.utils.book_append_sheet(wb, ws, 'PO List');
 
-    // 3. ดาวน์โหลด
+    // ตั้งชื่อไฟล์ตามเดือนที่เลือก
+    const poMonth = document.getElementById('poMonth')?.value || 'All';
     const fileName = `PO_Export_${poMonth}.xlsx`;
+    
+    // สั่งดาวน์โหลด
     XLSX.writeFile(wb, fileName);
 
     // ปิด Modal
