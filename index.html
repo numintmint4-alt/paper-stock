@@ -430,7 +430,8 @@
 
           <button class="primary" onclick="openCreatePOModal()">➕ สร้าง PO ใหม่</button>
 
-          <button onclick="openExportPOExcel()">📤 Export Excel</button>
+          <!-- แก้จาก openExportPOExcel() เป็น exportPOToExcel() -->
+      <button onclick="exportPOToExcel()">📤 Export Excel</button>
           <button onclick="window.print()">🖨 พิมพ์</button>
         </div>
 
