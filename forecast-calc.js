@@ -68,7 +68,18 @@ function fcCalcCell(i) {
 (function () {
   'use strict';
 
-  const GROUPS = ['CA', 'KA', 'KI', 'KK', 'KW', 'FSC'];
+  // ใบประมาณการ 1 ใบ = 1 เดือน + 1 กลุ่มนี้ + 1 Rev   (CA แยกทำ 2 ใบ: แกรมบาง / แกรมหนา)
+  const THICK_FROM = 150;                       // แกรม >= 150 = แกรมหนา (CA150-185) · < 150 = แกรมบาง (CA085-125)
+  const GROUP_DEFS = [
+    { key: 'CA_THIN',  base: 'CA', label: 'CA บาง', hint: 'CA085–125 (แกรมบาง)', thick: false },
+    { key: 'CA_THICK', base: 'CA', label: 'CA หนา', hint: 'CA150–185 (แกรมหนา)', thick: true },
+    { key: 'KA', base: 'KA', label: 'KA' }, { key: 'KI', base: 'KI', label: 'KI' },
+    { key: 'KK', base: 'KK', label: 'KK' }, { key: 'KW', base: 'KW', label: 'KW' },
+    { key: 'FSC', base: 'FSC', label: 'FSC' }
+  ];
+  const GROUPS = GROUP_DEFS.map(d => d.key);
+  const groupDef = k => GROUP_DEFS.find(d => d.key === k) || { key: k, base: k, label: k };
+  const groupLabel = k => groupDef(k).label;
   const DEFAULT_PARAMS = {
     m1: '', m2: '', m3: '',
     levelMonth: '', levelSnapId: null, levelSnapTitle: '', levelMode: '',
@@ -135,10 +146,13 @@ function fcCalcCell(i) {
   const shortTitle = t => String(t || '').replace(/^ตารางควบคุมระดับ Stock ม้วนกระดาษปกติในการสั่งซื้อ\s*/, '').replace(/^ประจำเดือน\s*/, '') || String(t || '');
 
   // ═════════════ โครงสร้างตาราง ═════════════
-  const inGroup = (label, group) => {
-    const u = label.toUpperCase();
-    if (group === 'FSC') return u.includes('F');
-    return u.startsWith(group) && !u.includes('F');
+  const inGroup = (label, groupKey) => {
+    const d = groupDef(groupKey), u = label.toUpperCase();
+    if (d.base === 'FSC') return u.includes('F');
+    if (!u.startsWith(d.base) || u.includes('F')) return false;
+    if (d.thick === undefined) return true;
+    const gram = parseInt(u.replace(/\D/g, ''), 10) || 0;
+    return d.thick ? gram >= THICK_FROM : gram < THICK_FROM;
   };
   function masterDefs(group) {
     const by = new Map();
@@ -199,7 +213,7 @@ function fcCalcCell(i) {
   }
 
   window.FC = Object.assign(window.FC || {}, {
-    GROUPS, DEFAULT_PARAMS, SRC_OF, CALC_ROWS, NEG_MSG,
+    GROUPS, GROUP_DEFS, groupDef, groupLabel, THICK_FROM, DEFAULT_PARAMS, SRC_OF, CALC_ROWS, NEG_MSG,
     pad2, num, thMonth, nextMonthStr, errText, fmtCell, fmtTot, shortTitle,
     inGroup, masterDefs, buildTables, getV,
     fcKey, fcRowGG, fcCalcCell
