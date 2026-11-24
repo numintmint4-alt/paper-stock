@@ -1,17 +1,8 @@
 // ═══════════════════════════════════════════════════════════════
 //  STOCK V10.1 — purchase-order.js — V.15.1
 //  V.14 NEW: คืนยอดจอง (roll_reservations → reserved) เมื่อลบ PO
-//           + รองรับ reservation_id ที่ติดมากับ PO items
-//           + deductReservationOnPO ฉลาดขึ้น: ใช้ reservation_id ถ้ามี,
-//             ถ้าไม่มีค่อย fallback ไปหา grade+size
 //  V.15.0 FIX: ย้ายจุดหักยอดจอง (deductReservationOnPO)
-//           → ออกจาก _doSaveAllPOs และ saveCreatePO
-//           → ไปเรียกใน markPOSaved แทน
 //  V.15.1 NEW: markPOSaved — บันทึก Audit Log (roll_reservation_logs)
-//           + ป้องกัน Log ซ้ำด้วย maybeSingle()
-//           + ลบฟังก์ชันซ้ำซ้อนที่ท้ายไฟล์ (deductReservationOnPO,
-//             returnReservationOnDeletePO, removeAddRow,
-//             saveAddPOItems, closeAddPOItemsModal)
 // ═══════════════════════════════════════════════════════════════
 
 let poCache = [];
@@ -1561,8 +1552,6 @@ async function saveCreatePO(btnEl) {
     });
     if (error) throw error;
 
-    // ❌ ไม่หักยอดจองตรงนี้ (จะหักตอน markPOSaved)
-
     alert(`✅ สร้าง PO ใหม่สำเร็จ: ${poNo}\n(${items.length} รายการ)\n\n(สถานะ Draft — ยอดจองจะถูกหักเมื่อกด "บันทึกเป็น Saved")`);
 
     closeModal('modalPOForm');
@@ -2344,6 +2333,9 @@ function closePOForm() {
   renderPOList();
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  🎯 EXPORT PO TO EXCEL (แก้ไขบั๊ก flatpickrInstances แล้ว)
+// ═══════════════════════════════════════════════════════════════
 function exportPOToExcel() {
   if (!poCache || !poCache.length) {
     alert('ไม่มีข้อมูล PO');
@@ -2392,14 +2384,15 @@ function exportPOToExcel() {
 
   const defaultDateISO = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
   
-  if (flatpickrInstances['exportPoDateFrom']) {
+  // 🟢 ป้องกัน Error: ตรวจสอบว่ามี flatpickrInstances หรือไม่ก่อนเรียกใช้
+  if (typeof flatpickrInstances !== 'undefined' && flatpickrInstances['exportPoDateFrom']) {
     flatpickrInstances['exportPoDateFrom'].setDate(defaultDateISO, false);
   } else {
     const fromEl = document.getElementById('exportPoDateFrom');
     if (fromEl) fromEl.value = defaultDateISO;
   }
   
-  if (flatpickrInstances['exportPoDateTo']) {
+  if (typeof flatpickrInstances !== 'undefined' && flatpickrInstances['exportPoDateTo']) {
     flatpickrInstances['exportPoDateTo'].setDate(defaultDateISO, false);
   } else {
     const toEl = document.getElementById('exportPoDateTo');
@@ -2729,13 +2722,11 @@ function updateAddItemsRemaining(remaining) {
   const label = $('addPOItemsRemaining');
   if (label) {
     if (remaining <= 0) {
-      label.innerHTML = `⚠️ <b style="color:#dc2626">ครบ 15 รายการ</b> — ไม่สามารถเพิ่มได้`;
-      const addBtn = $('addPOItemsAddBtn');
-      if (addBtn) addBtn.disabled = true;
+      label.innerHTML = '⚠️ <b>ครบ 15 รายการ</b> — ไม่สามารถเพิ่มได้';
+      label.style.color = '#dc2626';
     } else {
       label.innerHTML = `สามารถเพิ่มได้อีก <b>${remaining}</b> รายการ`;
-      const addBtn = $('addPOItemsAddBtn');
-      if (addBtn) addBtn.disabled = false;
+      label.style.color = '#475569';
     }
   }
 }
@@ -2750,78 +2741,89 @@ function onAddRowChange(uid, field, value) {
     row.size = '';
   }
 
-  renderAddPOItemsTable();
-}
-
-function addAddRow() {
-  const currentTotal = getCurrentPOItemCount() + _addItemsRows.length;
-  if (currentTotal >= 15) {
-    alert('⚠️ เกินขีดจำกัด 15 รายการ');
-    return;
+  if (field === 'customer_roll' || field === 'quality_b' || field === 'gradegram' || field === 'size') {
+    row.price = getPriceFromMaster(row.gradegram, row.customer_roll, row.quality_b);
   }
-  _addItemsRows.push(createEmptyAddRow());
+
   renderAddPOItemsTable();
 }
 
 function removeAddRow(uid) {
-  if (_addItemsRows.length <= 1) {
-    alert('ต้องมีอย่างน้อย 1 แถว');
-    return;
-  }
+  if (_addItemsRows.length <= 1) return;
   _addItemsRows = _addItemsRows.filter(r => r.uid !== uid);
   renderAddPOItemsTable();
 }
 
-async function saveAddPOItems() {
+function addEmptyRow() {
+  const currentCount = getCurrentPOItemCount();
+  const remaining = 15 - (currentCount + _addItemsRows.length);
+
+  if (remaining <= 0) {
+    alert('⚠️ ครบ 15 รายการแล้ว');
+    return;
+  }
+
+  _addItemsRows.push(createEmptyAddRow());
+  renderAddPOItemsTable();
+}
+
+function closeAddPOItemsModal() {
+  closeModal('modalAddPOItems');
+  _addItemsRows = [];
+}
+
+async function saveAddPOItems(btnEl) {
   if (!poEditingId) {
     alert('ไม่พบ PO ที่กำลังแก้ไข');
     return;
   }
 
-  const validRows = _addItemsRows.filter(r => r.gradegram && r.size && r.quantity && Number(r.quantity) > 0);
+  const validRows = _addItemsRows.filter(r => r.gradegram && r.size && r.quantity);
 
   if (!validRows.length) {
-    alert('⚠️ กรุณากรอกรายการให้ครบ (Gradegram / Size / Quantity)');
+    alert('⚠️ กรุณากรอกรายการให้ครบอย่างน้อย 1 รายการ');
     return;
   }
 
-  const currentCount = getCurrentPOItemCount();
-  const totalAfter = currentCount + validRows.length;
-  if (totalAfter > 15) {
-    alert(`⚠️ เกินขีดจำกัด 15 รายการ\nมีอยู่ ${currentCount} + ใหม่ ${validRows.length} = ${totalAfter}`);
-    return;
+  for (const row of validRows) {
+    if (Number(row.quantity) <= 0) {
+      alert(`⚠️ จำนวนต้อง > 0 (${row.gradegram} ${row.size})`);
+      return;
+    }
   }
 
-  const itemsPayload = validRows.map(r => {
-    const price = Number(r.price) || getPriceFromMaster(r.gradegram, r.customer_roll, r.quality_b);
-    const kgTotal = calcKgTotal(r.gradegram, r.size, r.quantity);
-
-    const custLabel = { normal: '', pump_f: 'ปั้ม F', pump_bt: 'ปั้ม BT', pump_ktp: 'ปั้ม KTP' }[r.customer_roll] || '';
-    const qualLabel = { normal: '', nc: 'NC' }[r.quality_b] || '';
-    const remarkParts = [custLabel, qualLabel, r.note].filter(x => x && String(x).trim());
-
-    return {
-      pc_code: r.pc_code || 'SDPC.01',
-      gradegram: r.gradegram,
-      size: Number(r.size),
-      gradegram_size: `${r.gradegram}-${Number(r.size).toFixed(2)}`,
-      quantity: Number(r.quantity),
-      kg_total: kgTotal,
-      price: price,
-      customer_roll: r.customer_roll,
-      quality_b: r.quality_b,
-      note: r.note || '',
-      remark_combined: remarkParts.join(',')
-    };
-  });
-
-  const btn = document.querySelector('#modalAddPOItems .form-actions .primary');
+  const btn = btnEl || document.getElementById('addPOItemsSaveBtn');
   if (btn) {
     btn.disabled = true;
     btn.textContent = 'กำลังบันทึก...';
   }
 
   try {
+    const itemsPayload = validRows.map(r => {
+      const price = Number(r.price) || getPriceFromMaster(r.gradegram, r.customer_roll, r.quality_b);
+      const kgTotal = calcKgTotal(r.gradegram, r.size, r.quantity);
+
+      const custLabel = { normal: '', pump_f: 'ปั้ม F', pump_bt: 'ปั้ม BT', pump_ktp: 'ปั้ม KTP' }[r.customer_roll] || '';
+      const qualLabel = { normal: '', nc: 'NC' }[r.quality_b] || '';
+      const remarkParts = [custLabel, qualLabel, r.note].filter(x => x && String(x).trim());
+      const remarkCombined = remarkParts.join(',');
+
+      return {
+        pc_code: r.pc_code || 'SDPC.01',
+        gradegram: r.gradegram,
+        size: Number(r.size),
+        gradegram_size: `${r.gradegram}-${Number(r.size).toFixed(2)}`,
+        quantity: Number(r.quantity),
+        kg_total: kgTotal,
+        price: price,
+        customer_roll: r.customer_roll,
+        quality_b: r.quality_b,
+        note: r.note || '',
+        remark_combined: remarkCombined,
+        reservation_id: r.reservation_id || null
+      };
+    });
+
     const { data, error } = await supabase.rpc('add_po_items', {
       p_po_id: poEditingId,
       p_items: itemsPayload,
@@ -2830,355 +2832,28 @@ async function saveAddPOItems() {
     if (error) throw error;
 
     if (!data || !data.success) {
-      throw new Error(data?.error || 'บันทึกไม่สำเร็จ');
+      throw new Error(data?.error || 'เพิ่มรายการไม่สำเร็จ');
     }
 
-    alert(`✅ เพิ่ม ${data.added || validRows.length} รายการสำเร็จ`);
-
-    closeModal('modalAddPOItems');
-    _addItemsRows = [];
+    alert(`✅ เพิ่ม ${validRows.length} รายการสำเร็จ`);
+    closeAddPOItemsModal();
 
     const { data: detail } = await supabase.rpc('get_purchase_order_detail', { p_po_id: poEditingId });
-    if (detail) renderPOFormContent(detail.header, detail.items);
+    if (detail) {
+      const poMonth = getMonthFromDate(detail.header.ref_receive || detail.header.po_date);
+      await loadPriceMasterForMonth(poMonth);
+      renderPOFormContent(detail.header, detail.items);
+    }
+
+    await renderPOList();
 
   } catch (e) {
+    console.error('saveAddPOItems:', e);
     alert('❌ ' + e.message);
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.textContent = '💾 บันทึกการเพิ่ม';
+      btn.textContent = '💾 บันทึก';
     }
   }
 }
-
-function closeAddPOItemsModal() {
-  if (_addItemsRows.some(r => r.gradegram || r.size || r.quantity)) {
-    if (!confirm('⚠️ มีข้อมูลที่กรอกไว้ — ต้องการปิดหรือไม่?')) return;
-  }
-  closeModal('modalAddPOItems');
-  _addItemsRows = [];
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  RESERVATIONS — หัก/คืนยอดจอง (Logic ละเอียด — ใช้เวอร์ชันนี้เท่านั้น)
-//  - deductReservationOnPO: หัก quantity + เปลี่ยน status เป็น used
-//  - returnReservationOnDeletePO: คืน quantity + เปลี่ยน status เป็น reserved
-// ═══════════════════════════════════════════════════════════════
-
-async function deductReservationOnPO(poNo, items) {
-  try {
-    let deductedCount = 0;
-
-    for (const item of items) {
-      // 🔹 ลำดับที่ 1: ลองหักด้วย reservation_id ก่อน (แม่นยำสุด)
-      if (item.reservation_id) {
-        try {
-          const { data: res, error } = await supabase
-            .from('roll_reservations')
-            .select('*')
-            .eq('id', item.reservation_id)
-            .eq('status', 'reserved')
-            .maybeSingle();
-
-          if (error) {
-            console.warn(`[Deduct] fetch by id error (${item.reservation_id}):`, error);
-            continue;
-          }
-
-          if (res) {
-            const deductQty = Number(item.quantity);
-            const newQty = Number(res.quantity) - deductQty;
-
-            if (newQty <= 0) {
-              const { error: updErr } = await supabase
-                .from('roll_reservations')
-                .update({
-                  status: 'used',
-                  po_ref_no: poNo,
-                  updated_at: new Date().toISOString()
-                })
-                .eq('id', res.id);
-              if (updErr) console.warn('[Deduct] update to used error:', updErr);
-              else deductedCount++;
-            } else {
-              const { error: updErr } = await supabase
-                .from('roll_reservations')
-                .update({
-                  quantity: newQty,
-                  updated_at: new Date().toISOString()
-                })
-                .eq('id', res.id);
-              if (updErr) console.warn('[Deduct] update qty error:', updErr);
-              else deductedCount++;
-            }
-            continue;
-          } else {
-            console.warn(`[Deduct] reservation_id ${item.reservation_id} not found or not 'reserved' → fallback to grade+size`);
-          }
-        } catch (e) {
-          console.warn('[Deduct] by reservation_id error:', e);
-        }
-      }
-
-      // 🔹 ลำดับที่ 2: Fallback — หาด้วย grade+size
-      const { data: reservations, error } = await supabase
-        .from('roll_reservations')
-        .select('*')
-        .eq('grade', item.gradegram)
-        .eq('size', item.size)
-        .eq('status', 'reserved')
-        .order('created_at', { ascending: true })
-        .limit(1);
-
-      if (error) {
-        console.warn(`[Deduct] error fetching reservation for ${item.gradegram}-${item.size}:`, error);
-        continue;
-      }
-      if (!reservations || reservations.length === 0) continue;
-
-      const res = reservations[0];
-      const deductQty = Number(item.quantity);
-      const newQty = Number(res.quantity) - deductQty;
-
-      if (newQty <= 0) {
-        const { error: updErr } = await supabase
-          .from('roll_reservations')
-          .update({
-            status: 'used',
-            po_ref_no: poNo,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', res.id);
-        if (updErr) console.warn('[Deduct] update to used error:', updErr);
-        else deductedCount++;
-      } else {
-        const { error: updErr } = await supabase
-          .from('roll_reservations')
-          .update({
-            quantity: newQty,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', res.id);
-        if (updErr) console.warn('[Deduct] update qty error:', updErr);
-        else deductedCount++;
-      }
-    }
-
-    if (typeof showToast === 'function') {
-      showToast(`✅ หักลบยอดจอง ${deductedCount} รายการ`, 'ok', 2000);
-    }
-    console.log(`[Deduct] ✅ หักลบยอดจองสำหรับ PO ${poNo} สำเร็จ (${deductedCount} รายการ)`);
-  } catch (err) {
-    console.error('deductReservationOnPO error:', err);
-    if (typeof showToast === 'function') {
-      showToast('⚠️ หักลบยอดจองไม่สำเร็จ: ' + err.message, 'warn', 3000);
-    }
-  }
-}
-
-async function returnReservationOnDeletePO(poNo, items) {
-  try {
-    let returnedCount = 0;
-
-    const resIds = [...new Set(
-      (items || [])
-        .map(it => it.reservation_id)
-        .filter(Boolean)
-    )];
-
-    if (resIds.length > 0) {
-      const { error: updErr } = await supabase
-        .from('roll_reservations')
-        .update({
-          status: 'reserved',
-          po_ref_no: null,
-          updated_at: new Date().toISOString()
-        })
-        .in('id', resIds)
-        .eq('status', 'used');
-
-      if (updErr) {
-        console.warn('[Return] update by resIds error:', updErr);
-      } else {
-        returnedCount += resIds.length;
-        console.log(`[Return] ✅ คืน ${resIds.length} รายการตาม reservation_id`);
-      }
-    }
-
-    try {
-      const { data: usedRes, error: fetchErr } = await supabase
-        .from('roll_reservations')
-        .select('id')
-        .eq('po_ref_no', poNo)
-        .eq('status', 'used');
-
-      if (fetchErr) {
-        console.warn('[Return] fetch by po_ref_no error:', fetchErr);
-      } else if (usedRes && usedRes.length > 0) {
-        const fallbackIds = usedRes
-          .map(r => r.id)
-          .filter(id => !resIds.includes(id));
-
-        if (fallbackIds.length > 0) {
-          const { error: updErr } = await supabase
-            .from('roll_reservations')
-            .update({
-              status: 'reserved',
-              po_ref_no: null,
-              updated_at: new Date().toISOString()
-            })
-            .in('id', fallbackIds);
-
-          if (updErr) {
-            console.warn('[Return] fallback update error:', updErr);
-          } else {
-            returnedCount += fallbackIds.length;
-            console.log(`[Return] ✅ FALLBACK po_ref_no คืน ${fallbackIds.length} รายการ`);
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('[Return] fallback po_ref_no error:', e);
-    }
-
-    if (returnedCount === 0 && items && items.length > 0) {
-      for (const item of items) {
-        try {
-          const { data: usedList, error } = await supabase
-            .from('roll_reservations')
-            .select('id')
-            .eq('grade', item.gradegram)
-            .eq('size', item.size)
-            .eq('status', 'used')
-            .order('updated_at', { ascending: false })
-            .limit(1);
-
-          if (error) {
-            console.warn('[Return] worst-case fetch error:', error);
-            continue;
-          }
-          if (!usedList || usedList.length === 0) continue;
-
-          const { error: updErr } = await supabase
-            .from('roll_reservations')
-            .update({
-              status: 'reserved',
-              po_ref_no: null,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', usedList[0].id);
-
-          if (updErr) console.warn('[Return] worst-case update error:', updErr);
-          else returnedCount++;
-        } catch (e) {
-          console.warn('[Return] worst-case error:', e);
-        }
-      }
-    }
-
-    if (typeof showToast === 'function') {
-      if (returnedCount > 0) {
-        showToast(`✅ คืนยอดจอง ${returnedCount} รายการ`, 'ok', 2500);
-      }
-    }
-    console.log(`[Return] ✅ คืนยอดจองสำหรับ PO ${poNo} สำเร็จ (${returnedCount} รายการ)`);
-  } catch (err) {
-    console.error('returnReservationOnDeletePO error:', err);
-    if (typeof showToast === 'function') {
-      showToast('⚠️ คืนยอดจองไม่สำเร็จ: ' + err.message, 'warn', 3000);
-    }
-  }
-}
-/* ==========================================================
-   EXPORT PO TO EXCEL (เวอร์ชันดั้งเดิม V.16.0 - ใช้ ExcelJS)
-   ========================================================== */
-async function exportPOToExcel() {
-  const btn = event?.target;
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ กำลังสร้างไฟล์...'; }
-
-  try {
-    // 1. ดึงค่าจากหน้าเว็บ (ดึงเดือนและ filter ที่เลือกอยู่)
-    const poMonth = document.getElementById('poMonth')?.value;
-    const supFilter = document.getElementById('poSupplier')?.value || '';
-    const statusFilter = document.getElementById('poStatus')?.value || '';
-
-    if (!poMonth) {
-      alert('⚠️ กรุณาเลือกเดือนก่อน Export');
-      return;
-    }
-
-    // 2. ดึงข้อมูลผ่าน RPC ตามโครงสร้างระบบเดิม (get_purchase_orders)
-    const { data: poList, error } = await supabase.rpc('get_purchase_orders', {
-      p_month: poMonth,
-      p_sup: supFilter,
-      p_status: statusFilter
-    });
-
-    if (error) throw error;
-    if (!poList || poList.length === 0) {
-      alert('⚠️ ไม่พบข้อมูล PO ในเดือนนี้');
-      return;
-    }
-
-    // 3. สร้างไฟล์ Excel ด้วย ExcelJS (เพื่อ Format ที่สวยงาม)
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('PO List');
-
-    // ตั้งค่าคอลัมน์
-    worksheet.columns = [
-      { header: 'PO No.', key: 'po_no', width: 15 },
-      { header: 'วันที่สั่ง', key: 'po_date', width: 15 },
-      { header: 'วันที่รับ', key: 'ref_receive', width: 15 },
-      { header: 'Supplier', key: 'sup_code', width: 15 },
-      { header: 'จำนวน (ม้วน)', key: 'total_qty', width: 15 },
-      { header: 'KG รวม', key: 'total_kg', width: 15 },
-      { header: 'สถานะ', key: 'status', width: 15 }
-    ];
-
-    // จัดการข้อมูลและใส่ลงใน Worksheet
-    poList.forEach(po => {
-      worksheet.addRow({
-        po_no: po.po_no,
-        po_date: po.po_date,
-        ref_receive: po.ref_receive,
-        sup_code: po.sup_code,
-        total_qty: po.total_qty,
-        total_kg: po.total_kg,
-        status: po.status
-      });
-    });
-
-    // ตกแต่ง Header ให้สวยงาม (สีฟ้า ตัวหนา)
-    worksheet.getRow(1).font = { bold: true };
-    worksheet.getRow(1).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FFE0F2FE' } // สีฟ้าอ่อน
-    };
-
-    // 4. สั่งดาวน์โหลด
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const url = window.URL.createObjectURL(blob);
-    
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `PO_Export_${poMonth}.xlsx`;
-    a.click();
-    
-    window.URL.revokeObjectURL(url);
-
-    if (typeof showToast === 'function') {
-      showToast('✅ Export Excel สำเร็จ', 'ok');
-    }
-
-  } catch (err) {
-    console.error('Export Error:', err);
-    alert('❌ เกิดข้อผิดพลาดในการ Export: ' + err.message);
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '📤 Export Excel'; }
-  }
-}
-// ═══════════════════════════════════════════════════════════════
-//  END OF FILE
-// ═══════════════════════════════════════════════════════════════
