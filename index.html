@@ -35,6 +35,7 @@
     <button data-tab="receive">Purchase Summary</button>
     <button data-tab="alert">Stock Alert</button>
     <button data-tab="purchase-order">Purchase Order</button>
+    <button data-tab="forecast">Forecast</button>
     <button data-tab="usage-pivot">Roll Paper Usage</button>
     <button data-tab="reservations">Roll Reservations</button>
     <button data-tab="summary" class="hidden">Summary</button>
@@ -434,6 +435,38 @@
         </div>
 
         <div id="poListBody"></div>
+      </div>
+    </div>
+
+    <!-- ==================== หน้า ประมาณการสั่งซื้อ (Forecast) — V1 ==================== -->
+    <div id="tab-forecast" class="hidden">
+      <div class="card">
+        <div class="report-head">
+          <div></div>
+          <div class="report-title">ประมาณการสั่งซื้อม้วนกระดาษ</div>
+          <div></div>
+        </div>
+
+        <div class="filters no-print fc-topbar">
+          <label>📅 เดือนที่จัดทำประมาณการ
+            <button type="button" id="fcMonthBtn" class="fc-gray fc-pick" onclick="fcPickForecastMonth(this)">(เลือกเดือน)</button>
+          </label>
+          <button type="button" class="primary" id="fcCreateBtn" onclick="fcCreateOrders()">🆕 จัดทำประมาณการสั่งซื้อ</button>
+          <span class="spacer"></span>
+          <button type="button" onclick="window.print()">🖨 พิมพ์</button>
+        </div>
+
+        <div id="fcGradeTabs" class="sub-tabs"></div>
+
+        <div class="fc-work">
+          <div id="fcRevTabs" class="fc-rev-tabs no-print"></div>
+          <div class="fc-main">
+            <div id="fcToolbar" class="fc-toolbar no-print"></div>
+            <div id="fcTables" class="fc-tables"><div class="fc-loading">กำลังโหลด…</div></div>
+            <div id="fcFooter" class="fc-footer"></div>
+          </div>
+        </div>
+        <input type="file" id="fcPdfInput" accept="application/pdf,.pdf" class="hidden">
       </div>
     </div>
 
@@ -845,6 +878,17 @@
           </div>
         </div>
 
+        <div class="acc-item admin-only">
+          <div class="acc-head" onclick="toggleAcc(this, 'accForecastPw'); if (typeof initForecastPwSettings === 'function') initForecastPwSettings();">
+            <span>🔐 รหัสผ่านประมาณการสั่งซื้อ (ใช้ปลดล็อกแก้ไข)</span>
+            <span class="arrow">▶</span>
+          </div>
+          <div class="acc-body hidden" id="accForecastPw">
+            <p class="hint">รหัสกลางสำหรับปลดล็อก "ประมาณการสั่งซื้อ" ที่บันทึกและล็อกแล้ว · เก็บแบบเข้ารหัสในฐานข้อมูล · เฉพาะ Admin เปลี่ยนได้</p>
+            <div id="fcPwBody"></div>
+          </div>
+        </div>
+
         <div class="acc-item" id="accUsersWrap">
           <div class="acc-head" onclick="toggleAcc(this, 'accUsers')">
             <span>👥 ผู้ใช้</span>
@@ -1167,6 +1211,29 @@
   </div>
 </div>
 
+<div class="modal-bg" id="modalFcPassword">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-head">
+      <h3 id="fcPwTitle">🔒 ยืนยันรหัสผ่าน</h3>
+      <button onclick="fcPwCancel()">ปิด</button>
+    </div>
+    <div id="fcPwMsg" class="msg info" style="margin-bottom:14px"></div>
+    <div class="form-grid" style="grid-template-columns:1fr">
+      <label>🔑 รหัสผ่านประมาณการสั่งซื้อ
+        <input type="password" id="fcPwInput" placeholder="••••••" autocomplete="new-password">
+      </label>
+      <label>📝 หมายเหตุเหตุผลที่แก้ไข (บังคับ)
+        <input type="text" id="fcPwNote" placeholder="เช่น ปรับยอด KK125 ตามยอดจองใหม่" autocomplete="off">
+      </label>
+    </div>
+    <div id="fcPwErr" style="margin-top:10px"></div>
+    <div class="form-actions" style="margin-top:16px">
+      <button onclick="fcPwCancel()">ยกเลิก</button>
+      <button class="primary" onclick="fcPwConfirm()">✅ ยืนยันและปลดล็อก</button>
+    </div>
+  </div>
+</div>
+
 <script src="app.js"></script>
 <script src="stock-level.js"></script>
 <script src="stock.js"></script>
@@ -1176,6 +1243,9 @@
 <script src="alert_part2.js"></script>
 <script src="alert_part3.js"></script>
 <script src="usage-pivot.js"></script>
+<script src="forecast-calc.js"></script>
+<script src="forecast-api.js"></script>
+<script src="forecast-ui.js"></script>
 <script src="reservations.js"></script>
 <script src="price-master.js"></script>
 
