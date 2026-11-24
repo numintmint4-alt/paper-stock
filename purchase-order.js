@@ -3090,81 +3090,93 @@ async function returnReservationOnDeletePO(poNo, items) {
   }
 }
 /* ==========================================================
-   EXPORT PO TO EXCEL (เวอร์ชันแก้ไข 100%)
+   EXPORT PO TO EXCEL (เวอร์ชันดั้งเดิม V.16.0 - ใช้ ExcelJS)
    ========================================================== */
-
-// 1. ฟังก์ชันเปิด Modal
-function openExportPOExcel() {
-  const modal = document.getElementById('modalExportPO');
-  if (modal) {
-    modal.classList.add('show');
-  } else {
-    // ถ้าหา Modal ไม่เจอ ให้เรียกฟังก์ชัน Export ตรงๆ ไปเลย
-    runExportPOExcel();
-  }
-}
-
-// 2. ฟังก์ชัน Export
-async function runExportPOExcel() {
+async function exportPOToExcel() {
   const btn = event?.target;
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ กำลังโหลด...'; }
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ กำลังสร้างไฟล์...'; }
 
   try {
-    // หาข้อมูลจากตาราง HTML ที่โชว์อยู่บนหน้าจอ (ใช้วิธีนี้ชัวร์ที่สุด ไม่ต้องกลัว Database พัง)
-    const tableRows = document.querySelectorAll('#poListBody table tbody tr');
-    
-    // ถ้าไม่พบแถวในตาราง
-    if (!tableRows || tableRows.length === 0) {
-      alert('⚠️ ไม่พบข้อมูล PO บนหน้าจอ (กรุณากดโหลดข้อมูลก่อน Export)');
+    // 1. ดึงค่าจากหน้าเว็บ (ดึงเดือนและ filter ที่เลือกอยู่)
+    const poMonth = document.getElementById('poMonth')?.value;
+    const supFilter = document.getElementById('poSupplier')?.value || '';
+    const statusFilter = document.getElementById('poStatus')?.value || '';
+
+    if (!poMonth) {
+      alert('⚠️ กรุณาเลือกเดือนก่อน Export');
       return;
     }
 
-    const exportData = [];
-
-    // วนลูปอ่านข้อมูลจากตารางทีละแถว
-    tableRows.forEach(row => {
-      const cols = row.querySelectorAll('td');
-      if (cols.length > 0) {
-        // สมมติฐานคอลัมน์จากที่เห็นในรูป: 
-        // 0=PO No, 1=วันที่สั่ง, 2=วันที่รับ, 3=Supplier, 4=จำนวน, 5=KG
-        exportData.push({
-          'PO No': cols[0]?.innerText.trim() || '',
-          'วันที่สั่ง': cols[1]?.innerText.trim() || '',
-          'วันที่รับ': cols[2]?.innerText.trim() || '',
-          'Supplier': cols[3]?.innerText.trim() || '',
-          'จำนวน (ม้วน)': cols[4]?.innerText.trim() || '',
-          'KG รวม': cols[5]?.innerText.trim() || ''
-        });
-      }
+    // 2. ดึงข้อมูลผ่าน RPC ตามโครงสร้างระบบเดิม (get_purchase_orders)
+    const { data: poList, error } = await supabase.rpc('get_purchase_orders', {
+      p_month: poMonth,
+      p_sup: supFilter,
+      p_status: statusFilter
     });
 
-    if (exportData.length === 0) {
-      alert('⚠️ ไม่สามารถดึงข้อมูลจากตารางได้');
+    if (error) throw error;
+    if (!poList || poList.length === 0) {
+      alert('⚠️ ไม่พบข้อมูล PO ในเดือนนี้');
       return;
     }
 
-    // สร้างไฟล์ Excel
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    XLSX.utils.book_append_sheet(wb, ws, 'PO List');
+    // 3. สร้างไฟล์ Excel ด้วย ExcelJS (เพื่อ Format ที่สวยงาม)
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('PO List');
 
-    // ตั้งชื่อไฟล์ตามเดือนที่เลือก
-    const poMonth = document.getElementById('poMonth')?.value || 'All';
-    const fileName = `PO_Export_${poMonth}.xlsx`;
+    // ตั้งค่าคอลัมน์
+    worksheet.columns = [
+      { header: 'PO No.', key: 'po_no', width: 15 },
+      { header: 'วันที่สั่ง', key: 'po_date', width: 15 },
+      { header: 'วันที่รับ', key: 'ref_receive', width: 15 },
+      { header: 'Supplier', key: 'sup_code', width: 15 },
+      { header: 'จำนวน (ม้วน)', key: 'total_qty', width: 15 },
+      { header: 'KG รวม', key: 'total_kg', width: 15 },
+      { header: 'สถานะ', key: 'status', width: 15 }
+    ];
+
+    // จัดการข้อมูลและใส่ลงใน Worksheet
+    poList.forEach(po => {
+      worksheet.addRow({
+        po_no: po.po_no,
+        po_date: po.po_date,
+        ref_receive: po.ref_receive,
+        sup_code: po.sup_code,
+        total_qty: po.total_qty,
+        total_kg: po.total_kg,
+        status: po.status
+      });
+    });
+
+    // ตกแต่ง Header ให้สวยงาม (สีฟ้า ตัวหนา)
+    worksheet.getRow(1).font = { bold: true };
+    worksheet.getRow(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE0F2FE' } // สีฟ้าอ่อน
+    };
+
+    // 4. สั่งดาวน์โหลด
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
     
-    // สั่งดาวน์โหลด
-    XLSX.writeFile(wb, fileName);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `PO_Export_${poMonth}.xlsx`;
+    a.click();
+    
+    window.URL.revokeObjectURL(url);
 
-    // ปิด Modal
-    if (typeof closeModal === 'function') {
-      closeModal('modalExportPO');
+    if (typeof showToast === 'function') {
+      showToast('✅ Export Excel สำเร็จ', 'ok');
     }
-    
+
   } catch (err) {
-    console.error("Export Error:", err);
+    console.error('Export Error:', err);
     alert('❌ เกิดข้อผิดพลาดในการ Export: ' + err.message);
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '📤 Export'; }
+    if (btn) { btn.disabled = false; btn.textContent = '📤 Export Excel'; }
   }
 }
 // ═══════════════════════════════════════════════════════════════
