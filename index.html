@@ -35,7 +35,6 @@
     <button data-tab="receive">Purchase Summary</button>
     <button data-tab="alert">Stock Alert</button>
     <button data-tab="purchase-order">Purchase Order</button>
-    <button data-tab="forecast">Forecast</button>
     <button data-tab="usage-pivot">Roll Paper Usage</button>
     <button data-tab="reservations">Roll Reservations</button>
     <button data-tab="summary" class="hidden">Summary</button>
@@ -436,85 +435,6 @@
 
         <div id="poListBody"></div>
       </div>
-    </div>
-
-    <!-- ========================================== -->
-    <!-- TAB: FORECAST (ประมาณการสั่งซื้อ) V3        -->
-    <!-- ========================================== -->
-    <div id="tab-forecast" class="tab-content hidden">
-        <div class="pf-container">
-            <!-- Header -->
-            <div class="pf-header">
-                <h2>ประมาณการสั่งซื้อม้วนกระดาษ</h2>
-                <div class="pf-header-actions">
-                    <div class="pf-month-picker">
-                        <label>เดือนที่จัดทำประมาณการ:</label>
-                        <input type="month" id="pf-main-month" class="form-control">
-                    </div>
-                    <button class="btn primary" onclick="openCreateForecastModal()">📝 จัดทำประมาณการสั่งซื้อ</button>
-                    <button class="btn" onclick="window.print()">🖨 พิมพ์</button>
-                </div>
-            </div>
-
-            <!-- Grade Tabs -->
-            <div class="pf-tabs" id="pf-grade-tabs">
-                <!-- Render ด้วย JS -->
-            </div>
-
-            <!-- Main Layout (Sidebar + Table) -->
-            <div class="pf-main-layout">
-                <!-- Sidebar Rev -->
-                <div class="pf-sidebar" id="pf-rev-sidebar">
-                    <!-- Render ด้วย JS -->
-                </div>
-
-                <!-- Table Area -->
-                <div class="pf-table-area">
-                    <div class="pf-table-header-info">
-                        <div id="pf-current-grade-label">KK125</div>
-                        <div id="pf-status-badge" class="badge">สถานะ: -</div>
-                        <div style="margin-left: auto; display: flex; gap: 10px;">
-                            <button class="btn" id="pf-btn-attach" onclick="document.getElementById('pf-file-upload').click()" style="display: none;">📎 แนบเอกสาร</button>
-                            <input type="file" id="pf-file-upload" hidden accept="image/*,application/pdf" multiple onchange="handleFileUpload(event)">
-                            <button class="btn primary" id="pf-btn-save" onclick="savePurchaseForecast()">💾 บันทึก & ล็อค</button>
-                            <button class="btn" id="pf-btn-revise" onclick="createRevision()" style="display: none;">🔄 สร้าง Revise</button>
-                        </div>
-                    </div>
-
-                    <div class="pf-table-wrapper" id="pf-table-wrapper">
-                        <table class="pf-table" id="pf-table">
-                            <thead id="pf-thead"></thead>
-                            <tbody id="pf-tbody"></tbody>
-                        </table>
-                    </div>
-
-                    <!-- Footer / Remark -->
-                    <div class="pf-footer">
-                        <label>หมายเหตุ:</label>
-                        <textarea id="pf-remark" class="form-control" rows="2" placeholder="ระบุหมายเหตุ..."></textarea>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Modal สร้าง Forecast -->
-        <div id="modal-create-forecast" class="modal-bg">
-            <div class="modal" style="max-width: 450px;">
-                <div class="modal-head">
-                    <h3>จัดทำประมาณการใหม่</h3>
-                    <button onclick="closeModal('modal-create-forecast')">ปิด</button>
-                </div>
-                <div class="form-grid" style="grid-template-columns: 1fr;">
-                    <label>เกรดแกรม (เช่น KK125): <input type="text" id="new-fc-grade" placeholder="ระบุเกรดแกรม"></label>
-                    <label>เดือน/ปี: <input type="month" id="new-fc-month"></label>
-                    <label>เลขที่เอกสาร: <input type="text" id="new-fc-docno" placeholder="เช่น 0001"></label>
-                </div>
-                <div class="form-actions">
-                    <button onclick="closeModal('modal-create-forecast')">ยกเลิก</button>
-                    <button class="primary" onclick="confirmCreateForecast()">สร้าง</button>
-                </div>
-            </div>
-        </div>
     </div>
 
     <!-- ==================== หน้า Usage Pivot ==================== -->
