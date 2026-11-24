@@ -344,7 +344,7 @@ $('logoutBtn').onclick = async () => {
 };
 
 // ================= TABS =================
-const TAB_LIST = ['matrix','stock','receive','alert','purchase-order','data','settings','summary','usage-pivot','reservations'];
+const TAB_LIST = ['matrix','stock','receive','alert','purchase-order','data','settings','summary','forecast','usage-pivot','reservations'];
 
 document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
   btn.onclick = () => {
@@ -358,6 +358,7 @@ document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
     if (t === 'alert' && typeof initAlertTab === 'function') initAlertTab();
     if (t === 'purchase-order' && typeof initPurchaseOrderTab === 'function') initPurchaseOrderTab();
     if (t === 'summary' && typeof initSummaryTab === 'function') initSummaryTab();
+    if (t === 'forecast' && typeof initForecastTab === 'function') initForecastTab();
     if (t === 'usage-pivot' && typeof initUsagePivotTab === 'function') initUsagePivotTab();
     if (t === 'reservations' && typeof loadReservations === 'function') loadReservations();
     if (t === 'data') renderData();
