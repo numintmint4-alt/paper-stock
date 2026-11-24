@@ -3093,47 +3093,42 @@ async function returnReservationOnDeletePO(poNo, items) {
    EXPORT PO TO EXCEL (เพิ่มใหม่เพื่อแก้ Error)
    ========================================================== */
 
-// 1. ฟังก์ชันสำหรับเปิด Modal เลือกวันที่
-function openExportPOExcel() {
-  // ตรวจสอบว่ามี Modal อยู่ใน HTML ไหม
-  const modal = document.getElementById('modalExportPO');
-  if (modal) {
-    modal.classList.add('show'); // เปิด Modal
-  } else {
-    // ถ้าไม่มี Modal ใน HTML ให้ export ไปเลยโดยไม่ต้องเลือกวันที่
-    runExportPOExcel();
-  }
-}
-
 // 2. ฟังก์ชันสำหรับดึงข้อมูลและโหลดไฟล์ Excel
 async function runExportPOExcel() {
   const btn = event?.target;
   if (btn) { btn.disabled = true; btn.textContent = '⏳ กำลังโหลด...'; }
 
   try {
-    // ดึงเดือนที่เลือก
     const poMonth = document.getElementById('poMonth')?.value;
     if (!poMonth) {
       alert('⚠️ กรุณาเลือกเดือนก่อนทำการ Export');
       return;
     }
 
-    // ดึงข้อมูลจาก Supabase (ใช้ชื่อตาราง purchase_orders ตามที่ระบบคุณใช้)
+    // 1. ดึงข้อมูลจากตาราง purchase_orders ตามเดือน
+    // ไม่ต้องกรอง po_no แล้ว ให้กรองด้วย order_date หรือ created_at แทน
+    const startOfMonth = `${poMonth}-01`;
+    // หาวันสุดท้ายของเดือน
+    const endOfMonth = new Date(poMonth.split('-')[0], poMonth.split('-')[1], 0).toISOString().split('T')[0];
+
     const { data, error } = await supabase
       .from('purchase_orders')
       .select('*')
-      .like('po_no', `PO${poMonth.replace('-', '')}%`); // ดึงเฉพาะ PO ของเดือนนั้น
+      .gte('order_date', startOfMonth) // 🟢 ใช้ order_date (ถ้าคุณใช้ receive_date ให้เปลี่ยนตรงนี้)
+      .lte('order_date', endOfMonth);
 
     if (error) throw error;
+    
+    // ถ้าในตารางว่างจริงๆ
     if (!data || data.length === 0) {
       alert('⚠️ ไม่พบข้อมูล PO ในเดือนนี้');
       return;
     }
 
-    // สร้างไฟล์ Excel
+    // 2. สร้างไฟล์ Excel
     const wb = XLSX.utils.book_new();
     
-    // จัดเตรียมข้อมูล
+    // จัดเตรียมข้อมูลให้ตรงกับที่โชว์บนหน้าจอ
     const rows = data.map(po => ({
       'PO No': po.po_no,
       'Supplier': po.supplier,
@@ -3148,11 +3143,11 @@ async function runExportPOExcel() {
     const ws = XLSX.utils.json_to_sheet(rows);
     XLSX.utils.book_append_sheet(wb, ws, 'PO List');
 
-    // ดาวน์โหลด
+    // 3. ดาวน์โหลด
     const fileName = `PO_Export_${poMonth}.xlsx`;
     XLSX.writeFile(wb, fileName);
 
-    // ปิด Modal (ถ้าเปิดอยู่)
+    // ปิด Modal
     if (typeof closeModal === 'function') {
       closeModal('modalExportPO');
     }
