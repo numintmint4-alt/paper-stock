@@ -430,8 +430,7 @@
 
           <button class="primary" onclick="openCreatePOModal()">➕ สร้าง PO ใหม่</button>
 
-          <!-- แก้จาก openExportPOExcel() เป็น exportPOToExcel() -->
-      <button onclick="exportPOToExcel()">📤 Export Excel</button>
+          <button onclick="exportPOToExcel()">📤 Export Excel</button>
           <button onclick="window.print()">🖨 พิมพ์</button>
         </div>
 
@@ -913,7 +912,6 @@
 
 <!-- ==================== MODALS ==================== -->
 
-<!-- Modal: Master -->
 <div class="modal-bg" id="modalMaster">
   <div class="modal" style="max-width:600px">
     <h3 id="masterFormTitle">เพิ่ม Master Data</h3>
@@ -932,7 +930,6 @@
   </div>
 </div>
 
-<!-- Modal: Drill (Stock Level) -->
 <div class="modal-bg" id="modalDrill">
   <div class="modal">
     <div class="modal-head">
@@ -943,7 +940,6 @@
   </div>
 </div>
 
-<!-- Modal: Stock Detail -->
 <div class="modal-bg" id="modalStockDetail">
   <div class="modal modal-stock-detail">
     <div class="modal-head">
@@ -954,7 +950,6 @@
   </div>
 </div>
 
-<!-- Modal: Stock Import -->
 <div class="modal-bg" id="modalStockImport">
   <div class="modal" style="max-width:480px">
     <h3>📥 Import Stock คงเหลือ</h3>
@@ -972,7 +967,6 @@
   </div>
 </div>
 
-<!-- Modal: Receive Detail -->
 <div class="modal-bg" id="modalReceiveDetail">
   <div class="modal" style="max-width:1000px">
     <div class="modal-head">
@@ -983,7 +977,6 @@
   </div>
 </div>
 
-<!-- Modal: PO Form (สร้าง PO ใหม่) -->
 <div class="modal-bg" id="modalPOForm">
   <div class="modal" style="max-width:1400px">
     <div class="modal-head">
@@ -994,7 +987,6 @@
   </div>
 </div>
 
-<!-- Modal: PO Detail -->
 <div class="modal-bg" id="modalPODetail">
   <div class="modal" style="max-width:1200px">
     <div class="modal-head">
@@ -1005,30 +997,6 @@
   </div>
 </div>
 
-<!-- Modal: Export PO Excel (NEW) -->
-<div class="modal-bg" id="modalExportPO">
-  <div class="modal" style="max-width:480px">
-    <div class="modal-head">
-      <h3>📤 Export Excel (Purchase Order)</h3>
-      <button onclick="closeModal('modalExportPO')">ปิด</button>
-    </div>
-    <div class="form-grid" style="grid-template-columns:1fr">
-      <label>📅 จากวันที่รับ (Receive Date)
-        <input type="date" id="exportPoDateFrom">
-      </label>
-      <label>📅 ถึงวันที่รับ (Receive Date)
-        <input type="date" id="exportPoDateTo">
-      </label>
-    </div>
-    <div class="hint">เว้นว่างเพื่อ Export ทั้งหมดในเดือนที่เลือก</div>
-    <div class="form-actions" style="margin-top:16px">
-      <button onclick="closeModal('modalExportPO')">ยกเลิก</button>
-      <button class="primary" onclick="runExportPOExcel()">📤 Export</button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal: Alert Detail -->
 <div class="modal-bg" id="modalAlertDetail">
   <div class="modal" style="max-width:1000px">
     <div class="modal-head">
@@ -1039,7 +1007,6 @@
   </div>
 </div>
 
-<!-- Modal: Alert Matrix Cell -->
 <div id="modalAlertMatrixCell" class="modal-bg">
   <div class="modal" style="max-width: 560px;">
     <div class="modal-head">
@@ -1050,7 +1017,6 @@
   </div>
 </div>
 
-<!-- Modal: Snapshot -->
 <div class="modal-bg" id="modalSnapshot">
   <div class="modal snapshot-modal" style="max-width:1100px">
     <div class="modal-head">
@@ -1064,7 +1030,6 @@
   </div>
 </div>
 
-<!-- Modal: User -->
 <div class="modal-bg" id="modalUser">
   <div class="modal" style="max-width:520px">
     <h3 id="userFormTitle">เพิ่มผู้ใช้ใหม่</h3>
@@ -1082,7 +1047,6 @@
   </div>
 </div>
 
-<!-- Modal: Price Master -->
 <div class="modal-bg" id="modalPM">
   <div class="modal" style="max-width:600px">
     <h3 id="pmFormTitle">แก้ไขราคา</h3>
@@ -1104,7 +1068,6 @@
   </div>
 </div>
 
-<!-- Modal: Delete Month -->
 <div class="modal-bg" id="modalDeleteMonth">
   <div class="modal" style="max-width:560px">
     <h3>🗑 ลบ Usage ตามเดือน</h3>
@@ -1125,7 +1088,6 @@
   </div>
 </div>
 
-<!-- Modal: Alert PO Detail -->
 <div class="modal-bg" id="modalAlertPODetail">
   <div class="modal" style="max-width:900px">
     <div class="modal-head">
@@ -1140,7 +1102,6 @@
   </div>
 </div>
 
-<!-- Modal: Add PO Items -->
 <div class="modal-bg" id="modalAddPOItems">
   <div class="modal" style="max-width:1200px">
     <div class="modal-head">
@@ -1184,7 +1145,6 @@
   </div>
 </div>
 
-<!-- Modal: Usage Plan Import -->
 <div class="modal-bg" id="modalUsagePlanImport">
   <div class="modal" style="max-width:560px">
     <div class="modal-head">
@@ -1201,7 +1161,6 @@
   </div>
 </div>
 
-<!-- Modal: Verify Password -->
 <div class="modal-bg" id="modalVerifyPassword">
   <div class="modal" style="max-width:520px">
     <div class="modal-head">
@@ -1231,7 +1190,6 @@
   </div>
 </div>
 
-<!-- Modal: Summary Detail -->
 <div class="modal-bg" id="modalSummaryDetail">
   <div class="modal" style="max-width:1000px">
     <div class="modal-head">
@@ -1253,7 +1211,6 @@
   </div>
 </div>
 
-<!-- Modal: Forecast Password -->
 <div class="modal-bg" id="modalFcPassword">
   <div class="modal" style="max-width:520px">
     <div class="modal-head">
@@ -1277,13 +1234,7 @@
   </div>
 </div>
 
-<!-- ==================== SCRIPTS ==================== -->
-<!-- Library โหลดใน <head> แล้ว — ไม่ต้องโหลดซ้ำ -->
-
-<!-- ไฟล์ JavaScript ของคุณ — เรียงตาม dependency -->
 <script src="app.js"></script>
-<script src="price-master.js"></script>
-<script src="purchase-order.js"></script>
 <script src="stock-level.js"></script>
 <script src="stock.js"></script>
 <script src="receive.js"></script>
@@ -1295,7 +1246,9 @@
 <script src="forecast-calc.js"></script>
 <script src="forecast-api.js"></script>
 <script src="forecast-ui.js"></script>
+<script src="forecast-export.js"></script>
 <script src="reservations.js"></script>
+<script src="price-master.js"></script>
 
 <script>
 document.addEventListener('keypress', (e) => {
