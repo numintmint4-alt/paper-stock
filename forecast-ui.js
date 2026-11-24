@@ -20,6 +20,7 @@
   };
 
   const $id = id => document.getElementById(id);
+  window.FC.state = S;     // ให้ forecast-export.js อ่านใบที่เปิดอยู่
   const { LOADERS, emptySrc } = api;
 
   // ═════════════ Stock Level Snapshot / เดือนที่บันทึกแล้ว ═════════════
@@ -186,6 +187,7 @@
             </div>
           </div>
         </div>
+        <button type="button" onclick="fcExport()" title="ส่งออกใบนี้เป็นไฟล์ Excel">📤 Export Excel</button>
         ${btns}
       </div>`;
   }
