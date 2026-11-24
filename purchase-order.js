@@ -3089,7 +3089,81 @@ async function returnReservationOnDeletePO(poNo, items) {
     }
   }
 }
+/* ==========================================================
+   EXPORT PO TO EXCEL (เพิ่มใหม่เพื่อแก้ Error)
+   ========================================================== */
 
+// 1. ฟังก์ชันสำหรับเปิด Modal เลือกวันที่
+function openExportPOExcel() {
+  // ตรวจสอบว่ามี Modal อยู่ใน HTML ไหม
+  const modal = document.getElementById('modalExportPO');
+  if (modal) {
+    modal.classList.add('show'); // เปิด Modal
+  } else {
+    // ถ้าไม่มี Modal ใน HTML ให้ export ไปเลยโดยไม่ต้องเลือกวันที่
+    runExportPOExcel();
+  }
+}
+
+// 2. ฟังก์ชันสำหรับดึงข้อมูลและโหลดไฟล์ Excel
+async function runExportPOExcel() {
+  const btn = event?.target;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ กำลังโหลด...'; }
+
+  try {
+    // ดึงเดือนที่เลือก
+    const poMonth = document.getElementById('poMonth')?.value;
+    if (!poMonth) {
+      alert('⚠️ กรุณาเลือกเดือนก่อนทำการ Export');
+      return;
+    }
+
+    // ดึงข้อมูลจาก Supabase (ใช้ชื่อตาราง purchase_orders ตามที่ระบบคุณใช้)
+    const { data, error } = await supabase
+      .from('purchase_orders')
+      .select('*')
+      .like('po_no', `PO${poMonth.replace('-', '')}%`); // ดึงเฉพาะ PO ของเดือนนั้น
+
+    if (error) throw error;
+    if (!data || data.length === 0) {
+      alert('⚠️ ไม่พบข้อมูล PO ในเดือนนี้');
+      return;
+    }
+
+    // สร้างไฟล์ Excel
+    const wb = XLSX.utils.book_new();
+    
+    // จัดเตรียมข้อมูล
+    const rows = data.map(po => ({
+      'PO No': po.po_no,
+      'Supplier': po.supplier,
+      'Order Date': po.order_date,
+      'Receive Date': po.receive_date,
+      'Total Qty': po.total_qty || 0,
+      'Total KG': po.total_kg || 0,
+      'Status': po.status,
+      'Remark': po.remark || ''
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, ws, 'PO List');
+
+    // ดาวน์โหลด
+    const fileName = `PO_Export_${poMonth}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+
+    // ปิด Modal (ถ้าเปิดอยู่)
+    if (typeof closeModal === 'function') {
+      closeModal('modalExportPO');
+    }
+    
+  } catch (err) {
+    console.error("Export Error:", err);
+    alert('❌ เกิดข้อผิดพลาดในการ Export: ' + err.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '📤 Export'; }
+  }
+}
 // ═══════════════════════════════════════════════════════════════
 //  END OF FILE
 // ═══════════════════════════════════════════════════════════════
