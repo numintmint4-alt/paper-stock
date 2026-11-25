@@ -1376,3 +1376,39 @@ table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
   .fc-table { page-break-inside: avoid; font-size: 9px; }
   .fc-gray { background: transparent !important; border: none !important; padding: 0; }
 }
+
+
+/* ═════ โทนสีหน้าประมาณการ (ตามภาพ palette) ═════ */
+.fc-work, .fc-main {
+  --fc-blue: #0640FF; --fc-navy: #0F3195; --fc-aqua: #8FE8FF; --fc-aqua2: #98F3F8;
+  --fc-pale: #DDF8FE; --fc-yellow: #FFEB61; --fc-gold: #FFC000;
+}
+.fc-table .fc-title { background: var(--fc-navy, #0F3195) !important; border-bottom: 3px solid var(--fc-aqua, #8FE8FF); }
+.fc-table thead th { background: var(--fc-blue, #0640FF); }
+.fc-table thead .fc-g { background: var(--fc-blue, #0640FF); }
+.fc-table .fc-g, .fc-table .fc-s { background: var(--fc-pale, #DDF8FE); color: var(--fc-navy, #0F3195); }
+.fc-table .fc-s { background: #EEFBFE; }
+.fc-table .fc-tot { background: var(--fc-pale, #DDF8FE); color: var(--fc-navy, #0F3195); }
+.fc-table .fc-tot-h { background: var(--fc-navy, #0F3195); color: #fff; }
+.fc-table tr:hover td.fc-c, .fc-table tr:hover td.fc-in { background: #EEFBFE; }
+.fc-table tr.fc-calc td.fc-c { background: #fff; }
+/* 1.1 / 1.3 แถวไฮไลท์ */
+.fc-table tr.fc-hl1 td.fc-g { background: var(--fc-aqua, #8FE8FF); color: var(--fc-navy, #0F3195); font-weight: 800; }
+.fc-table tr.fc-hl1 td.fc-c, .fc-table tr.fc-hl1 td.fc-tot { background: var(--fc-pale, #DDF8FE); color: var(--fc-navy, #0F3195); font-weight: 700; }
+.fc-table tr.fc-hl2 td.fc-g { background: var(--fc-aqua2, #98F3F8); color: var(--fc-navy, #0F3195); font-weight: 800; border-top: 2px solid var(--fc-blue, #0640FF); border-bottom: 2px solid var(--fc-blue, #0640FF); }
+.fc-table tr.fc-hl2 td.fc-c { background: #fff; color: var(--fc-navy, #0F3195); font-weight: 800; border-top: 2px solid var(--fc-blue, #0640FF); border-bottom: 2px solid var(--fc-blue, #0640FF); }
+.fc-table tr.fc-hl2 td.fc-tot { background: var(--fc-aqua2, #98F3F8); color: var(--fc-navy, #0F3195); border-top: 2px solid var(--fc-blue, #0640FF); border-bottom: 2px solid var(--fc-blue, #0640FF); }
+/* แถวสรุปจำนวนสั่ง */
+.fc-table tr.fc-final td { background: var(--fc-yellow, #FFEB61); border-color: var(--fc-gold, #FFC000); color: var(--fc-navy, #0F3195); }
+.fc-table tr.fc-final td.fc-g, .fc-table tr.fc-final td.fc-tot { background: var(--fc-gold, #FFC000); color: var(--fc-navy, #0F3195); }
+/* Rev tabs / chips / ปุ่ม */
+.fc-rev-tab.st-draft { background: var(--fc-pale, #DDF8FE); color: var(--fc-navy, #0F3195); }
+.fc-rev-tab.st-saved { background: var(--fc-aqua, #8FE8FF); color: var(--fc-navy, #0F3195); }
+.fc-rev-tab.st-approved { background: var(--fc-yellow, #FFEB61); color: var(--fc-navy, #0F3195); }
+.fc-rev-tab.active { background: var(--fc-blue, #0640FF); color: #fff; box-shadow: 0 2px 8px rgba(6,64,255,.35); }
+.fc-chip.lock { background: var(--fc-aqua, #8FE8FF); color: var(--fc-navy, #0F3195); }
+.fc-chip.draft { background: var(--fc-yellow, #FFEB61); color: var(--fc-navy, #0F3195); }
+.fc-mp-grid button.sel { background: var(--fc-blue, #0640FF); border-color: var(--fc-blue, #0640FF); }
+@media print { .fc-table tr.fc-hl1 td, .fc-table tr.fc-hl2 td, .fc-table tr.fc-final td { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+#fcGradeTabs .sub-tab.active:not(.fc-fsc) { background: #0640FF; border-color: #0F3195; color: #fff; box-shadow: 0 2px 8px rgba(6,64,255,.3); }
+#fcGradeTabs .sub-tab:not(.active):not(.fc-fsc):hover { background: #DDF8FE; border-color: #0640FF; color: #0F3195; }
