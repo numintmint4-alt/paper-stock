@@ -649,7 +649,11 @@ async function markPOSaved(poId) {
 
     // 3. สั่งหักยอดจอง + บันทึก Audit Log
     if (activeItems.length > 0) {
-      await deductReservationOnPO(po.po_no, activeItems);
+      // ตัดยอดจริงทำผ่าน Audit Log 'complete' ด้านล่าง (หน้า Roll Reservations คำนวณยอดจากล็อกนี้)
+      // deductReservationOnPO เดิมไม่มีในระบบแล้ว → เรียกเฉพาะเมื่อมีฟังก์ชันนี้อยู่
+      if (typeof deductReservationOnPO === 'function') {
+        try { await deductReservationOnPO(po.po_no, activeItems); } catch (e) { console.warn('[markPOSaved] deductReservationOnPO:', e); }
+      }
 
       // 🔥 บันทึก Audit Log ว่าถูกตัดยอดไปสร้าง PO (ป้องกันซ้ำทีละรายการ)
       for (const item of activeItems) {
@@ -2857,3 +2861,75 @@ async function saveAddPOItems(btnEl) {
     }
   }
 }
+
+
+// ═══════════════════════════════════════════════════════════════
+//  หักยอดจอง / คืนยอดจอง (ตาม Developer Guide ข้อ 6.1)
+//   Save PO  → roll_reservations.status = 'completed'  (+ Audit Log 'complete' เขียนใน markPOSaved)
+//   ลบ PO    → roll_reservations.status = 'reserved'   (+ ลบ Log 'complete' ของ PO นั้น แล้วบันทึก Log 'restore')
+//  หน้า Roll Reservations คำนวณยอดจาก Log 'complete' จึงต้องลบ Log ตอนคืนยอด
+// ═══════════════════════════════════════════════════════════════
+async function deductReservationOnPO(poNo, items) {
+  const ids = [...new Set((items || []).map(it => it.reservation_id).filter(Boolean))];
+  if (!ids.length) return;
+  const { error } = await supabase.from('roll_reservations').update({ status: 'completed' }).in('id', ids);
+  if (error) throw error;
+  console.log(`[deductReservationOnPO] ${poNo}: status=completed ${ids.length} รายการจอง`);
+}
+
+async function returnReservationOnDeletePO(poNo, items) {
+  const rows = (items || []).filter(it => it.reservation_id);
+  const ids = [...new Set(rows.map(it => it.reservation_id))];
+  if (!ids.length) return;
+  const { error } = await supabase.from('roll_reservations').update({ status: 'reserved' }).in('id', ids);
+  if (error) throw error;
+  // ลบ Log 'complete' ของ PO นี้ → ตารางจองจะคืนยอดกลับ
+  const { error: delErr } = await supabase.from('roll_reservation_logs').delete()
+    .eq('reference_po', poNo).eq('action_type', 'complete').in('reservation_id', ids);
+  if (delErr) console.warn('[returnReservationOnDeletePO] ลบ Log complete ไม่สำเร็จ:', delErr);
+  // Audit: restore (ไม่นับในตาราง เพราะตารางอ่านเฉพาะ 'complete')
+  for (const it of rows) {
+    const qty = Number(it.quantity) || 0; if (qty <= 0) continue;
+    const { error: lErr } = await supabase.from('roll_reservation_logs').insert({
+      reservation_id: it.reservation_id, action_type: 'restore', qty_change: Math.abs(qty),
+      reference_po: poNo, reason: `คืนยอดจองจากการลบ PO ${poNo}`, created_by: (typeof currentUser !== 'undefined' && currentUser?.id) || null
+    });
+    if (lErr) console.warn('[returnReservationOnDeletePO] log restore:', lErr);
+  }
+  console.log(`[returnReservationOnDeletePO] ${poNo}: status=reserved ${ids.length} รายการจอง`);
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+//  🛠 ซ่อมย้อนหลัง: PO ที่เป็น Saved แต่ยังไม่ถูกตัดยอดจอง (Audit Log 'complete' ไม่มี)
+//  วิธีใช้: เปิดหน้า Purchase Order → กด F12 → Console → พิมพ์  backfillPOReservationLogs()
+//  ปลอดภัยเรียกซ้ำได้ (ข้ามรายการที่มี Log แล้ว) · ใส่เลข PO เพื่อซ่อมเฉพาะใบ เช่น backfillPOReservationLogs('PO226110097')
+// ═══════════════════════════════════════════════════════════════
+async function backfillPOReservationLogs(onlyPoNo) {
+  const { data: pos, error } = await supabase.from('purchase_orders').select('id, po_no, status').eq('status', 'saved');
+  if (error) { console.error(error); alert('❌ ' + error.message); return; }
+  let added = 0, skipped = 0, checked = 0;
+  for (const po of (pos || [])) {
+    if (onlyPoNo && po.po_no !== onlyPoNo) continue;
+    const { data: detail, error: dErr } = await supabase.rpc('get_purchase_order_detail', { p_po_id: po.id });
+    if (dErr) { console.warn('detail fail', po.po_no, dErr); continue; }
+    checked++;
+    try { await deductReservationOnPO(po.po_no, (detail.items || []).filter(i => i.status !== 'cancelled')); } catch (e) { console.warn('status update fail', po.po_no, e); }
+    for (const it of (detail.items || [])) {
+      if (it.status === 'cancelled' || !it.reservation_id) continue;
+      const qty = Number(it.quantity) || 0; if (qty <= 0) continue;
+      const { data: ex } = await supabase.from('roll_reservation_logs').select('id')
+        .eq('reservation_id', it.reservation_id).eq('reference_po', po.po_no).eq('action_type', 'complete').maybeSingle();
+      if (ex) { skipped++; continue; }
+      const { error: iErr } = await supabase.from('roll_reservation_logs').insert({
+        reservation_id: it.reservation_id, action_type: 'complete', qty_change: -Math.abs(qty),
+        reference_po: po.po_no, reason: `ตัดยอดเพื่อสร้าง PO ${po.po_no} (ซ่อมย้อนหลัง)`, created_by: (typeof currentUser !== 'undefined' && currentUser?.id) || null
+      });
+      if (iErr) console.warn('insert fail', po.po_no, iErr); else added++;
+    }
+  }
+  const msg = `ตรวจ ${checked} PO · เพิ่ม Log ตัดยอด ${added} รายการ · มีอยู่แล้ว ${skipped}`;
+  console.log('[backfill]', msg); alert('✅ ' + msg);
+  if (typeof loadReservations === 'function') { try { await loadReservations(); } catch (e) {} }
+}
+window.backfillPOReservationLogs = backfillPOReservationLogs;
