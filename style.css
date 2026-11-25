@@ -1412,3 +1412,19 @@ table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
 @media print { .fc-table tr.fc-hl1 td, .fc-table tr.fc-hl2 td, .fc-table tr.fc-final td { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
 #fcGradeTabs .sub-tab.active:not(.fc-fsc) { background: #0640FF; border-color: #0F3195; color: #fff; box-shadow: 0 2px 8px rgba(6,64,255,.3); }
 #fcGradeTabs .sub-tab:not(.active):not(.fc-fsc):hover { background: #DDF8FE; border-color: #0640FF; color: #0F3195; }
+
+/* ประมาณการ (ก่อน/หลังหัก Stock): <0 ตัวอักษรแดง · 0–0.99 พื้นเหลืองอ่อน · ≥1 สีเดิม */
+.fc-table tr.fc-hl2 td.fc-c.fc-lvl-red { color: #dc2626; }
+.fc-table tr.fc-hl2 td.fc-c.fc-lvl-yel { background: #FFF6B3; }
+
+/* ชื่อ Gradegram ตามการเลื่อนซ้าย-ขวา */
+.fc-table .fc-title { padding: 0 !important; }
+.fc-table .fc-title-in { position: sticky; left: 0; display: inline-flex; align-items: center; padding: 10px 16px; max-width: 100%; }
+/* Tooltip ชี้เซล */
+.fc-tip { position: fixed; z-index: 100001; display: none; pointer-events: none; background: #DDF8FE; color: #0F3195; border: 1px solid #0640FF; border-radius: 8px; padding: 6px 14px; font: 700 13px 'Sarabun', sans-serif; box-shadow: 0 4px 14px rgba(6,64,255,.25); white-space: nowrap; }
+.fc-table td.fc-c:hover, .fc-table td.fc-in:hover { box-shadow: inset 0 0 0 2px #0640FF; }
+/* ช่องสีเทา → ฟ้าอ่อน กรอบประ */
+.fc-gray, .fc-gray:disabled, .fc-gray.fc-static { background: #EAFAFF; color: #0F3195; border: 1.5px dashed #0640FF; }
+.fc-gray:hover:not(:disabled) { background: #DDF8FE; border-color: #0F3195; }
+.fc-gray.fc-pick:empty::before { color: #5b7bd5; }
+.fc-table td.fc-in input:disabled { background: #F4FCFF; }
