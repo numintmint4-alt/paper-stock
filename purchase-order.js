@@ -2,6 +2,7 @@
 //  STOCK V10.1 — purchase-order.js — V.15.1
 //  V.14 NEW: คืนยอดจอง (roll_reservations → reserved) เมื่อลบ PO
 //  V.15.0 FIX: ย้ายจุดหักยอดจอง (deductReservationOnPO)
+//  V.15.2 FIX: autoGroupPOItems รวมจำนวนรายการซ้ำ (เดิมทิ้งทำให้ม้วนหาย) + เพิ่ม deductReservationOnPO/returnReservationOnDeletePO + backfill
 //  V.15.1 NEW: markPOSaved — บันทึก Audit Log (roll_reservation_logs)
 // ═══════════════════════════════════════════════════════════════
 
@@ -809,14 +810,27 @@ function autoGroupPOItems(items) {
     return match[1].includes('F');
   }
 
-  const seen = new Set();
+  // 🔧 V.15.2: เดิมรายการที่ซ้ำกัน (เกรดแกรม+Size+ม้วนลูกค้า+คุณภาพ+หมายเหตุ) ถูก "ทิ้ง" ทำให้จำนวนม้วนหาย
+  //    ตอนนี้ "รวมจำนวน" แทน (เฉพาะที่ใช้ใบจองเดียวกัน/ไม่มีใบจอง) · ถ้าคนละใบจองให้แยกบรรทัด เพื่อให้ตัดยอดจองถูกใบ
+  const seen = new Map();
   const uniqueItems = [];
+  let _inQty = 0, _outQty = 0;
   items.forEach(it => {
-    const key = `${it.gradegram}|${Number(it.size)}|${it.customer_roll || 'normal'}|${it.quality_b || 'normal'}|${it.note || ''}`;
-    if (seen.has(key)) return;
-    seen.add(key);
-    uniqueItems.push(it);
+    _inQty += Number(it.quantity) || 0;
+    const key = `${it.gradegram}|${Number(it.size)}|${it.customer_roll || 'normal'}|${it.quality_b || 'normal'}|${it.note || ''}|${it.reservation_id || ''}`;
+    if (seen.has(key)) {
+      const base = seen.get(key);
+      base.quantity = (Number(base.quantity) || 0) + (Number(it.quantity) || 0);
+      if (base.kg_total != null || it.kg_total != null) base.kg_total = (Number(base.kg_total) || 0) + (Number(it.kg_total) || 0);
+      return;
+    }
+    const copy = Object.assign({}, it);
+    seen.set(key, copy);
+    uniqueItems.push(copy);
   });
+  uniqueItems.forEach(it => { _outQty += Number(it.quantity) || 0; });
+  if (_inQty !== _outQty) console.warn(`[autoGroupPOItems] จำนวนไม่ตรง: เข้า ${_inQty} ออก ${_outQty}`);
+  else console.log(`[autoGroupPOItems] ${items.length} → ${uniqueItems.length} รายการ · รวม ${_outQty} ม้วน`);
 
   const bySup = {};
   uniqueItems.forEach(it => {
