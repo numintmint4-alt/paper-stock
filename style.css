@@ -1477,3 +1477,9 @@ table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
 .fc-tbl-wrap::-webkit-scrollbar-track { background: #EAFAFF; border-radius: 0 0 16px 16px; }
 .fc-tbl-wrap::-webkit-scrollbar-thumb { background: #8FE8FF; border-radius: 8px; border: 2px solid #EAFAFF; }
 .fc-tbl-wrap { width: fit-content; max-width: calc(100% - 8px); }
+
+/* ไฮไลท์คอลัมน์ตอนชี้เซล (แทน tooltip) — โทนเดียวกับไฮไลท์แถว */
+.fc-tip { display: none !important; }
+.fc-table tr:hover td.fc-c, .fc-table tr:hover td.fc-in { background: #E3F4FF; }
+.fc-table tr:not(.fc-hl1):not(.fc-hl2):not(.fc-final) td.fc-col-hl { background: #E3F4FF; }
+.fc-table thead th.fc-col-hl { background: #0F3195; color: #fff; }
