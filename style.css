@@ -1415,7 +1415,6 @@ table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
 
 /* ประมาณการ (ก่อน/หลังหัก Stock): <0 ตัวอักษรแดง · 0–0.99 พื้นเหลืองอ่อน · ≥1 สีเดิม */
 .fc-table tr.fc-hl2 td.fc-c.fc-lvl-red { color: #dc2626; }
-.fc-table tr.fc-hl2 td.fc-c.fc-lvl-yel { background: #FFF6B3; }
 
 /* ชื่อ Gradegram ตามการเลื่อนซ้าย-ขวา */
 .fc-table .fc-title { padding: 0 !important; }
@@ -1428,3 +1427,28 @@ table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
 .fc-gray:hover:not(:disabled) { background: #DDF8FE; border-color: #0F3195; }
 .fc-gray.fc-pick:empty::before { color: #5b7bd5; }
 .fc-table td.fc-in input:disabled { background: #F4FCFF; }
+
+/* ปรับ: เส้นเล็กเฉพาะด้านล่างแถวประมาณการ · ระดับค่าเปลี่ยนแค่สีตัวเลข */
+.fc-table tr.fc-hl2 td.fc-g, .fc-table tr.fc-hl2 td.fc-c, .fc-table tr.fc-hl2 td.fc-tot { border-top: 1px solid var(--border); border-bottom: 1px solid #0F3195; }
+.fc-table tr.fc-hl2 td.fc-c.fc-lvl-yel { background: #fff; color: #E0A800; }
+.fc-table tr.fc-hl2 td.fc-c.fc-lvl-red { color: #dc2626; }
+
+/* การ์ดลอย + มุมโค้งต่อ 1 ตารางเกรดแกรม */
+.fc-tbl-wrap { border-radius: 16px; border: 1px solid #b9d3ff; background: #fff; padding-bottom: 0; margin: 4px 4px 30px; max-width: calc(100% - 8px);
+  box-shadow: 0 10px 28px rgba(15,49,149,.22), 0 2px 6px rgba(15,49,149,.12); }
+.fc-tbl-wrap .fc-table { border-radius: 16px; }
+.fc-table td.fc-c.fc-lvl-yel, .fc-table tr.fc-hl2 td.fc-c.fc-lvl-yel { background: #fff; color: #E0A800; }
+
+/* 5) ช่องเลือก: พื้นขาว กรอบประเข้มชัดขึ้น  6) ตัวอักษรใหญ่-คมขึ้น */
+.fc-gray, .fc-gray:disabled, .fc-gray.fc-static { background: #fff; border: 2px dashed #0640FF; color: #0F3195; font: 700 13.5px 'Sarabun', sans-serif; height: 30px; box-shadow: 0 1px 3px rgba(6,64,255,.12); }
+.fc-gray:hover:not(:disabled) { background: #fff; border-style: solid; border-color: #0640FF; box-shadow: 0 0 0 3px rgba(6,64,255,.15); }
+.fc-gray.fc-pick:empty::before, .fc-gray::placeholder { color: #4a63b8; }
+.fc-mini { border: 2px dashed #0640FF; background: #fff; font-weight: 700; font-size: 12.5px; }
+.fc-table { font-size: 14px; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+.fc-table .fc-g, .fc-table .fc-s { font-size: 13.5px; font-weight: 700; color: #0A2470; }
+.fc-table td.fc-c { font-size: 14px; font-weight: 600; color: #0B1B4D; }
+.fc-table tr.fc-hl1 td.fc-c, .fc-table tr.fc-hl2 td.fc-c { font-weight: 800; }
+.fc-table thead th { font-size: 13.5px; }
+.fc-table td.fc-in input { font-size: 14px; font-weight: 700; color: #0B1B4D; }
+.fc-table tr.fc-hl2 td.fc-c.fc-lvl-red { color: #dc2626; }
+.fc-table tr.fc-hl2 td.fc-c.fc-lvl-yel { color: #D99A00; }
