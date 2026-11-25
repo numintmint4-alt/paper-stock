@@ -227,7 +227,7 @@
 
     let h = `<table class="fc-table" data-g="${g}"><thead>
       <tr><th class="fc-title" colspan="${n + 3}"><div class="fc-title-in"><span>${g}</span><span class="fc-warnmsg hidden">⚠ ${NEG_MSG}</span></div></th></tr>
-      <tr><th class="fc-g fc-h" colspan="2">Size</th>${tbl.sizes.map(s => `<th>${s}</th>`).join('')}<th class="fc-tot-h">Total</th></tr></thead><tbody>`;
+      <tr><th class="fc-g fc-h" colspan="2">Size</th>${tbl.sizes.map(s => `<th data-s="${s}">${s}</th>`).join('')}<th class="fc-tot-h">Total</th></tr></thead><tbody>`;
 
     // 1) การใช้ม้วน (ทั่วไป) ย้อนหลัง 3 เดือน
     ['m1', 'm2', 'm3'].forEach((p, i) => {
@@ -444,23 +444,20 @@
       }
     });
 
-    // Tooltip ชี้เซล: Gradegram + Size
-    let tip = null;
-    const tipHide = () => { if (tip) tip.style.display = 'none'; };
+    // ไฮไลท์ทั้งคอลัมน์ Size ที่เมาส์ชี้ (เหมือนไฮไลท์แถว)
+    let hlTbl = null, hlS = null;
+    const clearColHl = () => { if (hlTbl) hlTbl.querySelectorAll('.fc-col-hl').forEach(el => el.classList.remove('fc-col-hl')); hlTbl = null; hlS = null; };
     document.addEventListener('mouseover', e => {
-      const td = e.target.closest && e.target.closest('.fc-table td.fc-c, .fc-table td.fc-in');
-      if (!td) return tipHide();
-      const wrap = td.closest('.fc-tbl-wrap'); const el = td.dataset.s ? td : td.querySelector('[data-s]');
-      if (!wrap || !el || !el.dataset.s) return tipHide();
-      if (!tip) { tip = document.createElement('div'); tip.className = 'fc-tip'; document.body.appendChild(tip); }
-      tip.textContent = `Gradegram ${wrap.dataset.gw} - Size ${el.dataset.s}`;
-      tip.style.display = 'block';
-      const r = td.getBoundingClientRect(), w = tip.offsetWidth;
-      tip.style.left = Math.max(6, Math.min(window.innerWidth - w - 6, r.left + r.width / 2 - w / 2)) + 'px';
-      tip.style.top = Math.max(6, r.top - tip.offsetHeight - 8) + 'px';
+      const c = e.target.closest && e.target.closest('.fc-table td.fc-c, .fc-table td.fc-in');
+      if (!c) return clearColHl();
+      const el = c.dataset.s ? c : c.querySelector('[data-s]');
+      const s = el && el.dataset.s; const tb = c.closest('.fc-table');
+      if (!s || !tb) return clearColHl();
+      if (tb === hlTbl && s === hlS) return;
+      clearColHl(); hlTbl = tb; hlS = s;
+      tb.querySelectorAll('[data-s]').forEach(x => { if (x.dataset.s === s) (x.closest('td,th') || x).classList.add('fc-col-hl'); });
     });
-    document.addEventListener('mouseleave', tipHide);
-    window.addEventListener('scroll', tipHide, true);
+    document.addEventListener('mouseleave', clearColHl);
     document.addEventListener('click', e => {
       const d = $id('fcGramDrop'); if (d && !d.classList.contains('hidden') && !e.target.closest('#fcGramBox')) d.classList.add('hidden');
     });
