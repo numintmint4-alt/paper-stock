@@ -226,7 +226,7 @@
     const fm = esc(thMonth(S.month)), lm = P.levelMonth ? esc(thMonth(P.levelMonth)) : '…', em = P.estMonth ? esc(thMonth(P.estMonth)) : '…';
 
     let h = `<table class="fc-table" data-g="${g}"><thead>
-      <tr><th class="fc-title" colspan="${n + 3}"><span>${g}</span><span class="fc-warnmsg hidden">⚠ ${NEG_MSG}</span></th></tr>
+      <tr><th class="fc-title" colspan="${n + 3}"><div class="fc-title-in"><span>${g}</span><span class="fc-warnmsg hidden">⚠ ${NEG_MSG}</span></div></th></tr>
       <tr><th class="fc-g fc-h" colspan="2">Size</th>${tbl.sizes.map(s => `<th>${s}</th>`).join('')}<th class="fc-tot-h">Total</th></tr></thead><tbody>`;
 
     // 1) การใช้ม้วน (ทั่วไป) ย้อนหลัง 3 เดือน
@@ -317,6 +317,8 @@
       const bad = v.order_qty != null && v.order_qty < 0;
       if (bad) neg++;
       ['est_after', 'after_deduct', 'est_before'].forEach(r => { const td = tbl._tds[r + '|' + s]; if (td) td.classList.toggle('fc-neg-val', (v[r] || 0) < -1e-9); });
+      ['est_before', 'est_after'].forEach(r => { const td = tbl._tds[r + '|' + s]; if (!td) return; const x = v[r] || 0;
+        td.classList.toggle('fc-lvl-red', x < -1e-9); td.classList.toggle('fc-lvl-yel', x >= -1e-9 && x < 1 - 1e-9); });
       const td15 = tbl._tds['order_qty|' + s]; if (td15) { td15.classList.toggle('fc-neg', bad); td15.title = bad ? NEG_MSG : ''; }
       const rs = tbl._el.querySelector(`input[data-act="adjM"][data-s="${s}"]`); if (rs) rs.classList.toggle('fc-neg-in', bad);
     });
@@ -442,6 +444,23 @@
       }
     });
 
+    // Tooltip ชี้เซล: Gradegram + Size
+    let tip = null;
+    const tipHide = () => { if (tip) tip.style.display = 'none'; };
+    document.addEventListener('mouseover', e => {
+      const td = e.target.closest && e.target.closest('.fc-table td.fc-c, .fc-table td.fc-in');
+      if (!td) return tipHide();
+      const wrap = td.closest('.fc-tbl-wrap'); const el = td.dataset.s ? td : td.querySelector('[data-s]');
+      if (!wrap || !el || !el.dataset.s) return tipHide();
+      if (!tip) { tip = document.createElement('div'); tip.className = 'fc-tip'; document.body.appendChild(tip); }
+      tip.textContent = `Gradegram ${wrap.dataset.gw} - Size ${el.dataset.s}`;
+      tip.style.display = 'block';
+      const r = td.getBoundingClientRect(), w = tip.offsetWidth;
+      tip.style.left = Math.max(6, Math.min(window.innerWidth - w - 6, r.left + r.width / 2 - w / 2)) + 'px';
+      tip.style.top = Math.max(6, r.top - tip.offsetHeight - 8) + 'px';
+    });
+    document.addEventListener('mouseleave', tipHide);
+    window.addEventListener('scroll', tipHide, true);
     document.addEventListener('click', e => {
       const d = $id('fcGramDrop'); if (d && !d.classList.contains('hidden') && !e.target.closest('#fcGramBox')) d.classList.add('hidden');
     });
