@@ -127,6 +127,8 @@
       res.forEach(r => addTo(map, key(r), Number(r.quantity) || 0));
       logs.forEach(l => { const p = byId.get(String(l.reservation_id)); if (p) addTo(map, key(p), Number(l.qty_change) || 0); });
     }
+    // ไม่นำค่าติดลบมาแสดง/คำนวณ → ตัดทิ้ง (ถือเป็นไม่มียอดจอง)
+    for (const [k, v] of Array.from(map.entries())) if (!(v > 0)) map.delete(k);
     W.src.resv = map;
   }
   async function srcEst(W) {                          // ข้อ 11: แถว 6 ของ Rev ล่าสุด (ที่บันทึกแล้ว) ของเดือนที่เลือก
