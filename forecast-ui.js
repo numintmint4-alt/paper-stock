@@ -234,7 +234,7 @@
       h += sub('u' + (i + 1), i === 0 ? 'การใช้ม้วน (ทั่วไป)<br>ย้อนหลัง 3 เดือน' : null, 3, monthBtn(p, P[p], L));
     });
     // 2) เฉลี่ย
-    h += full('avg3', 'การใช้ม้วน (ทั่วไป) เฉลี่ย 3 เดือน', 'fc-calc');
+    h += full('avg3', 'การใช้ม้วน (ทั่วไป) เฉลี่ย 3 เดือน', 'fc-calc fc-hl1');
     // 3) กลุ่มลูกค้า Forecast
     for (let i = 0; i < nc; i++) {
       const cur = tbl.cfg.customers[i] || '';
@@ -255,18 +255,18 @@
     // 5) % ของระดับ Stock
     h += full('level_pct_qty', `<input type="number" class="fc-pct" min="0" max="100" step="1" data-act="pct" data-g="${g}" value="${tbl.cfg.pct}" ${L ? 'disabled' : ''}> % ของระดับ Stock เดือน : ${lm}`);
     // 6) ประมาณการ (ก่อนหัก Stock)
-    h += full('est_before', `ประมาณการใช้ม้วนเดือน : <b>${fm}</b> (ก่อนหัก Stock)`, 'fc-calc fc-strong');
+    h += full('est_before', `ประมาณการใช้ม้วนเดือน : <b>${fm}</b> (ก่อนหัก Stock)`, 'fc-calc fc-strong fc-hl2');
     // 7-9) Stock / รับม้วน / ยอดจอง
     h += sub('stock_qty', 'Stock ณ วันที่ :', 1, dateIn('stockDate', P.stockDate, L));
     h += sub('receive_qty', 'รับม้วนกระดาษ ณ วันที่', 1, dateIn('recvDate', P.recvDate, L));
     h += sub('reserve_qty', 'ยอดจองคงเหลือ ณ วันที่ :', 1, dateIn('resvDate', P.resvDate, L));
     // 10) คงเหลือรวมยอดจอง
-    h += full('total_avail', 'ม้วนกระดาษคงเหลือรวมยอดจอง', 'fc-calc');
+    h += full('total_avail', 'ม้วนกระดาษคงเหลือรวมยอดจอง', 'fc-calc fc-hl1');
     // 11) ประมาณการใช้ม้วนเดือน (Rev ล่าสุดที่บันทึก)
     h += sub('est_month', 'ประมาณการใช้ม้วนเดือน :', 1, monthBtn('estMonth', P.estMonth, L) + (W.src.estRev != null ? ` <small class="fc-muted">Rev.${pad2(W.src.estRev)}</small>` : ''));
     // 12) / 13)
     h += full('after_deduct', `ม้วนกระดาษคงเหลือ หักประมาณการใช้ม้วนเดือน : ${em} แล้ว`, 'fc-calc');
-    h += full('est_after', `ประมาณการใช้ม้วนเดือน : <b>${fm}</b> (หลังหัก Stock)`, 'fc-calc fc-strong');
+    h += full('est_after', `ประมาณการใช้ม้วนเดือน : <b>${fm}</b> (หลังหัก Stock)`, 'fc-calc fc-strong fc-hl2');
     // 14) ปรับเพิ่ม/ลด
     h += `<tr class="fc-row fc-adj"><td class="fc-g" rowspan="2">ปรับเพิ่มหรือลดจำนวนตามความเหมาะสม<br>ประเมินจากสถานการณ์ปัจจุบัน</td><td class="fc-s">ปรับเพิ่มจำนวน +</td>${inputs('adjP', s => tbl.cells[s].adjP)}<td class="fc-tot" data-r="adjP" data-t="1"></td></tr>`;
     h += `<tr class="fc-row fc-adj"><td class="fc-s">ปรับลดจำนวน −</td>${inputs('adjM', s => tbl.cells[s].adjM)}<td class="fc-tot" data-r="adjM" data-t="1"></td></tr>`;
