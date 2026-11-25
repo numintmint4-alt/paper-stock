@@ -1452,3 +1452,28 @@ table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
 .fc-table td.fc-in input { font-size: 14px; font-weight: 700; color: #0B1B4D; }
 .fc-table tr.fc-hl2 td.fc-c.fc-lvl-red { color: #dc2626; }
 .fc-table tr.fc-hl2 td.fc-c.fc-lvl-yel { color: #D99A00; }
+
+/* ── รอบล่าสุด: กระชับให้เห็นทุก Size ที่ 100% · สี · มุมโค้ง ── */
+.fc-table { font-size: 13px; }
+.fc-table .fc-g { left: 0; min-width: 190px; width: 190px; max-width: 190px; padding: 4px 8px; }
+.fc-table .fc-g[colspan="2"] { min-width: 190px; width: 190px; }
+.fc-table .fc-s { left: 190px; min-width: 170px; width: 170px; max-width: 170px; padding: 4px 6px; }
+.fc-table th:not(.fc-g):not(.fc-title):not(.fc-tot-h), .fc-table td.fc-c, .fc-table td.fc-in, .fc-table td.fc-note-td { min-width: 40px; width: 40px; max-width: 40px; }
+.fc-table .fc-tot, .fc-table .fc-tot-h { min-width: 50px; width: 50px; }
+.fc-table th, .fc-table td { padding: 4px 1px; }
+.fc-table td.fc-c, .fc-table td.fc-in input { font-size: 13px; }
+.fc-table thead th { font-size: 12.5px; }
+.fc-table .fc-s .fc-gray { max-width: 100%; min-width: 0; width: 100%; padding: 3px 6px; font-size: 13px; }
+.fc-table .fc-s .fc-gray.fc-cust { width: calc(100% - 20px); }
+/* สีเหลือง → สีเดียวกับแถบ "สรุปประมาณการสั่งซื้อ" */
+.fc-table tr.fc-hl2 td.fc-c.fc-lvl-yel { color: #FFC000; }
+/* เส้นปะ: นุ่ม สีฟ้าเดียวกับแถว "การใช้ม้วน เฉลี่ย 3 เดือน" */
+.fc-gray, .fc-gray:disabled, .fc-gray.fc-static { border: 2px dashed #8FE8FF; box-shadow: none; }
+.fc-gray:hover:not(:disabled) { border: 2px solid #8FE8FF; box-shadow: 0 0 0 3px rgba(143,232,255,.35); }
+.fc-mini { border: 2px dashed #8FE8FF; }
+/* มุมล่างโค้ง: บังคับตัดขอบให้ครอบ sticky/scrollbar ด้วย */
+.fc-tbl-wrap { isolation: isolate; transform: translateZ(0); overflow-y: hidden; border-radius: 16px; }
+.fc-tbl-wrap::-webkit-scrollbar { height: 12px; }
+.fc-tbl-wrap::-webkit-scrollbar-track { background: #EAFAFF; border-radius: 0 0 16px 16px; }
+.fc-tbl-wrap::-webkit-scrollbar-thumb { background: #8FE8FF; border-radius: 8px; border: 2px solid #EAFAFF; }
+.fc-tbl-wrap { width: fit-content; max-width: calc(100% - 8px); }
