@@ -49,6 +49,7 @@
     S.custLoading = true;
     try { S.customers = await api.fetchCustomers(); } catch (e) { console.warn('load customers', e); }
     S.custLoading = false;
+    syncCustDatalist();
     if (S.W && !S.W.locked) renderTables();
   }
 
@@ -205,13 +206,23 @@
   const dateIn = (p, val, L) =>
     `<input type="text" class="fc-gray fc-date" data-p="${p}" name="no_autofill_fc_${p}" autocomplete="new-password" value="${esc(val || '')}" placeholder="(เลือกวันที่)" readonly ${L ? 'disabled' : ''}>`;
 
-  function custOptions(tbl, i) {
-    const cur = tbl.cfg.customers[i] || '';
-    const taken = new Set(tbl.cfg.customers.filter((x, k) => x && k !== i));
-    let list = S.customers;
-    if (cur && !list.includes(cur)) list = [cur, ...list];
-    return '<option value="">(เลือกลูกค้า)</option>' + list.map(c =>
-      `<option value="${esc(c)}" ${c === cur ? 'selected' : ''} ${taken.has(c) ? 'disabled' : ''}>${esc(c)}</option>`).join('');
+  // V.Forecast: ช่องลูกค้าเป็นช่องพิมพ์ค้นหาได้ (input + datalist) — พิมพ์บางส่วนของรหัส/ชื่อแล้วรายการจะกรองให้
+  //             รายชื่อทั้งหมดอยู่ใน datalist กลางอันเดียว (id = fcCustList)
+  function syncCustDatalist() {
+    let dl = document.getElementById('fcCustList');
+    if (!dl) { dl = document.createElement('datalist'); dl.id = 'fcCustList'; document.body.appendChild(dl); }
+    dl.innerHTML = S.customers.map(c => `<option value="${esc(c)}"></option>`).join('');
+  }
+
+  // แปลงข้อความที่พิมพ์เป็นชื่อลูกค้าในรายการ: ตรงเป๊ะ → ใช้เลย, พิมพ์บางส่วนแล้วเจอตัวเดียว → ใช้ตัวนั้น
+  function resolveCustomer(text) {
+    const q = String(text || '').trim();
+    if (!q) return { ok: true, value: '' };
+    if (S.customers.includes(q)) return { ok: true, value: q };
+    const ql = q.toLowerCase();
+    const hits = S.customers.filter(c => c.toLowerCase().includes(ql));
+    if (hits.length === 1) return { ok: true, value: hits[0] };
+    return { ok: false, count: hits.length };
   }
 
   function tableHTML(W, tbl) {
@@ -239,7 +250,7 @@
     for (let i = 0; i < nc; i++) {
       const cur = tbl.cfg.customers[i] || '';
       const sel = L ? `<span class="fc-gray fc-static" title="${esc(cur)}">${esc(cur) || '-'}</span>`
-        : `<select class="fc-gray fc-cust" data-act="custname" data-g="${g}" data-i="${i}">${custOptions(tbl, i)}</select>` +
+        : `<input type="text" list="fcCustList" class="fc-gray fc-cust" data-act="custname" data-g="${g}" data-i="${i}" value="${esc(cur)}" placeholder="🔍 พิมพ์หรือเลือกลูกค้า" autocomplete="off" title="พิมพ์ส่วนหนึ่งของรหัสหรือชื่อลูกค้า แล้วเลือกจากรายการ">` +
           (i >= 3 ? `<button type="button" class="fc-x" title="ลบแถวนี้" data-act="delcust" data-g="${g}" data-i="${i}">✕</button>` : '');
       const grp = i === 0 ? `จำนวนม้วนกระดาษ - กลุ่มลูกค้า<br>Forecast (Code)${L ? '' : `<br><button type="button" class="fc-mini" data-act="addcust" data-g="${g}">＋ เพิ่มแถว</button>`}` : null;
       h += `<tr class="fc-row">${grp != null ? `<td class="fc-g" rowspan="${nc}">${grp}</td>` : ''}<td class="fc-s">${sel}</td>${inputs('cust', s => tbl.cells[s].cust[i], i)}<td class="fc-tot" data-r="cust${i}" data-t="1"></td></tr>`;
@@ -281,6 +292,7 @@
   }
 
   function renderTables() {
+    syncCustDatalist();
     const box = $id('fcTables'), W = S.W; if (!box || !W) return;
     const sxs = {}; box.querySelectorAll('.fc-tbl-wrap').forEach(w => { sxs[w.dataset.gw] = w.scrollLeft; });
     const wy = window.scrollY;
@@ -404,7 +416,13 @@
       if (!act || !W || W.locked) return;
       const tbl = W.tables[t.dataset.g];
       if (act === 'custname') {
-        const i = Number(t.dataset.i), v = t.value;
+        const i = Number(t.dataset.i);
+        const r = resolveCustomer(t.value);
+        if (!r.ok) {
+          toast(r.count > 1 ? `พบลูกค้า ${r.count} รายที่ตรงกัน กรุณาพิมพ์ให้เจาะจงขึ้นหรือเลือกจากรายการ` : 'ไม่พบลูกค้านี้ในรายชื่อ กรุณาเลือกจากรายการที่แสดง', 'warn');
+          t.value = tbl.cfg.customers[i] || ''; return;
+        }
+        const v = r.value;
         if (v && tbl.cfg.customers.some((x, k) => k !== i && x === v)) { toast('ลูกค้านี้ถูกเลือกในตารางนี้แล้ว', 'warn'); t.value = tbl.cfg.customers[i] || ''; return; }
         tbl.cfg.customers[i] = v; renderTables();
       } else if (act === 'snap') setParam('levelSnapId', t.value || null);
