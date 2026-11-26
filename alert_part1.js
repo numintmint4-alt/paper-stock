@@ -245,11 +245,13 @@ async function saveAlertSnapshot(receiveDates) {
   if (!analyzedDate) return { ok: false, error: 'ไม่มีวันที่วิเคราะห์' };
 
   try {
+    // V.18.6 FIX: บันทึกชุดข้อมูลเต็ม ไม่ใช่ชุดที่ถูกฟิลเตอร์
+    const fullData = (window._alertFullCache && window._alertFullCache.length) ? window._alertFullCache : alertCache;
     const summary = {
-      shortage: alertCache.filter(r => Number(r.alert) < 0).length,
-      ok:       alertCache.filter(r => Number(r.alert) === 0).length,
-      over:     alertCache.filter(r => Number(r.alert) > 0).length,
-      total:    alertCache.length
+      shortage: fullData.filter(r => Number(r.alert) < 0).length,
+      ok:       fullData.filter(r => Number(r.alert) === 0).length,
+      over:     fullData.filter(r => Number(r.alert) > 0).length,
+      total:    fullData.length
     };
 
     const filters = {
@@ -265,7 +267,7 @@ async function saveAlertSnapshot(receiveDates) {
       receive_date:   getISODateFromInput('alertReceiveDate') || null,
       receive_dates:  receiveDates || [...alertReceiveDates],
       summary_json:   summary,
-      result_json:    alertCache,
+      result_json:    fullData,
       filters_json:   filters,
       analyzed_by:    currentUser?.id || null,
       updated_at:     new Date().toISOString()
