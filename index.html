@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ระบบ Stock ม้วนกระดาษ V6</title>
+<title>CS Roll Control</title>
+<script>(function(){var t=null;try{t=localStorage.getItem("theme")}catch(e){}if(t!=="dark"&&t!=="light")t="light";document.documentElement.setAttribute("data-theme",t)})()</script>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
@@ -13,38 +14,53 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/th.js"></script>
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="shell.css">
+<link rel="stylesheet" href="dark.css">
 </head>
 <body>
 
 <div id="loginScreen" class="login-wrap">
   <div class="login-card">
-    <h1>📦 ระบบ Stock ม้วนกระดาษ</h1>
-    <p>กรุณาเข้าสู่ระบบ (V6)</p>
+    <div class="lg-logo" data-logo></div>
+    <h1 data-site-name>CS Roll Control</h1>
+    <p class="lg-sub" data-site-sub>ระบบบริหารม้วนกระดาษ</p>
     <label>ชื่อผู้ใช้<input id="loginUser" autocomplete="username" placeholder="เช่น sukanya"></label>
     <label>รหัสผ่าน<input id="loginPass" type="password" autocomplete="current-password" placeholder="••••••"></label>
     <button id="loginBtn">เข้าสู่ระบบ</button>
     <div id="loginMsg" class="login-msg hidden"></div>
+    <div class="lg-ver" data-app-version></div>
   </div>
+  <button type="button" id="loginThemeBtn" class="tb-btn login-theme" title="สลับโหมดสว่าง/มืด">◐</button>
 </div>
 
 <div id="app" class="hidden">
-  <nav class="nav">
-    <strong>📦 Stock ม้วนกระดาษ</strong>
-    <button data-tab="matrix" class="active">Stock Level</button>
-    <button data-tab="stock">Stock</button>
-    <button data-tab="receive">Purchase Summary</button>
-    <button data-tab="alert">Stock Alert</button>
-    <button data-tab="purchase-order">Purchase Order</button>
-    <button data-tab="forecast">Forecast</button>
-    <button data-tab="usage-pivot">Roll Paper Usage</button>
-    <button data-tab="reservations">Roll Reservations</button>
-    <button data-tab="summary" class="hidden">Summary</button>
-    <button data-tab="data" class="hidden">Data</button>
-    <button data-tab="settings">⚙ ตั้งค่า</button>
-    <span class="spacer"></span>
-    <span class="user-badge" id="userBadge"></span>
-    <button class="logout" id="logoutBtn">ออกจากระบบ</button>
-  </nav>
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-brand">
+      <span data-logo></span>
+      <div class="bt"><b data-site-name>CS Roll Control</b><small data-site-sub>ระบบบริหารม้วนกระดาษ</small></div>
+    </div>
+    <nav class="nav sb-nav" id="sbNav"></nav>
+    <div class="sb-foot">
+      <img src="img/forklift.png" alt="">
+      <div class="fv"><b data-site-name>CS Roll Control</b><span class="ver" data-app-version></span></div>
+    </div>
+  </aside>
+  <div class="sb-overlay" id="sbOverlay"></div>
+
+  <div class="main" id="main">
+    <header class="topbar">
+      <button type="button" class="tb-btn" id="sbCollapseBtn" title="ย่อ/ขยายเมนู"><span id="sbCollapseIcon"></span></button>
+      <div class="tb-crumb" id="tbCrumb"></div>
+      <span class="tb-spacer"></span>
+      <button type="button" class="tb-btn" id="themeBtn" title="สลับโหมดสว่าง/มืด"></button>
+      <span class="user-badge" id="userBadge"></span>
+      <button class="tb-logout logout" id="logoutBtn"><span id="logoutIcon"></span><span>ออกจากระบบ</span></button>
+    </header>
+    <div class="content">
+    <div class="page-banner">
+      <div class="bn-img" id="bnImg"></div>
+      <div class="bn-txt"><div class="bn-group" id="bnGroup"></div><h1 id="bnTitle"></h1></div>
+    </div>
 
   <div class="container">
 
@@ -697,71 +713,6 @@
       </div>
     </div>
 
-    <div id="tab-summary" class="hidden">
-      <div class="card">
-        <div class="report-head">
-          <div></div>
-          <div class="report-title" id="summaryReportTitle">
-            ตารางสรุปรายการสั่งเข้า<br>ประจำวันที่
-          </div>
-        </div>
-
-        <div class="filters no-print" id="summaryFilterBox">
-          <label>📅 วันที่รับเข้า
-            <input type="text" id="summaryDate" name="no_autofill_summary" autocomplete="new-password" readonly>
-          </label>
-
-          <label class="grade-filter-wrap">
-            Gradegrams
-            <div class="grade-filter-box" id="summaryGradeFilterBox">
-              <button type="button" class="grade-filter-btn" id="summaryGradeFilterBtn">
-                <span id="summaryGradeFilterLabel">ทั้งหมด</span>
-                <span class="arrow">▼</span>
-              </button>
-              <div class="grade-dropdown hidden" id="summaryGradeDropdown">
-                <div class="grade-actions">
-                  <button type="button" onclick="selectAllSummaryGrades()">✓ เลือกทั้งหมด</button>
-                  <button type="button" onclick="clearAllSummaryGrades()">✗ ล้างทั้งหมด</button>
-                </div>
-                <div class="grade-list" id="summaryGradeList"></div>
-              </div>
-            </div>
-          </label>
-
-          <label>FSC
-            <select id="summaryFsc">
-              <option value="all">ทั้งหมด</option>
-              <option value="fsc">FSC (มี F)</option>
-              <option value="non_fsc">Non-FSC</option>
-            </select>
-          </label>
-
-          <label>หมายเหตุ
-            <select id="summaryRemark">
-              <option value="">ทั้งหมด</option>
-              <option value="ปั้ม F">ปั้ม F</option>
-              <option value="ปั้ม BT">ปั้ม BT</option>
-              <option value="ปั้ม KTP">ปั้ม KTP</option>
-              <option value="NC">NC</option>
-            </select>
-          </label>
-
-          <label>โหมด
-            <select id="summaryMode">
-              <option value="qty">จำนวน</option>
-              <option value="kg">KG รวม</option>
-              <option value="both">จำนวน + KG</option>
-            </select>
-          </label>
-
-          <button class="primary" onclick="renderSummary()">🔍 ค้นหา</button>
-          <button onclick="window.print()">🖨 พิมพ์ (A4 แนวนอน)</button>
-        </div>
-
-        <div id="summaryBody"></div>
-      </div>
-    </div>
-
     <div id="tab-data" class="hidden">
       <div class="card">
         <h2>Data — ทุกคอลัมน์จาก Excel</h2>
@@ -827,23 +778,6 @@
             <div id="importUsageMsg"></div>
             <div id="usageProgress" class="hidden"></div>
             <div id="latestBatch"></div>
-          </div>
-        </div>
-
-        <div class="acc-item">
-          <div class="acc-head" onclick="toggleAcc(this, 'accArchive')">
-            <span>📦 Archive ข้อมูลเก่า (เก่ากว่า 2 ปี)</span>
-            <span class="arrow">▶</span>
-          </div>
-          <div class="acc-body hidden" id="accArchive">
-            <p class="hint">ย้ายข้อมูลที่เก่ากว่า <b>2 ปี</b> จากตาราง <b>usage_records</b> ไปเก็บใน <b>usage_records_archive</b> · ข้อมูลจะไม่แสดงใน Matrix อีก</p>
-            <div class="filters">
-              <button class="primary" onclick="previewArchive()">🔍 ดูจำนวนที่พร้อม Archive</button>
-              <button class="primary" onclick="runArchive()">📦 ย้ายไป Archive</button>
-              <button onclick="loadArchiveStats()">📊 ดูสถิติ Archive</button>
-            </div>
-            <div id="archiveMsg"></div>
-            <div id="archiveStats"></div>
           </div>
         </div>
 
@@ -1209,15 +1143,7 @@
       <button class="primary" id="verifyPasswordConfirmBtn" onclick="confirmVerifyPassword()">✅ ยืนยัน</button>
     </div>
   </div>
-</div>
-
-<div class="modal-bg" id="modalSummaryDetail">
-  <div class="modal" style="max-width:1000px">
-    <div class="modal-head">
-      <h3 id="summaryDetailTitle">รายละเอียด Summary</h3>
-      <button onclick="closeModal('modalSummaryDetail')">ปิด</button>
     </div>
-    <div id="summaryDetailBody"></div>
   </div>
 </div>
 
@@ -1256,13 +1182,14 @@
 </div>
 
 <!-- ==================== SCRIPTS ==================== -->
+<script src="config.js"></script>
+<script src="shell.js"></script>
 <script src="app.js"></script>
 <script src="price-master.js"></script>
 <script src="purchase-order.js"></script>
 <script src="stock-level.js"></script>
 <script src="stock.js"></script>
 <script src="receive.js"></script>
-<script src="summary.js"></script>
 <script src="alert_part1.js"></script>
 <script src="alert_part2.js"></script>
 <script src="alert_part3.js"></script>
