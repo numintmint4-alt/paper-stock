@@ -105,8 +105,7 @@
   async function srcRecv(W) {
     const map = new Map(), d = W.params.recvDate;
     if (d) {
-      const { count } = await supabase.from('po_receive').select('*', { count: 'exact', head: true }).eq('po_date', d);
-      if (!count && typeof fetchFromPO === 'function') await fetchFromPO(d, { silent: true });   // เหมือนหน้า Purchase Summary
+      if (typeof ensureReceiveFresh === 'function') await ensureReceiveFresh(d, { silent: true });   // เหมือนหน้า Purchase Summary (ดึงใหม่เมื่อ PO เปลี่ยน)
       const { data, error } = await supabase.rpc('get_receive_list', {
         p_date_from: d, p_date_to: d, p_grades: null, p_suppliers: null, p_fsc: 'all', p_remarks: null });
       if (error) toast('โหลดยอดรับม้วนไม่สำเร็จ: ' + error.message, 'err');
