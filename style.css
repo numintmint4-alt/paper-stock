@@ -1473,3 +1473,13 @@ table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
 .fc-dd-it:hover, .fc-dd-it.on { background: var(--primary-soft); color: var(--primary-dark); }
 .fc-dd-it.used { opacity: .55; } .fc-dd-it small { font-weight: 500; }
 .fc-dd-empty { padding: 8px 10px; font-size: 12.5px; color: var(--text-muted); }
+
+/* ===== Phase 4: รายงานการเบิกใช้ม้วนกระดาษ ===== */
+.ui-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.ui-table td.ui-grp { font-weight: 700; vertical-align: middle; background: var(--primary-soft); }
+.ui-table tr.ui-diff td { border-bottom: 2px solid var(--border); font-weight: 600; }
+.ui-table tr.ui-total td { font-weight: 800; }
+.ui-table .ui-neg { color: var(--red-dark, #b91c1c); }
+.ui-pct { font-size: 11px; opacity: .7; margin-left: 6px; }
+.ui-import { margin-top: 18px; border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
+.ui-import > summary { cursor: pointer; font-weight: 700; }
