@@ -19,8 +19,109 @@ window.fcState = window.fcState || { masterData: [] };
 let resState = {
     data: [],
     logs: [],          // เก็บ Audit Log (complete) เพื่อหักลบยอดใน Matrix
-    gradeFilter: 'ALL'
+    gradeFilter: 'ALL',
+    customers: [],     // V.6.5: ลูกค้าที่เลือกกรอง (ว่าง = ทั้งหมด)
+    allCustomers: []   // รายชื่อลูกค้าทั้งหมดที่พบในข้อมูลการจอง
 };
+
+// ==========================================
+// V.6.5: ตัวกรองลูกค้า (customer_mark) ของหน้า Reservations
+// ==========================================
+function refreshResCustomerList() {
+    const set = new Set((resState.data || []).map(r => (r.customer_mark || '-').trim() || '-'));
+    resState.customers.forEach(c => set.add(c));
+    resState.allCustomers = [...set].sort((a, b) => a.localeCompare(b, 'th'));
+    renderResCustomerList();
+    updateResCustomerLabel();
+    attachResCustomerListeners();
+}
+
+function renderResCustomerList() {
+    const list = document.getElementById('resCustomerList');
+    if (!list) return;
+    if (!resState.allCustomers.length) {
+        list.innerHTML = '<div style="padding:10px;text-align:center;color:#94a3b8;font-size:13px">ไม่มีข้อมูล</div>';
+        return;
+    }
+    list.innerHTML = resState.allCustomers.map(c => {
+        const checked = resState.customers.includes(c);
+        return `<label class="item ${checked ? 'checked' : ''}" data-customer="${escAttr(c)}">
+            <input type="checkbox" ${checked ? 'checked' : ''}>
+            <span>${escHtml(c === '-' ? '— ไม่ระบุลูกค้า —' : c)}</span>
+        </label>`;
+    }).join('');
+
+    list.querySelectorAll('.item').forEach(el => {
+        const cb = el.querySelector('input[type="checkbox"]');
+        const val = el.dataset.customer;
+        el.addEventListener('click', (e) => {
+            if (e.target.tagName === 'INPUT') return;
+            e.preventDefault();
+            cb.checked = !cb.checked;
+            toggleResCustomer(val, cb.checked);
+            el.classList.toggle('checked', cb.checked);
+        });
+        cb.addEventListener('change', () => {
+            toggleResCustomer(val, cb.checked);
+            el.classList.toggle('checked', cb.checked);
+        });
+    });
+}
+
+function toggleResCustomer(val, isChecked) {
+    if (isChecked) {
+        if (!resState.customers.includes(val)) resState.customers.push(val);
+    } else {
+        resState.customers = resState.customers.filter(x => x !== val);
+    }
+    updateResCustomerLabel();
+    renderReservationsTable();
+}
+
+function updateResCustomerLabel() {
+    const label = document.getElementById('resCustomerFilterLabel');
+    if (!label) return;
+    const n = resState.customers.length;
+    if (n === 0) { label.textContent = 'ทั้งหมด'; label.style.color = '#1e293b'; }
+    else if (n === 1) { label.textContent = resState.customers[0] === '-' ? 'ไม่ระบุลูกค้า' : resState.customers[0]; label.style.color = '#1e40af'; }
+    else { label.textContent = `เลือก ${n} ลูกค้า`; label.style.color = '#1e40af'; }
+}
+
+function selectAllResCustomers() {
+    resState.customers = [...resState.allCustomers];
+    renderResCustomerList();
+    updateResCustomerLabel();
+    renderReservationsTable();
+}
+
+function clearAllResCustomers() {
+    resState.customers = [];
+    renderResCustomerList();
+    updateResCustomerLabel();
+    renderReservationsTable();
+}
+
+function attachResCustomerListeners() {
+    const btn = document.getElementById('resCustomerFilterBtn');
+    const dropdown = document.getElementById('resCustomerDropdown');
+    const box = document.getElementById('resCustomerFilterBox');
+    if (!btn || !dropdown || !box) return;
+    if (btn.dataset.listenerAttached === '1') return;
+    btn.dataset.listenerAttached = '1';
+
+    btn.onclick = (e) => {
+        e.preventDefault(); e.stopPropagation();
+        dropdown.classList.toggle('hidden');
+        btn.classList.toggle('open');
+    };
+
+    document.addEventListener('click', (e) => {
+        if (!box.contains(e.target)) {
+            dropdown.classList.add('hidden');
+            btn.classList.remove('open');
+        }
+    });
+}
 
 // ==========================================
 // Fallback helpers (ถ้าโปรเจกต์ยังไม่มี escHtml/escAttr)
@@ -167,6 +268,7 @@ async function loadReservations() {
         // 5. เก็บข้อมูลลง State
         resState.data = resData || [];
         resState.logs = logData || [];
+        refreshResCustomerList();
 
         // 6. อัปเดตข้อความบรรทัดใหญ่กลางจอ
         const dateLabel = document.getElementById('resCurrentDateLabel');
@@ -199,7 +301,10 @@ function renderReservationsTable() {
     }
 
     const group = resState.gradeFilter;
-    const data = resState.data;
+    // V.6.5: กรองตามลูกค้าที่เลือก (ว่าง = ทั้งหมด) — log หักลบจะตามแถวแม่ที่ผ่านฟิลเตอร์อัตโนมัติ
+    const data = resState.customers.length
+        ? resState.data.filter(r => resState.customers.includes((r.customer_mark || '-').trim() || '-'))
+        : resState.data;
 
     // 1. Gradegrams ทั้งหมดจาก Master
     const masterGrades = [...new Set(window.fcState.masterData.map(m => m.grade + m.gram))].sort();
@@ -957,7 +1062,34 @@ async function saveDecreaseReservation(grade, size) {
 // 8.11 รีเซ็ตข้อมูลการจองทั้งหมด
 // ==========================================
 async function resetReservations() {
+    // V.6.5: จำกัดเฉพาะผู้ดูแลระบบ + ต้องยืนยันด้วยรหัสผ่านของตัวเอง
+    if (typeof isAdmin === 'function' && !isAdmin()) {
+        showToast('เฉพาะผู้ดูแลระบบเท่านั้นที่รีเซ็ตการจองได้', 'err');
+        return;
+    }
+
     if (!confirm('⚠️ คุณต้องการลบข้อมูลการจองทั้งหมดและเริ่มนับ 1 ใหม่ใช่หรือไม่?\n\n(ข้อมูลประวัติการจองจะหายไปทั้งหมด และยอดใน Matrix จะกลายเป็น 0)')) return;
+
+    const pwd = prompt('🔒 กรุณาใส่รหัสผ่านของคุณเพื่อยืนยันการรีเซ็ตการจอง:');
+    if (!pwd) return;
+
+    try {
+        const tempClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+        });
+        const { data: vData, error: vErr } = await tempClient.auth.signInWithPassword({
+            email: currentUser?.email || '',
+            password: pwd
+        });
+        if (vErr || !vData?.user) {
+            showToast('รหัสผ่านไม่ถูกต้อง — ยกเลิกการรีเซ็ต', 'err');
+            return;
+        }
+        try { await tempClient.auth.signOut(); } catch (e) { /* ignore */ }
+    } catch (e) {
+        showToast('ตรวจรหัสผ่านไม่สำเร็จ: ' + e.message, 'err');
+        return;
+    }
 
     try {
         const { error } = await supabase
