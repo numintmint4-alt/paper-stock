@@ -1017,6 +1017,14 @@ async function exportMonthBeforeDelete() {
   $('deleteMonthMsg').innerHTML = `<div class="msg ok">✅ Export ${rows.length} แถวแล้ว</div>`;
 }
 
+// แปลง 'YYYY-MM' → 'พ.ย. 2569' (V.16.1: เพิ่ม เพราะเดิมไม่มีฟังก์ชันนี้ ทำให้ "ลบตามเดือน" error)
+function thaiMonthShort(ym) {
+  const names = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+  const [y, m] = String(ym).split('-').map(Number);
+  if (!y || !m) return String(ym);
+  return `${names[m - 1]} ${y + 543}`;
+}
+
 async function confirmDeleteMonth() {
   const m = $('delMonth').value;
   if (!m) return;
