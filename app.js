@@ -292,7 +292,6 @@ function toggleAcc(head, bodyId) {
     if (bodyId === 'accMaster') renderMaster();
     if (bodyId === 'accRolluse') renderLatestBatch();
     if (bodyId === 'accUsers' && HAS_EDGE_FUNCTION) loadUsers();
-    if (bodyId === 'accArchive') loadArchiveStats();
     if (bodyId === 'accPriceMaster' && typeof initPriceMaster === 'function') initPriceMaster();
   }
 }
@@ -344,7 +343,7 @@ $('logoutBtn').onclick = async () => {
 };
 
 // ================= TABS =================
-const TAB_LIST = ['matrix','stock','receive','alert','purchase-order','data','settings','summary','forecast','usage-pivot','reservations'];
+const TAB_LIST = ['matrix','stock','receive','alert','purchase-order','data','settings','forecast','usage-pivot','reservations'];
 
 document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
   btn.onclick = () => {
@@ -357,13 +356,26 @@ document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
     if (t === 'receive' && typeof initReceiveTab === 'function') initReceiveTab();
     if (t === 'alert' && typeof initAlertTab === 'function') initAlertTab();
     if (t === 'purchase-order' && typeof initPurchaseOrderTab === 'function') initPurchaseOrderTab();
-    if (t === 'summary' && typeof initSummaryTab === 'function') initSummaryTab();
     if (t === 'forecast' && typeof initForecastTab === 'function') initForecastTab();
     if (t === 'usage-pivot' && typeof initUsagePivotTab === 'function') initUsagePivotTab();
     if (t === 'reservations' && typeof loadReservations === 'function') loadReservations();
     if (t === 'data') renderData();
+    if (t === 'settings') applySettingsSection(btn.dataset.sec);
+    if (typeof window.onShellNavigate === 'function') window.onShellNavigate(btn);
   };
 });
+
+// หน้าตั้งค่า: แสดงทีละส่วนตามเมนูซ้าย (Data Master / Price Master / รายงานการเบิกใช้ / ผู้ใช้งาน)
+function applySettingsSection(sec) {
+  const tab = $('tab-settings');
+  tab.classList.toggle('single-sec', !!sec);
+  tab.querySelectorAll('.acc-item').forEach(it => {
+    const body = it.querySelector('.acc-body');
+    const show = !sec || body.id === sec || (sec === 'accUsers' && body.id === 'accForecastPw');
+    it.classList.toggle('sec-hidden', !show);
+    if (show && body.classList.contains('hidden')) it.querySelector('.acc-head').click();
+  });
+}
 
 // ================= MASTER =================
 async function loadMaster(onProgress = null) {
@@ -1049,70 +1061,6 @@ async function confirmDeleteMonth() {
   setTimeout(() => { closeModal('modalDeleteMonth'); renderLatestBatch(); }, 2000);
 }
 
-// ================= ARCHIVE =================
-async function previewArchive() {
-  $('archiveMsg').innerHTML = '<div class="msg info">กำลังตรวจสอบ...</div>';
-  const { data, error } = await supabase.rpc('count_archivable_usage');
-  if (error) {
-    $('archiveMsg').innerHTML = `<div class="msg err">ตรวจสอบไม่สำเร็จ: ${error.message}</div>`;
-    return;
-  }
-  const cutoffThai = new Date(data.cutoff).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
-  $('archiveMsg').innerHTML = `<div class="msg info">
-    📊 ข้อมูลที่เก่ากว่า <b>2 ปี</b> (ก่อน ${cutoffThai})<br>
-    มีทั้งหมด <b>${data.count.toLocaleString()}</b> แถว พร้อมย้าย
-  </div>`;
-}
-
-async function runArchive() {
-  if (!confirm('⚠️ ย้ายข้อมูลที่เก่ากว่า 2 ปี ไป Archive?')) return;
-  if (!confirm('ยืนยันอีกครั้ง?')) return;
-
-  $('archiveMsg').innerHTML = '<div class="msg info">กำลังย้ายข้อมูล...</div>';
-  const { data, error } = await supabase.rpc('archive_old_usage');
-  if (error) {
-    $('archiveMsg').innerHTML = `<div class="msg err">ย้ายไม่สำเร็จ: ${error.message}</div>`;
-    return;
-  }
-  const cutoffThai = new Date(data.cutoff).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
-  $('archiveMsg').innerHTML = `<div class="msg ok">
-    ✅ ย้ายสำเร็จ ${data.archived.toLocaleString()} แถว<br>
-    (ข้อมูลก่อน ${cutoffThai})
-  </div>`;
-  await loadArchiveStats();
-}
-
-async function loadArchiveStats() {
-  $('archiveStats').innerHTML = '<p style="color:#94a3b8;font-size:13px">กำลังโหลด...</p>';
-  try {
-    const { count, error } = await supabase
-      .from('usage_records_archive')
-      .select('*', { count: 'exact', head: true });
-    if (error) throw error;
-
-    const { data: oldest } = await supabase
-      .from('usage_records_archive')
-      .select('usage_date')
-      .order('usage_date', { ascending: true })
-      .limit(1);
-    const { data: newest } = await supabase
-      .from('usage_records_archive')
-      .select('usage_date')
-      .order('usage_date', { ascending: false })
-      .limit(1);
-
-    let html = `<div class="msg info">
-      📦 <b>Archive ทั้งหมด:</b> ${(count || 0).toLocaleString()} แถว<br>`;
-    if (oldest?.[0]?.usage_date) {
-      html += `<b>ช่วงวันที่:</b> ${oldest[0].usage_date} ถึง ${newest[0].usage_date}`;
-    }
-    html += `</div>`;
-    $('archiveStats').innerHTML = html;
-  } catch (e) {
-    $('archiveStats').innerHTML = `<div class="msg err">โหลดสถิติไม่สำเร็จ: ${e.message}</div>`;
-  }
-}
-
 // ================= USERS =================
 async function callAdmin(action, payload = {}) {
   let { data: { session } } = await supabase.auth.getSession();
@@ -1256,7 +1204,6 @@ async function delUser(id, username) {
     'alertHistoryDate',
     'stockDate',
     'receiveDate',
-    'summaryDate',
     'stockImportDate',
     'dtFrom',
     'dtTo',
