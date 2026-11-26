@@ -1,0 +1,98 @@
+/* =====================================================================
+   tables.css — รอบ 2: ตาราง Matrix แบบใหม่ (หัวแคปซูล + ป้ายสี)
+   ใช้เฉพาะบนจอ (ตอนพิมพ์ใช้สไตล์เดิมทั้งหมด) โหลดหลัง theme3.css
+   ===================================================================== */
+@media screen {
+  :root {
+    --tbl-head-bg: #dcebff; --tbl-head-tx: #0a4ec2; --tbl-zebra: rgba(22,119,255,.035); --tbl-hover: rgba(22,119,255,.08);
+    --tbl-line: #e6eef9; --tbl-tot-bg: rgba(25,195,240,.14); --tbl-tot-tx: #0a63c9;
+    --pl1-bg:#fff0b3; --pl1-tx:#7a5a00; --pl2-bg:#ffd470; --pl2-tx:#6b4300; --pl3-bg:#ffa94d; --pl3-tx:#5c2a00;
+    --pr-bg:#ffe0e2; --pr-tx:#c01f2a; --py-bg:#fff3c4; --py-tx:#8a6a00; --pg-bg:#d9f6e6; --pg-tx:#15803d;
+  }
+  :root[data-theme="dark"] {
+    --tbl-head-bg: #14315f; --tbl-head-tx: #a9d4ff; --tbl-zebra: rgba(120,170,255,.045); --tbl-hover: rgba(120,170,255,.10);
+    --tbl-line: #1d2f55; --tbl-tot-bg: rgba(25,195,240,.16); --tbl-tot-tx: #7fd6ff;
+    --pl1-bg:#4a4014; --pl1-tx:#ffe48a; --pl2-bg:#6b5014; --pl2-tx:#ffe3a0; --pl3-bg:#8a5a14; --pl3-tx:#ffe3b0;
+    --pr-bg:#4f2128; --pr-tx:#ffb3b8; --py-bg:#4a4014; --py-tx:#ffe08a; --pg-bg:#14513a; --pg-tx:#8ff0bd;
+  }
+
+  /* ---------- ตาราง Matrix ทั่วไป (ระดับ Stock / Stock คงเหลือ / Receive) ---------- */
+  .report-table, .alert-matrix-new-table { border-collapse: separate !important; border-spacing: 0 !important; font-variant-numeric: tabular-nums; }
+  .report-table th, .report-table td, .alert-matrix-new-table th, .alert-matrix-new-table td { border: 0 !important; border-bottom: 1px solid var(--tbl-line) !important; }
+
+  /* หัวคอลัมน์แคปซูล */
+  .report-table thead th, .alert-matrix-new-table thead th {
+    height: 46px; padding: 0 4px !important; line-height: 1; vertical-align: middle;
+    background: var(--tbl-head-bg) !important; background-clip: padding-box !important; color: var(--tbl-head-tx) !important;
+    font: 800 16px/1 inherit !important; text-transform: none; letter-spacing: 0; text-shadow: none;
+    border: 0 !important; border-left: 4px solid transparent !important; border-right: 4px solid transparent !important;
+    border-top: 4px solid transparent !important; border-bottom: 4px solid transparent !important; border-radius: 999px;
+  }
+  .report-table thead th.grade-col, .alert-matrix-new-table thead th.grade-col-matrix {
+    background: linear-gradient(90deg,#0a3a8a,#1677ff) !important; background-clip: padding-box !important; color: #fff !important;
+    text-align: left; padding-left: 14px !important; padding-right: 8px !important; font-size: 12px !important; letter-spacing: .03em; text-transform: uppercase; border-left: 0 !important; white-space: nowrap;
+  }
+  .report-table thead th.total-col, .alert-matrix-new-table thead th.total-col-matrix {
+    background: linear-gradient(135deg,#1677ff,#19c3f0) !important; background-clip: padding-box !important; color: #fff !important;
+    border-right: 0 !important; font-size: 15px !important;
+  }
+
+  /* คอลัมน์ชื่อ Gradegrams และคอลัมน์รวม */
+  .report-table td.grade-col, .alert-matrix-new-table td.grade-col-matrix {
+    background: var(--surface) !important; color: var(--tbl-head-tx); font-weight: 800; font-size: 14px; padding-left: 14px !important;
+  }
+  .report-table td.total-col, .alert-matrix-new-table td.total-col-matrix {
+    background: var(--tbl-tot-bg) !important; color: var(--tbl-tot-tx) !important; font-weight: 800; font-size: 14px;
+  }
+  .report-table tbody tr:nth-child(even) td:not(.total-col):not(.grade-col),
+  .alert-matrix-new-table tbody tr:nth-child(even) td:not(.total-col-matrix):not(.grade-col-matrix) { background: var(--tbl-zebra); }
+  .report-table tbody tr:hover td:not(.total-col):not(.grade-col) { background: var(--tbl-hover); }
+  .report-table td { padding: 5px 3px; height: 44px; }
+  .alert-matrix-new-table td { height: 44px; }
+  .report-table td.empty, .alert-matrix-new-table td.empty-cell { color: var(--text-light); background: transparent; }
+
+  /* แถวรวม */
+  .report-table .total-row td, .alert-matrix-new-table tr.total-row-matrix td {
+    background: var(--tbl-tot-bg) !important; color: var(--tbl-tot-tx) !important; font-weight: 800; font-size: 14px !important; border-bottom: 0 !important;
+  }
+  .report-table .total-row td.grade-col, .alert-matrix-new-table tr.total-row-matrix td.grade-col-matrix { border-radius: 12px 0 0 12px; }
+  .report-table .total-row td.total-col, .alert-matrix-new-table tr.total-row-matrix td.total-col-matrix { background: linear-gradient(135deg,#1677ff,#19c3f0) !important; color: #fff !important; border-radius: 0 12px 12px 0; }
+
+  /* ช่องตัวเลข = ป้ายสีตามปริมาณ (JS ใส่ data-lv และห่อ .pill) */
+  .report-table td.clickable { background: transparent !important; }
+  .report-table td.clickable:hover { background: var(--tbl-hover) !important; }
+  .report-table td .pill, .report-table td[data-lv] .cell-main {
+    display: inline-grid; place-items: center; min-width: 28px; height: 26px; padding: 0 8px; border-radius: 9px; font-weight: 800; font-size: 13.5px; transition: transform .12s;
+  }
+  .report-table td[data-lv="1"] .pill, .report-table td[data-lv="1"] .cell-main { background: var(--pl1-bg); color: var(--pl1-tx); }
+  .report-table td[data-lv="2"] .pill, .report-table td[data-lv="2"] .cell-main { background: var(--pl2-bg); color: var(--pl2-tx); }
+  .report-table td[data-lv="3"] .pill, .report-table td[data-lv="3"] .cell-main { background: var(--pl3-bg); color: var(--pl3-tx); }
+  .report-table td.clickable:hover .pill { transform: translateY(-1px) scale(1.06); }
+  #receiveBody .report-table td .cell-main { font-size: 14px; }
+
+  /* ---------- ตาราง Alert (สั่งซื้อประจำวัน) ---------- */
+  .alert-matrix-new-table .matrix-cell { background: transparent !important; box-shadow: none !important; padding: 5px 4px; }
+  .alert-matrix-new-table .matrix-cell:hover { filter: none; background: var(--tbl-hover) !important; box-shadow: none !important; }
+  .alert-matrix-new-table .matrix-value {
+    position: relative; display: inline-block; min-width: 62px; padding: 5px 9px; border-radius: 10px; font-weight: 800; font-size: 13.5px;
+  }
+  .alert-matrix-new-table .matrix-red .matrix-value    { background: var(--pr-bg); color: var(--pr-tx); }
+  .alert-matrix-new-table .matrix-yellow .matrix-value { background: var(--py-bg); color: var(--py-tx); }
+  .alert-matrix-new-table .matrix-green .matrix-value  { background: var(--pg-bg); color: var(--pg-tx); }
+  .alert-matrix-new-table .matrix-cell.has-order .matrix-value { box-shadow: 0 0 0 2px #1677ff; }
+  .alert-matrix-new-table .matrix-cell.order-incomplete .matrix-value { box-shadow: 0 0 0 2px #f59e0b; }
+  .alert-matrix-new-table .matrix-cart-svg {
+    position: absolute; top: -8px; right: -8px; width: 18px !important; height: 18px !important; margin: 0 !important; padding: 3px; border-radius: 50%;
+    background: #1677ff; color: #fff !important; box-shadow: 0 2px 6px rgba(22,119,255,.45);
+  }
+  .alert-matrix-new-table .matrix-cell.order-incomplete .matrix-cart-svg { background: #f59e0b; color: #fff !important; }
+  .alert-matrix-new-table .matrix-cell.has-order, .alert-matrix-new-table .matrix-cell.order-incomplete { background: transparent !important; }
+
+  /* ---------- ตารางรายการทั่วไป ---------- */
+  .data-table { border-collapse: separate; border-spacing: 0; }
+  .data-table th { background: linear-gradient(90deg,#0d47a8,#1677ff) !important; color: #fff !important; text-transform: none; font-size: 13px; letter-spacing: 0; padding: 11px 12px; }
+  .data-table th:first-child { border-top-left-radius: 12px; } .data-table th:last-child { border-top-right-radius: 12px; }
+  .data-table td { border: 0; border-bottom: 1px solid var(--tbl-line); }
+  .data-table tbody tr:nth-child(even) td { background: var(--tbl-zebra); }
+  :root[data-theme="dark"] .data-table th { background: linear-gradient(90deg,#0a3a8a,#1456bd) !important; }
+}
