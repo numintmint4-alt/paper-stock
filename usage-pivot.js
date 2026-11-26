@@ -954,26 +954,8 @@ async function handleUsageImport(event) {
             const validData = importData.filter(d => d.usage_date && d.grade && d.width > 0);
             if (validData.length === 0) return showToast('ไม่พบข้อมูลที่ถูกต้อง', 'warn');
 
-            if (monthsToDelete.size > 0) {
-                showToast('กำลังล้างข้อมูลเก่าของเดือนในไฟล์นี้...', 'info');
-                for (const m of monthsToDelete) {
-                    const [yy, mo2] = m.split('-').map(Number);
-                    const firstDay = `${m}-01`;
-                    const lastDay  = usageLastDayOfMonth(yy, mo2);
-
-                    const { error: delError } = await supabase
-                        .from('usage_records_raw')
-                        .delete()
-                        .gte('usage_date', firstDay)
-                        .lte('usage_date', lastDay);
-
-                    if (delError) {
-                        console.error(`ลบข้อมูลเดือน ${m} ไม่สำเร็จ:`, delError);
-                        return showToast(`ลบข้อมูลเก่าไม่สำเร็จ (ติด RLS หรือ Network): ${delError.message}`, 'err', 6000);
-                    }
-                }
-            }
-
+            // V.Pivot FIX: insert ข้อมูลใหม่ให้สำเร็จก่อน แล้วค่อยลบข้อมูลเก่า
+            // (เดิมลบก่อน ถ้า insert พังกลางทาง ข้อมูลทั้งเดือนหาย)
             showToast(`กำลังบันทึก ${validData.length} รายการ...`, 'info');
 
             const CHUNK = 500;
@@ -987,17 +969,48 @@ async function handleUsageImport(event) {
                     fail += chunk.length;
                     insertErrorMsg = error.message;
                     console.error('Insert error:', error);
+                    break;
                 } else {
                     ok += chunk.length;
                 }
             }
 
             if (fail > 0) {
-                showToast(`❌ Import ล้มเหลว! (สำเร็จ ${ok} / ล้มเหลว ${fail})`, 'err', 8000);
-                alert(`คำเตือน: การนำเข้าข้อมูลล้มเหลวบางส่วน!\n\nสาเหตุ: ${insertErrorMsg}\n\nกรุณากด Import ไฟล์เดิมซ้ำอีกครั้งเพื่อให้ข้อมูลสมบูรณ์ (ระบบได้ลบข้อมูลเก่าไปแล้ว)`);
-            } else {
-                showToast(`Import สำเร็จ ${ok} รายการ`, 'ok');
+                // ย้อนกลับ: ลบเฉพาะข้อมูลที่เพิ่งใส่ในรอบนี้ — ข้อมูลเก่ายังอยู่ครบ
+                const { error: rbErr } = await supabase.from('usage_records_raw').delete().eq('import_batch_id', batchId);
+                showToast('❌ Import ไม่สำเร็จ — ข้อมูลเดิมยังอยู่ครบ', 'err', 8000);
+                alert(`Import ไม่สำเร็จ ระบบไม่ได้เปลี่ยนแปลงข้อมูลเดิม\n\nสาเหตุ: ${insertErrorMsg}` +
+                      (rbErr ? `\n\n⚠️ ย้อนกลับข้อมูลที่ใส่ไปบางส่วนไม่สำเร็จ (${rbErr.message}) กรุณาแจ้งผู้ดูแลระบบ` : '\n\nกรุณาลอง Import ไฟล์เดิมอีกครั้ง'));
+                return;
             }
+
+            // insert สำเร็จทั้งหมด → ลบข้อมูลเก่าของเดือนเหล่านี้ (ยกเว้นชุดที่เพิ่งใส่)
+            if (monthsToDelete.size > 0) {
+                showToast('กำลังล้างข้อมูลเก่าของเดือนในไฟล์นี้...', 'info');
+                let delFail = '';
+                for (const m of monthsToDelete) {
+                    const [yy, mo2] = m.split('-').map(Number);
+                    const firstDay = `${m}-01`;
+                    const lastDay  = usageLastDayOfMonth(yy, mo2);
+
+                    const { error: delError } = await supabase
+                        .from('usage_records_raw')
+                        .delete()
+                        .gte('usage_date', firstDay)
+                        .lte('usage_date', lastDay)
+                        .or(`import_batch_id.is.null,import_batch_id.neq.${batchId}`);
+
+                    if (delError) {
+                        console.error(`ลบข้อมูลเก่าเดือน ${m} ไม่สำเร็จ:`, delError);
+                        delFail = delError.message;
+                    }
+                }
+                if (delFail) {
+                    alert(`นำเข้าข้อมูลใหม่สำเร็จ ${ok} รายการ แต่ลบข้อมูลเก่าไม่สำเร็จ (${delFail})\nข้อมูลเก่าอาจซ้ำกับข้อมูลใหม่ กรุณาแจ้งผู้ดูแลระบบ`);
+                }
+            }
+
+            showToast(`Import สำเร็จ ${ok} รายการ`, 'ok');
 
             const fileInput = document.getElementById('pivot-file-upload');
             if (fileInput) fileInput.value = '';
