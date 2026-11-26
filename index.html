@@ -823,7 +823,6 @@
               <button class="primary admin-only" onclick="document.getElementById('fileUsage').click()">📥 Import Excel</button>
               <input type="file" id="fileUsage" accept=".xlsx,.xls" class="hidden" onchange="importUsage(event)">
               <button class="danger admin-only" onclick="openDeleteMonth()">🗑 ลบตามเดือน</button>
-              <button class="danger admin-only" onclick="clearAllUsage()">🗑 ลบทั้งหมด (Raw + Usage)</button>
             </div>
             <div id="importUsageMsg"></div>
             <div id="usageProgress" class="hidden"></div>
@@ -1153,7 +1152,7 @@
     </div>
 
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;gap:8px;flex-wrap:wrap">
-      <button type="button" id="addPOItemsAddBtn" onclick="addAddRow()"
+      <button type="button" id="addPOItemsAddBtn" onclick="addEmptyRow()"
               style="border:1px dashed #2563eb;color:#1e40af;background:#eff6ff;padding:8px 18px">
         ➕ เพิ่มแถว
       </button>
