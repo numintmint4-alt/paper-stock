@@ -290,7 +290,6 @@ function toggleAcc(head, bodyId) {
     body.classList.remove('hidden');
     head.classList.add('open');
     if (bodyId === 'accMaster') renderMaster();
-    if (bodyId === 'accRolluse') renderLatestBatch();
     if (bodyId === 'accUsers' && HAS_EDGE_FUNCTION) loadUsers();
     if (bodyId === 'accPriceMaster' && typeof initPriceMaster === 'function') initPriceMaster();
   }
@@ -343,7 +342,7 @@ $('logoutBtn').onclick = async () => {
 };
 
 // ================= TABS =================
-const TAB_LIST = ['matrix','stock','receive','alert','purchase-order','data','settings','forecast','usage-pivot','reservations'];
+const TAB_LIST = ['matrix','stock','receive','alert','purchase-order','data','settings','forecast','usage-pivot','reservations','usage-issue'];
 
 document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
   btn.onclick = () => {
@@ -358,6 +357,7 @@ document.querySelectorAll('.nav button[data-tab]').forEach(btn => {
     if (t === 'purchase-order' && typeof initPurchaseOrderTab === 'function') initPurchaseOrderTab();
     if (t === 'forecast' && typeof initForecastTab === 'function') initForecastTab();
     if (t === 'usage-pivot' && typeof initUsagePivotTab === 'function') initUsagePivotTab();
+    if (t === 'usage-issue' && typeof initUsageIssueTab === 'function') initUsageIssueTab();
     if (t === 'reservations' && typeof loadReservations === 'function') loadReservations();
     if (t === 'data') renderData();
     if (t === 'settings') applySettingsSection(btn.dataset.sec);
