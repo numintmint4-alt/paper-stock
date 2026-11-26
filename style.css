@@ -1467,3 +1467,9 @@ table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
 .fc-table tr:hover td.fc-c, .fc-table tr:hover td.fc-in { background: #E3F4FF; }
 .fc-table tr:not(.fc-hl1):not(.fc-hl2):not(.fc-final) td.fc-col-hl { background: #E3F4FF; }
 .fc-table thead th.fc-col-hl { background: #0F3195; color: #fff; }
+/* dropdown ค้นหาลูกค้า (หน้าประมาณการ) */
+.fc-dd { position: fixed; z-index: 100001; max-height: 260px; overflow-y: auto; background: var(--surface); color: var(--text); border: 1.5px solid var(--primary); border-radius: 12px; box-shadow: var(--shadow-lg); padding: 4px; }
+.fc-dd-it { padding: 7px 10px; border-radius: 8px; cursor: pointer; font: 600 13px 'Sarabun', sans-serif; }
+.fc-dd-it:hover, .fc-dd-it.on { background: var(--primary-soft); color: var(--primary-dark); }
+.fc-dd-it.used { opacity: .55; } .fc-dd-it small { font-weight: 500; }
+.fc-dd-empty { padding: 8px 10px; font-size: 12.5px; color: var(--text-muted); }
