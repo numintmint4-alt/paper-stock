@@ -101,6 +101,7 @@
     const bc = document.getElementById('tbCrumb'); if (bc && g) bc.innerHTML = '<span>' + g.title + '</span><i>›</i><b>' + title + '</b>';
     const im = document.getElementById('bnImg'); if (im && g) im.style.backgroundImage = 'url(' + g.img + ')';
     const grp = btn.closest('.sb-group'); if (grp) grp.classList.add('open');
+    document.querySelectorAll('.sb-group').forEach(x => x.classList.toggle('has-active', x === grp));
     document.body.classList.remove('sb-open');           // ปิดเมนูบนมือถือ
     const m = document.getElementById('main'); if (m) m.scrollTop = 0;
     window.scrollTo(0, 0);
