@@ -405,6 +405,10 @@ async function loadGradeFilter() {
 
   if (!btn || !dropdown || !box) return;
 
+  // V.16.2 FIX: ผูก event ครั้งเดียว (เดิมผูกซ้ำทุกครั้งที่ถูกเรียก ทำให้ dropdown เปิดแล้วปิดทันที)
+  if (btn.dataset.listenerAttached === '1') return;
+  btn.dataset.listenerAttached = '1';
+
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
     const isHidden = dropdown.classList.contains('hidden');
@@ -1151,8 +1155,12 @@ async function handleSessionExpired() {
   } catch (e) {
     console.warn('signOut error:', e);
   }
-  localStorage.clear();
-  sessionStorage.clear();
+  // V.16.2 FIX: ล้างเฉพาะข้อมูลล็อกอินของ Supabase (เดิม clear ทั้งหมด ทำให้ธง PO และการตั้งค่าอื่นหาย)
+  try {
+    [localStorage, sessionStorage].forEach(store => {
+      Object.keys(store).filter(k => k.startsWith('sb-') || k.includes('supabase.auth')).forEach(k => store.removeItem(k));
+    });
+  } catch (e) { console.warn('clear auth storage error:', e); }
   setTimeout(() => location.reload(), 1500);
   throw new Error('Session หมดอายุ');
 }
