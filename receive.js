@@ -146,6 +146,37 @@ function renderSupplierSummary(rows, dateThai) {
   return html;
 }
 
+// V.Receive: ตรวจว่า po_receive ของวันนั้นตรงกับ PO (saved/sent) หรือยัง ถ้าไม่ตรงให้ดึงใหม่
+// ใช้ร่วมกับหน้า Purchase Summary, Stock Alert และ Forecast
+// หมายเหตุ: เทียบ "เลข PO" — ถ้าแก้ตัวเลขใน PO ที่ Saved ไปแล้ว ให้กด "ดึง PO ใหม่" ในหน้า Purchase Summary
+async function ensureReceiveFresh(receiveDate, opts = {}) {
+  try {
+    const [poRes, recRes] = await Promise.all([
+      supabase.from('purchase_orders').select('po_no').eq('ref_receive', receiveDate).in('status', ['saved', 'sent']),
+      supabase.from('po_receive').select('po_no').eq('po_date', receiveDate)
+    ]);
+    if (poRes.error) throw poRes.error;
+    if (recRes.error) throw recRes.error;
+
+    const poSet = new Set((poRes.data || []).map(r => r.po_no));
+    const recSet = new Set((recRes.data || []).map(r => r.po_no));
+
+    // ไม่มี PO ของวันนั้น: คงพฤติกรรมเดิม (ถ้ามีข้อมูลเก่าอยู่ก็แสดงต่อ)
+    if (poSet.size === 0) {
+      return recSet.size ? { ok: true, synced: false } : { ok: false, reason: 'no_po' };
+    }
+
+    let same = poSet.size === recSet.size;
+    if (same) for (const n of poSet) { if (!recSet.has(n)) { same = false; break; } }
+    if (same) return { ok: true, synced: false };
+
+    return await fetchFromPO(receiveDate, opts).then(r => ({ ...r, synced: !!r.ok }));
+  } catch (e) {
+    console.error('ensureReceiveFresh error:', e);
+    return { ok: false, error: e.message };
+  }
+}
+
 async function renderReceive() {
   const receiveDate = getISODateFromInput('receiveDate');
   const supplier = $('receiveSupplier')?.value || '';
@@ -167,22 +198,15 @@ async function renderReceive() {
   $('receiveBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
 
   try {
-    const { count: existCount, error: countErr } = await supabase
-      .from('po_receive')
-      .select('*', { count: 'exact', head: true })
-      .eq('po_date', receiveDate);
-
-    if (countErr) throw countErr;
-
-    if (!existCount || existCount === 0) {
-      const fetchResult = await fetchFromPO(receiveDate, { silent: true });
-      if (!fetchResult.ok) {
-        if (fetchResult.reason === 'no_po') {
-          $('receiveBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่พบ PO ของวันนี้ — ไม่มีข้อมูลให้แสดง</p>';
-          return;
-        }
-        throw new Error(fetchResult.error || 'ดึงจาก PO ไม่สำเร็จ');
+    // V.Receive FIX: เทียบรายการ PO กับข้อมูลที่แคชไว้ใน po_receive ถ้าไม่ตรงให้ดึงใหม่
+    // (เดิมดึงเฉพาะตอนที่ยังไม่มีข้อมูลเลย PO ที่ Saved ทีหลังจึงไม่เข้า)
+    const sync = await ensureReceiveFresh(receiveDate, { silent: true });
+    if (!sync.ok) {
+      if (sync.reason === 'no_po') {
+        $('receiveBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:30px">ไม่พบ PO ของวันนี้ — ไม่มีข้อมูลให้แสดง</p>';
+        return;
       }
+      throw new Error(sync.error || 'ดึงจาก PO ไม่สำเร็จ');
     }
 
     const normalizedGrades = receiveSelectedGrades.map(g => normalizeGrade(g));
