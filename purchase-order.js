@@ -643,6 +643,21 @@ async function verifyAndOpen(po, password, note) {
   }
 }
 
+// V.15.4: ตัวช่วยจัดการข้อผิดพลาดจากฟังก์ชันใน DB (RPC)
+function isRpcMissing(e) {
+  const m = String(e?.message || e || '');
+  return e?.code === 'PGRST202' || /Could not find the function|schema cache/i.test(m);
+}
+
+function poRpcErrorText(e) {
+  const m = String(e?.message || e || '');
+  if (m.includes('WRONG_PASSWORD'))  return 'รหัสผ่านไม่ถูกต้อง';
+  if (m.includes('NOT_AUTHORIZED'))  return 'คุณไม่มีสิทธิ์ทำรายการนี้';
+  if (m.includes('PO_NOT_DRAFT'))    return 'PO นี้ไม่ใช่ Draft (อาจถูกบันทึกไปแล้ว) กรุณารีเฟรชหน้าจอ';
+  if (m.includes('PO_NOT_FOUND'))    return 'ไม่พบ PO นี้ (อาจถูกลบไปแล้ว)';
+  return m;
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  🎯 markPOSaved — หักยอดจอง + บันทึก Audit Log (ป้องกันซ้ำ)
 // ═══════════════════════════════════════════════════════════════
@@ -657,6 +672,17 @@ async function markPOSaved(poId) {
   if (!confirm(`ยืนยันบันทึก PO ${po.po_no} เป็น Saved?\n\n⚠️ หลังจากนี้จะแก้ไขไม่ได้โดยไม่ต้องใส่รหัสผ่าน\n(ยอดจองจะถูกหัก ณ ตอนนี้)`)) return;
 
   try {
+    // V.15.4: เรียกฟังก์ชันใน DB ที่ทำทุกขั้นในรอบเดียว (เปลี่ยนสถานะ + ตัดยอดจอง + log) — พลาดแล้วย้อนกลับทั้งหมด
+    //          ถ้ายังไม่ได้รัน SQL รอบ 4 (ไม่พบฟังก์ชัน) จะใช้วิธีเดิมแทนอัตโนมัติ
+    let usedRpc = false;
+    {
+      const { error: rpcErr } = await supabase.rpc('mark_po_saved', { p_po_id: poId });
+      if (!rpcErr) usedRpc = true;
+      else if (!isRpcMissing(rpcErr)) throw new Error(poRpcErrorText(rpcErr));
+      else console.warn('[markPOSaved] ยังไม่มี mark_po_saved ใน DB → ใช้วิธีเดิม');
+    }
+
+    if (!usedRpc) {
     // 1. อัปเดตสถานะ PO เป็น Saved
     const { error } = await supabase
       .from('purchase_orders')
@@ -716,6 +742,8 @@ async function markPOSaved(poId) {
         }
       }
     }
+
+    } // end legacy (ไม่มี mark_po_saved)
 
     alert(`✅ บันทึก ${po.po_no} เป็น Saved สำเร็จ\n(หักยอดจองเรียบร้อย)`);
 
@@ -2327,16 +2355,20 @@ async function deletePO(poId) {
 
     // V.15.3 FIX: ลบ PO ให้สำเร็จก่อน แล้วค่อยคืนยอดจอง
     // (เดิมคืนยอดก่อน ถ้ารหัสผิด/ลบไม่ผ่าน ยอดจองจะถูกคืนไปแล้วทั้งที่ PO ยังอยู่)
-    const { error } = await supabase.rpc('delete_purchase_order', {
+    const { data: delRes, error } = await supabase.rpc('delete_purchase_order', {
       p_po_id: poId,
       p_user_id: currentUser?.id,
       p_password: password,
       p_note: note
     });
-    if (error) throw error;
+    if (error) throw new Error(poRpcErrorText(error));
+    if (delRes && delRes.success === false) throw new Error(delRes.error || 'ลบ PO ไม่สำเร็จ');
+
+    // V.15.4: DB ฟังก์ชันใหม่คืนยอดจองให้แล้ว (reservation_returned) — ไม่ต้องคืนซ้ำที่หน้าเว็บ
+    const dbReturned = !!(delRes && delRes.reservation_returned);
 
     let returnFailed = false;
-    if (poItems.length > 0) {
+    if (poItems.length > 0 && !dbReturned) {
       try {
         await returnReservationOnDeletePO(po.po_no, poItems);
       } catch (e) {
@@ -2348,7 +2380,9 @@ async function deletePO(poId) {
     alert(`✅ ลบ PO ${po.po_no} สำเร็จ\n` +
       (returnFailed
         ? '⚠️ แต่คืนยอดจองไม่สำเร็จ กรุณาตรวจหน้า Roll Reservations'
-        : (poItems.length > 0 ? `(คืนยอดจอง ${poItems.length} รายการ)` : '')));
+        : (dbReturned
+            ? (delRes.restored_reservations > 0 ? `(คืนยอดจอง ${delRes.restored_reservations} รายการ)` : '')
+            : (poItems.length > 0 ? `(คืนยอดจอง ${poItems.length} รายการ)` : ''))));
 
     await renderPOList();
 
