@@ -624,6 +624,47 @@
       </div>
     </div>
 
+    <!-- ==================== หน้า รายงานการเบิกใช้ม้วนกระดาษ ==================== -->
+    <div id="tab-usage-issue" class="hidden">
+      <div class="card">
+        <div class="report-head">
+          <div></div>
+          <div class="report-title">รายงานการเบิกใช้ม้วนกระดาษ</div>
+          <div></div>
+        </div>
+
+        <div class="filters no-print">
+          <label>📅 ตั้งแต่ <input type="date" id="uiFrom"></label>
+          <label>ถึง <input type="date" id="uiTo"></label>
+          <label>จัดกลุ่มตาม
+            <select id="uiGroup">
+              <option value="day">วัน</option>
+              <option value="grade">เกรด</option>
+              <option value="size">ไซส์</option>
+            </select>
+          </label>
+          <label>เกรด <select id="uiGrade"><option value="">ทุกเกรด</option></select></label>
+          <label>ไซส์ <select id="uiSize"><option value="">ทุกไซส์</option></select></label>
+          <button type="button" id="uiReload">🔄 โหลดใหม่</button>
+        </div>
+
+        <div id="uiBody"></div>
+
+        <details id="uiImportBox" class="ui-import no-print">
+          <summary>📥 นำเข้าข้อมูลเบิกใช้ / ลบตามเดือน / ตรวจสอบชุดล่าสุด</summary>
+          <p class="hint">Import ไฟล์ Usage Records — ระบบจะบันทึกทุกคอลัมน์ลงตาราง <b>usage_records_raw</b> และบันทึกเฉพาะแถวที่ผ่านลง <b>usage_records</b></p>
+          <div class="filters">
+            <button class="primary admin-only" onclick="document.getElementById('fileUsage').click()">📥 Import Excel</button>
+            <input type="file" id="fileUsage" accept=".xlsx,.xls" class="hidden" onchange="importUsage(event)">
+            <button class="danger admin-only" onclick="openDeleteMonth()">🗑 ลบตามเดือน</button>
+          </div>
+          <div id="importUsageMsg"></div>
+          <div id="usageProgress" class="hidden"></div>
+          <div id="latestBatch"></div>
+        </details>
+      </div>
+    </div>
+
     <!-- ==================== หน้า Roll Reservations ==================== -->
     <div id="tab-reservations" class="hidden">
       <div class="card">
@@ -760,24 +801,6 @@
             <div id="importMasterMsg"></div>
             <div id="masterProgress" class="hidden"></div>
             <div id="masterBody"></div>
-          </div>
-        </div>
-
-        <div class="acc-item">
-          <div class="acc-head" onclick="toggleAcc(this, 'accRolluse')">
-            <span>📥 Roll Paper Use — Import & ตรวจสอบข้อมูล</span>
-            <span class="arrow">▶</span>
-          </div>
-          <div class="acc-body hidden" id="accRolluse">
-            <p class="hint">Import ไฟล์ Usage Records — ระบบจะบันทึกทุกคอลัมน์ลงตาราง <b>usage_records_raw</b> และบันทึกเฉพาะแถวที่ผ่านลง <b>usage_records</b></p>
-            <div class="filters">
-              <button class="primary admin-only" onclick="document.getElementById('fileUsage').click()">📥 Import Excel</button>
-              <input type="file" id="fileUsage" accept=".xlsx,.xls" class="hidden" onchange="importUsage(event)">
-              <button class="danger admin-only" onclick="openDeleteMonth()">🗑 ลบตามเดือน</button>
-            </div>
-            <div id="importUsageMsg"></div>
-            <div id="usageProgress" class="hidden"></div>
-            <div id="latestBatch"></div>
           </div>
         </div>
 
@@ -1199,6 +1222,7 @@
 <script src="forecast-ui.js"></script>
 <script src="forecast-export.js"></script>
 <script src="reservations.js"></script>
+<script src="usage-issue.js"></script>
 
 <script>
 document.addEventListener('keypress', (e) => {
