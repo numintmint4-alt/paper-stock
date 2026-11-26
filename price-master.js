@@ -126,6 +126,18 @@ async function forceRecopy() {
   )) return;
 
   try {
+    // 0) V.16.1 FIX: ตรวจว่าเดือนต้นทางมีราคาจริงก่อน — ถ้าว่างห้ามลบอะไรเลย
+    const { count: prevCount, error: errPrev } = await supabase
+      .from('price_master')
+      .select('*', { count: 'exact', head: true })
+      .eq('month', prevMonth)
+      .eq('is_active', true);
+    if (errPrev) throw errPrev;
+    if (!prevCount) {
+      showMsg('pmMsg', `❌ เดือน ${esc(prevMonth)} ไม่มีราคาให้ copy — ยกเลิก (ราคาเดือนนี้ยังอยู่ครบ)`, 'err');
+      return;
+    }
+
     // 1) ลบราคาเดือนปัจจุบันทั้งหมด
     const { error: err1 } = await supabase
       .from('price_master')
