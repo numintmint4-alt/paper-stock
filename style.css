@@ -35,22 +35,7 @@ body {
 }
 .hidden { display: none !important; }
 
-/* ================= NAV ================= */
-.nav {
-  background: var(--surface); color: var(--text);
-  display: flex; gap: 4px; align-items: center;
-  height: 64px; padding: 0 24px; flex-wrap: wrap;
-  position: sticky; top: 0; z-index: 50;
-  box-shadow: var(--shadow-sm); border-bottom: 1px solid var(--border);
-}
-.nav strong { margin-right: 20px; font: 700 16px inherit; color: var(--text); display: flex; align-items: center; gap: 8px; }
-.nav button { color: var(--text-muted); background: none; border: none; padding: 8px 14px; border-radius: var(--radius-md); cursor: pointer; font: 600 14px inherit; transition: var(--transition); }
-.nav button:hover { color: var(--primary); background: var(--primary-soft); }
-.nav button.active { background: var(--primary-soft); color: var(--primary); font-weight: 700; }
-.nav .spacer { flex: 1; }
-.nav .user-badge { font-size: 13px; padding: 6px 14px; background: var(--surface-soft); color: var(--text); border-radius: var(--radius-full); font-weight: 600; }
-.nav .logout { padding: 8px 16px; background: var(--red); color: #fff; border-radius: var(--radius-md); font-size: 13px; font-weight: 600; transition: var(--transition); }
-.nav .logout:hover { background: var(--red-dark); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+/* NAV: ย้ายไป shell.css (เมนูซ้าย) */
 
 /* ================= LAYOUT ================= */
 .container { max-width: 100%; margin: auto; padding: 20px; }
@@ -692,7 +677,6 @@ table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
 }
 @media (max-width: 640px) {
   .form-grid { grid-template-columns: 1fr; }
-  .nav { height: auto; padding: 10px; }
   .grade-filter-box { min-width: 160px; }
   .alert-table { font-size: 11px; }
   .snapshot-save-bar { flex-direction: column; align-items: stretch; }
