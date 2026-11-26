@@ -663,7 +663,8 @@ async function createPOFromAlert() {
       });
     }
 
-    for (const r of alertCache) {
+    // V.18.6 FIX: วนจากชุดข้อมูลเต็ม ไม่ใช่ชุดที่ถูกฟิลเตอร์ (กันรายการนอกฟิลเตอร์หายจาก PO)
+    for (const r of (window._alertFullCache && window._alertFullCache.length ? window._alertFullCache : alertCache)) {
       const cellKey = `${r.gradegram}|${Number(r.size)}|${dateKey}`;
 
       if (processedCells.has(cellKey)) continue;
