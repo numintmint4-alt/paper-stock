@@ -206,13 +206,66 @@
   const dateIn = (p, val, L) =>
     `<input type="text" class="fc-gray fc-date" data-p="${p}" name="no_autofill_fc_${p}" autocomplete="new-password" value="${esc(val || '')}" placeholder="(เลือกวันที่)" readonly ${L ? 'disabled' : ''}>`;
 
-  // V.Forecast: ช่องลูกค้าเป็นช่องพิมพ์ค้นหาได้ (input + datalist) — พิมพ์บางส่วนของรหัส/ชื่อแล้วรายการจะกรองให้
-  //             รายชื่อทั้งหมดอยู่ใน datalist กลางอันเดียว (id = fcCustList)
-  function syncCustDatalist() {
-    let dl = document.getElementById('fcCustList');
-    if (!dl) { dl = document.createElement('datalist'); dl.id = 'fcCustList'; document.body.appendChild(dl); }
-    dl.innerHTML = S.customers.map(c => `<option value="${esc(c)}"></option>`).join('');
+  // ช่องลูกค้า = dropdown พิมพ์ค้นหาได้ (กล่องรายการลอยใต้ช่อง กรองตามที่พิมพ์ รองรับลูกศร/Enter/Esc)
+  function syncCustDatalist() { /* เลิกใช้ datalist แล้ว — คงฟังก์ชันไว้เพื่อไม่ให้จุดเรียกเดิมพัง */ }
+  const DD = { input: null, items: [], idx: -1 };
+  function ddEl() {
+    let el = document.getElementById('fcCustDd');
+    if (!el) { el = document.createElement('div'); el.id = 'fcCustDd'; el.className = 'fc-dd hidden'; document.body.appendChild(el); }
+    return el;
   }
+  function ddClose() { const el = document.getElementById('fcCustDd'); if (el) el.classList.add('hidden'); DD.input = null; DD.idx = -1; }
+  function ddRender(filterText) {
+    const el = ddEl(), inp = DD.input; if (!inp) return;
+    const q = String(filterText || '').trim().toLowerCase();
+    const used = new Set(((S.W && S.W.tables[inp.dataset.g]) ? S.W.tables[inp.dataset.g].cfg.customers : []).filter((x, k) => k !== Number(inp.dataset.i)));
+    DD.items = S.customers.filter(c => !q || c.toLowerCase().includes(q));
+    if (!DD.items.length) { el.innerHTML = '<div class="fc-dd-empty">ไม่พบลูกค้าที่ตรงกับที่พิมพ์</div>'; }
+    else el.innerHTML = DD.items.slice(0, 200).map((c, i) =>
+      `<div class="fc-dd-it${used.has(c) ? ' used' : ''}${i === DD.idx ? ' on' : ''}" data-v="${esc(c)}">${esc(c)}${used.has(c) ? ' <small>(เลือกแล้ว)</small>' : ''}</div>`).join('')
+      + (DD.items.length > 200 ? `<div class="fc-dd-empty">แสดง 200 จาก ${DD.items.length} รายการ — พิมพ์เพิ่มเพื่อกรอง</div>` : '');
+    const r = inp.getBoundingClientRect();
+    el.style.left = Math.max(4, r.left) + 'px'; el.style.minWidth = Math.max(220, r.width) + 'px';
+    const below = window.innerHeight - r.bottom, h = 260;
+    if (below < h && r.top > below) { el.style.top = 'auto'; el.style.bottom = (window.innerHeight - r.top + 4) + 'px'; }
+    else { el.style.bottom = 'auto'; el.style.top = (r.bottom + 4) + 'px'; }
+    el.classList.remove('hidden');
+  }
+  function ddPick(v) {
+    const inp = DD.input; if (!inp) return;
+    inp.value = v; ddClose();
+    inp.blur();   // ปล่อยโฟกัสก่อน แล้วค่อยแจ้ง change (กัน error ตอนวาดตารางใหม่ขณะช่องยังโฟกัสอยู่)
+    setTimeout(() => inp.dispatchEvent(new Event('change', { bubbles: true })), 0);
+  }
+  document.addEventListener('focusin', e => {
+    const t = e.target; if (!t || !t.matches || !t.matches('input[data-act="custname"]')) return;
+    DD.input = t; DD.idx = -1; t.select(); ddRender('');
+  });
+  document.addEventListener('input', e => {
+    const t = e.target; if (!t || !t.matches || !t.matches('input[data-act="custname"]')) return;
+    DD.input = t; DD.idx = -1; ddRender(t.value);
+  });
+  document.addEventListener('keydown', e => {
+    const t = e.target; if (!t || !t.matches || !t.matches('input[data-act="custname"]')) return;
+    const el = document.getElementById('fcCustDd'); if (!el || el.classList.contains('hidden')) return;
+    const n = Math.min(DD.items.length, 200);
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault(); if (!n) return;
+      DD.idx = (DD.idx + (e.key === 'ArrowDown' ? 1 : -1) + n) % n;
+      el.querySelectorAll('.fc-dd-it').forEach((x, i) => x.classList.toggle('on', i === DD.idx));
+      const on = el.querySelector('.fc-dd-it.on'); if (on) on.scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter') {
+      if (DD.idx >= 0 && DD.items[DD.idx]) { e.preventDefault(); ddPick(DD.items[DD.idx]); }
+      else if (DD.items.length === 1) { e.preventDefault(); ddPick(DD.items[0]); }
+    } else if (e.key === 'Escape') { ddClose(); }
+  });
+  document.addEventListener('mousedown', e => {
+    const it = e.target.closest && e.target.closest('#fcCustDd .fc-dd-it');
+    if (it) { e.preventDefault(); ddPick(it.dataset.v); return; }
+    if (!(e.target.closest && (e.target.closest('#fcCustDd') || e.target.closest('input[data-act="custname"]')))) ddClose();
+  }, true);
+  window.addEventListener('scroll', () => { if (DD.input) ddRender(DD.input.value); }, true);
+  window.addEventListener('resize', ddClose);
 
   // แปลงข้อความที่พิมพ์เป็นชื่อลูกค้าในรายการ: ตรงเป๊ะ → ใช้เลย, พิมพ์บางส่วนแล้วเจอตัวเดียว → ใช้ตัวนั้น
   function resolveCustomer(text) {
@@ -250,7 +303,7 @@
     for (let i = 0; i < nc; i++) {
       const cur = tbl.cfg.customers[i] || '';
       const sel = L ? `<span class="fc-gray fc-static" title="${esc(cur)}">${esc(cur) || '-'}</span>`
-        : `<input type="text" list="fcCustList" class="fc-gray fc-cust" data-act="custname" data-g="${g}" data-i="${i}" value="${esc(cur)}" placeholder="🔍 พิมพ์หรือเลือกลูกค้า" autocomplete="off" title="พิมพ์ส่วนหนึ่งของรหัสหรือชื่อลูกค้า แล้วเลือกจากรายการ">` +
+        : `<input type="text" class="fc-gray fc-cust" data-act="custname" data-g="${g}" data-i="${i}" value="${esc(cur)}" placeholder="🔍 พิมพ์ค้นหาหรือเลือกลูกค้า" autocomplete="off" title="พิมพ์ส่วนหนึ่งของรหัสหรือชื่อลูกค้า แล้วเลือกจากรายการที่ขึ้นมา">` +
           (i >= 3 ? `<button type="button" class="fc-x" title="ลบแถวนี้" data-act="delcust" data-g="${g}" data-i="${i}">✕</button>` : '');
       const grp = i === 0 ? `จำนวนม้วนกระดาษ - กลุ่มลูกค้า<br>Forecast (Code)${L ? '' : `<br><button type="button" class="fc-mini" data-act="addcust" data-g="${g}">＋ เพิ่มแถว</button>`}` : null;
       h += `<tr class="fc-row">${grp != null ? `<td class="fc-g" rowspan="${nc}">${grp}</td>` : ''}<td class="fc-s">${sel}</td>${inputs('cust', s => tbl.cells[s].cust[i], i)}<td class="fc-tot" data-r="cust${i}" data-t="1"></td></tr>`;
