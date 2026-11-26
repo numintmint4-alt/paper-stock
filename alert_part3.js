@@ -419,6 +419,10 @@ async function renderAlert() {
   $('alertBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังวิเคราะห์...</p>';
 
   try {
+    // V.18.6: ให้ยอดรับม้วนตรงกับ PO ล่าสุดก่อนคำนวณ (เหมือนหน้า Purchase Summary)
+    if (typeof ensureReceiveFresh === 'function') {
+      try { await ensureReceiveFresh(receiveDate, { silent: true }); } catch (e) { console.warn('[Alert] sync receive:', e); }
+    }
     const { data, error } = await supabase.rpc('get_alert_matrix_v2', {
       p_snapshot_month: snapshotMonth,
       p_stock_date:     stockDate,
