@@ -184,6 +184,25 @@
   window.addEventListener('beforeprint', () => moveTitleSelects(false));
   window.addEventListener('afterprint', () => setTimeout(refreshChips, 50));
 
+
+  // ---------- 3) ตาราง Matrix: ใส่ระดับสีให้ช่องตัวเลข ----------
+  function lvOf(v) { return v < 3 ? 1 : v < 6 ? 2 : 3; }
+  function skinTables(root) {
+    (root.querySelectorAll ? root : document).querySelectorAll('.report-table td.clickable:not([data-lv])').forEach(td => {
+      const m = /-?\d+(?:\.\d+)?/.exec(td.textContent.replace(/,/g, ''));
+      if (!m) return;
+      td.dataset.lv = lvOf(Math.abs(parseFloat(m[0])));
+      const kid = td.firstElementChild;
+      if (!kid && td.childNodes.length === 1 && td.firstChild.nodeType === 3) {
+        const sp = document.createElement('span'); sp.className = 'pill'; sp.textContent = td.firstChild.nodeValue; td.replaceChild(sp, td.firstChild);
+      }
+    });
+  }
+  const mo2 = new MutationObserver(muts => {
+    for (const m of muts) for (const n of m.addedNodes) if (n.nodeType === 1 && (n.matches('.report-wrap,.report-table,table') || n.querySelector('.report-table'))) { skinTables(n); }
+  });
+  mo2.observe(document.body, { childList: true, subtree: true });
+
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
   setTimeout(refreshChips, 300);
 })();
