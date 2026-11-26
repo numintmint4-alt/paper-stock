@@ -2281,14 +2281,8 @@ async function deletePO(poId) {
       console.warn('[Delete PO] ดึงรายการ PO ไม่สำเร็จ:', e);
     }
 
-    if (poItems.length > 0) {
-      try {
-        await returnReservationOnDeletePO(po.po_no, poItems);
-      } catch (e) {
-        console.warn('[Delete PO] คืนยอดจองไม่สำเร็จ:', e);
-      }
-    }
-
+    // V.15.3 FIX: ลบ PO ให้สำเร็จก่อน แล้วค่อยคืนยอดจอง
+    // (เดิมคืนยอดก่อน ถ้ารหัสผิด/ลบไม่ผ่าน ยอดจองจะถูกคืนไปแล้วทั้งที่ PO ยังอยู่)
     const { error } = await supabase.rpc('delete_purchase_order', {
       p_po_id: poId,
       p_user_id: currentUser?.id,
@@ -2297,7 +2291,20 @@ async function deletePO(poId) {
     });
     if (error) throw error;
 
-    alert(`✅ ลบ PO ${po.po_no} สำเร็จ\n${poItems.length > 0 ? `(คืนยอดจอง ${poItems.length} รายการ)` : ''}`);
+    let returnFailed = false;
+    if (poItems.length > 0) {
+      try {
+        await returnReservationOnDeletePO(po.po_no, poItems);
+      } catch (e) {
+        returnFailed = true;
+        console.warn('[Delete PO] คืนยอดจองไม่สำเร็จ:', e);
+      }
+    }
+
+    alert(`✅ ลบ PO ${po.po_no} สำเร็จ\n` +
+      (returnFailed
+        ? '⚠️ แต่คืนยอดจองไม่สำเร็จ กรุณาตรวจหน้า Roll Reservations'
+        : (poItems.length > 0 ? `(คืนยอดจอง ${poItems.length} รายการ)` : '')));
 
     await renderPOList();
 
