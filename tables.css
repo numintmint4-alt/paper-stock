@@ -104,4 +104,20 @@
   .data-table td { border: 0; border-bottom: 1px solid var(--tbl-line); }
   .data-table tbody tr:nth-child(even) td { background: var(--tbl-zebra); }
   :root[data-theme="dark"] .data-table th { background: linear-gradient(90deg,#0a3a8a,#1456bd) !important; }
+
+  /* ---------- เส้นคอลัมน์ (แนวตั้ง) ทุกตาราง ---------- */
+  :root { --tbl-vline: #b4c9e6; }
+  :root[data-theme="dark"] { --tbl-vline: #3a5a94; }
+  .report-table tbody td, .alert-matrix-new-table tbody td, .data-table tbody td, #res-table tbody td { border-right: 1px solid var(--tbl-vline) !important; }
+  .report-table tbody td:last-child, .alert-matrix-new-table tbody td:last-child, .data-table tbody td:last-child, #res-table tbody td:last-child { border-right: 0 !important; }
+  .report-table thead th, .alert-matrix-new-table thead th, .data-table thead th { border-right: 1px solid rgba(255,255,255,.28) !important; }
+  .report-table thead th:last-child, .alert-matrix-new-table thead th:last-child, .data-table thead th:last-child { border-right: 0 !important; }
+  .data-table td { border-right: 1px solid var(--tbl-vline); }
+  #res-table tbody td.grade-col { border-right: 1px solid var(--tbl-vline) !important; }
+
+  /* เส้นคอลัมน์ตารางอื่นๆ ที่ยังไม่มีเส้น */
+  table:not([class]) { border-collapse: collapse; }
+  table:not([class]) td, .alert-flat-table td, .add-items-table td, .yearly-pivot-table td, .fc-table td { border-right: 1px solid var(--tbl-vline) !important; border-bottom: 1px solid var(--tbl-vline) !important; }
+  table:not([class]) th, .alert-flat-table th, .add-items-table th, .yearly-pivot-table th, .fc-table th { border-right: 1px solid rgba(255,255,255,.28) !important; }
+  table:not([class]) td:last-child, table:not([class]) th:last-child, .alert-flat-table td:last-child, .alert-flat-table th:last-child, .add-items-table td:last-child, .add-items-table th:last-child, .yearly-pivot-table td:last-child, .yearly-pivot-table th:last-child, .fc-table td:last-child, .fc-table th:last-child { border-right: 0 !important; }
 }
