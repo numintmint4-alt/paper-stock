@@ -1,0 +1,64 @@
+/* =====================================================================
+   theme3.css — รอบ 1: ไอคอนใหม่ / แบนเนอร์รวมหัวรายงาน / ปรับแถบกรอง
+   โหลดหลัง shell.css และ dark.css
+   ===================================================================== */
+/* ไอคอนแทนอีโมจิ */
+svg.ic { width: 1.12em; height: 1.12em; vertical-align: -.2em; flex: none; margin-right: .3em; }
+button svg.ic:only-child, .ic-only svg.ic { margin-right: 0; }
+.ic-g { color: #16a34a; } .ic-r { color: #e5484d; } .ic-a { color: #e0912b; } .ic-o { color: #ee6c1b; }
+:root[data-theme="dark"] .ic-g { color: #4ade80; } :root[data-theme="dark"] .ic-r { color: #ff8a90; }
+:root[data-theme="dark"] .ic-a { color: #fbbf24; } :root[data-theme="dark"] .ic-o { color: #fb923c; }
+button.primary svg.ic, button.danger svg.ic, .tb-logout svg.ic { color: inherit; }
+.ic-dot { display: inline-block; width: .7em; height: .7em; border-radius: 50%; margin-right: .4em; vertical-align: .02em; }
+.ic-dot.ic-g { background: #22c55e; } .ic-dot.ic-r { background: #ef4444; } .ic-dot.ic-a { background: #f59e0b; } .ic-dot.ic-n { background: #cbd5e1; }
+.filters label { display: inline-flex; align-items: center; }
+.filters > label > svg.ic:first-child { color: var(--primary); }
+
+/* หัวรายงานเดิม: ซ่อนบนจอ (ข้อมูลย้ายไปอยู่ในแบนเนอร์) — ยังแสดงตอนพิมพ์ */
+@media screen { .report-head { display: none !important; } }
+
+/* แบนเนอร์ใหม่: ชื่อ + ป้ายข้อมูล + เลขเอกสาร */
+.page-banner { min-height: 132px; align-items: center; }
+.page-banner .bn-txt { padding: 20px 28px 22px; max-width: 70%; }
+.page-banner h1 { margin: 2px 0 10px; line-height: 1.25; }
+.bn-chips { display: flex; flex-wrap: wrap; gap: 8px; min-height: 28px; }
+.bn-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+  background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.3); color: #fff; backdrop-filter: blur(4px); }
+.bn-chip svg.ic { margin: 0; width: 14px; height: 14px; }
+.bn-ctl select.title-select { background: rgba(255,255,255,.16) !important; color: #fff !important; border: 1px solid rgba(255,255,255,.3) !important;
+  border-radius: 8px; padding: 1px 6px; font: 700 12.5px inherit; width: auto; min-width: 0; margin: 0; -webkit-appearance: auto; appearance: auto; }
+.bn-ctl select.title-select option { color: #111; }
+.bn-code { position: absolute; right: 18px; top: 14px; z-index: 2; padding: 4px 12px; border-radius: 10px; font-size: 12px; font-weight: 600;
+  background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.3); color: #fff; backdrop-filter: blur(4px); }
+@media print { .page-banner, .bn-code { display: none !important; } }
+
+/* แถบกรองให้ดูทันสมัย */
+.filters { border-radius: 16px; }
+
+/* เมนูซ้ายสีกรมท่าไล่ฟ้า (ตามแบบที่เลือก) — ทั้งโทนสว่างและมืด */
+:root[data-theme="light"] .sidebar { background: linear-gradient(180deg,#06214f 0%,#0a3f94 62%,#0b57c9 100%); border-right: 0; box-shadow: 4px 0 24px rgba(5,25,80,.22); }
+:root[data-theme="light"] .sidebar::before { background: radial-gradient(420px 260px at -10% 0%, rgba(60,170,255,.30), transparent 70%), radial-gradient(360px 300px at 120% 100%, rgba(25,195,240,.34), transparent 70%); }
+:root[data-theme="light"] .sb-brand b { color: #fff; }
+:root[data-theme="light"] .sb-brand small { color: #8fd6ff; letter-spacing: .06em; }
+:root[data-theme="light"] .sb-group-head { background: rgba(255,255,255,.07); color: #eaf3ff; border: 0; box-shadow: none; }
+:root[data-theme="light"] .sb-group-head:hover { background: rgba(255,255,255,.14); }
+:root[data-theme="light"] .sb-group-head .gi { color: #7fd6ff; }
+:root[data-theme="light"] .sb-group.has-active > .sb-group-head { background: linear-gradient(90deg,#1677ff,#19c3f0); color: #fff; box-shadow: 0 6px 16px rgba(22,119,255,.38); }
+:root[data-theme="light"] .sb-group.has-active > .sb-group-head .gi { color: #fff; }
+:root[data-theme="light"] .sb-items { border-left-color: rgba(255,255,255,.16); }
+:root[data-theme="light"] .sb-item { color: #c4d9fb; }
+:root[data-theme="light"] .sb-item .ii { color: #86b7f5; }
+:root[data-theme="light"] .sb-item:hover { background: rgba(255,255,255,.12); color: #fff; }
+:root[data-theme="light"] .sb-item:hover .ii { color: #bfe6ff; }
+:root[data-theme="light"] .sb-item.active { background: rgba(255,255,255,.16); color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.26); }
+:root[data-theme="light"] .sb-item.active .ii { color: #19e6ff; }
+:root[data-theme="light"] .sb-foot .fv { color: #a9c9f5; } :root[data-theme="light"] .sb-foot .fv b { color: #fff; }
+:root[data-theme="light"] .sb-foot .fv .ver { background: rgba(255,255,255,.16); color: #d7ecff; }
+:root[data-theme="light"] .sb-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.22); }
+:root[data-theme="dark"] .sb-group.has-active > .sb-group-head { background: linear-gradient(90deg,#1f62ff,#19c3f0); color: #fff; border: 0; }
+:root[data-theme="dark"] .sb-item.active { background: rgba(255,255,255,.14); box-shadow: inset 0 0 0 1px rgba(120,180,255,.35); }
+:root[data-theme="dark"] .sb-item.active .ii { color: #19e6ff; }
+
+/* โหมดมืด: ตัวอักษรในปุ่มตัวกรองแบบเลือกหลายรายการต้องอ่านออก */
+:root[data-theme="dark"] .grade-filter-btn, :root[data-theme="dark"] .grade-filter-btn span { color: var(--text) !important; }
+:root[data-theme="dark"] .grade-filter-btn { background: var(--surface-soft) !important; border-color: var(--border-strong) !important; }
