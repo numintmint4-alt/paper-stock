@@ -36,7 +36,13 @@
   async function fetchCustomers() {
     if (typeof usagePivotState !== 'undefined' && usagePivotState.pivotCustomers && usagePivotState.pivotCustomers.length)
       return usagePivotState.pivotCustomers.slice();
-    const data = await fetchAllRows(() => supabase.from('usage_records_raw').select('customer_code, customer_name'));
+    // V.Forecast: ดึงรายชื่อ distinct จาก DB (RPC get_raw_usage_customers) — ถ้ายังไม่มีฟังก์ชันใช้วิธีเดิม
+    let data = null;
+    try {
+      const r = await supabase.rpc('get_raw_usage_customers');
+      if (!r.error && Array.isArray(r.data)) data = r.data;
+    } catch (e) { /* ใช้วิธีเดิม */ }
+    if (!data) data = await fetchAllRows(() => supabase.from('usage_records_raw').select('customer_code, customer_name'));
     const set = new Set();
     (data || []).forEach(d => {
       const code = (d.customer_code || '').trim(), name = (d.customer_name || '').trim();
