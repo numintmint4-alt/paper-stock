@@ -10,7 +10,7 @@ window.APP_CONFIG = {
   //   00  = จำนวนครั้งที่เผยแพร่ให้ใช้งานจริง
   //   001 = นับครั้งที่แก้ไขตั้งแต่วันเริ่มแก้ไข
   //   01  = ครั้งที่แก้ไขในวันนั้น
-  version: 'Version.00.001.01',
+  version: 'Version.00.001.02',
 
   // เมนูซ้าย: จัดกลุ่มตามนี้ (tab = หน้าเดิม, sec = ส่วนในหน้าตั้งค่า)
   menu: [
@@ -27,7 +27,7 @@ window.APP_CONFIG = {
     { id: 'use', title: 'การใช้ม้วนกระดาษ', icon: 'factory', img: 'img/machine.jpg', items: [
       { tab: 'usage-pivot',    title: 'รายงานการใช้ม้วนกระดาษตามผลผลิต',         icon: 'chart' },
       { tab: 'reservations',   title: 'ตารางรายการจองม้วนกระดาษ',                icon: 'calcheck' },
-      { tab: 'settings', sec: 'accRolluse', title: 'รายงานการเบิกใช้ม้วนกระดาษ', icon: 'inbox' }
+      { tab: 'usage-issue',   title: 'รายงานการเบิกใช้ม้วนกระดาษ',              icon: 'inbox' }
     ]},
     { id: 'set', title: 'ตั้งค่า', icon: 'gear', img: 'img/fsc.jpg', items: [
       { tab: 'settings', sec: 'accMaster',      title: 'Data Master',  icon: 'database' },
