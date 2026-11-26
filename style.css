@@ -118,7 +118,7 @@ input:focus, select:focus { outline: none; border-color: var(--primary); box-sha
 .grade-list .item.checked{background:var(--primary-soft);color:var(--primary-dark);font-weight:700}
 
 /* ================= MESSAGES ================= */
-.msg { padding: 12px 16px; border-radius: var(--radius-md); margin: 12px 0; font-size: 14px; line-height: 1.6; border: 1px solid transparent; display: flex; align-items: center; gap: 8px; }
+.msg { padding: 12px 16px; border-radius: var(--radius-md); margin: 12px 0; font-size: 14px; line-height: 1.6; border: 1px solid transparent; display: block; white-space: normal; word-break: break-word; }
 .msg.err  { background: var(--red-soft);    color: var(--red-dark);    border-color: var(--red-bg); }
 .msg.ok   { background: var(--green-soft);  color: var(--green-dark);  border-color: var(--green-bg); }
 .msg.info { background: var(--primary-soft);color: var(--primary-dark);border-color: var(--primary-bg); }
