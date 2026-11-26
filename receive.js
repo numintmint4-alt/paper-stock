@@ -166,11 +166,22 @@ async function ensureReceiveFresh(receiveDate, opts = {}) {
       return recSet.size ? { ok: true, synced: false } : { ok: false, reason: 'no_po' };
     }
 
+    // ผู้ใช้ที่ไม่ใช่แอดมินเขียน po_receive ไม่ได้ (RLS) — ดึงเฉพาะเมื่อยังไม่มีข้อมูลเลย (พฤติกรรมเดิม)
+    if (typeof isAdmin === 'function' && !isAdmin() && recSet.size > 0) {
+      return { ok: true, synced: false };
+    }
+
     let same = poSet.size === recSet.size;
     if (same) for (const n of poSet) { if (!recSet.has(n)) { same = false; break; } }
     if (same) return { ok: true, synced: false };
 
-    return await fetchFromPO(receiveDate, opts).then(r => ({ ...r, synced: !!r.ok }));
+    const r = await fetchFromPO(receiveDate, opts);
+    // ดึงใหม่ไม่สำเร็จ แต่ยังมีข้อมูลเดิม → แสดงข้อมูลเดิมต่อ แทนการขึ้น error
+    if (!r.ok && r.reason !== 'no_po' && recSet.size > 0) {
+      console.warn('[ensureReceiveFresh] ดึงใหม่ไม่สำเร็จ ใช้ข้อมูลเดิมแทน:', r.error);
+      return { ok: true, synced: false, stale: true };
+    }
+    return { ...r, synced: !!r.ok };
   } catch (e) {
     console.error('ensureReceiveFresh error:', e);
     return { ok: false, error: e.message };
