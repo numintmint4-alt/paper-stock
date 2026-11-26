@@ -139,35 +139,59 @@ async function saveAlertItems(gradegram, size, items, dateOrIdx) {
   if (!_dbAlertInputs[isoDate]) _dbAlertInputs[isoDate] = {};
   _dbAlertInputs[isoDate][`${gradegram}|${size}`] = items;
 
-  try {
-    await supabase.from('alert_active_inputs')
-      .delete()
-      .eq('receive_date', isoDate)
-      .eq('gradegram', gradegram)
-      .eq('size', size);
+  // เรียงคิวต่อรายการ (วัน+เกรด+ไซส์) กันบันทึกซ้อนกันตอนพิมพ์/กดเร็วๆ
+  const qKey = `${isoDate}|${gradegram}|${size}`;
+  window._alertSaveQ = window._alertSaveQ || {};
+  const run = async () => {
+    let backup = null;
+    try {
+      // 1) เก็บสำเนาของเดิมไว้ก่อน (เผื่อบันทึกใหม่ไม่สำเร็จ จะได้คืนค่าเดิม ไม่ให้ข้อมูลหาย)
+      const { data: old, error: e0 } = await supabase.from('alert_active_inputs')
+        .select('*').eq('receive_date', isoDate).eq('gradegram', gradegram).eq('size', size);
+      if (e0) throw e0;
+      backup = old || [];
 
-    if (items && items.length > 0) {
-      const payload = items.map(it => ({
-        receive_date: isoDate,
-        gradegram: gradegram,
-        size: size,
-        qty: Number(it.qty) || 0,
-        sup: it.sup || '',
-        customer_roll: it.customer_roll || 'normal',
-        quality_b: it.quality_b || 'normal',
-        note: it.note || '',
-        updated_by: currentUser?.id || null,
-        res_id: it.res_id || it.reservation_id || null
-      }));
-      const { error } = await supabase.from('alert_active_inputs').insert(payload);
-      if (error) throw error;
+      // 2) ลบของเดิม
+      const { error: eDel } = await supabase.from('alert_active_inputs')
+        .delete().eq('receive_date', isoDate).eq('gradegram', gradegram).eq('size', size);
+      if (eDel) throw eDel;
+
+      // 3) บันทึกชุดใหม่ — ถ้าล้มเหลว คืนค่าเดิม
+      if (items && items.length > 0) {
+        const payload = items.map(it => ({
+          receive_date: isoDate,
+          gradegram: gradegram,
+          size: size,
+          qty: Number(it.qty) || 0,
+          sup: it.sup || '',
+          customer_roll: it.customer_roll || 'normal',
+          quality_b: it.quality_b || 'normal',
+          note: it.note || '',
+          updated_by: currentUser?.id || null,
+          res_id: it.res_id || it.reservation_id || null
+        }));
+        const { error } = await supabase.from('alert_active_inputs').insert(payload);
+        if (error) {
+          if (backup.length) {
+            const restore = backup.map(r => { const c = { ...r }; delete c.id; return c; });
+            const { error: eRes } = await supabase.from('alert_active_inputs').insert(restore);
+            if (eRes) console.error('Restore alert_active_inputs failed:', eRes);
+            else _dbAlertInputs[isoDate][`${gradegram}|${size}`] = backup.map(r => ({
+              qty: r.qty, sup: r.sup, customer_roll: r.customer_roll, quality_b: r.quality_b, note: r.note, res_id: r.res_id
+            }));
+          }
+          throw error;
+        }
+      }
+    } catch (err) {
+      console.error('Autosave Error:', err);
+      if (typeof showToast === 'function') {
+        showToast('⚠️ บันทึกอัตโนมัติไม่สำเร็จ (ข้อมูลเดิมยังอยู่): ' + (err.message || err), 'err');
+      }
     }
-  } catch (err) {
-    console.error('Autosave Error:', err);
-    if (typeof showToast === 'function') {
-      showToast('⚠️ บันทึกอัตโนมัติไม่สำเร็จ: ' + err.message, 'err');
-    }
-  }
+  };
+  window._alertSaveQ[qKey] = (window._alertSaveQ[qKey] || Promise.resolve()).then(run, run);
+  return window._alertSaveQ[qKey];
 }
 
 // ═══════════════════════════════════════════════════════════════
