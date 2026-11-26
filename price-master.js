@@ -48,11 +48,32 @@ async function initPriceMaster() {
 
   await loadPriceMasterList();
 
-  // ถ้าเดือนนี้ยังไม่มีราคา → auto-copy จากเดือนก่อนหน้า
-  if (!pmCache.length) {
-    await autoCopyFromPrevMonth();
-  }
+  // ถ้าเดือนนี้ยังไม่มีราคา → ถามก่อนว่าจะ copy จากเดือนก่อนไหม (ไม่เขียนข้อมูลเองอัตโนมัติอีกแล้ว)
+  renderPMList();
+  if (!pmCache.length) await promptCopyFromPrevMonth();
+}
 
+// แสดงปุ่มให้ผู้ใช้กดเองเมื่อเดือนที่เปิดยังไม่มีราคา (เดิมระบบ copy ให้เองทันทีที่เปิดหน้า/เปลี่ยนเดือน)
+async function promptCopyFromPrevMonth() {
+  try {
+    const prevMonth = getPrevMonth(pmSelectedMonth);
+    const { count, error } = await supabase.from('price_master')
+      .select('*', { count: 'exact', head: true }).eq('month', prevMonth).eq('is_active', true);
+    if (error) throw error;
+    if (!count) {
+      showMsg('pmMsg', `เดือน ${esc(pmSelectedMonth)} ยังไม่มีราคา และเดือนก่อนหน้า (${esc(prevMonth)}) ก็ไม่มีราคาให้ copy — ใช้ Import Excel เพื่อนำเข้าราคา`, 'info');
+      return;
+    }
+    showMsg('pmMsg',
+      `เดือน ${esc(pmSelectedMonth)} ยังไม่มีราคา — ` +
+      `<button type="button" class="primary" style="margin-left:6px" onclick="doCopyFromPrevMonthNow()">📋 Copy ราคาจากเดือน ${esc(prevMonth)} (${count} รายการ)</button>`, 'info');
+  } catch (e) {
+    console.warn('promptCopyFromPrevMonth:', e);
+  }
+}
+
+async function doCopyFromPrevMonthNow() {
+  await autoCopyFromPrevMonth();
   renderPMList();
 }
 
@@ -64,8 +85,7 @@ async function initPriceMaster() {
 async function autoCopyFromPrevMonth() {
   try {
     const prevMonth = getPrevMonth(pmSelectedMonth);
-    console.log('[PriceMaster] เดือน ' + pmSelectedMonth + ' ว่าง → auto-copy จาก ' + prevMonth);
-
+    
     // 1) ดึงราคาเดือนก่อนหน้า
     const { data: prev, error: err1 } = await supabase
       .from('price_master')
@@ -189,12 +209,10 @@ async function onPMonthChange() {
 
   await loadPriceMasterList();
 
-  // ถ้าเดือนใหม่ไม่มีราคา → auto-copy จากเดือนก่อนหน้า
-  if (!pmCache.length) {
-    await autoCopyFromPrevMonth();
-  }
-
+  // ถ้าเดือนใหม่ไม่มีราคา → ถามก่อนว่าจะ copy จากเดือนก่อนไหม
+  const msgEl = $('pmMsg'); if (msgEl) msgEl.innerHTML = '';
   renderPMList();
+  if (!pmCache.length) await promptCopyFromPrevMonth();
 }
 
 // ═══════════════════════════════════════════════════════════════
