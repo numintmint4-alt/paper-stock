@@ -2254,6 +2254,23 @@ async function openDeletedPODetail(poId) {
   }
 }
 
+// V.15.3: ตรวจรหัสผ่านของผู้ใช้ที่ล็อกอินอยู่ (ไม่กระทบ session ปัจจุบัน)
+async function verifyOwnPassword(password) {
+  const email = currentUser?.email || '';
+  if (!email) return { ok: false, error: 'ไม่พบ email ผู้ใช้' };
+  try {
+    const tempClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+    });
+    const { data, error } = await tempClient.auth.signInWithPassword({ email, password });
+    if (error || !data?.user) return { ok: false, error: 'รหัสผ่านไม่ถูกต้อง' };
+    try { await tempClient.auth.signOut(); } catch (e) { /* ignore */ }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: 'ตรวจรหัสผ่านไม่สำเร็จ: ' + e.message };
+  }
+}
+
 async function deletePO(poId) {
   const po = poCache.find(p => p.id === poId);
   if (!po) return;
@@ -2261,8 +2278,15 @@ async function deletePO(poId) {
   let password = null;
 
   if (po.status === 'saved' || po.status === 'sent') {
-    password = prompt(`🔒 PO นี้สถานะ ${po.status.toUpperCase()}\nกรุณาใส่รหัสผ่านเพื่อยืนยัน:`);
+    password = prompt(`🔒 PO นี้สถานะ ${po.status.toUpperCase()}\nกรุณาใส่รหัสผ่านของคุณเพื่อยืนยัน:`);
     if (!password) return;
+
+    // V.15.3 FIX: ตรวจรหัสผ่านที่หน้าเว็บก่อน (ฟังก์ชัน delete_purchase_order ใน DB ไม่ได้ตรวจรหัสจริง)
+    const v = await verifyOwnPassword(password);
+    if (!v.ok) {
+      alert('❌ ' + v.error + ' — ยกเลิกการลบ');
+      return;
+    }
   }
 
   const note = prompt('📝 หมายเหตุการลบ:');
