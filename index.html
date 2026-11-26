@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CS Roll Control</title>
+<title>RollPaper Control</title>
 <script>(function(){var t=null;try{t=localStorage.getItem("theme")}catch(e){}if(t!=="dark"&&t!=="light")t="light";document.documentElement.setAttribute("data-theme",t)})()</script>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
@@ -16,13 +16,14 @@
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="shell.css">
 <link rel="stylesheet" href="dark.css">
+<link rel="stylesheet" href="theme3.css">
 </head>
 <body>
 
 <div id="loginScreen" class="login-wrap">
   <div class="login-card">
     <div class="lg-logo" data-logo></div>
-    <h1 data-site-name>CS Roll Control</h1>
+    <h1 data-site-name>RollPaper Control</h1>
     <p class="lg-sub" data-site-sub>ระบบบริหารม้วนกระดาษ</p>
     <label>ชื่อผู้ใช้<input id="loginUser" autocomplete="username" placeholder="เช่น sukanya"></label>
     <label>รหัสผ่าน<input id="loginPass" type="password" autocomplete="current-password" placeholder="••••••"></label>
@@ -37,12 +38,12 @@
   <aside class="sidebar" id="sidebar">
     <div class="sb-brand">
       <span data-logo></span>
-      <div class="bt"><b data-site-name>CS Roll Control</b><small data-site-sub>ระบบบริหารม้วนกระดาษ</small></div>
+      <div class="bt"><b data-site-name>RollPaper Control</b><small data-site-sub>ระบบบริหารม้วนกระดาษ</small></div>
     </div>
     <nav class="nav sb-nav" id="sbNav"></nav>
     <div class="sb-foot">
       <img src="img/forklift.png" alt="">
-      <div class="fv"><b data-site-name>CS Roll Control</b><span class="ver" data-app-version></span></div>
+      <div class="fv"><b data-site-name>RollPaper Control</b><span class="ver" data-app-version></span></div>
     </div>
   </aside>
   <div class="sb-overlay" id="sbOverlay"></div>
@@ -59,7 +60,8 @@
     <div class="content">
     <div class="page-banner">
       <div class="bn-img" id="bnImg"></div>
-      <div class="bn-txt"><div class="bn-group" id="bnGroup"></div><h1 id="bnTitle"></h1></div>
+      <div class="bn-txt"><div class="bn-group" id="bnGroup"></div><h1 id="bnTitle"></h1><div class="bn-chips" id="bnChips"></div></div>
+      <span class="bn-code" id="bnCode"></span>
     </div>
 
   <div class="container">
@@ -1210,6 +1212,7 @@
 <script src="app.js"></script>
 <script src="price-master.js"></script>
 <script src="purchase-order.js"></script>
+<script src="ui-polish.js"></script>
 <script src="stock-level.js"></script>
 <script src="stock.js"></script>
 <script src="receive.js"></script>
@@ -1223,6 +1226,7 @@
 <script src="forecast-export.js"></script>
 <script src="reservations.js"></script>
 <script src="usage-issue.js"></script>
+<script src="autorun.js"></script>
 
 <script>
 document.addEventListener('keypress', (e) => {
