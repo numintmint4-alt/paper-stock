@@ -755,6 +755,36 @@ function toggleResReasonNote() {
 }
 
 // ==========================================
+// V.6.6: ยอดคงเหลือจริงของแต่ละรายการจอง
+//   = จำนวนที่จอง + ยอดปรับลด (รายการลูกที่ parent = รายการนี้) + ยอดตัดจาก PO (log 'complete')
+//   ใช้กับปุ่ม "ปรับลด/คืนยอด" เพื่อให้เห็นรายการที่ตัดบางส่วนแล้วแต่ยังเหลือยอด
+// ==========================================
+async function getResRemainingMap(rows) {
+    const map = {};
+    (rows || []).forEach(r => { map[r.id] = Number(r.quantity) || 0; });
+    const ids = (rows || []).map(r => r.id);
+    const CH = 100;
+    for (let i = 0; i < ids.length; i += CH) {
+        const part = ids.slice(i, i + CH);
+        const { data: kids, error: e1 } = await supabase
+            .from('roll_reservations')
+            .select('parent_reservation_id, quantity')
+            .in('parent_reservation_id', part);
+        if (e1) throw e1;
+        (kids || []).forEach(k => { map[k.parent_reservation_id] += Number(k.quantity) || 0; });
+
+        const { data: logs, error: e2 } = await supabase
+            .from('roll_reservation_logs')
+            .select('reservation_id, qty_change')
+            .eq('action_type', 'complete')
+            .in('reservation_id', part);
+        if (e2) throw e2;
+        (logs || []).forEach(l => { map[l.reservation_id] += Number(l.qty_change) || 0; });
+    }
+    return map;
+}
+
+// ==========================================
 // 8.7 ฟังก์ชันบันทึกข้อมูล
 // ==========================================
 async function saveReservation(grade, size) {
@@ -778,7 +808,8 @@ async function saveReservation(grade, size) {
     btn.innerHTML = '⏳ กำลังบันทึก...';
 
     try {
-        const { error } = await supabase.from('roll_reservations').insert({
+        // V.6.6 FIX: รับ id ของแถวที่เพิ่ง insert โดยตรง (เดิมค้นหา "แถวล่าสุด" ซึ่งอาจผิดแถวถ้ามีคนบันทึกพร้อมกัน)
+        const { data: newData, error } = await supabase.from('roll_reservations').insert({
             reservation_date: resDate,
             grade: grade,
             size: size,
@@ -792,23 +823,11 @@ async function saveReservation(grade, size) {
             adjust_type: 'increase',
             status: 'reserved',
             created_by: currentUser?.id || null
-        });
+        }).select('id').single();
 
         if (error) throw error;
 
-        // บันทึก Log
-        const { data: newData } = await supabase
-            .from('roll_reservations')
-            .select('id')
-            .eq('reservation_date', resDate)
-            .eq('grade', grade)
-            .eq('size', size)
-            .eq('supplier', supplier)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
-
-        if (newData) {
+        if (newData?.id) {
             await logReservationAction(newData.id, 'reserve', qty, null, 'สร้างรายการจองใหม่');
         }
 
@@ -844,24 +863,30 @@ async function openDecreaseReservationForm(grade, size) {
             .select('*')
             .eq('grade', grade)
             .eq('size', size)
-            .eq('status', 'reserved')
             .gt('quantity', 0)
             .order('created_at', { ascending: false });
 
         if (error) throw error;
 
-        if (!data || data.length === 0) {
+        // V.6.6 FIX: ไม่กรองด้วย status แล้ว — ใช้ "ยอดคงเหลือจริง" แทน
+        // (เดิม PO ตัดยอดบางส่วนแล้วสถานะเป็น completed ทำให้รายการที่ยังเหลือยอดหายจากรายการนี้)
+        const remMap = await getResRemainingMap(data || []);
+        const usable = (data || []).filter(r => (remMap[r.id] || 0) > 0);
+
+        if (usable.length === 0) {
             modalBody.innerHTML = `<div style="text-align:center;padding:30px;color:#94a3b8;">ไม่มียอดจองให้ปรับลด</div>`;
             return;
         }
 
-        const srcOptions = data.map(r => {
+        const srcOptions = usable.map(r => {
+            const rem = remMap[r.id] || 0;
             const dateStr = r.reservation_date
                 ? new Date(r.reservation_date).toLocaleDateString('th-TH')
                 : '-';
             const qualityLabel = r.quality === 'B' ? 'B(NC)' : 'A';
-            const label = `${dateStr} · ${r.supplier} · ${r.quantity} ม้วน · ${qualityLabel} · ${r.customer_mark || '-'}`;
-            return `<option value="${r.id}" data-qty="${r.quantity}" data-supplier="${escAttr(r.supplier || '')}">
+            const remText = rem === Number(r.quantity) ? `${rem} ม้วน` : `เหลือ ${rem} ม้วน (จองไว้ ${r.quantity})`;
+            const label = `${dateStr} · ${r.supplier} · ${remText} · ${qualityLabel} · ${r.customer_mark || '-'}`;
+            return `<option value="${r.id}" data-qty="${rem}" data-supplier="${escAttr(r.supplier || '')}">
                         ${escHtml(label)}
                     </option>`;
         }).join('');
@@ -1004,12 +1029,13 @@ async function saveDecreaseReservation(grade, size) {
         if (srcErr) throw srcErr;
         if (!srcData) throw new Error('ไม่พบรายการต้นทาง');
 
-        const srcQty = Number(srcData.quantity) || 0;
+        const remMap = await getResRemainingMap([srcData]);
+        const srcQty = remMap[srcData.id] || 0;
         if (decQty > srcQty) {
-            throw new Error(`จำนวนที่ลด (${decQty}) มากกว่ายอดต้นทาง (${srcQty})`);
+            throw new Error(`จำนวนที่ลด (${decQty}) มากกว่ายอดคงเหลือของรายการต้นทาง (${srcQty})`);
         }
 
-        const { error } = await supabase.from('roll_reservations').insert({
+        const { data: newDecData, error } = await supabase.from('roll_reservations').insert({
             reservation_date: getTodayISO(),
             grade: grade,
             size: size,
@@ -1025,24 +1051,11 @@ async function saveDecreaseReservation(grade, size) {
             remark: remark,
             status: 'reserved',
             created_by: currentUser?.id || null
-        });
+        }).select('id').single();
 
         if (error) throw error;
 
-        // บันทึก Log
-        const { data: newDecData } = await supabase
-            .from('roll_reservations')
-            .select('id')
-            .eq('reservation_date', getTodayISO())
-            .eq('grade', grade)
-            .eq('size', size)
-            .eq('supplier', srcData.supplier)
-            .eq('adjust_type', 'decrease')
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
-
-        if (newDecData) {
+        if (newDecData?.id) {
             await logReservationAction(newDecData.id, 'decrease', -Math.abs(decQty), null, adjustReason);
         }
 
@@ -1141,66 +1154,103 @@ function exportReservationForm() {
 }
 
 // ==========================================
-// 8.13 Export ข้อมูลจริงตามวันที่ที่เลือก
+// 8.13 Export ข้อมูลการจอง — ตรงกับตารางที่แสดง (สะสมถึงวันที่เลือก)
+//   V.6.6: เดิม export เฉพาะรายการของ "วันนั้น" แต่ตารางแสดงยอดสะสม ตัวเลขจึงไม่ตรงกัน
+//   ตอนนี้: export ทุกรายการจองถึงวันที่เลือก (ตามตัวกรองลูกค้า + แท็บเกรดที่เลือก)
+//   พร้อมคอลัมน์ "ตัดยอดแล้ว" และ "คงเหลือ" — ผลรวม "คงเหลือ" ต่อเกรด/ไซส์ = ตัวเลขในตาราง
 // ==========================================
+function resGradeInGroup(gradeName, group) {
+    const gn = String(gradeName || '').toUpperCase();
+    if (group === 'ALL') return true;
+    if (group === 'FSC') return gn.includes('F');
+    return gn.startsWith(group) && !gn.includes('F');
+}
+
 function exportReservationData() {
     const filterDate = document.getElementById('reservationDate')?.value || '';
+    const group = resState.gradeFilter;
 
-    let dataToExport = resState.data || [];
-    if (filterDate) {
-        dataToExport = dataToExport.filter(r => r.reservation_date === filterDate);
+    let rows = (resState.data || []).filter(r => resGradeInGroup(r.grade, group));
+    if (resState.customers.length) {
+        rows = rows.filter(r => resState.customers.includes((r.customer_mark || '-').trim() || '-'));
     }
 
-    if (dataToExport.length === 0) {
-        return showToast(`ไม่พบข้อมูลการจอง${filterDate ? ' ณ วันที่ ' + filterDate : ''}`, 'warn');
+    if (rows.length === 0) {
+        return showToast(`ไม่พบข้อมูลการจอง${filterDate ? ' ถึงวันที่ ' + filterDate : ''}`, 'warn');
     }
+
+    // ยอดที่ถูกตัดจาก PO ต่อรายการ (log complete ที่โหลดมาแล้วถึงวันที่เลือก)
+    const doneById = {};
+    (resState.logs || []).forEach(l => {
+        doneById[l.reservation_id] = (doneById[l.reservation_id] || 0) + (Number(l.qty_change) || 0);
+    });
+
+    rows = [...rows].sort((a, b) =>
+        String(a.reservation_date).localeCompare(String(b.reservation_date)) ||
+        String(a.grade).localeCompare(String(b.grade)) ||
+        (Number(a.size) - Number(b.size)));
 
     const headers = [
         'วันที่จอง', 'Gradegrams', 'Size', 'Supplier',
         'จำนวน (ม้วน)', 'คุณภาพ', 'ปั๊มลูกค้า', 'ประเภท',
-        'หมายเหตุ', 'สถานะ', 'การเคลื่อนไหว'
+        'หมายเหตุ', 'สถานะ', 'การเคลื่อนไหว',
+        'ตัดยอดแล้ว (ม้วน)', 'คงเหลือ (ม้วน)'
     ];
 
-    const dataRows = dataToExport.map(r => {
+    const cellTotals = {};
+    const dataRows = rows.map(r => {
+        const qty = Number(r.quantity) || 0;
+        const done = doneById[r.id] || 0;          // ค่าติดลบ (ตัดยอดแล้ว)
+        const remain = qty + done;
+
         let qType = 'ปกติ';
         if (r.adjust_type === 'decrease') qType = 'ปรับลด/คืน';
 
-        let dateStr = '-';
-        if (r.reservation_date) {
-            const d = new Date(r.reservation_date);
-            dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-        }
+        let statusText = 'จองอยู่';
+        if (r.status !== 'reserved') statusText = remain <= 0 ? 'ตัดยอดครบ' : 'ตัดยอดบางส่วน';
+
+        const key = `${r.grade}|${r.size}`;
+        cellTotals[key] = (cellTotals[key] || 0) + remain;
 
         return [
-            dateStr,
+            r.reservation_date ? String(r.reservation_date).slice(0, 10) : '-',
             r.grade || '-',
             r.size || '-',
             r.supplier || '-',
-            Number(r.quantity) || 0,
+            qty,
             r.quality === 'B' ? 'B' : 'A',
             r.customer_mark || '-',
             r.reason_type === 'forecast' ? 'ประมาณการ' : (r.reason_note || 'อื่นๆ'),
             r.remark || '-',
-            r.status === 'reserved' ? 'จองอยู่' : 'ปิด/ตัดยอด',
-            qType
+            statusText,
+            qType,
+            done,
+            remain
         ];
     });
 
-    const wsData = [headers, ...dataRows];
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
-
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows]);
     ws['!cols'] = [
         {wch: 14}, {wch: 12}, {wch: 8}, {wch: 10}, {wch: 12},
-        {wch: 10}, {wch: 15}, {wch: 18}, {wch: 25}, {wch: 12}, {wch: 15}
+        {wch: 10}, {wch: 15}, {wch: 18}, {wch: 25}, {wch: 14}, {wch: 15},
+        {wch: 16}, {wch: 14}
     ];
+
+    // ชีทสรุป: ตรงกับตัวเลขในตาราง Matrix
+    const sumRows = Object.keys(cellTotals).sort().map(k => {
+        const [g, sz] = k.split('|');
+        return [g, Number(sz), cellTotals[k]];
+    }).filter(r => r[2] !== 0);
+    const ws2 = XLSX.utils.aoa_to_sheet([['Gradegrams', 'Size', 'คงเหลือ (ม้วน)'], ...sumRows]);
+    ws2['!cols'] = [{wch: 14}, {wch: 8}, {wch: 16}];
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'ReservationData');
+    XLSX.utils.book_append_sheet(wb, ws2, 'สรุปตามเกรด-ไซส์');
 
-    const dateLabel = filterDate || 'all';
-    XLSX.writeFile(wb, `reservation_data_${dateLabel}.xlsx`);
+    XLSX.writeFile(wb, `reservation_data_asof_${filterDate || 'all'}.xlsx`);
 
-    showToast(`✅ Export ข้อมูล ${dataToExport.length} รายการ สำเร็จ`, 'ok');
+    showToast(`✅ Export ข้อมูลสะสมถึง ${filterDate || 'ปัจจุบัน'} จำนวน ${rows.length} รายการ สำเร็จ`, 'ok');
 }
 
 // ==========================================
@@ -1258,12 +1308,32 @@ async function importReservations(event) {
         const payload = [];
         const errors = [];
 
+        // จับคู่เกรดกับ Master (รองรับพิมพ์ต่างรูปแบบ เช่น CA85 → CA085) และข้ามรายการที่ไม่มีใน Master
+        // (รายการที่ไม่มีใน Master จะไม่แสดงในตาราง Matrix ทำให้ยอดจองหายจากสายตา)
+        await ensureMasterDataLoaded();
+        const masterGradeMap = new Map();
+        const masterPairs = new Set();
+        ((window.fcState && window.fcState.masterData) || []).forEach(m => {
+            const g = m.grade + m.gram;
+            masterGradeMap.set(typeof normalizeGrade === 'function' ? normalizeGrade(g) : g, g);
+            masterPairs.add(`${g}|${Number(m.size)}`);
+        });
+
         rows.forEach((row, idx) => {
             const rowNum = idx + 2;
             const isoDate = resParseImportDate(row['วันที่จอง']);
-            const grade = String(row['Gradegrams'] || '').trim().toUpperCase();
+            let grade = String(row['Gradegrams'] || '').trim().toUpperCase();
             const size = Number(row['Size']);
             const qty = Number(row['จำนวน (ม้วน)']);
+
+            if (grade && masterGradeMap.size) {
+                const exact = masterGradeMap.get(typeof normalizeGrade === 'function' ? normalizeGrade(grade) : grade);
+                if (exact) grade = exact;
+                if (size && !masterPairs.has(`${grade}|${size}`)) {
+                    errors.push(`แถว ${rowNum}: ไม่พบ ${grade} ไซส์ ${size} ใน Master Data`);
+                    return;
+                }
+            }
 
             if (!isoDate || !grade || !size || isNaN(qty) || qty === 0) {
                 errors.push(`แถว ${rowNum}: ข้อมูลไม่ครบหรือวันที่ไม่ถูกต้อง (วันที่/Grade/Size/จำนวน)`);
