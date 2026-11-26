@@ -632,6 +632,7 @@ async function _saveUsageSnapshotImpl() {
         showToast('บันทึก Snapshot ไม่สำเร็จ: ' + error.message, 'err');
     } else {
         showToast(`บันทึก Snapshot เดือน ${month} สำเร็จ (${payloads.length} รายการ)`, 'ok');
+        document.getElementById('pivot-stale-notice')?.remove();
         renderSnapshotHistory();
     }
 }
@@ -861,6 +862,31 @@ async function viewSnapshotDetail(month, customer) {
 }
 
 // ==========================================
+// แจ้งเตือนหลัง Import: ผลสรุปรายปี/Forecast ยังเป็นค่าเดิมจนกว่าจะกด "บันทึก"
+// ==========================================
+function showSnapshotStaleNotice(months) {
+    try {
+        const old = document.getElementById('pivot-stale-notice');
+        if (old) old.remove();
+
+        const monthText = (months || []).map(m => (typeof thaiMonthShort === 'function' ? thaiMonthShort(m) : m)).join(', ');
+        const html = `<div id="pivot-stale-notice" class="msg warn" style="margin:10px 0;border-left:4px solid #f59e0b;display:flex;gap:10px;align-items:flex-start;justify-content:space-between">
+            <div>⚠️ <b>Import เดือน ${usageEscHtml(monthText)} สำเร็จแล้ว</b><br>
+            ผลสรุปรายปีและ Forecast ยังเป็นค่าเดิม — กด <b>โหลดข้อมูล Pivot</b> แล้วกด <b>บันทึก</b> เพื่ออัปเดต
+            (ทำซ้ำทุกชุดลูกค้าที่เคยบันทึก เช่น ALL และ "ลูกค้าทั่วไป")</div>
+            <button type="button" onclick="document.getElementById('pivot-stale-notice')?.remove()" style="flex:none">ปิด</button>
+        </div>`;
+
+        const host = document.getElementById('pivot-monthly-container') || document.getElementById('tab-usage-pivot');
+        if (host) host.insertAdjacentHTML('afterbegin', html);
+
+        showToast('Import แล้ว — ผลสรุปรายปีและ Forecast ยังเป็นค่าเดิม กด โหลดข้อมูล Pivot แล้ว บันทึก เพื่ออัปเดต', 'warn', 10000);
+    } catch (e) {
+        console.warn('showSnapshotStaleNotice:', e);
+    }
+}
+
+// ==========================================
 // 3. Import Excel (Usage Pivot)
 // ==========================================
 async function handleUsageImport(event) {
@@ -1011,6 +1037,7 @@ async function handleUsageImport(event) {
             }
 
             showToast(`Import สำเร็จ ${ok} รายการ`, 'ok');
+            showSnapshotStaleNotice([...monthsToDelete].sort());
 
             const fileInput = document.getElementById('pivot-file-upload');
             if (fileInput) fileInput.value = '';
