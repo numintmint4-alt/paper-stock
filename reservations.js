@@ -1206,14 +1206,46 @@ function exportReservationData() {
 // ==========================================
 // 8.14 Import ตารางการจองจาก Excel
 // ==========================================
-async function importReservations(event) {
-    const file = event.target.files[0];
-    if (!file) return;
+// V.6.5 FIX: Import ตารางการจอง
+//  - ไม่แตะแถบฟิลเตอร์ (เดิมใช้ previousElementSibling ทำให้แถบฟิลเตอร์ถูกล้าง)
+//  - กัน Import ซ้ำ (เทียบกับรายการที่มีอยู่แล้วในวันเดียวกัน)
+//  - เขียน log 'reserve' ให้ทุกรายการ
+//  - รองรับวันที่แบบเลข Excel / พ.ศ. / dd/mm/yyyy / yyyy-mm-dd
+let _resImporting = false;
 
-    const btn = event.target.previousElementSibling;
-    const originalText = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '⏳ กำลัง Import...';
+function resParseImportDate(v) {
+    if (v === null || v === undefined || v === '') return null;
+    if (v instanceof Date && !isNaN(v)) return v.toISOString().slice(0, 10);
+    if (typeof v === 'number' && v > 20000 && v < 80000) {            // เลข serial ของ Excel
+        const d = new Date(Math.round((v - 25569) * 86400 * 1000));
+        return d.toISOString().slice(0, 10);
+    }
+    const s = String(v).trim();
+    let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);       // dd/mm/yyyy
+    let y, mo, d;
+    if (m) { d = +m[1]; mo = +m[2]; y = +m[3]; }
+    else {
+        m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);        // yyyy-mm-dd
+        if (!m) return null;
+        y = +m[1]; mo = +m[2]; d = +m[3];
+    }
+    if (y > 2400) y -= 543;                                              // พ.ศ. → ค.ศ.
+    if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+    return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+function resImportKey(r) {
+    return [r.reservation_date, r.grade, Number(r.size), r.supplier || '', Number(r.quantity),
+            r.quality, (r.customer_mark || '-').trim(), r.reason_type, (r.remark || '').trim()].join('|');
+}
+
+async function importReservations(event) {
+    const input = event.target;
+    const file = input.files[0];
+    if (!file) return;
+    if (_resImporting) { showToast('กำลัง Import อยู่ กรุณารอสักครู่', 'warn'); input.value = ''; return; }
+    _resImporting = true;
+    showToast('⏳ กำลังอ่านไฟล์ Import...', 'info', 2500);
 
     try {
         const data = await file.arrayBuffer();
@@ -1228,22 +1260,14 @@ async function importReservations(event) {
 
         rows.forEach((row, idx) => {
             const rowNum = idx + 2;
-            const date = String(row['วันที่จอง'] || '').trim();
+            const isoDate = resParseImportDate(row['วันที่จอง']);
             const grade = String(row['Gradegrams'] || '').trim().toUpperCase();
             const size = Number(row['Size']);
             const qty = Number(row['จำนวน (ม้วน)']);
 
-            if (!date || !grade || !size || isNaN(qty) || qty === 0) {
-                errors.push(`แถว ${rowNum}: ข้อมูลไม่ครบ (วันที่/Grade/Size/จำนวน)`);
+            if (!isoDate || !grade || !size || isNaN(qty) || qty === 0) {
+                errors.push(`แถว ${rowNum}: ข้อมูลไม่ครบหรือวันที่ไม่ถูกต้อง (วันที่/Grade/Size/จำนวน)`);
                 return;
-            }
-
-            let isoDate = date;
-            if (date.includes('/')) {
-                const parts = date.split('/');
-                if (parts.length === 3) {
-                    isoDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-                }
             }
 
             const qualityStr = String(row['คุณภาพ'] || 'A').trim().toUpperCase();
@@ -1259,7 +1283,7 @@ async function importReservations(event) {
                 supplier: String(row['Supplier'] || '').trim() || null,
                 quantity: qty,
                 quality: quality,
-                customer_mark: String(row['ปั๊มลูกค้า'] || '-').trim(),
+                customer_mark: String(row['ปั๊มลูกค้า'] || '-').trim() || '-',
                 reason_type: reasonType,
                 reason_note: reasonType === 'other' ? reasonTypeStr : null,
                 remark: String(row['หมายเหตุ'] || '').trim(),
@@ -1273,17 +1297,65 @@ async function importReservations(event) {
             throw new Error(`ไม่มีข้อมูลที่สามารถ Import ได้\n${errors.slice(0, 3).join('\n')}`);
         }
 
+        // ---- กัน Import ซ้ำ: เทียบกับรายการที่มีอยู่แล้วในวันที่เดียวกัน ----
+        const dates = [...new Set(payload.map(p => p.reservation_date))];
+        const existing = await fetchAllRows(() => supabase
+            .from('roll_reservations')
+            .select('reservation_date, grade, size, supplier, quantity, quality, customer_mark, reason_type, remark')
+            .in('reservation_date', dates)
+            .order('reservation_date'));
+        const existCount = {};
+        (existing || []).forEach(r => {
+            const k = resImportKey(r);
+            existCount[k] = (existCount[k] || 0) + 1;
+        });
+
+        const toInsert = [];
+        let dupCount = 0;
+        payload.forEach(p => {
+            const k = resImportKey(p);
+            if (existCount[k] > 0) { existCount[k]--; dupCount++; }
+            else toInsert.push(p);
+        });
+
+        if (dupCount > 0) {
+            const msg = `พบรายการที่ซ้ำกับข้อมูลที่มีอยู่แล้ว ${dupCount} จาก ${payload.length} รายการ\n\n` +
+                `กด OK = ข้ามรายการซ้ำ และนำเข้าเฉพาะที่เหลือ ${toInsert.length} รายการ\n` +
+                `กด Cancel = ยกเลิกการ Import ทั้งหมด`;
+            if (!confirm(msg)) { showToast('ยกเลิกการ Import', 'warn'); return; }
+        }
+        if (toInsert.length === 0) { showToast('ไม่มีรายการใหม่ให้ Import (ซ้ำทั้งหมด)', 'warn', 4000); return; }
+
+        // ---- insert + เขียน log ----
         const CHUNK_SIZE = 500;
         let successCount = 0;
+        const newIds = [];
 
-        for (let i = 0; i < payload.length; i += CHUNK_SIZE) {
-            const chunk = payload.slice(i, i + CHUNK_SIZE);
-            const { error } = await supabase.from('roll_reservations').insert(chunk);
+        for (let i = 0; i < toInsert.length; i += CHUNK_SIZE) {
+            const chunk = toInsert.slice(i, i + CHUNK_SIZE);
+            const { data: inserted, error } = await supabase.from('roll_reservations').insert(chunk).select('id, quantity');
             if (error) throw error;
             successCount += chunk.length;
+            (inserted || []).forEach(r => newIds.push(r));
         }
 
-        showToast(`✅ Import สำเร็จ ${successCount} รายการ`, 'ok', 4000);
+        try {
+            const logs = newIds.map(r => ({
+                reservation_id: r.id,
+                action_type: 'reserve',
+                qty_change: Number(r.quantity),
+                reason: 'Import จาก Excel',
+                created_by: currentUser?.id || null
+            }));
+            for (let i = 0; i < logs.length; i += CHUNK_SIZE) {
+                const { error: logErr } = await supabase.from('roll_reservation_logs').insert(logs.slice(i, i + CHUNK_SIZE));
+                if (logErr) console.warn('Import log error:', logErr);
+            }
+        } catch (logEx) {
+            console.warn('Import log exception:', logEx);
+        }
+
+        showToast(`✅ Import สำเร็จ ${successCount} รายการ${dupCount ? ` (ข้ามซ้ำ ${dupCount})` : ''}`, 'ok', 4000);
         if (errors.length > 0) {
             console.warn('Import errors:', errors);
             alert(`Import สำเร็จ ${successCount} รายการ\n\nแต่มีบางแถวที่ข้ามไป (${errors.length} แถว):\n\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? '\n...' : ''}`);
@@ -1295,8 +1367,7 @@ async function importReservations(event) {
         console.error('importReservations error:', err);
         alert('Import ไม่สำเร็จ: ' + err.message);
     } finally {
-        btn.disabled = false;
-        btn.innerHTML = originalText;
-        event.target.value = '';
+        _resImporting = false;
+        input.value = '';
     }
 }
