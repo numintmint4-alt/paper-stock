@@ -570,6 +570,37 @@ async function openPOFormWithVerify(poId) {
   openPOForm(poId);
 }
 
+// V.15.4: เตือนเมื่อมีรายการที่ราคา = 0 (ไม่มีใน Price Master หรือกรอกเป็น 0)
+//   คืน true = ไปต่อได้, false = ผู้ใช้เลือกกลับไปแก้
+function confirmIfZeroPrice(rows) {
+  const zero = (rows || []).filter(r => {
+    const p = r._strictPrice ? Number(r.price) : (Number(r.price) || getPriceFromMaster(r.gradegram, r.customer_roll, r.quality_b));
+    return !(p > 0);
+  });
+  if (!zero.length) return true;
+  const list = zero.slice(0, 8).map(r => `• ${r.gradegram || '-'} ${r.size || ''}`.trim()).join('\n');
+  return confirm(`⚠️ พบ ${zero.length} รายการที่ไม่มีราคา (ราคา = 0)\n\n${list}${zero.length > 8 ? '\n...' : ''}\n\nตรวจสอบ Price Master ของเดือนนี้ก่อน\n\nกด OK = บันทึกต่อทั้งที่ราคาเป็น 0\nกด Cancel = กลับไปแก้ไข`);
+}
+
+// V.15.4: บันทึกประวัติ po_change_log และแจ้งเตือนถ้าบันทึกไม่สำเร็จ
+//   (เดิม supabase ไม่ throw error จึงไม่เข้า catch ประวัติที่ไม่ครบจึงเงียบหาย)
+async function logPOChange(poId, action, note) {
+  try {
+    const { error } = await supabase.from('po_change_log').insert({
+      po_id: poId,
+      changed_by: currentUser?.id,
+      action: action,
+      note: note || '(ไม่ระบุ)'
+    });
+    if (error) throw error;
+    return true;
+  } catch (e) {
+    console.error('po_change_log insert failed:', e);
+    if (typeof showToast === 'function') showToast('⚠️ บันทึกประวัติการแก้ไขไม่สำเร็จ (' + (e.message || e) + ') — การทำรายการยังดำเนินต่อ', 'warn', 6000);
+    return false;
+  }
+}
+
 async function verifyAndOpen(po, password, note) {
   try {
     const email = currentUser?.email || '';
@@ -602,16 +633,7 @@ async function verifyAndOpen(po, password, note) {
       console.warn('[Verify] tempClient signOut error:', e);
     }
 
-    try {
-      await supabase.from('po_change_log').insert({
-        po_id: po.id,
-        changed_by: currentUser?.id,
-        action: 'edit_verified',
-        note: note || '(ไม่ระบุ)'
-      });
-    } catch (logErr) {
-      console.warn('po_change_log insert failed:', logErr);
-    }
+    await logPOChange(po.id, 'edit_verified', note);
 
     openPOForm(po.id);
     return { ok: true };
@@ -965,6 +987,9 @@ async function saveAllPOs(btnEl) {
     return;
   }
 
+  // V.15.4: เตือนถ้ามีรายการราคา 0
+  if (!confirmIfZeroPrice(posList.flatMap(p => p.items || []))) return;
+
   if (poEditingId) {
     const po = poCache.find(p => p.id === poEditingId);
     if (po && (po.status === 'saved' || po.status === 'sent')) {
@@ -999,16 +1024,7 @@ async function saveAllPOs(btnEl) {
             console.warn('[Verify] tempClient signOut error:', e);
           }
 
-          try {
-            await supabase.from('po_change_log').insert({
-              po_id: po.id,
-              changed_by: currentUser?.id,
-              action: 'save_verified',
-              note: note
-            });
-          } catch (logErr) {
-            console.warn('po_change_log insert failed:', logErr);
-          }
+          await logPOChange(po.id, 'save_verified', note);
 
           await _doSaveAllPOs(posList, alertData, btnEl);
           return { ok: true };
@@ -1486,6 +1502,8 @@ async function saveCreatePO(btnEl) {
     }
   }
 
+  if (!confirmIfZeroPrice(activeRows)) return;
+
   if (!confirm(`ยืนยันสร้าง PO ใหม่?\n\nSup: ${header.sup_code}\nวันที่รับ: ${header.ref_receive}\nจำนวน: ${activeRows.length} รายการ`)) return;
 
   const btn = btnEl || document.querySelector('#poFormBody .form-actions .primary');
@@ -1873,6 +1891,8 @@ async function saveEditPOItems(btnEl) {
   if (updatedOld.length) totalMsg.push(`แก้ไข ${updatedOld.length} รายการ`);
   if (newRows.length) totalMsg.push(`เพิ่ม ${newRows.length} รายการ`);
   if (orderChanged) totalMsg.push(`จัดลำดับใหม่ ${activeRows.filter(r => !r.isNew).length} รายการ`);
+
+  if (!confirmIfZeroPrice([...updatedOld.map(r => ({ ...r, _strictPrice: true })), ...newRows])) return;
 
   if (!confirm(`ยืนยันบันทึก?\n\n${totalMsg.join(' · ')}`)) return;
 
@@ -2840,6 +2860,8 @@ async function saveAddPOItems(btnEl) {
       return;
     }
   }
+
+  if (!confirmIfZeroPrice(validRows)) return;
 
   const btn = btnEl || document.getElementById('addPOItemsSaveBtn');
   if (btn) {
