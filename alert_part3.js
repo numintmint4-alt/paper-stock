@@ -391,7 +391,19 @@ function isFSCGrade(gradegram) {
 //  RENDER ALERT (Main)
 // ═══════════════════════════════════════════════════════════════
 
+// ครอบ renderAlert: ซ่อนการ์ด History + กันที่ไว้ จนกว่าตารางหลักจะวาดเสร็จ (กันภาพกระพริบ/โชว์ค่าเก่าก่อน)
 async function renderAlert() {
+  const hc = $('alertHistoryCard'), ab = $('alertBody');
+  if (hc) hc.style.display = 'none';
+  if (ab) ab.style.minHeight = '520px';
+  try { return await _renderAlertCore(); }
+  finally {
+    if (ab) ab.style.minHeight = '';
+    if (hc) hc.style.display = '';
+  }
+}
+
+async function _renderAlertCore() {
   const snapshotMonth = $('alertSnapshotMonth')?.value;
   const stockDate     = getISODateFromInput('alertStockDate');
 
