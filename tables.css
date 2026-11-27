@@ -445,10 +445,12 @@
 
 
   /* ---- hover ไฮไลท์แถว+คอลัมน์ใน Matrix ---- */
-  table td.hl-line { background-color: #e6f0ff !important; }
-  table td.hl-cell { background-color: #cfe1ff !important; }
-  :root[data-theme="dark"] table td.hl-line { background-color: #1c3563 !important; }
-  :root[data-theme="dark"] table td.hl-cell { background-color: #26457f !important; }
+  html body table tbody td.hl-line.hl-line.hl-line { background-color: #e6f0ff !important; }
+  html body table tbody td.hl-cell.hl-cell.hl-cell.hl-line { background-color: #cfe1ff !important; }
+  :root[data-theme="dark"] body table tbody td.hl-line.hl-line.hl-line { background-color: #1c3563 !important; }
+  :root[data-theme="dark"] body table tbody td.hl-cell.hl-cell.hl-cell.hl-line { background-color: #26457f !important; }
+  #alertMatrixCellBody .dd { display: block; width: 100%; }
+  #alertMatrixCellBody .dd-btn { width: 100%; }
 
 
   /* ======== แท็บ ALL / CA / KA / KI / KK / KW / FSC (ทุกหน้า) ======== */
