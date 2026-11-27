@@ -128,11 +128,11 @@
       else {
         const cur = curOrder(), last = arr[arr.length - 1];
         const canAdd = last.status === 'approved';
-        rt.innerHTML = arr.map(o => `<button type="button" class="fc-rev-tab st-${o.status} ${cur && o.id === cur.id ? 'active' : ''}"
+        rt.innerHTML = '<span class="fc-rev-lbl">Rev.</span>' + arr.map(o => `<button type="button" class="fc-rev-tab st-${o.status} ${cur && o.id === cur.id ? 'active' : ''}"
             title="${o.status === 'draft' ? 'ร่าง' : (o.status === 'saved' ? 'ล็อกแล้ว (รอแนบเอกสารอนุมัติ)' : 'อนุมัติแล้ว')}"
-            onclick="fcSelectRev('${o.id}')">Rev.${pad2(o.rev)}${o.status === 'approved' ? ' ✓' : (o.status === 'saved' ? ' 🔒' : '')}</button>`).join('') +
+            onclick="fcSelectRev('${o.id}')"><i class="d"></i>${pad2(o.rev)}${o.status === 'approved' ? ' ✓' : (o.status === 'saved' ? ' 🔒' : ' ร่าง')}</button>`).join('') +
           `<button type="button" class="fc-rev-tab fc-rev-add" ${canAdd ? '' : 'disabled'}
-            title="${canAdd ? 'เพิ่ม Rev ใหม่ (คัดลอกข้อมูลจาก Rev ล่าสุด)' : 'ต้องแนบเอกสารอนุมัติของ Rev ล่าสุดก่อน'}"
+            title="${canAdd ? 'เพิ่ม Rev ใหม่ (คัดลอกข้อมูลจาก Rev ล่าสุด)' : 'ต้องแนบเอกสารอนุมัติของ Rev ล่าสุดก่อน จึงจะเพิ่ม Rev ใหม่ได้'}"
             onclick="fcAddRev()">+ Rev.</button>`;
       }
     }
@@ -539,6 +539,42 @@
     });
     $id('fcPdfInput').addEventListener('change', fcAttachUpload);
     ['fcPwInput', 'fcPwNote'].forEach(id => $id(id)?.addEventListener('keypress', e => { if (e.key === 'Enter') window.fcPwConfirm(); }));
+
+    // เลื่อนช่องกรอกด้วยคีย์บอร์ด: Enter / ↓ = ลงช่องถัดไปใน Size เดียวกัน · Shift+Enter / ↑ = ขึ้น
+    // ถึงแถวสุดท้ายของตาราง → ข้ามไปแถวแรกของตารางแกรมถัดไป (และย้อนกลับตารางก่อนหน้าได้)
+    document.addEventListener('keydown', e => {
+      const inp = e.target;
+      if (!inp || inp.tagName !== 'INPUT' || !inp.closest || !inp.closest('.fc-table td.fc-in')) return;
+      if (e.isComposing || e.ctrlKey || e.altKey || e.metaKey) return;
+      let dir = 0;
+      if (e.key === 'ArrowDown' || (e.key === 'Enter' && !e.shiftKey)) dir = 1;
+      else if (e.key === 'ArrowUp' || (e.key === 'Enter' && e.shiftKey)) dir = -1;
+      if (!dir) return;
+      const tbl = inp.closest('.fc-table'), sz = inp.dataset.s;
+      const colInputs = t => [...t.querySelectorAll('td.fc-in input:not(:disabled)')].filter(x => x.offsetParent);
+      const same = colInputs(tbl).filter(x => x.dataset.s === sz);
+      const i = same.indexOf(inp);
+      let next = same[i + dir];
+      if (!next) {
+        const tables = [...document.querySelectorAll('#fcTables .fc-table')].filter(t => t.offsetParent);
+        let k = tables.indexOf(tbl) + dir;
+        while (k >= 0 && k < tables.length && !next) {
+          const all = colInputs(tables[k]);
+          const sizes = [...new Set(all.map(x => x.dataset.s))];
+          if (sizes.length) {
+            const pick = sizes.includes(sz) ? sz : sizes.reduce((a, b) => Math.abs(Number(b) - Number(sz)) < Math.abs(Number(a) - Number(sz)) ? b : a);
+            const col = all.filter(x => x.dataset.s === pick);
+            next = dir > 0 ? col[0] : col[col.length - 1];
+          }
+          k += dir;
+        }
+      }
+      e.preventDefault();
+      if (!next) return;
+      next.focus();
+      try { next.select(); } catch (_) {}
+      if (next.closest('.fc-table') !== tbl) next.scrollIntoView({ block: 'center' });
+    });
   }
 
   // ═════════════ บันทึก / ล็อก / แก้ไข / แนบ / Rev ═════════════
