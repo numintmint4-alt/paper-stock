@@ -896,5 +896,14 @@
   html body #poFormBody .form-actions button.primary { background: linear-gradient(90deg,#1677ff,#0b3f95) !important; color: #fff !important; border: 0 !important; box-shadow: 0 6px 16px rgba(22,119,255,.4); }
   /* หัวตาราง: "รายการคำนวณ / SIZE" ครอบคลุมตั้งแต่คอลัมน์ซ้ายสุด */
   html body .fc-table thead th.fc-h { left: 0 !important; text-align: left; padding-left: 16px !important; background: linear-gradient(90deg,#0d2f8f,#0b3f95) !important; z-index: 6; }
+  /* ===== ปุ่ม/แท็บในหน้าประมาณการ ขนาดและรูปแบบเดียวกัน ===== */
+  html body .fc-toolbar .fc-grp-sel, html body .fc-rev-inline .fc-rev-tab, html body .fc-toolbar .fc-chip, html body .fc-toolbar .fc-tb-right > button { height: 32px !important; box-sizing: border-box; border-radius: 99px !important; font: 700 12.5px 'Sarabun', sans-serif !important; padding: 0 16px !important; display: inline-flex; align-items: center; gap: 6px; line-height: 1; white-space: nowrap; }
+  html body .fc-toolbar .fc-grp-sel { padding-right: 30px !important; box-shadow: none; }
+  html body .fc-rev-inline .fc-rev-tab.active, html body .fc-toolbar .fc-tb-right > button.primary { background: linear-gradient(90deg,#1677ff,#0b3f95) !important; color: #fff !important; border: 0 !important; box-shadow: 0 4px 10px rgba(22,119,255,.35) !important; }
+  html body .fc-toolbar .fc-tb-right > button:not(.primary) { border: 1.5px solid #b9d0f2; background: #fff; color: #0b3f95; }
+  html body .fc-toolbar .fc-tb-right > button.fc-draft-btn { background: #eaf3ff; border-color: #1677ff; }
+  html body .fc-toolbar .fc-chip { padding: 0 14px !important; }
+  html body .fc-rail .it { height: 32px; padding: 0 6px !important; display: flex; align-items: center; justify-content: center; font: 700 12.5px 'Sarabun', sans-serif !important; box-sizing: border-box; }
+  html body .fc-rail .fc-rail-mode { height: 32px; padding: 0 8px; font: 700 12px 'Sarabun', sans-serif; border-radius: 99px; display: flex; align-items: center; justify-content: center; }
 }
 @media print { .fc-rail, .fc-pgnav { display: none !important; } .fc-tbl-wrap.fc-pg-hide { display: block !important; } .szh-pop, .sz-hide-btn { display: none !important; } .report-title .dd-btn { display: none !important; } .calc-note { display: none !important; } .ss-share { display: none !important; } .ss-chip { background: none !important; padding: 0 !important; } }
