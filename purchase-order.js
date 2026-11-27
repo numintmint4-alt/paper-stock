@@ -705,11 +705,18 @@ async function markPOSaved(poId) {
       }
 
       // 🔥 บันทึก Audit Log ว่าถูกตัดยอดไปสร้าง PO (ป้องกันซ้ำทีละรายการ)
+      // ✅ รวมจำนวนต่อ reservation_id ก่อน (PO เดียวอาจมีหลายบรรทัดที่ใช้รายการจองเดียวกัน
+      //    ไม่รวม = บรรทัดที่ 2 ถูกข้ามเพราะเช็กซ้ำด้วย reservation_id + po_no → ตัดยอดขาด)
+      const qtyByRes = new Map();
       for (const item of activeItems) {
         if (!item.reservation_id) continue; // ข้ามถ้าไม่มี ID จอง (Stock กลาง)
+        const q = Number(item.quantity) || 0;
+        if (q <= 0) continue;
+        qtyByRes.set(item.reservation_id, (qtyByRes.get(item.reservation_id) || 0) + q);
+      }
 
-        const qty = Number(item.quantity) || 0;
-        if (qty <= 0) continue; // ข้ามถ้าไม่มีจำนวน
+      for (const [resId, qty] of qtyByRes) {
+        const item = { reservation_id: resId, quantity: qty };
 
         try {
           // 🔒 เช็กทีละตัวว่ามี Log ของ PO นี้ + reservation_id นี้แล้วหรือยัง
@@ -3016,9 +3023,14 @@ async function backfillPOReservationLogs(onlyPoNo) {
     if (dErr) { console.warn('detail fail', po.po_no, dErr); continue; }
     checked++;
     try { await deductReservationOnPO(po.po_no, (detail.items || []).filter(i => i.status !== 'cancelled')); } catch (e) { console.warn('status update fail', po.po_no, e); }
+    const qtyByRes = new Map();
     for (const it of (detail.items || [])) {
       if (it.status === 'cancelled' || !it.reservation_id) continue;
-      const qty = Number(it.quantity) || 0; if (qty <= 0) continue;
+      const q = Number(it.quantity) || 0; if (q <= 0) continue;
+      qtyByRes.set(it.reservation_id, (qtyByRes.get(it.reservation_id) || 0) + q);
+    }
+    for (const [resId, qty] of qtyByRes) {
+      const it = { reservation_id: resId, quantity: qty };
       const { data: ex } = await supabase.from('roll_reservation_logs').select('id')
         .eq('reservation_id', it.reservation_id).eq('reference_po', po.po_no).eq('action_type', 'complete').maybeSingle();
       if (ex) { skipped++; continue; }
