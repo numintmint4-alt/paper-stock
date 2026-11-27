@@ -277,6 +277,8 @@ function renderAlertMatrixView(rows) {
   html += `<td class="total-col-matrix">${grandTotal > 0 ? '+' + grandTotal.toFixed(2) : grandTotal.toFixed(2)}</td>`;
   html += '</tr></tbody></table>';
   matrixWrap.innerHTML = html;
+  window._alertMatrixSizes = sizes;
+  applyAlertSizeHide();
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -673,3 +675,70 @@ async function saveMatrixOrder(gradegram, size) {
 // ═══════════════════════════════════════════════════════════════
 //  END OF PART 2 — ต่อใน alert_part3.js
 // ═══════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════
+//  ซ่อน Size ที่ไม่ใช้งานใน Matrix (เลือกเอง · จำค่าไว้ในเบราว์เซอร์)
+//  ซ่อนเฉพาะการแสดงผล — ยอด TOTAL ยังรวมครบทุก Size
+// ═══════════════════════════════════════════════════════════════
+const ALERT_SZ_KEY = 'alertHiddenSizes', ALERT_SZ_ALL_KEY = 'alertSizeShowAll';
+function _szHidden() { try { return new Set(JSON.parse(localStorage.getItem(ALERT_SZ_KEY) || '[]').map(String)); } catch (e) { return new Set(); } }
+function _szSave(set) { try { localStorage.setItem(ALERT_SZ_KEY, JSON.stringify([...set])); } catch (e) {} }
+function _szShowAll() { try { return localStorage.getItem(ALERT_SZ_ALL_KEY) === '1'; } catch (e) { return false; } }
+function _szSetShowAll(v) { try { localStorage.setItem(ALERT_SZ_ALL_KEY, v ? '1' : '0'); } catch (e) {} }
+
+function applyAlertSizeHide() {
+  const sizes = window._alertMatrixSizes || [];
+  const hidden = _szHidden(), showAll = _szShowAll();
+  const tbl = document.querySelector('#alertMatrixWrap .alert-matrix-new-table');
+  if (tbl) {
+    tbl.querySelectorAll('tr').forEach(tr => {
+      const cells = tr.children;
+      sizes.forEach((sz, i) => {
+        const c = cells[i + 1]; if (!c) return;
+        c.classList.toggle('sz-hide', !showAll && hidden.has(String(sz)));
+      });
+    });
+  }
+  const n = sizes.filter(sz => hidden.has(String(sz))).length;
+  const btn = document.getElementById('alertSizeHideBtn');
+  if (btn) {
+    btn.title = n ? (showAll ? `ตอนนี้แสดง Size ครบ (มี ${n} Size ที่ตั้งซ่อนไว้)` : `ซ่อนอยู่ ${n} Size`) : 'ซ่อน Size ที่ไม่ใช้งาน';
+    btn.innerHTML = '<span class="szh-ic">👁</span>' + (n ? ` <b class="szh-n">${n}</b>` : '');
+    btn.classList.toggle('szh-on', n > 0 && !showAll);
+    if (window.enhanceEmoji) try { window.enhanceEmoji(btn); } catch (e) {}
+  }
+}
+
+function openAlertSizeHide(ev) {
+  if (ev) ev.stopPropagation();
+  let pop = document.getElementById('alertSizePop');
+  if (pop) { pop.remove(); return; }
+  const sizes = window._alertMatrixSizes || [];
+  const btn = document.getElementById('alertSizeHideBtn'); if (!btn) return;
+  pop = document.createElement('div'); pop.id = 'alertSizePop'; pop.className = 'szh-pop';
+  const draw = () => {
+    const hidden = _szHidden(), showAll = _szShowAll();
+    pop.innerHTML = `<div class="szh-hd"><span>เลือก Size ที่ต้องการซ่อน</span><a class="szh-clear">ล้างทั้งหมด</a></div>
+      <div class="szh-chips">${sizes.map(sz => `<button type="button" class="szh-chip${hidden.has(String(sz)) ? ' h' : ''}" data-sz="${sz}">${sz}</button>`).join('') || '<span style="color:#94a3b8">ยังไม่มีข้อมูล Size</span>'}</div>
+      <div class="szh-ft"><button type="button" class="szh-all${showAll ? ' on' : ''}">${showAll ? 'กลับไปซ่อน' : 'แสดงที่ซ่อนทั้งหมด'}</button><button type="button" class="szh-close">ปิด</button></div>`;
+  };
+  draw();
+  document.body.appendChild(pop);
+  const r = btn.getBoundingClientRect();
+  pop.style.top = (r.bottom + 6) + 'px';
+  pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 330)) + 'px';
+  pop.addEventListener('click', e => {
+    e.stopPropagation();
+    const chip = e.target.closest('.szh-chip');
+    if (chip) { const h = _szHidden(), k = chip.dataset.sz; h.has(k) ? h.delete(k) : h.add(k); _szSave(h); if (h.size && _szShowAll() === false) {} applyAlertSizeHide(); draw(); return; }
+    if (e.target.closest('.szh-clear')) { _szSave(new Set()); applyAlertSizeHide(); draw(); return; }
+    if (e.target.closest('.szh-all')) { _szSetShowAll(!_szShowAll()); applyAlertSizeHide(); draw(); return; }
+    if (e.target.closest('.szh-close')) pop.remove();
+  });
+  setTimeout(() => document.addEventListener('click', function f(e) {
+    if (!document.getElementById('alertSizePop')) { document.removeEventListener('click', f); return; }
+    if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener('click', f); }
+  }), 0);
+}
+window.openAlertSizeHide = openAlertSizeHide; window.applyAlertSizeHide = applyAlertSizeHide;
+document.addEventListener('DOMContentLoaded', () => setTimeout(applyAlertSizeHide, 0));
