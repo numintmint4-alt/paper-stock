@@ -61,7 +61,7 @@
 
   async function loadMonth(keepId) {
     const box = $id('fcTables');
-    if (box) box.innerHTML = '<div class="fc-loading">กำลังโหลด…</div>';
+    if (box) softLoad(box, '<div class="fc-loading ld-ph">กำลังโหลด…</div>');
     const seq = ++S.seq;
     let data;
     try { data = await api.fetchOrders(S.month); }
