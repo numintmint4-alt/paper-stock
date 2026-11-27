@@ -735,7 +735,6 @@
   html body #alertMatrixWrap .alert-matrix-new-table { width: max-content !important; min-width: 0 !important; table-layout: auto; }
   html body #alertMatrixWrap .alert-matrix-new-table th.grade-col-matrix, html body #alertMatrixWrap .alert-matrix-new-table td.grade-col-matrix, html body #alertMatrixWrap .alert-matrix-new-table th.total-col-matrix, html body #alertMatrixWrap .alert-matrix-new-table td.total-col-matrix { width: auto; }
   /* เมนูซ้าย: ตัวอักษรคมขึ้น */
-  html body .sidebar { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
   html body .sb-item { font-size: 13px; }
   :root[data-theme="light"] html body .sb-item, html body :root[data-theme="light"] .sb-item { color: #f2f7ff; }
   :root[data-theme="light"] .sb-item { color: #f2f7ff; }
@@ -743,8 +742,6 @@
   :root[data-theme="light"] .sb-group-head { color: #fff; }
   :root[data-theme="light"] .sb-brand small { color: #cfe3ff; }
   /* ---------- ตัวหนังสือคมชัดทั้งเว็บ ---------- */
-  html body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
-  html body button, html body input, html body select, html body textarea { text-rendering: optimizeLegibility; }
   /* แถบบนที่โปร่งแสง+เบลอ ทำให้ตัวหนังสือฟุ้ง → ทึบขึ้น */
   :root[data-theme="light"] .topbar { background: rgba(255,255,255,.96) !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
   html body .page-banner h1 { text-shadow: 0 1px 2px rgba(0,20,80,.35); }
