@@ -536,22 +536,25 @@ async function openDrill(gradegram, size) {
   });
   const dates = Object.keys(byDate).sort();
 
-  let html = '<table><thead><tr><th>วันที่</th><th>kg รวม</th><th>Std Weight</th><th>จำนวนม้วน</th><th>รายการ</th><th></th></tr></thead><tbody>';
+  const totRolls = dates.reduce((a, d) => a + (mode === 'full' ? Math.ceil(byDate[d].kg / std) : byDate[d].kg / std), 0);
+  const totKg = dates.reduce((a, d) => a + byDate[d].kg, 0);
+  let html = `<div class="pop-chips"><span class="pc">${dates.length} วัน</span><span class="pc pc-f">รวม ${totRolls.toFixed(2)} ม้วน</span><span class="pc pc-k">${totKg.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} kg</span></div>`;
+  html += '<div class="pop-scroll"><table class="data-table pop-table"><thead><tr><th>วันที่</th><th>kg รวม</th><th>Std Weight</th><th>จำนวนม้วน</th><th>รายการ</th><th></th></tr></thead><tbody>';
   if (!dates.length) html += '<tr><td colspan="6" style="text-align:center;color:#94a3b8">ไม่มีข้อมูล</td></tr>';
   dates.forEach(d => {
     const info = byDate[d];
     const rolls = mode === 'full' ? Math.ceil(info.kg / std) : info.kg / std;
     html += `<tr><td>${d}</td><td>${info.kg.toFixed(2)}</td><td>${std}</td>
       <td><b>${rolls.toFixed(2)}</b></td><td>${info.records.length}</td>
-      <td><button onclick="toggleDate('${d}')">ดู</button></td></tr>
+      <td><button type="button" class="pop-btn" onclick="toggleDate('${d}')">ดูรายการ</button></td></tr>
       <tr id="rec-${d}" class="hidden"><td colspan="6">
-        <table style="background:#fff"><thead><tr><th>Doc No</th><th>ลูกค้า</th><th style="text-align:right">kg</th></tr></thead>
+        <table class="data-table pop-sub"><thead><tr><th>Doc No</th><th>ลูกค้า</th><th style="text-align:right">kg</th></tr></thead>
         <tbody>${info.records.map(r => `<tr><td>${esc(r.doc_no)||'-'}</td>
           <td>${esc(r.roll_for_customer)||'ทั่วไป'}</td>
           <td style="text-align:right">${Number(r.used_kgs).toFixed(2)}</td></tr>`).join('')}
         </tbody></table></td></tr>`;
   });
-  html += '</tbody></table>';
+  html += '</tbody></table></div>';
   $('drillBody').innerHTML = html;
 }
 function toggleDate(d) { $('rec-'+d).classList.toggle('hidden'); }
