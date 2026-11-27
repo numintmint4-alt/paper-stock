@@ -341,10 +341,10 @@ async function openAlertMatrixCell(gradegram, size) {
   `;
 
   html += `
-    <div class="matrix-cell-summary" style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border-color:#fcd34d;margin-top:12px">
-      <div class="matrix-cell-summary-title" style="color:#92400e">
+    <div class="matrix-cell-summary res-box">
+      <div class="matrix-cell-summary-title">
         🔖 ยอดจอง (Reserved)
-        <span class="alert-status-badge" id="alertReservedBadge" style="background:#fbbf24;color:#fff">
+        <span class="alert-status-badge" id="alertReservedBadge">
           ${reservedTotal > 0 ? reservedTotal + ' ม้วน' : 'ไม่มี'}
         </span>
       </div>
