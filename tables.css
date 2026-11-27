@@ -385,6 +385,109 @@
   html body .grade-dropdown .gd-group { height: auto !important; min-height: 0 !important; display: flex; align-items: center; }
   html body .card .grade-dropdown .gd-search input, html body .grade-dropdown .gd-search input { width: 100% !important; max-width: 100% !important; }
 
+
+  /* ---- ไฮไลท์วันที่ใช้ม้วนกระดาษสูงสุดใน popup ---- */
+  .pop-table tr.pop-max > td { background: #dcebff !important; font-weight: 800; color: #0b3f95; }
+  .pop-table tr.pop-max > td:first-child { box-shadow: inset 4px 0 0 #1677ff; }
+  .pop-maxtag { display: inline-block; margin-left: 8px; padding: 1px 10px; border-radius: 99px; background: linear-gradient(90deg,#0b3f95,#1677ff); color: #fff; font-size: 11px; font-weight: 800; vertical-align: 1px; }
+  :root[data-theme="dark"] .pop-table tr.pop-max > td { background: #17305c !important; color: #cfe3ff; }
+
+
+  /* ======== popup สั่งซื้อประจำวัน (ดีไซน์ใหม่) ======== */
+  #modalAlertMatrixCell .modal { max-width: 860px !important; width: 94vw; }
+  #alertMatrixCellBody .matrix-cell-summary { background: transparent !important; border: 0 !important; padding: 0 !important; margin: 0 0 12px !important; box-shadow: none !important; }
+  #alertMatrixCellBody .matrix-cell-summary-title { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 800; color: #1677ff !important; margin-bottom: 8px; }
+  #alertMatrixCellBody .alert-status-badge { background: #dcebff !important; color: #0f3f95 !important; border-radius: 99px; padding: 2px 12px; font-size: 12px; font-weight: 800; }
+  #alertMatrixCellBody .matrix-cell-grid { display: grid !important; grid-template-columns: repeat(4, 1fr) !important; gap: 10px !important; }
+  #alertMatrixCellBody .matrix-cell-row { flex-direction: column !important; align-items: flex-start !important; gap: 2px; background: var(--surface-soft); border: 1px solid var(--border) !important; border-radius: 12px; padding: 8px 12px !important; }
+  #alertMatrixCellBody .matrix-cell-row .label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+  #alertMatrixCellBody .matrix-cell-row .value { font-size: 18px; font-weight: 800; color: #0b3f95; }
+  #alertMatrixCellBody .matrix-alert-big { margin-top: 10px; border-radius: 12px !important; padding: 10px !important; font-size: 17px !important; font-weight: 800 !important; }
+  #alertMatrixCellBody .matrix-alert-big.green { background: linear-gradient(90deg,#d9f7e4,#eafaf0) !important; border: 1px solid #9be2b6 !important; color: #0f7a3d !important; }
+  #alertMatrixCellBody .matrix-alert-big.red { background: linear-gradient(90deg,#ffe0e0,#fff0f0) !important; border: 1px solid #f5a8a8 !important; color: #c53030 !important; }
+  #alertMatrixCellBody .matrix-alert-big.yellow { background: linear-gradient(90deg,#e3efff,#f2f8ff) !important; border: 1px solid #b9d0f2 !important; color: #0f3f95 !important; }
+  #alertMatrixCellBody .res-box { background: var(--surface-soft) !important; border: 1px solid var(--border) !important; border-radius: 12px !important; padding: 9px 14px !important; }
+  #alertMatrixCellBody .res-box .matrix-cell-summary-title { color: var(--text-muted) !important; margin-bottom: 0; }
+  #alertMatrixCellBody .res-box .alert-status-badge { background: #dcebff !important; color: #0f3f95 !important; }
+  #alertMatrixCellBody .matrix-order-form { border: 0 !important; padding: 0 !important; background: transparent !important; }
+  #alertMatrixCellBody .matrix-order-form-header h4, #alertMatrixCellBody .matrix-order-form h4 { color: #1677ff !important; font-weight: 800; }
+  #alertMatrixCellBody .add-row-btn { border: 1.5px dashed #1677ff !important; color: #1677ff !important; background: var(--surface) !important; border-radius: 99px !important; padding: 3px 16px !important; font-weight: 800; }
+  #alertMatrixCellBody .matrix-order-rows { max-height: 46vh; gap: 0 !important; border: 1px solid var(--border); border-radius: 12px; overflow: auto; }
+  #alertMatrixCellBody .matrix-order-row { display: grid !important; grid-template-columns: 62px 84px 1.2fr 1fr 1fr 1.3fr 30px; gap: 8px; align-items: end; border: 0 !important; border-bottom: 1px solid var(--border) !important; border-radius: 0 !important; padding: 8px 10px !important; background: var(--surface) !important; }
+  #alertMatrixCellBody .matrix-order-row:nth-child(even) { background: var(--surface-soft) !important; }
+  #alertMatrixCellBody .matrix-order-row-head, #alertMatrixCellBody .matrix-order-row .form-row { display: contents !important; }
+  #alertMatrixCellBody .matrix-order-row-head .row-label { align-self: center; padding-bottom: 6px; white-space: nowrap; }
+  #alertMatrixCellBody .matrix-order-row-head .row-res-tag { display: none; }
+  #alertMatrixCellBody .row-remove-btn { order: 20; width: 26px; height: 26px; padding: 0 !important; border-radius: 50% !important; background: #ffe3e3 !important; color: #c53030 !important; border: 0 !important; margin-bottom: 4px; }
+  #alertMatrixCellBody .matrix-order-row .form-field label { font-size: 11px; font-weight: 800; color: var(--text-muted); }
+  #alertMatrixCellBody .matrix-order-form .form-field input, #alertMatrixCellBody .matrix-order-form .form-field select { height: 30px; border-radius: 10px !important; border: 1.5px solid #b9d0f2 !important; padding: 0 8px !important; width: 100% !important; font-size: 13px; }
+  #alertMatrixCellBody .matrix-order-form .form-field input.qty-input { color: #1677ff; text-align: center; }
+  #alertMatrixCellBody .form-actions button { border-radius: 99px !important; padding: 7px 24px !important; }
+  #alertMatrixCellBody .form-actions button.primary { background: linear-gradient(90deg,#0b3f95,#1677ff) !important; color: #fff !important; border: 0 !important; }
+  #alertMatrixCellBody .matrix-order-prompt { background: var(--surface-soft) !important; border: 1px dashed #8fb8f0 !important; border-radius: 12px !important; }
+  #alertMatrixCellBody .matrix-order-prompt p { color: #0f3f95 !important; }
+
+  /* ======== สีม้วนเต็ม / เศษ / รอกรอ (สว่างสด) ======== */
+  .nf { color: #1677ff; font-weight: 800; } .ns { color: #38bdf8; font-weight: 800; } .nw { color: #a3b1c6; font-weight: 800; }
+  #stockBody .report-table td .cell-main .nf, #stockBody .report-table td .cell-main .ns, #stockBody .report-table td .cell-main .nw { font-weight: 800; }
+  #stockBody .report-table td .cell-main { color: inherit !important; }
+  .pc-f { background: #d6e8ff !important; color: #1677ff !important; } .pc-s { background: #d9f3ff !important; color: #0ea5e9 !important; } .pc-w { background: #eef1f6 !important; color: #8b9bb2 !important; }
+  .st-f { background: #d6e8ff !important; color: #1677ff !important; } .st-f i { background: #1677ff !important; }
+  .st-s { background: #d9f3ff !important; color: #0ea5e9 !important; } .st-s i { background: #38bdf8 !important; }
+  .st-w { background: #eef1f6 !important; color: #8b9bb2 !important; } .st-w i { background: #a3b1c6 !important; }
+  :root[data-theme="dark"] .st-f, :root[data-theme="dark"] .pc-f { background: #17305c !important; color: #6db0ff !important; }
+  :root[data-theme="dark"] .st-s, :root[data-theme="dark"] .pc-s { background: #10405a !important; color: #7fd6ff !important; }
+  :root[data-theme="dark"] .st-w, :root[data-theme="dark"] .pc-w { background: #2a3447 !important; color: #b4c0d4 !important; }
+  :root[data-theme="dark"] .nf { color: #5aa2ff; } :root[data-theme="dark"] .ns { color: #6fd0ff; } :root[data-theme="dark"] .nw { color: #9aa9c0; }
+  #modalStockDetail .modal { max-width: 1180px !important; width: 95vw; }
+  #modalReceiveDetail .modal { max-width: 960px !important; width: 94vw; }
+  .pop-table tr.pop-total td { background: #dcebff !important; font-weight: 800; color: #0b3f95; }
+
+
+  /* ---- hover ไฮไลท์แถว+คอลัมน์ใน Matrix ---- */
+  table td.hl-line { background-color: #e6f0ff !important; }
+  table td.hl-cell { background-color: #cfe1ff !important; }
+  :root[data-theme="dark"] table td.hl-line { background-color: #1c3563 !important; }
+  :root[data-theme="dark"] table td.hl-cell { background-color: #26457f !important; }
+
+
+  /* ======== แท็บ ALL / CA / KA / KI / KK / KW / FSC (ทุกหน้า) ======== */
+  html body .sub-tabs .sub-tab, html body #fcGradeTabs .sub-tab { border: 1.5px solid #b9d0f2 !important; border-radius: 999px !important; padding: 4px 22px !important; font-weight: 800 !important; font-size: 13px !important; color: #0b3f95 !important; background: var(--surface) !important; box-shadow: none !important; transition: all .15s; }
+  html body .sub-tabs .sub-tab:hover, html body #fcGradeTabs .sub-tab:not(.active):hover { background: #eaf3ff !important; border-color: #1677ff !important; color: #1677ff !important; }
+  html body .sub-tabs .sub-tab.active, html body #fcGradeTabs .sub-tab.active { background: linear-gradient(90deg,#0b3f95,#1677ff) !important; border-color: transparent !important; color: #fff !important; box-shadow: 0 3px 8px rgba(22,119,255,.3) !important; }
+  :root[data-theme="dark"] html body .sub-tabs .sub-tab, :root[data-theme="dark"] .sub-tabs .sub-tab { color: #cfe3ff !important; border-color: #2a4a80 !important; }
+  :root[data-theme="dark"] .sub-tabs .sub-tab.active { color: #fff !important; }
+
+
+  html body #btn-tab-fsc, html body #btn-tab-fsc-res, html body #btn-tab-fsc-yearly, html body .sub-tab.fc-fsc { border: 1.5px solid #b9d0f2 !important; color: #0b3f95 !important; background: var(--surface) !important; background-color: var(--surface) !important; box-shadow: none !important; }
+  html body #btn-tab-fsc.active, html body #btn-tab-fsc-res.active, html body #btn-tab-fsc-yearly.active, html body .sub-tab.fc-fsc.active { background: linear-gradient(90deg,#0b3f95,#1677ff) !important; border-color: transparent !important; color: #fff !important; box-shadow: 0 3px 8px rgba(22,119,255,.3) !important; }
+
+
+  /* ======== ตารางผลผลิตรายเดือน (สไตล์เดียวกับตารางการจอง) ======== */
+  #pivotBody table th { text-align: center !important; }
+  #pivotBody table tbody td { height: 30px; text-align: center; border-right: 1px solid var(--tbl-vline) !important; padding-top: 3px !important; padding-bottom: 3px !important; }
+  #pivotBody table tbody tr:nth-child(even) td:not(:first-child):not(:last-child) { background: var(--surface-soft); }
+  #pivotBody table tbody td:first-child { background: var(--primary-soft) !important; text-align: left; font-weight: 800; color: var(--tbl-head-tx, #0b3f95); padding-left: 12px; }
+  #pivotBody table tbody td:last-child { background: var(--primary-soft) !important; font-weight: 800 !important; color: var(--tbl-head-tx, #0b3f95); border-right: 0 !important; }
+
+  /* ======== ตารางผลผลิตรายปี (สไตล์เดียวกับตารางการจอง) ======== */
+  .yearly-pivot-table { border-radius: 14px !important; border: 1px solid var(--border) !important; box-shadow: none !important; background: var(--surface) !important; }
+  .yearly-pivot-table .yearly-pivot-header-grade { background: linear-gradient(90deg,#0b3f95,#1677ff) !important; font-size: 15px !important; text-align: center !important; padding: 9px 16px !important; border-bottom: 0 !important; }
+  .yearly-pivot-table thead th:not(.yearly-pivot-header-grade) { background: linear-gradient(90deg,#0b3f95,#1677ff) !important; text-align: center; }
+  .yearly-pivot-table tbody td { border-right: 1px solid var(--tbl-vline) !important; height: 30px; padding-top: 3px !important; padding-bottom: 3px !important; }
+  .yearly-pivot-table tbody tr:nth-child(even) td:not(.yearly-pivot-month-col):not(.yearly-pivot-total-col) { background: var(--surface-soft); }
+  .yearly-pivot-table .yearly-pivot-month-col, .yearly-pivot-table .yearly-pivot-total-col { background: var(--primary-soft) !important; color: var(--tbl-head-tx, #0b3f95) !important; }
+  .yearly-pivot-table .yearly-pivot-row-total td { background: #dcebff !important; border-top: 0 !important; }
+  :root[data-theme="dark"] .yearly-pivot-table .yearly-pivot-row-total td { background: #17305c !important; }
+
+  .yearly-pivot-table thead th.yearly-pivot-month-col, .yearly-pivot-table thead th.yearly-pivot-total-col { background: linear-gradient(90deg,#0b3f95,#1677ff) !important; color: #fff !important; text-align: center !important; padding-left: 4px !important; }
+  .yearly-pivot-table .yearly-pivot-row-total .yearly-pivot-month-col, .yearly-pivot-table .yearly-pivot-row-total .yearly-pivot-total-col { background: #dcebff !important; }
+  :root[data-theme="dark"] .yearly-pivot-table .yearly-pivot-row-total .yearly-pivot-month-col, :root[data-theme="dark"] .yearly-pivot-table .yearly-pivot-row-total .yearly-pivot-total-col { background: #17305c !important; }
+
+
+  #stockBody .report-table td .cell-main { display: inline-flex !important; flex-direction: row !important; align-items: baseline; justify-content: center; white-space: nowrap; width: auto !important; height: auto !important; gap: 0; }
+  #stockBody .report-table td .cell-main b { display: inline !important; }
+
   /* เส้นคอลัมน์ตารางอื่นๆ ที่ยังไม่มีเส้น */
   table:not([class]) { border-collapse: collapse; }
   table:not([class]) td, .alert-flat-table td, .add-items-table td, .yearly-pivot-table td, .fc-table td { border-right: 1px solid var(--tbl-vline) !important; border-bottom: 1px solid var(--tbl-vline) !important; }
