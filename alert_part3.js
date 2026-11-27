@@ -747,11 +747,18 @@ function renderAlertPODetail(items) {
   });
 
   let totalQty = 0;
+  const grandQty = items.reduce((t, i) => t + Number(i.quantity || 0), 0);
+  const supCls = sup => {
+    const k = String(sup || '').trim().toUpperCase();
+    return ['EKP', 'MKP', 'SCGP'].includes(k) ? k : 'OT';
+  };
+  const supPill = (sup, extra) => `<span class="pv-sp pv-${supCls(sup)}">${esc(sup || '-')}${extra || ''}</span>`;
+
   let html = `
-    <div class="po-detail-summary">
-      <div>📦 <b>${items.length}</b> รายการ</div>
-      <div>🔢 รวม <b>${items.reduce((s, i) => s + i.quantity, 0)}</b> ม้วน</div>
-      <div>📅 <b>${Object.keys(byDate).length}</b> วันรับสินค้า</div>
+    <div class="pv-stats">
+      <div class="pv-st"><small>รายการ</small><b>${items.length}</b> <span>รายการ</span></div>
+      <div class="pv-st pv-st-o"><small>รวมทั้งหมด</small><b>${grandQty}</b> <span>ม้วน</span></div>
+      <div class="pv-st"><small>วันรับสินค้า</small><b>${Object.keys(byDate).length}</b> <span>วัน</span></div>
     </div>`;
 
   Object.keys(byDate).sort().forEach(dateKey => {
@@ -764,17 +771,18 @@ function renderAlertPODetail(items) {
       supSummary[sup] = (supSummary[sup] || 0) + Number(it.quantity || 0);
     });
     const supList = Object.keys(supSummary).sort()
-      .map(sup => `${esc(sup)} ${supSummary[sup]} ม้วน`)
-      .join(' · ');
+      .map(sup => supPill(sup, ' ' + supSummary[sup] + ' ม้วน'))
+      .join('');
 
     html += `
-      <div class="po-detail-date-section">
-        <div class="po-detail-date-head">📅 วันที่รับ: <b>${fmtDate(dateKey)}</b> · ${dayItems.length} รายการ · รวม ${dayTotal} ม้วน · ${supList}</div>
-        <table>
+      <div class="pv-day">
+        <div class="pv-dh"><span>📅 วันที่รับ <b>${fmtDate(dateKey)}</b> · ${dayItems.length} รายการ</span><em>${supList}</em></div>
+        <table class="pv-tbl">
           <thead><tr>
-            <th style="width:50px">#</th>
-            <th style="width:180px">Gradegram-Size</th>
-            <th style="width:90px;text-align:center">Quantity</th>
+            <th style="width:48px">#</th>
+            <th>Gradegram · Size</th>
+            <th style="width:90px">Sup.</th>
+            <th style="width:90px">จำนวน</th>
             <th>หมายเหตุ</th>
           </tr></thead>
           <tbody>`;
@@ -782,40 +790,37 @@ function renderAlertPODetail(items) {
     dayItems.forEach((it, idx) => {
       totalQty += it.quantity;
 
-      const parts = [];
+      const tags = [];
       if (it.customer_roll && it.customer_roll !== 'normal') {
-        parts.push(labelCustomer(it.customer_roll));
+        tags.push(`<span class="pv-tg pv-tg-c">${esc(labelCustomer(it.customer_roll))}</span>`);
       }
       if (it.quality_b && it.quality_b !== 'normal') {
-        parts.push(labelQuality(it.quality_b));
+        tags.push(`<span class="pv-tg pv-tg-q">${esc(labelQuality(it.quality_b))}</span>`);
       }
       if (it.note && it.note.trim() !== '') {
-        parts.push(it.note);
+        tags.push(`<span class="pv-note">${esc(it.note)}</span>`);
       }
-      const remarkCombined = parts.join(',');
+
+      const gsz = String(it.gradegram_size || '');
+      const cut = gsz.lastIndexOf('-');
+      const gName = cut > 0 ? gsz.slice(0, cut) : gsz;
+      const gSize = cut > 0 ? Number(gsz.slice(cut + 1)) : '';
 
       html += `<tr>
-        <td style="text-align:center">${idx + 1}</td>
-        <td><b>${esc(it.gradegram_size)}</b></td>
-        <td style="text-align:center;font-weight:700;color:#1e40af">${it.quantity}</td>
-        <td>${esc(remarkCombined)}</td>
+        <td class="pv-n">${idx + 1}</td>
+        <td><b class="pv-g">${esc(gName)}</b>${gSize !== '' ? `<span class="pv-sz">Size ${gSize}</span>` : ''}</td>
+        <td class="pv-c">${it.sup ? supPill(it.sup) : ''}</td>
+        <td class="pv-q"><span>${it.quantity}</span></td>
+        <td>${tags.join(' ')}</td>
       </tr>`;
     });
 
-    html += `</tbody>
-      <tfoot><tr style="background:#cbd5e1;font-weight:700">
-        <td colspan="2" style="text-align:right">รวมวันนี้ (ม้วน)</td>
-        <td style="text-align:center;color:#dc2626;font-size:15px">${dayTotal}</td>
-        <td></td>
-      </tr></tfoot>
-      </table>
+    html += `<tr class="pv-tot"><td></td><td colspan="2">รวมวันนี้</td><td class="pv-q"><span>${dayTotal}</span></td><td></td></tr>
+      </tbody></table>
       </div>`;
   });
 
-  html += `<div class="po-detail-grand-total">
-    <b>รวมทั้งหมด: ${totalQty} ม้วน</b>
-  </div>`;
-
+  const tq = $('alertPOTotalQty'); if (tq) tq.textContent = totalQty;
   $('alertPODetailBody').innerHTML = html;
 }
 
