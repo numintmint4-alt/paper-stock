@@ -293,7 +293,7 @@
     const saveBtn = (!L) ? `<button type="button" class="fc-tbl-save" data-act="savedraft" title="บันทึกร่าง (บันทึกทุกแกรมของกลุ่มนี้)">💾 บันทึกร่าง</button>` : '';
     const fm = esc(thMonth(S.month)), lm = P.levelMonth ? esc(thMonth(P.levelMonth)) : '…', em = P.estMonth ? esc(thMonth(P.estMonth)) : '…';
 
-    let h = `<table class="fc-table" data-g="${g}" style="min-width:${22 + 140 + 150 + 50 + n * 28}px"><colgroup><col class="c-v"><col class="c-g"><col class="c-s">${tbl.sizes.map(() => '<col>').join('')}<col class="c-t"></colgroup><thead>
+    let h = `<table class="fc-table" data-g="${g}" style="min-width:${22 + 152 + 150 + 50 + n * 28}px"><colgroup><col class="c-v"><col class="c-g"><col class="c-s">${tbl.sizes.map(() => '<col>').join('')}<col class="c-t"></colgroup><thead>
       <tr><th class="fc-g fc-h" colspan="3">รายการคำนวณ / Size</th>${tbl.sizes.map(s => `<th data-s="${s}">${s}</th>`).join('')}<th class="fc-tot-h">Total</th></tr></thead><tbody>`;
 
     // 1) การใช้ม้วน (ทั่วไป) ย้อนหลัง 3 เดือน
@@ -323,7 +323,7 @@
     // 5) % ของระดับ Stock
     h += full('level_pct_qty', `<input type="number" class="fc-pct" min="0" max="100" step="1" data-act="pct" data-g="${g}" value="${tbl.cfg.pct}" ${L ? 'disabled' : ''}> % ของระดับ Stock เดือน : ${lm}`);
     // 6) ประมาณการ (ก่อนหัก Stock)
-    h += full('est_before', `ประมาณการใช้ม้วนเดือน : <b>${fm}</b> (ก่อนหัก Stock)`, 'fc-calc fc-strong fc-hl2');
+    h += full('est_before', `ประมาณการใช้ม้วนเดือน : <b>${fm}</b><br>(ก่อนหัก Stock)`, 'fc-calc fc-strong fc-hl2');
     // 7-9) Stock / รับม้วน / ยอดจอง
     h += ws(sub('stock_qty', 'Stock ณ วันที่ :', 1, dateIn('stockDate', P.stockDate, L)), V('D', 'ม้วนกระดาษคงเหลือ', 4));
     h += sub('receive_qty', 'รับม้วนกระดาษ ณ วันที่', 1, dateIn('recvDate', P.recvDate, L));
@@ -331,12 +331,12 @@
     // 10) คงเหลือรวมยอดจอง
     h += full('total_avail', 'ม้วนกระดาษคงเหลือรวมยอดจอง', 'fc-calc fc-hl1');
     // 11) ประมาณการใช้ม้วนเดือน (Rev ล่าสุดที่บันทึก)
-    h += ws(sub('est_month', 'ประมาณการใช้ม้วนเดือน :', 1, monthBtn('estMonth', P.estMonth, L) + (W.src.estRev != null ? ` <small class="fc-muted">Rev.${pad2(W.src.estRev)}</small>` : '')), V('E', 'คำนวณ', 3));
+    h += ws(sub('est_month', '<span style="white-space:nowrap">ประมาณการใช้ม้วนเดือน :</span>', 1, monthBtn('estMonth', P.estMonth, L) + (W.src.estRev != null ? ` <small class="fc-muted">Rev.${pad2(W.src.estRev)}</small>` : '')), V('E', 'คำนวณ', 3));
     // 12) / 13)
     h += full('after_deduct', `ม้วนกระดาษคงเหลือ หักประมาณการใช้ม้วนเดือน : ${em} แล้ว`, 'fc-calc');
-    h += full('est_after', `ประมาณการใช้ม้วนเดือน : <b>${fm}</b> (หลังหัก Stock)`, 'fc-calc fc-strong fc-hl2');
+    h += full('est_after', `ประมาณการใช้ม้วนเดือน : <b>${fm}</b><br>(หลังหัก Stock)`, 'fc-calc fc-strong fc-hl2');
     // 14) ปรับเพิ่ม/ลด
-    h += `<tr class="fc-row fc-adj">${V('F', 'ปรับเพิ่ม/ลด', 2)}<td class="fc-g" rowspan="2">ปรับเพิ่มหรือลดจำนวนตามความเหมาะสม<br>ประเมินจากสถานการณ์ปัจจุบัน</td><td class="fc-s">ปรับเพิ่มจำนวน +</td>${inputs('adjP', s => tbl.cells[s].adjP)}<td class="fc-tot" data-r="adjP" data-t="1"></td></tr>`;
+    h += `<tr class="fc-row fc-adj">${V('F', 'ปรับเพิ่ม/ลด', 2)}<td class="fc-g" rowspan="2">ปรับเพิ่มหรือลดจำนวน<br>ตามสถานการณ์ปัจจุบัน</td><td class="fc-s">ปรับเพิ่มจำนวน +</td>${inputs('adjP', s => tbl.cells[s].adjP)}<td class="fc-tot" data-r="adjP" data-t="1"></td></tr>`;
     h += `<tr class="fc-row fc-adj"><td class="fc-s">ปรับลดจำนวน −</td>${inputs('adjM', s => tbl.cells[s].adjM)}<td class="fc-tot" data-r="adjM" data-t="1"></td></tr>`;
     // 15) สรุป
     h += ws(full('order_qty', `สรุปประมาณการสั่งซื้อม้วนเดือน : <b>${fm}</b>`, 'fc-final'), V0);
