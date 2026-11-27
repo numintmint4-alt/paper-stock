@@ -461,3 +461,19 @@
   document.addEventListener('mouseleave', clear, true);
   document.addEventListener('mouseout', e => { if (!e.relatedTarget || !(e.relatedTarget.closest && e.relatedTarget.closest(SEL))) clear(); }, true);
 })();
+
+
+/* softLoad(el, placeholderHtml): ถ้ามีผลลัพธ์เดิมอยู่แล้ว → คงไว้จางๆ (ไม่ล้างเป็นหน้าว่าง) แล้วสลับเมื่อผลใหม่มา; ถ้ายังว่างค่อยโชว์ข้อความกำลังโหลด */
+window.softLoad = function (el, html) {
+  if (!el) return;
+  const hasContent = el.children.length > 0 && !el.querySelector('.ld-ph') && !/กำลัง(โหลด|วิเคราะห์)/.test((el.textContent || '').slice(0, 60));
+  if (hasContent) {
+    if (el.classList.contains('ld-dim')) return;
+    el.classList.add('ld-dim');
+    const mo = new MutationObserver(() => { el.classList.remove('ld-dim'); mo.disconnect(); clearTimeout(t); });
+    mo.observe(el, { childList: true, subtree: el.tagName === 'TABLE' });
+    const t = setTimeout(() => { el.classList.remove('ld-dim'); mo.disconnect(); }, 20000);
+    return;
+  }
+  el.innerHTML = html;
+};
