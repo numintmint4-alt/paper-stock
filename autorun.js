@@ -17,7 +17,6 @@
     { id: 'receive', root: '#receiveFilterBox',              fn: 'renderReceive',     btn: 'button[onclick="renderReceive()"]' },
     { id: 'alert',   root: '#tab-alert .filters',            fn: 'renderAlert',       btn: 'button[onclick="renderAlert()"]', label: 'วิเคราะห์ใหม่',
       guard: () => !!($q('#alertStockDate') && $q('#alertStockDate').value && $q('#alertReceiveDate') && $q('#alertReceiveDate').value) },
-    { id: 'alertHistory', root: '#alertHistoryCard',         fn: 'loadAlertHistory',  btn: 'button[onclick="loadAlertHistory()"]', label: 'โหลดใหม่' },
     { id: 'pivot',   root: '#pivot-monthly-container',       fn: 'loadUsagePivot',    btn: 'button[onclick="loadUsagePivot()"]' },
     { id: 'pivotY',  root: '#pivot-yearly-container',        fn: 'loadYearlyPivot',   btn: '#btnLoadYearlyPivot' },
     { id: 'res',     root: '#tab-reservations .filters',     fn: 'loadReservations', btn: 'button[onclick="loadReservations()"]' }
