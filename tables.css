@@ -758,5 +758,8 @@
       radial-gradient(360px 300px at 343px 100%, rgba(25,195,240,.34), transparent 70%) fixed,
       linear-gradient(180deg,#06214f 0%,#0a3f94 62%,#0b57c9 100%) fixed;
   }
+  /* เมนูซ้าย: ใส่ "สีพื้นทึบ" ใต้ไล่สี เพื่อให้ Chrome ถือว่าชั้นนี้ทึบ และวาดตัวหนังสือแบบคมชัด */
+  :root[data-theme="light"] html body .sidebar, :root[data-theme="light"] .sidebar { background-color: #0a3f94 !important; }
+  :root[data-theme="light"] html body .sidebar .sb-nav, :root[data-theme="light"] .sidebar .sb-nav { background-color: #0a3f94 !important; }
 }
 @media print { .szh-pop, .sz-hide-btn { display: none !important; } .report-title .dd-btn { display: none !important; } .calc-note { display: none !important; } .ss-share { display: none !important; } .ss-chip { background: none !important; padding: 0 !important; } }
