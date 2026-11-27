@@ -170,7 +170,7 @@
       btns = `<button type="button" onclick="fcUnlock()" style="background:#fffbeb;color:#b45309;border-color:#fcd34d">✏️ แก้ไข (ใส่รหัสผ่าน)</button>
               <button type="button" class="primary" onclick="fcAttachPick()">📎 แนบเอกสารอนุมัติ (PDF)</button>`;
     } else {
-      btns = `<button type="button" class="primary" onclick="fcViewDoc()">📄 ดูเอกสารอนุมัติ${o.doc_name ? ' (' + esc(o.doc_name) + ')' : ''}</button>`;
+      btns = `<button type="button" class="primary" onclick="fcViewDoc()">📄 ดูเอกสารอนุมัติ</button>`;
     }
     const saved = o.saved_at ? ` · บันทึกเมื่อ ${new Date(o.saved_at).toLocaleString('th-TH')}` : '';
     el.innerHTML = `<div class="fc-tb-left"><b>${esc(groupLabel(S.group))} · Rev.${pad2(o.rev)}</b> ${statusChip(o)}<span class="fc-muted">${saved}</span></div>
@@ -292,7 +292,7 @@
     const saveBtn = (!L) ? `<button type="button" class="fc-tbl-save" data-act="savedraft" title="บันทึกร่าง (บันทึกทุกแกรมของกลุ่มนี้)">💾 บันทึกร่าง</button>` : '';
     const fm = esc(thMonth(S.month)), lm = P.levelMonth ? esc(thMonth(P.levelMonth)) : '…', em = P.estMonth ? esc(thMonth(P.estMonth)) : '…';
 
-    let h = `<table class="fc-table" data-g="${g}"><thead>
+    let h = `<table class="fc-table" data-g="${g}" style="min-width:${22 + 140 + 170 + 54 + n * 32}px"><colgroup><col class="c-v"><col class="c-g"><col class="c-s">${tbl.sizes.map(() => '<col>').join('')}<col class="c-t"></colgroup><thead>
       <tr><th class="fc-title" colspan="${n + 4}"><div class="fc-title-in"><span>${g}</span><span class="fc-warnmsg hidden">⚠ ${NEG_MSG}</span>${saveBtn}</div></th></tr>
       <tr><th class="fc-v-h"></th><th class="fc-g fc-h" colspan="2">รายการคำนวณ / Size</th>${tbl.sizes.map(s => `<th data-s="${s}">${s}</th>`).join('')}<th class="fc-tot-h">Total</th></tr></thead><tbody>`;
 
