@@ -488,6 +488,43 @@
   #stockBody .report-table td .cell-main { display: inline-flex !important; flex-direction: row !important; align-items: baseline; justify-content: center; white-space: nowrap; width: auto !important; height: auto !important; gap: 0; }
   #stockBody .report-table td .cell-main b { display: inline !important; }
 
+
+  /* ======== หน้าจัดทำประมาณการ (ดีไซน์ใหม่) ======== */
+  .fc-table { border-collapse: separate !important; border-spacing: 0; border-radius: 14px; overflow: visible; border: 1px solid var(--border); }
+  .fc-table .fc-title { background: linear-gradient(90deg,#0b3f95,#1677ff) !important; border-bottom: 0 !important; text-align: center !important; font-size: 16px !important; padding: 8px 14px !important; border-radius: 14px 14px 0 0; }
+  .fc-title-in { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .fc-title-in > span:first-child { position: sticky; left: 36px; }
+  .fc-tbl-save { height: 28px; padding: 0 16px !important; border-radius: 99px !important; border: 0 !important; background: #fff !important; color: #0b3f95 !important; font-weight: 800; font-size: 12px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,.2); position: sticky; right: 10px; margin-left: auto; }
+  .fc-table thead th:not(.fc-title) { background: linear-gradient(90deg,#0b3f95,#1677ff) !important; color: #fff !important; }
+  .fc-table thead th.fc-tot-h { background: linear-gradient(90deg,#0b3f95,#1677ff) !important; }
+  .fc-table .fc-v-h { width: 24px; min-width: 24px; max-width: 24px; padding: 0 !important; position: sticky; left: 0; z-index: 6; }
+  .fc-table td.fc-v { width: 24px !important; min-width: 24px !important; max-width: 24px !important; padding: 0 !important; position: sticky; left: 0; z-index: 4; color: #fff !important; border-right: 1px solid rgba(255,255,255,.6) !important; border-bottom: 2px solid #fff !important; text-align: center; vertical-align: middle; }
+  .fc-table td.fc-v > span { writing-mode: vertical-rl; transform: rotate(180deg); display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: .02em; white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,.25); }
+  .fc-table td.fc-vA { background: linear-gradient(180deg,#3ba4ff,#1677ff) !important; }
+  .fc-table td.fc-vB { background: linear-gradient(180deg,#ff6ec4,#ff3d9a) !important; }
+  .fc-table td.fc-vC { background: linear-gradient(180deg,#ffa63d,#ff7a18) !important; }
+  .fc-table td.fc-vD { background: linear-gradient(180deg,#34d98b,#12b76a) !important; }
+  .fc-table td.fc-vE { background: linear-gradient(180deg,#22d3ee,#0ea5e9) !important; }
+  .fc-table td.fc-vF { background: linear-gradient(180deg,#ffe14d,#ffc400) !important; color: #6b4300 !important; }
+  .fc-table td.fc-vF > span { text-shadow: none; }
+  .fc-table td.fc-v0 { background: var(--primary-soft) !important; }
+  .fc-table .fc-g { left: 24px !important; background: var(--primary-soft) !important; color: var(--tbl-head-tx, #0b3f95) !important; }
+  .fc-table .fc-s { left: 239px !important; background: var(--surface-soft) !important; color: var(--text) !important; }
+  .fc-table td { border-right: 1px solid var(--tbl-vline) !important; border-color: var(--tbl-vline); }
+  .fc-table tr.fc-hl1 td.fc-c, .fc-table tr.fc-hl1 td.fc-tot, .fc-table tr.fc-hl2 td.fc-c, .fc-table tr.fc-hl2 td.fc-tot { background: #dcebff !important; color: #0b3f95 !important; border-top: 0 !important; border-bottom: 0 !important; }
+  .fc-table tr.fc-hl1 td.fc-g, .fc-table tr.fc-hl2 td.fc-g { background: #dcebff !important; color: #0b3f95 !important; border-top: 0 !important; }
+  .fc-table tr.fc-final td { background: linear-gradient(90deg,#0b3f95,#1677ff) !important; color: #fff !important; border: 0 !important; font-size: 15px; }
+  .fc-table tr.fc-final td.fc-g { background: #0b3f95 !important; color: #fff !important; }
+  .fc-table tr.fc-final td.fc-v0 { background: #0b3f95 !important; }
+  .fc-table td.fc-in input, .fc-pct { border: 1.5px solid #b9d0f2 !important; border-radius: 10px !important; background: #fff !important; }
+  .fc-table td.fc-in input:focus, .fc-pct:focus { border-color: #1677ff !important; outline: 0 !important; box-shadow: 0 0 0 3px rgba(22,119,255,.2) !important; }
+  .fc-table .fc-note { border-radius: 50% !important; width: 26px; height: 26px; background: #eaf3ff !important; color: #1677ff !important; border: 0 !important; font-weight: 800; padding: 0 !important; }
+  .fc-table .fc-note.has { background: #1677ff !important; color: #fff !important; }
+  .fc-table td.fc-neg, .fc-table td.fc-neg-val { color: #d64545 !important; }
+  .fc-table .fc-gray, .fc-table .fc-pick { border: 1.5px solid #b9d0f2 !important; border-radius: 99px !important; background: #fff !important; color: #0b3f95 !important; font-weight: 800; }
+  .fc-table .fc-mini { border: 1.5px dashed #1677ff !important; color: #1677ff !important; background: #fff !important; border-radius: 99px !important; font-weight: 800; padding: 1px 12px !important; }
+  :root[data-theme="dark"] .fc-table tr.fc-hl1 td.fc-c, :root[data-theme="dark"] .fc-table tr.fc-hl1 td.fc-tot, :root[data-theme="dark"] .fc-table tr.fc-hl2 td.fc-c, :root[data-theme="dark"] .fc-table tr.fc-hl2 td.fc-tot, :root[data-theme="dark"] .fc-table tr.fc-hl1 td.fc-g, :root[data-theme="dark"] .fc-table tr.fc-hl2 td.fc-g { background: #17305c !important; color: #cfe3ff !important; }
+
   /* เส้นคอลัมน์ตารางอื่นๆ ที่ยังไม่มีเส้น */
   table:not([class]) { border-collapse: collapse; }
   table:not([class]) td, .alert-flat-table td, .add-items-table td, .yearly-pivot-table td, .fc-table td { border-right: 1px solid var(--tbl-vline) !important; border-bottom: 1px solid var(--tbl-vline) !important; }
