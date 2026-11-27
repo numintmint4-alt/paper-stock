@@ -209,7 +209,7 @@ async function renderReceive() {
     ประจำวันที่ ${dateThai}
   `;
 
-  $('receiveBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
+  softLoad($('receiveBody'), '<p class="ld-ph" style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>');
 
   try {
     // V.Receive FIX: เทียบรายการ PO กับข้อมูลที่แคชไว้ใน po_receive ถ้าไม่ตรงให้ดึงใหม่
