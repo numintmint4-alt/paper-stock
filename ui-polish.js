@@ -315,7 +315,7 @@
   }
 
   function scan() {
-    document.querySelectorAll('.filters select:not([data-dd]), .ui-filters select:not([data-dd])').forEach(enhanceSelect);
+    document.querySelectorAll('.filters select:not([data-dd]), .ui-filters select:not([data-dd]), #alertMatrixCellBody select:not([data-dd])').forEach(enhanceSelect);
     document.querySelectorAll('input[type="month"]:not([data-mp])').forEach(i => { if (!i.closest('.modal-bg.hidden')) enhanceMonth(i); });
     document.querySelectorAll('input[type="date"]:not([data-dp])').forEach(enhanceDate);
   }
@@ -439,7 +439,7 @@
   document.addEventListener('mouseover', e => {
     const td = e.target.closest && e.target.closest('td');
     const tb = td && td.closest(SEL);
-    if (!tb || td.closest('tfoot') ) { clear(); return; }
+    if (!tb || td.closest('tfoot, tr.total-row, tr.total-row-matrix')) { clear(); return; }
     if (td.classList.contains('hl-cell')) return;
     clear(); lastTable = tb;
     const tr = td.parentElement, ci = td.cellIndex;
