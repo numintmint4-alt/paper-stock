@@ -120,22 +120,21 @@
       const badge = !last ? '' : (last.status === 'approved' ? ' ✅' : (last.status === 'saved' ? ' 🔒' : ''));
       return `<button type="button" class="sub-tab ${g === 'FSC' ? 'fc-fsc' : ''} ${g === S.group ? 'active' : ''}" title="${esc(d.hint || d.label)}" onclick="fcSelectGroup('${g}')">${esc(d.label)}${badge}</button>`;
     }).join('');
-    // แท็บ Rev ซ้อนด้านข้าง
-    const rt = $id('fcRevTabs');
+    // ชิป Rev อยู่ในแถวหัวข้อ (ถัดจากชื่อกลุ่มเกรด) — สร้างใหม่ทุกครั้งที่ paintHeader
+    const ri = $id('fcRevInline'); if (ri) ri.innerHTML = revChipsHTML();
+  }
+
+  function revChipsHTML() {
     const arr = S.orders[S.group] || [];
-    if (rt) {
-      if (!arr.length) rt.innerHTML = '';
-      else {
-        const cur = curOrder(), last = arr[arr.length - 1];
-        const canAdd = last.status === 'approved';
-        rt.innerHTML = '<span class="fc-rev-lbl">Rev.</span>' + arr.map(o => `<button type="button" class="fc-rev-tab st-${o.status} ${cur && o.id === cur.id ? 'active' : ''}"
-            title="${o.status === 'draft' ? 'ร่าง' : (o.status === 'saved' ? 'ล็อกแล้ว (รอแนบเอกสารอนุมัติ)' : 'อนุมัติแล้ว')}"
-            onclick="fcSelectRev('${o.id}')"><i class="d"></i>${pad2(o.rev)}${o.status === 'approved' ? ' ✓' : (o.status === 'saved' ? ' 🔒' : ' ร่าง')}</button>`).join('') +
-          `<button type="button" class="fc-rev-tab fc-rev-add" ${canAdd ? '' : 'disabled'}
-            title="${canAdd ? 'เพิ่ม Rev ใหม่ (คัดลอกข้อมูลจาก Rev ล่าสุด)' : 'ต้องแนบเอกสารอนุมัติของ Rev ล่าสุดก่อน จึงจะเพิ่ม Rev ใหม่ได้'}"
-            onclick="fcAddRev()">+ Rev.</button>`;
-      }
-    }
+    if (!arr.length) return '';
+    const cur = curOrder(), last = arr[arr.length - 1];
+    const canAdd = last.status === 'approved';
+    return arr.map(o => `<button type="button" class="fc-rev-tab st-${o.status} ${cur && o.id === cur.id ? 'active' : ''}"
+        title="${o.status === 'draft' ? 'ร่าง' : (o.status === 'saved' ? 'ล็อกแล้ว (รอแนบเอกสารอนุมัติ)' : 'อนุมัติแล้ว')}"
+        onclick="fcSelectRev('${o.id}')"><i class="d"></i>Rev.${pad2(o.rev)}${o.status === 'approved' ? ' ✓' : (o.status === 'saved' ? ' 🔒' : ' ร่าง')}</button>`).join('') +
+      `<button type="button" class="fc-rev-tab fc-rev-add" ${canAdd ? '' : 'disabled'}
+        title="${canAdd ? 'เพิ่ม Rev ใหม่ (คัดลอกข้อมูลจาก Rev ล่าสุด)' : 'ต้องแนบเอกสารอนุมัติของ Rev ล่าสุดก่อน จึงจะเพิ่ม Rev ใหม่ได้'}"
+        onclick="fcAddRev()">+ Rev.</button>`;
   }
 
   function renderEmpty() {
@@ -173,7 +172,7 @@
       btns = `<button type="button" class="primary" onclick="fcViewDoc()">📄 ดูเอกสารอนุมัติ</button>`;
     }
     const saved = o.saved_at ? ` · บันทึกเมื่อ ${new Date(o.saved_at).toLocaleString('th-TH')}` : '';
-    el.innerHTML = `<div class="fc-tb-left"><b>${esc(groupLabel(S.group))} · Rev.${pad2(o.rev)}</b> ${statusChip(o)}<span class="fc-muted">${saved}</span></div>
+    el.innerHTML = `<div class="fc-tb-left"><b>${esc(groupLabel(S.group))}</b><span class="fc-rev-tabs fc-rev-inline no-print" id="fcRevInline">${revChipsHTML()}</span> ${statusChip(o)}<span class="fc-muted">${saved}</span></div>
       <div class="fc-tb-right">
         <div class="fc-inline">แสดงแกรม
           <div class="grade-filter-box" id="fcGramBox">
