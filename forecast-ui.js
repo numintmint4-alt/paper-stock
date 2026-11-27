@@ -293,7 +293,7 @@
     const saveBtn = (!L) ? `<button type="button" class="fc-tbl-save" data-act="savedraft" title="บันทึกร่าง (บันทึกทุกแกรมของกลุ่มนี้)">💾 บันทึกร่าง</button>` : '';
     const fm = esc(thMonth(S.month)), lm = P.levelMonth ? esc(thMonth(P.levelMonth)) : '…', em = P.estMonth ? esc(thMonth(P.estMonth)) : '…';
 
-    let h = `<table class="fc-table" data-g="${g}" style="min-width:${22 + 152 + 150 + 50 + n * 28}px"><colgroup><col class="c-v"><col class="c-g"><col class="c-s">${tbl.sizes.map(() => '<col>').join('')}<col class="c-t"></colgroup><thead>
+    let h = `<table class="fc-table" data-g="${g}" style="min-width:${22 + 152 + 172 + 50 + n * 28}px"><colgroup><col class="c-v"><col class="c-g"><col class="c-s">${tbl.sizes.map(() => '<col>').join('')}<col class="c-t"></colgroup><thead>
       <tr><th class="fc-g fc-h" colspan="3">รายการคำนวณ / Size</th>${tbl.sizes.map(s => `<th data-s="${s}">${s}</th>`).join('')}<th class="fc-tot-h">Total</th></tr></thead><tbody>`;
 
     // 1) การใช้ม้วน (ทั่วไป) ย้อนหลัง 3 เดือน
@@ -331,7 +331,7 @@
     // 10) คงเหลือรวมยอดจอง
     h += full('total_avail', 'ม้วนกระดาษคงเหลือรวมยอดจอง', 'fc-calc fc-hl1');
     // 11) ประมาณการใช้ม้วนเดือน (Rev ล่าสุดที่บันทึก)
-    h += ws(sub('est_month', '<span style="white-space:nowrap">ประมาณการใช้ม้วนเดือน :</span>', 1, monthBtn('estMonth', P.estMonth, L) + (W.src.estRev != null ? ` <small class="fc-muted">Rev.${pad2(W.src.estRev)}</small>` : '')), V('E', 'คำนวณ', 3));
+    h += ws(sub('est_month', '<span style="white-space:nowrap">ประมาณการใช้ม้วนเดือน :</span>', 1, `<span class="fc-pick-wrap">${monthBtn('estMonth', P.estMonth, L)}${W.src.estRev != null ? `<i class="fc-rev-in">Rev.${pad2(W.src.estRev)}</i>` : ''}</span>`), V('E', 'คำนวณ', 3));
     // 12) / 13)
     h += full('after_deduct', `ม้วนกระดาษคงเหลือ หักประมาณการใช้ม้วนเดือน : ${em} แล้ว`, 'fc-calc');
     h += full('est_after', `ประมาณการใช้ม้วนเดือน : <b>${fm}</b><br>(หลังหัก Stock)`, 'fc-calc fc-strong fc-hl2');
