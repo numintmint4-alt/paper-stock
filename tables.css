@@ -600,5 +600,54 @@
   table:not([class]) td, .alert-flat-table td, .add-items-table td, .yearly-pivot-table td, .fc-table td { border-right: 1px solid var(--tbl-vline) !important; border-bottom: 1px solid var(--tbl-vline) !important; }
   table:not([class]) th, .alert-flat-table th, .add-items-table th, .yearly-pivot-table th, .fc-table th { border-right: 1px solid rgba(255,255,255,.28) !important; }
   table:not([class]) td:last-child, table:not([class]) th:last-child, .alert-flat-table td:last-child, .alert-flat-table th:last-child, .add-items-table td:last-child, .add-items-table th:last-child, .yearly-pivot-table td:last-child, .yearly-pivot-table th:last-child, .fc-table td:last-child, .fc-table th:last-child { border-right: 0 !important; }
+
+  /* ===================== ประมาณการสั่งซื้อ: ดีไซน์ใหม่ (เทค/สดใส) พอดีหน้าจอ ===================== */
+  html body .fc-tbl-wrap { border: 0 !important; border-radius: 22px !important; background: #fff; box-shadow: 0 14px 40px rgba(27,79,209,.16), 0 0 0 1px #d7e5ff; overflow-x: auto; overflow-y: hidden; }
+  html body .fc-table { table-layout: fixed !important; width: 100% !important; border: 0 !important; border-radius: 0 !important; font-variant-numeric: tabular-nums; }
+  html body .fc-table col.c-v { width: 22px; } html body .fc-table col.c-g { width: 140px; } html body .fc-table col.c-s { width: 170px; } html body .fc-table col.c-t { width: 54px; }
+  html body .fc-table td, html body .fc-table th { border: 0 !important; border-bottom: 1px solid #edf2fb !important; height: 34px; padding: 0 2px !important; white-space: nowrap; overflow: hidden; text-overflow: clip; min-width: 0 !important; max-width: none !important; width: auto !important; }
+  /* ชื่อกลุ่ม + แถบสีรุ้ง */
+  html body .fc-table th.fc-title { background: radial-gradient(120% 260% at 15% 0%, #1f6bff 0, #0a2a8a 55%, #071a5c 100%) !important; height: 46px; padding: 0 !important; border: 0 !important; position: sticky; left: 0; overflow: visible; }
+  html body .fc-table th.fc-title::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: linear-gradient(90deg,#22d3ee,#6366f1,#ec4899,#f59e0b); }
+  html body .fc-title-in { display: flex !important; width: 100% !important; justify-content: center; align-items: center; position: relative; padding: 0 !important; height: 43px; font-size: 17px; font-weight: 800; letter-spacing: .5px; color: #fff; }
+  html body .fc-title-in > span:first-child { position: static; }
+  html body .fc-tbl-save { position: absolute; right: 16px; top: 8px; }
+  html body .fc-warnmsg { position: absolute; left: 16px; font-size: 12px; }
+  /* หัวขนาด */
+  html body .fc-table thead tr + tr th { background: #0d2f8f !important; color: #cfe3ff !important; font-weight: 700; font-size: 12px; height: 32px; }
+  html body .fc-table thead th[data-s] { background: linear-gradient(180deg,#143fb5,#0d2f8f) !important; color: #fff !important; }
+  html body .fc-table thead th.fc-tot-h { background: linear-gradient(180deg,#22d3ee,#0ea5e9) !important; color: #fff !important; }
+  html body .fc-table thead th.fc-g { text-align: left; padding-left: 12px !important; }
+  html body .fc-table thead th.fc-v-h { background: #0d2f8f !important; }
+  /* แถบสีซ้าย */
+  html body .fc-table td.fc-v { padding: 0 !important; border-bottom: 0 !important; }
+  html body .fc-table td.fc-v > span { font-size: 11px; }
+  /* ป้ายรายการ */
+  html body .fc-table td.fc-g, html body .fc-table td.fc-s { white-space: normal; line-height: 1.15; font-size: 11.5px; font-weight: 700; padding: 0 8px !important; text-align: left; background: #f4f8ff !important; color: #12326f !important; }
+  html body .fc-table td.fc-g { left: 22px !important; }
+  html body .fc-table td.fc-s { left: 162px !important; border-right: 1px solid #e3ecfb !important; }
+  html body .fc-table td.fc-g[colspan="2"] { border-right: 1px solid #e3ecfb !important; }
+  /* ตัวเลข */
+  html body .fc-table td.fc-c { font-size: 11.5px; font-weight: 600; color: #1b3a75; }
+  html body .fc-table td.fc-tot { background: #eef5ff !important; color: #0b3f95; font-weight: 800; font-size: 12px; }
+  html body .fc-table tr.fc-hl1 td, html body .fc-table tr.fc-hl2 td { background: #e4f0ff !important; color: #0b3f95 !important; font-weight: 800; border-top: 0 !important; }
+  html body .fc-table tr.fc-hl1 td.fc-v, html body .fc-table tr.fc-hl2 td.fc-v { background: unset; }
+  html body .fc-table td.fc-neg { background: #ffe3e6 !important; box-shadow: none !important; color: #d1243b !important; }
+  /* ช่องกรอก */
+  html body .fc-table td.fc-in { padding: 0 2px !important; }
+  html body .fc-table td.fc-in input { width: 100% !important; height: 24px !important; border: 0 !important; border-radius: 8px !important; background: #f1f6ff !important; text-align: center; font-size: 11.5px; font-weight: 700; color: #0b3f95; padding: 0 !important; box-shadow: none !important; }
+  html body .fc-table td.fc-in input:hover { background: #fff !important; box-shadow: 0 0 0 1.5px #b9d0f2 !important; }
+  html body .fc-table td.fc-in input:focus { background: #fff !important; box-shadow: 0 0 0 2px #1677ff !important; }
+  html body .fc-table .fc-gray, html body .fc-table .fc-pick, html body .fc-table .fc-snap, html body .fc-table .fc-cust { height: 24px !important; border: 1px solid #cfe0fb !important; border-radius: 99px !important; background: #fff !important; box-shadow: 0 1px 3px rgba(27,79,209,.14); font-size: 11.5px !important; font-weight: 700; padding: 0 10px !important; color: #2a4a8f !important; max-width: 100%; }
+  html body .fc-table td.fc-s .fc-gray, html body .fc-table td.fc-s .fc-pick, html body .fc-table td.fc-s .fc-snap, html body .fc-table td.fc-s .fc-cust { width: 100%; }
+  html body .fc-table .fc-note { width: 22px !important; height: 22px !important; font-size: 12px; }
+  html body .fc-table .fc-mini { font-size: 11px; padding: 0 10px !important; }
+  /* แถวสรุป */
+  html body .fc-table tr.fc-final { background: linear-gradient(90deg,#0b2a8a,#1677ff 60%,#22d3ee); }
+  html body .fc-table tr.fc-final td { background: transparent !important; color: #fff !important; height: 40px; font-size: 14px; font-weight: 800; border: 0 !important; text-shadow: 0 1px 2px rgba(0,0,0,.25); }
+  html body .fc-table tr.fc-final td.fc-g { font-size: 12.5px; text-align: left; }
+  html body .fc-table tr.fc-final td.fc-v0 { background: #0b2a8a !important; }
+  html body .fc-table tr.fc-adj td { height: 34px; }
+
 }
 @media print { .ss-share { display: none !important; } .ss-chip { background: none !important; padding: 0 !important; } }
