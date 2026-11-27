@@ -322,7 +322,13 @@
   function tick() {
     for (let i = synced.length - 1; i >= 0; i--) { try { if (synced[i]() === false) synced.splice(i, 1); } catch (e) { synced.splice(i, 1); } }
   }
-  function start() { scan(); setInterval(scan, 1200); setInterval(tick, 600); }
+  function start() {
+    scan(); setInterval(scan, 1200); setInterval(tick, 600);
+    // ปรับเป็นคอนโทรลใหม่ทันทีที่มีองค์ประกอบโผล่ (ก่อนวาดภาพ) กันเห็นของเก่ากระพริบ
+    let pend = false;
+    new MutationObserver(() => { if (pend) return; pend = true; Promise.resolve().then(() => { pend = false; try { scan(); } catch (e) {} }); })
+      .observe(document.body, { childList: true, subtree: true });
+  }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();
 
@@ -421,7 +427,12 @@
     regroup(box, list); refresh(box);
   }
   function scan() { document.querySelectorAll('.grade-filter-box').forEach(b => { try { build(b); } catch (e) { console.warn('[multi-select]', e); } }); }
-  function start() { scan(); setInterval(scan, 1500); }
+  function start() {
+    scan(); setInterval(scan, 1500);
+    let pend = false;
+    new MutationObserver(() => { if (pend) return; pend = true; Promise.resolve().then(() => { pend = false; scan(); }); })
+      .observe(document.body, { childList: true, subtree: true });
+  }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();
 
