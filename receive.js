@@ -129,19 +129,22 @@ function renderSupplierSummary(rows, dateThai) {
   });
 
   const supKeys = Object.keys(supplierSummary).sort();
-  let html = '<div class="supplier-summary"><h4>📊 สรุป Supplier (วันที่ ' + dateThai + ')</h4>';
-  html += '<table><thead><tr><th>Supplier</th><th>จำนวน (ม้วน)</th><th>KG รวม</th></tr></thead><tbody>';
   let totalSupQty = 0, totalSupKg = 0;
+  supKeys.forEach(sup => { totalSupQty += supplierSummary[sup].qty; totalSupKg += supplierSummary[sup].kg; });
+  let html = '<div class="supplier-summary ss-new"><h4>📊 สรุป Supplier (วันที่ ' + dateThai + ')</h4>';
+  html += '<table class="ss-table"><thead><tr><th>Supplier</th><th class="n">จำนวน (ม้วน)</th><th class="n">KG รวม</th><th class="ss-share">สัดส่วน</th></tr></thead><tbody>';
   supKeys.forEach(sup => {
     const s = supplierSummary[sup];
-    totalSupQty += s.qty; totalSupKg += s.kg;
-    html += `<tr><td>${esc(sup)}</td>
-      <td style="text-align:right">${s.qty}</td>
-      <td style="text-align:right">${fmtKg(s.kg)}</td></tr>`;
+    const pct = totalSupKg > 0 ? Math.round((s.kg / totalSupKg) * 100) : 0;
+    html += `<tr><td><span class="ss-chip">${esc(sup)}</span></td>
+      <td class="n">${s.qty}</td>
+      <td class="n">${fmtKg(s.kg)}</td>
+      <td class="ss-share"><div class="ss-bar-row"><div class="ss-bar"><i style="width:${pct}%"></i></div><b>${pct}%</b></div></td></tr>`;
   });
   html += `<tr class="total-row"><td>รวม</td>
-    <td style="text-align:right">${totalSupQty}</td>
-    <td style="text-align:right">${fmtKg(totalSupKg)}</td></tr>`;
+    <td class="n">${totalSupQty}</td>
+    <td class="n">${fmtKg(totalSupKg)}</td>
+    <td class="ss-share">100%</td></tr>`;
   html += '</tbody></table></div>';
   return html;
 }
