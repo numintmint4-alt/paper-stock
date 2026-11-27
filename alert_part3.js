@@ -1750,8 +1750,11 @@ async function _getUsedReservationQtyMap() {
       .select('res_id, qty, receive_date')
       .not('res_id', 'is', null));
 
+    const validDates = new Set(_dbReceiveDates || []);
     (data || []).forEach(row => {
       if (memDates.has(row.receive_date)) return; // memory เป็นตัวแทนวันนั้นแล้ว
+      // แถวค้างของวันที่ไม่มีแท็บแล้ว (ผู้ใช้มองไม่เห็น) → ไม่นับ กันยอดจองหายลอยๆ
+      if (validDates.size && !validDates.has(row.receive_date)) return;
       add(row.res_id, row.qty);
     });
   } catch (e) {
