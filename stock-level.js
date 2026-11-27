@@ -434,7 +434,7 @@ async function renderMatrix() {
 
   updateReportTitle();
 
-  $('matrixBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลดข้อมูล...</p>';
+  softLoad($('matrixBody'), '<p class="ld-ph" style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลดข้อมูล...</p>');
 
   const allUsage = await fetchAllRows(() => {
     let q = supabase.from('usage_records').select('*');
