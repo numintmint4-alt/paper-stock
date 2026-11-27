@@ -649,5 +649,9 @@
   html body .fc-table tr.fc-final td.fc-v0 { background: #0b2a8a !important; }
   html body .fc-table tr.fc-adj td { height: 34px; }
 
+  /* ช่องจำนวน: ซ่อนลูกศรขึ้น-ลง (ไม่ให้โผล่ตอนเอาเมาส์วาง) */
+  input.matrix-row-qty::-webkit-outer-spin-button, input.matrix-row-qty::-webkit-inner-spin-button, .qty-input::-webkit-outer-spin-button, .qty-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  input.matrix-row-qty, .qty-input { -moz-appearance: textfield; appearance: textfield; text-align: center; }
+
 }
 @media print { .ss-share { display: none !important; } .ss-chip { background: none !important; padding: 0 !important; } }
