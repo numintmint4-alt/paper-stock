@@ -325,3 +325,102 @@
   function start() { scan(); setInterval(scan, 1200); setInterval(tick, 600); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();
+
+
+/* =====================================================================
+   ฟิลเตอร์เลือกหลายรายการ (.grade-filter-box) — หัวไล่สี + ค้นหา + แบ่งกลุ่ม + แท็กในช่อง + ปุ่มตกลง
+   (ชั้นหน้าตาเท่านั้น: การเลือกจริงยังเป็น checkbox เดิม แต่ละหน้าจึงทำงานเหมือนเดิม)
+   ===================================================================== */
+(function () {
+  const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const titleOf = box => {
+    const lab = box.closest('label');
+    if (lab) for (const n of lab.childNodes) if (n.nodeType === 3 && n.textContent.trim()) return n.textContent.trim().replace(/[:：]\s*$/, '');
+    return 'เลือกรายการ';
+  };
+  const items = dd => Array.from(dd.querySelectorAll('.grade-list .item'));
+  const txt = it => { const sp = it.querySelector('span'); return (sp ? sp.textContent : it.textContent).trim(); };
+  const cbOf = it => it.querySelector('input[type="checkbox"]');
+  const isGradeBox = box => /grade/i.test(box.id || '');
+
+  function regroup(box, list) {
+    list.querySelectorAll('.gd-group').forEach(g => g.remove());
+    if (!isGradeBox(box)) return;
+    let prev = null;
+    items(box.querySelector('.grade-dropdown')).forEach(it => {
+      const m = /^[A-Z]+/.exec(txt(it)); const g = m ? m[0] : '';
+      if (g && g !== prev) {
+        const h = document.createElement('div'); h.className = 'gd-group'; h.dataset.g = g;
+        h.innerHTML = '<span>' + esc(g) + '</span><b>เลือกทั้งกลุ่ม</b>';
+        list.insertBefore(h, it);
+      }
+      it.dataset.g = g; prev = g;
+    });
+  }
+
+  function refresh(box) {
+    const dd = box.querySelector('.grade-dropdown'), btn = box.querySelector('.grade-filter-btn'); if (!dd || !btn) return;
+    const its = items(dd), on = its.filter(it => cbOf(it) && cbOf(it).checked);
+    const n = on.length, total = its.length;
+    const c = dd.querySelector('.gd-count'); if (c) c.textContent = 'เลือกแล้ว ' + n;
+    const sel = dd.querySelector('.gd-sel'); if (sel) sel.textContent = 'เลือกแล้ว ' + n + ' จาก ' + total;
+    const tags = btn.querySelector('.gf-tags');
+    if (tags) {
+      if (n > 0 && n < total) {
+        const show = on.slice(0, 2);
+        tags.innerHTML = show.map(it => '<span class="gf-tag" data-k="' + its.indexOf(it) + '">' + esc(txt(it)) + '<b>×</b></span>').join('') + (n > 2 ? '<span class="gf-tag more">+' + (n - 2) + '</span>' : '');
+        btn.classList.add('has-tags');
+      } else { tags.innerHTML = ''; btn.classList.remove('has-tags'); }
+    }
+  }
+
+  function build(box) {
+    const dd = box.querySelector('.grade-dropdown'), btn = box.querySelector('.grade-filter-btn'), list = dd && dd.querySelector('.grade-list');
+    if (!dd || !btn || !list || dd.dataset.gd) return;
+    dd.dataset.gd = '1';
+    const head = document.createElement('div'); head.className = 'gd-head';
+    head.innerHTML = '<span class="gd-title">เลือก ' + esc(titleOf(box)) + '</span><span class="gd-count">เลือกแล้ว 0</span>';
+    dd.insertBefore(head, dd.firstChild);
+    if (!dd.querySelector('input[type="text"]')) {
+      const sw = document.createElement('div'); sw.className = 'gd-search';
+      sw.innerHTML = '<input type="text" placeholder="ค้นหา…" autocomplete="off">';
+      head.after(sw);
+      sw.firstChild.addEventListener('input', () => {
+        const q = sw.firstChild.value.trim().toLowerCase();
+        items(dd).forEach(it => { it.style.display = !q || txt(it).toLowerCase().includes(q) ? '' : 'none'; });
+        list.querySelectorAll('.gd-group').forEach(g => {
+          const any = items(dd).some(it => it.dataset.g === g.dataset.g && it.style.display !== 'none'); g.style.display = any ? '' : 'none';
+        });
+      });
+    }
+    const foot = document.createElement('div'); foot.className = 'gd-foot';
+    foot.innerHTML = '<span class="gd-sel">เลือกแล้ว 0 จาก 0</span><button type="button" class="gd-ok">ตกลง</button>';
+    dd.appendChild(foot);
+    foot.querySelector('.gd-ok').addEventListener('click', e => { e.stopPropagation(); dd.classList.add('hidden'); btn.classList.remove('open'); });
+    const tags = document.createElement('span'); tags.className = 'gf-tags';
+    const arrow = btn.querySelector('.arrow'); btn.insertBefore(tags, arrow || null);
+    tags.addEventListener('click', e => {
+      const t = e.target.closest('.gf-tag'); if (!t) return;
+      e.stopPropagation(); e.preventDefault();
+      if (t.classList.contains('more')) { btn.click(); return; }
+      const it = items(dd)[+t.dataset.k]; const cb = it && cbOf(it); if (cb && cb.checked) cb.click();
+    });
+    list.addEventListener('click', e => {
+      const g = e.target.closest('.gd-group'); if (!g) return;
+      const grp = items(dd).filter(it => it.dataset.g === g.dataset.g && it.style.display !== 'none');
+      const allOn = grp.every(it => cbOf(it) && cbOf(it).checked);
+      grp.forEach(it => { const cb = cbOf(it); if (cb && cb.checked === allOn) cb.click(); });
+    });
+    let raf = 0, busy = false;
+    const mo = new MutationObserver(() => {
+      if (busy) return; cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => { busy = true; try { regroup(box, list); refresh(box); } finally { setTimeout(() => { busy = false; }, 0); } });
+    });
+    mo.observe(list, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+    box.addEventListener('change', () => refresh(box), true);
+    regroup(box, list); refresh(box);
+  }
+  function scan() { document.querySelectorAll('.grade-filter-box').forEach(b => { try { build(b); } catch (e) { console.warn('[multi-select]', e); } }); }
+  function start() { scan(); setInterval(scan, 1500); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+})();
