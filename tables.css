@@ -858,5 +858,41 @@
   html body #fcFooter { margin-top: 8px !important; }
   /* ซ่อน Alert History (ย้อนหลัง) ถาวร */
   html body #alertHistoryCard { display: none !important; }
+  /* ===== หน้าต่างสร้าง/แก้ไข PO แบบใหม่ ===== */
+  html body #modalPOForm .modal { padding: 0 !important; border-radius: 24px !important; overflow: hidden auto !important; box-shadow: 0 30px 80px rgba(7,26,92,.35) !important; }
+  html body #modalPOForm .modal-head { margin: 0 !important; padding: 0 24px !important; height: 60px; display: flex; align-items: center; justify-content: space-between; border-bottom: 0 !important; background: radial-gradient(120% 260% at 15% 0%, #1f6bff 0, #0a2a8a 55%, #071a5c 100%) !important; position: sticky; top: 0; z-index: 20; }
+  html body #modalPOForm .modal-head::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: linear-gradient(90deg,#22d3ee,#6366f1,#ec4899,#f59e0b); }
+  html body #modalPOForm .modal-head h3 { color: #fff !important; font-size: 19px; font-weight: 800; margin: 0; }
+  html body #modalPOForm .modal-head button { background: rgba(255,255,255,.18) !important; color: #fff !important; border: 1px solid rgba(255,255,255,.4) !important; border-radius: 99px !important; padding: 5px 18px !important; font-weight: 700; box-shadow: none !important; }
+  html body #modalPOForm .modal-head button:hover { background: rgba(255,255,255,.3) !important; }
+  html body #poFormBody { padding: 18px 24px 4px; }
+  html body #poFormBody .po-info-bar { background: linear-gradient(180deg,#f4f9ff,#eaf3ff) !important; border: 1.5px solid #cfe0f7 !important; border-radius: 18px !important; padding: 14px 18px !important; margin-bottom: 14px; }
+  html body #poFormBody .po-info-bar .po-info-row { border-bottom: 1px dashed #bcd2f2 !important; }
+  html body #poFormBody .po-info-bar .po-info-row b { color: #0b3f95 !important; }
+  html body #poFormBody .po-info-bar .po-info-badge { background: #fff4dc !important; color: #b45309 !important; border: 0 !important; font-weight: 700; padding: 3px 14px !important; }
+  html body #poFormBody .po-info-bar .po-info-field label { color: #475b7e !important; }
+  html body #poFormBody .po-info-bar .po-info-input { height: 34px; border: 1.5px solid #b9d0f2 !important; border-radius: 99px !important; padding: 0 16px !important; background-color: #fff; box-shadow: none; }
+  html body #poFormBody .po-info-bar select.po-info-input { appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%231677ff' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 34px !important; }
+  html body #poFormBody .po-info-bar .po-info-input:focus { border-color: #1677ff !important; box-shadow: 0 0 0 3px rgba(22,119,255,.2) !important; }
+  html body #poFormBody .po-info-bar .po-info-meta { color: #475b7e !important; border-top: 0 !important; padding-top: 2px !important; }
+  html body #poFormBody .po-info-bar .po-info-meta b { background: #fff; border: 1px solid #cfe0f7; border-radius: 99px; padding: 1px 10px; color: #0b3f95 !important; }
+  html body #poFormBody .report-wrap { border: 1.5px solid #cfe0f7 !important; border-radius: 16px !important; }
+  html body #poFormBody .add-items-table { border-collapse: separate; border-spacing: 0; }
+  html body #poFormBody .add-items-table thead th { background: linear-gradient(90deg,#0b3f95,#1677ff) !important; border: 0 !important; height: 34px; padding: 0 6px; letter-spacing: .3px; }
+  html body #poFormBody .add-items-table tbody td { border: 0 !important; border-bottom: 1px solid #e6eefb !important; height: 38px; padding: 3px 6px; text-align: center; }
+  html body #poFormBody .add-items-table tbody tr:nth-child(even) td { background: #f8fbff; }
+  html body #poFormBody .add-items-table tbody tr:hover td { background: #e4efff !important; }
+  html body #poFormBody .add-items-table :is(select, input[type="number"], input[type="text"]) { height: 28px; border: 1.5px solid #b9d0f2 !important; border-radius: 99px !important; background-color: #fff; padding: 0 12px !important; font-weight: 600; }
+  html body #poFormBody .add-items-table input[type="number"] { text-align: center; }
+  html body #poFormBody .add-items-table select { appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%231677ff' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 26px !important; }
+  html body #poFormBody .add-items-table :is(select, input):focus { border-color: #1677ff !important; box-shadow: 0 0 0 3px rgba(22,119,255,.18) !important; }
+  html body #poFormBody .add-items-table td:nth-child(6) input { background: #fff1f1 !important; border-color: #ffd0d0 !important; color: #d64545 !important; font-weight: 800; }
+  html body #poFormBody .add-items-table button.danger { width: 28px; height: 28px; padding: 0 !important; border-radius: 50% !important; background: #fff0f0 !important; color: #ef4444 !important; font-weight: 800; border: 0 !important; }
+  html body #poFormBody .add-items-table button.danger:hover:not(:disabled) { background: #ef4444 !important; color: #fff !important; }
+  html body #poFormBody > div > button[onclick="addEditRow()"], html body #poFormBody button[onclick="addEditRow()"] { border: 1.5px dashed #1677ff !important; border-radius: 99px !important; background: #fff !important; color: #1677ff !important; padding: 7px 20px !important; font-weight: 800; }
+  html body #poFormBody .form-actions { position: sticky; bottom: 0; background: #fff !important; border-top: 1px solid #e6eefb !important; margin: 14px -24px 0 !important; padding: 14px 24px 18px !important; display: flex; justify-content: flex-end; gap: 10px; }
+  html body #poFormBody .form-actions button { border: 1.5px solid #b9d0f2; border-radius: 12px !important; padding: 9px 22px !important; font-weight: 700; background: #fff; color: #0b3f95; cursor: pointer; }
+  html body #poFormBody .form-actions button[onclick="repricePO()"] { background: #fff8ea !important; border-color: #f59e0b !important; color: #b45309 !important; }
+  html body #poFormBody .form-actions button.primary { background: linear-gradient(90deg,#1677ff,#0b3f95) !important; color: #fff !important; border: 0 !important; box-shadow: 0 6px 16px rgba(22,119,255,.4); }
 }
 @media print { .fc-rail, .fc-pgnav { display: none !important; } .fc-tbl-wrap.fc-pg-hide { display: block !important; } .szh-pop, .sz-hide-btn { display: none !important; } .report-title .dd-btn { display: none !important; } .calc-note { display: none !important; } .ss-share { display: none !important; } .ss-chip { background: none !important; padding: 0 !important; } }
