@@ -124,17 +124,20 @@
   function moveTitleSelects(toBanner) {
     const m = $('titleMonth'), y = $('titleYear');
     if (!m || !y) return;
+    const mw = m.closest('.dd') || m, yw = y.closest('.dd') || y;
     if (toBanner) {
-      if (!orig.parent) { orig.parent = m.parentNode; orig.nextM = m.nextSibling; }
+      if (!orig.parent) { orig.parent = mw.parentNode; }
       let box = $('bnTitleCtl');
       if (!box) {
         box = document.createElement('span'); box.id = 'bnTitleCtl'; box.className = 'bn-chip bn-ctl';
         box.innerHTML = ci('cal') + '<span>ประจำเดือน</span>';
       }
-      box.appendChild(m); box.appendChild(y);
-      $('bnChips').appendChild(box);
-    } else if (orig.parent && m.parentNode !== orig.parent) {
-      orig.parent.appendChild(m); orig.parent.appendChild(y);
+      // ย้ายเฉพาะเมื่อยังไม่อยู่ที่เดิม (ย้ายซ้ำทำให้รายการเลือกที่เปิดอยู่เด้งปิด)
+      if (mw.parentNode !== box) box.appendChild(mw);
+      if (yw.parentNode !== box) box.appendChild(yw);
+      const bc = $('bnChips'); if (bc && box.parentNode !== bc) bc.insertBefore(box, bc.firstChild);
+    } else if (orig.parent && mw.parentNode !== orig.parent) {
+      orig.parent.appendChild(mw); orig.parent.appendChild(yw);
       const b = $('bnTitleCtl'); if (b) b.remove();
     }
   }
@@ -315,7 +318,7 @@
   }
 
   function scan() {
-    document.querySelectorAll('.filters select:not([data-dd]), .ui-filters select:not([data-dd]), #alertMatrixCellBody select:not([data-dd])').forEach(enhanceSelect);
+    document.querySelectorAll('.filters select:not([data-dd]), .ui-filters select:not([data-dd]), #alertMatrixCellBody select:not([data-dd]), .bn-ctl select:not([data-dd])').forEach(enhanceSelect);
     document.querySelectorAll('input[type="month"]:not([data-mp])').forEach(i => { if (!i.closest('.modal-bg.hidden')) enhanceMonth(i); });
     document.querySelectorAll('input[type="date"]:not([data-dp])').forEach(enhanceDate);
   }
@@ -477,3 +480,27 @@ window.softLoad = function (el, html) {
   }
   el.innerHTML = html;
 };
+
+
+/* ป้าย "เลือกข้อมูลที่ใช้ในการคำนวณ : ปี … เดือน …" บนแถบฟิลเตอร์ของหน้าระดับ Stock */
+(function () {
+  const MON = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+  function months() {
+    try { return (typeof selectedMonths !== 'undefined' && Array.isArray(selectedMonths)) ? selectedMonths.slice().sort() : []; } catch (e) { return []; }
+  }
+  function textNow() {
+    const y = document.getElementById('filterYear');
+    const yr = y ? y.value : '';
+    const ms = months().map(v => { const m = /^(\d{4})-(\d{2})/.exec(v); return m ? MON[+m[2] - 1] : v; });
+    return 'เลือกข้อมูลที่ใช้ในการคำนวณ : ปี ' + (yr || '-') + ' · เดือน ' + (ms.length ? ms.join(', ') : 'ทั้งหมด');
+  }
+  function tick() {
+    const f = document.querySelector('#tab-matrix .filters'); if (!f) return;
+    let n = f.querySelector('.calc-note');
+    if (!n) { n = document.createElement('div'); n.className = 'calc-note'; f.insertBefore(n, f.firstChild); }
+    const t = textNow(); if (n.textContent !== t) n.textContent = t;
+  }
+  setInterval(tick, 400);
+  document.addEventListener('change', () => setTimeout(tick, 50), true);
+  document.addEventListener('click', () => setTimeout(tick, 80), true);
+})();
