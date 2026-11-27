@@ -377,7 +377,7 @@
   function recalcTable(tbl, silent) {
     const W = S.W; if (!W || !tbl._el) return;
     const tot = {}; let neg = 0;
-    const put = (r, s, v) => { const td = tbl._tds[r + '|' + s]; if (td) td.textContent = fmtCell(r, v); };
+    const put = (r, s, v) => { const td = tbl._tds[r + '|' + s]; if (td) { td.textContent = fmtCell(r, v); td.classList.toggle('fc-zero', !v || Math.abs(v) < 1e-9); } };
     tbl.sizes.forEach(s => {
       const v = getV(W, tbl, s), c = tbl.cells[s];
       CALC_ROWS.forEach(r => { put(r, s, v[r]); if (v[r] != null) tot[r] = (tot[r] || 0) + v[r]; });
@@ -391,7 +391,7 @@
       const td15 = tbl._tds['order_qty|' + s]; if (td15) { td15.classList.toggle('fc-neg', bad); td15.title = bad ? NEG_MSG : ''; }
       const rs = tbl._el.querySelector(`input[data-act="adjM"][data-s="${s}"]`); if (rs) rs.classList.toggle('fc-neg-in', bad);
     });
-    Object.keys(tot).forEach(r => { const td = tbl._tds[r + '|t']; if (td) td.textContent = fmtTot(r, tot[r]); });
+    Object.keys(tot).forEach(r => { const td = tbl._tds[r + '|t']; if (td) { td.textContent = fmtTot(r, tot[r]); td.classList.toggle('fc-zero', !tot[r] || Math.abs(tot[r]) < 1e-9); } });
     const wm = tbl._el.querySelector('.fc-warnmsg'); if (wm) wm.classList.toggle('hidden', neg === 0);
     if (!silent && neg > tbl._neg) toast('⚠️ ' + NEG_MSG, 'warn', 4500);
     tbl._neg = neg;
