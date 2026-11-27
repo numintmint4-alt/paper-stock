@@ -778,11 +778,12 @@ function renderAlertPODetail(items) {
       <div class="pv-day">
         <div class="pv-dh"><span>📅 วันที่รับ <b>${fmtDate(dateKey)}</b> · ${dayItems.length} รายการ</span><em>${supList}</em></div>
         <table class="pv-tbl">
+          <colgroup><col style="width:52px"><col style="width:210px"><col style="width:100px"><col style="width:90px"><col></colgroup>
           <thead><tr>
-            <th style="width:48px">#</th>
-            <th>Gradegram · Size</th>
-            <th style="width:90px">Sup.</th>
-            <th style="width:90px">จำนวน</th>
+            <th class="pv-c">#</th>
+            <th>Gradegram-Size</th>
+            <th class="pv-c">Sup.</th>
+            <th class="pv-c">จำนวน</th>
             <th>หมายเหตุ</th>
           </tr></thead>
           <tbody>`;
@@ -801,21 +802,16 @@ function renderAlertPODetail(items) {
         tags.push(`<span class="pv-note">${esc(it.note)}</span>`);
       }
 
-      const gsz = String(it.gradegram_size || '');
-      const cut = gsz.lastIndexOf('-');
-      const gName = cut > 0 ? gsz.slice(0, cut) : gsz;
-      const gSize = cut > 0 ? Number(gsz.slice(cut + 1)) : '';
-
       html += `<tr>
-        <td class="pv-n">${idx + 1}</td>
-        <td><b class="pv-g">${esc(gName)}</b>${gSize !== '' ? `<span class="pv-sz">Size ${gSize}</span>` : ''}</td>
+        <td class="pv-c pv-n">${idx + 1}</td>
+        <td><b class="pv-g">${esc(it.gradegram_size)}</b></td>
         <td class="pv-c">${it.sup ? supPill(it.sup) : ''}</td>
         <td class="pv-q"><span>${it.quantity}</span></td>
         <td>${tags.join(' ')}</td>
       </tr>`;
     });
 
-    html += `<tr class="pv-tot"><td></td><td colspan="2">รวมวันนี้</td><td class="pv-q"><span>${dayTotal}</span></td><td></td></tr>
+    html += `<tr class="pv-tot"><td colspan="5"><div class="pv-tot-in"><span class="pv-tot-l">รวมวันนี้ <small>${dayItems.length} รายการ</small></span><span class="pv-tot-q"><b>${dayTotal}</b> ม้วน</span></div></td></tr>
       </tbody></table>
       </div>`;
   });
