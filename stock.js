@@ -543,26 +543,26 @@ async function openStockDetail(gradegram, size) {
     const waitingCount = rows.filter(r => r.roll_status === 'waiting').length;
     const totalKgs     = rows.reduce((s, r) => s + (Number(r.kgs) || 0), 0);
 
-    let html = `<div class="msg info" style="margin-bottom:12px">
-      📦 ทั้งหมด ${rows.length} ม้วน ·
-      <b style="color:#166534">เต็ม ${fullCount}</b> ·
-      <b style="color:#d97706">เศษ ${scrapCount}</b> ·
-      <b style="color:#0369a1">รอกรอ ${waitingCount}</b> ·
-      <b>${totalKgs.toFixed(2)} kg</b>
+    let html = `<div class="pop-chips">
+      <span class="pc">ทั้งหมด ${rows.length} ม้วน</span>
+      <span class="pc pc-f">เต็ม ${fullCount}</span>
+      <span class="pc pc-s">เศษ ${scrapCount}</span>
+      <span class="pc pc-w">รอกรอ ${waitingCount}</span>
+      <span class="pc pc-k">${totalKgs.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} kg</span>
     </div>`;
 
-    html += '<div style="max-height:550px;overflow:auto"><table><thead><tr>';
+    html += '<div class="pop-scroll"><table class="data-table pop-table"><thead><tr>';
     html += '<th>#</th><th>SN</th><th>Diameter</th><th>Kgs</th><th>Meter</th>';
     html += '<th>Supplier</th><th>QLT</th><th>Customer</th><th>Loc</th><th>สถานะ</th>';
     html += '</tr></thead><tbody>';
 
     rows.forEach((r, i) => {
       const statusMap = {
-        full:    { cls: 'full-row',    txt: '✅ เต็ม' },
-        scrap:   { cls: 'scrap-row',   txt: '♻️ เศษ' },
-        waiting: { cls: 'waiting-row', txt: '⏳ รอกรอ' }
+        full:    { cls: 'full-row',    txt: '<span class="st st-f"><i></i>เต็ม</span>' },
+        scrap:   { cls: 'scrap-row',   txt: '<span class="st st-s"><i></i>เศษ</span>' },
+        waiting: { cls: 'waiting-row', txt: '<span class="st st-w"><i></i>รอกรอ</span>' }
       };
-      const st = statusMap[r.roll_status] || { cls: '', txt: r.roll_status || '-' };
+      const st = statusMap[r.roll_status] || { cls: '', txt: esc(r.roll_status || '-') };
       const custTxt = r.is_customer_roll ? `👤 ${esc(r.customer)}` : esc(r.customer) || '-';
 
       html += `<tr class="${st.cls}">
