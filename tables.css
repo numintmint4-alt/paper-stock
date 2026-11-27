@@ -525,6 +525,24 @@
   .fc-table .fc-mini { border: 1.5px dashed #1677ff !important; color: #1677ff !important; background: #fff !important; border-radius: 99px !important; font-weight: 800; padding: 1px 12px !important; }
   :root[data-theme="dark"] .fc-table tr.fc-hl1 td.fc-c, :root[data-theme="dark"] .fc-table tr.fc-hl1 td.fc-tot, :root[data-theme="dark"] .fc-table tr.fc-hl2 td.fc-c, :root[data-theme="dark"] .fc-table tr.fc-hl2 td.fc-tot, :root[data-theme="dark"] .fc-table tr.fc-hl1 td.fc-g, :root[data-theme="dark"] .fc-table tr.fc-hl2 td.fc-g { background: #17305c !important; color: #cfe3ff !important; }
 
+
+  /* ---- ลดความรก: ช่องกรอกเรียบ + เลขศูนย์จาง ---- */
+  .fc-table td.fc-in { padding: 2px 3px !important; }
+  .fc-table td.fc-in input { height: 24px !important; border: 1px solid transparent !important; border-radius: 6px !important; background: #f1f6ff !important; font-weight: 700; color: #0b3f95; }
+  .fc-table td.fc-in input:hover { border-color: #b9d0f2 !important; background: #fff !important; }
+  .fc-table td.fc-in input:focus { border-color: #1677ff !important; background: #fff !important; }
+  .fc-table td.fc-in input:placeholder-shown { background: #f6f9ff !important; }
+  html body .fc-table tr td.fc-zero { color: #c5d0e0 !important; font-weight: 400 !important; }
+  html body .fc-table tr.fc-final td.fc-zero { color: rgba(255,255,255,.55) !important; font-weight: 700 !important; }
+  .fc-table td { border-right-color: #dbe7f8 !important; }
+  .fc-table td.fc-c, .fc-table td.fc-tot { font-size: 12.5px; }
+  .fc-table td.fc-v > span { font-size: 12px; }
+  .fc-table td.fc-s .fc-gray, .fc-table td.fc-s .fc-pick, .fc-table td.fc-s .fc-snap { height: 26px; font-size: 12px; padding: 0 10px; }
+  .fc-table .fc-cust { border-radius: 8px !important; border: 1px solid #cfe0f7 !important; background: #fff !important; font-weight: 600; }
+  .fc-table .fc-tot { background: #eaf3ff !important; }
+  :root[data-theme="dark"] .fc-table td.fc-in input { background: #1a2a48 !important; color: #cfe3ff; }
+  :root[data-theme="dark"] .fc-table td.fc-zero { color: #4a5a78 !important; }
+
   /* เส้นคอลัมน์ตารางอื่นๆ ที่ยังไม่มีเส้น */
   table:not([class]) { border-collapse: collapse; }
   table:not([class]) td, .alert-flat-table td, .add-items-table td, .yearly-pivot-table td, .fc-table td { border-right: 1px solid var(--tbl-vline) !important; border-bottom: 1px solid var(--tbl-vline) !important; }
