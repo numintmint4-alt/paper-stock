@@ -691,5 +691,10 @@
   html body .pop-table tr.pop-max .pop-maxtag { background: #fff; color: #0b3f95; }
   html body .pop-table tr.pop-max .st-f, html body .pop-table tr.pop-max button { color: #0b3f95; }
 
+  /* พับแบนเนอร์ด้านบน */
+  html body .page-banner { max-height: 320px; transition: max-height .35s ease, min-height .35s ease, margin .35s ease, opacity .25s ease; }
+  html body .page-banner.bn-collapsed { max-height: 0 !important; min-height: 0 !important; margin-top: 0 !important; margin-bottom: 0 !important; opacity: 0; border-width: 0 !important; box-shadow: none !important; pointer-events: none; }
+  html body:has(.page-banner.bn-collapsed) #matrixBody .report-wrap { max-height: calc(100vh - 250px) !important; }
+
 }
 @media print { .report-title .dd-btn { display: none !important; } .calc-note { display: none !important; } .ss-share { display: none !important; } .ss-chip { background: none !important; padding: 0 !important; } }
