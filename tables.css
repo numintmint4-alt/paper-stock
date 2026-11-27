@@ -775,22 +775,20 @@
   @supports (writing-mode: sideways-lr) {
     html body .fc-table td.fc-v > span { writing-mode: sideways-lr; transform: none; }
   }
-  /* ---------- หน้าประมาณการ: ชิป Rev อยู่ในแถวแท็บเกรด (ชิดขวา) ---------- */
-  html body .fc-tabrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  html body .fc-tabrow #fcGradeTabs { flex: 0 1 auto; margin: 0 !important; }
-  html body .fc-tabrow { margin-bottom: 12px; }
-  html body .fc-tabrow .fc-rev-tabs { display: flex !important; flex-direction: row !important; align-items: center; gap: 6px; width: auto !important; padding: 0 !important; margin-left: auto; flex-shrink: 0; }
-  html body .fc-rev-lbl { font-size: 12px; font-weight: 700; color: #64748b; margin-right: 2px; }
-  html body .fc-tabrow .fc-rev-tab { writing-mode: horizontal-tb !important; transform: none !important; padding: 4px 12px !important; border: 1.5px solid #b9d0f2 !important; border-radius: 10px !important;
+  /* ---------- หน้าประมาณการ: ชิป Rev อยู่ในแถวหัวข้อ ถัดจากชื่อกลุ่มเกรด ---------- */
+  html body .fc-tb-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  html body .fc-tb-left > b { font-size: 15px; font-weight: 800; }
+  html body .fc-rev-inline { display: inline-flex !important; flex-direction: row !important; align-items: center; gap: 6px; width: auto !important; padding: 0 !important; }
+  html body .fc-rev-inline .fc-rev-tab { writing-mode: horizontal-tb !important; transform: none !important; padding: 4px 12px !important; border: 1.5px solid #b9d0f2 !important; border-radius: 10px !important;
     background: #f4f8ff !important; color: #0b3f95 !important; font: 700 12.5px 'Sarabun', sans-serif; display: inline-flex; align-items: center; gap: 6px; box-shadow: none !important; filter: none; }
-  html body .fc-tabrow .fc-rev-tab .d { width: 7px; height: 7px; border-radius: 50%; background: #f59e0b; display: inline-block; }
-  html body .fc-tabrow .fc-rev-tab.st-approved .d { background: #16a34a; }
-  html body .fc-tabrow .fc-rev-tab.st-saved .d { background: #64748b; }
-  html body .fc-tabrow .fc-rev-tab:hover:not(:disabled):not(.active) { background: #eaf3ff !important; border-color: #1677ff !important; }
-  html body .fc-tabrow .fc-rev-tab.active { background: #1677ff !important; border-color: #1677ff !important; color: #fff !important; box-shadow: 0 3px 8px rgba(22,119,255,.38) !important; }
-  html body .fc-tabrow .fc-rev-tab.active .d { background: #fff; }
-  html body .fc-tabrow .fc-rev-tab.fc-rev-add { background: transparent !important; border: 1.5px dashed #8fb2e6 !important; color: #1677ff !important; }
-  html body .fc-tabrow .fc-rev-tab.fc-rev-add:disabled { opacity: .45; color: #64748b !important; cursor: not-allowed; }
+  html body .fc-rev-inline .fc-rev-tab .d { width: 7px; height: 7px; border-radius: 50%; background: #f59e0b; display: inline-block; }
+  html body .fc-rev-inline .fc-rev-tab.st-approved .d { background: #16a34a; }
+  html body .fc-rev-inline .fc-rev-tab.st-saved .d { background: #64748b; }
+  html body .fc-rev-inline .fc-rev-tab:hover:not(:disabled):not(.active) { background: #eaf3ff !important; border-color: #1677ff !important; }
+  html body .fc-rev-inline .fc-rev-tab.active { background: #1677ff !important; border-color: #1677ff !important; color: #fff !important; box-shadow: 0 3px 8px rgba(22,119,255,.38) !important; }
+  html body .fc-rev-inline .fc-rev-tab.active .d { background: #fff; }
+  html body .fc-rev-inline .fc-rev-tab.fc-rev-add { background: transparent !important; border: 1.5px dashed #8fb2e6 !important; color: #1677ff !important; }
+  html body .fc-rev-inline .fc-rev-tab.fc-rev-add:disabled { opacity: .45; color: #64748b !important; cursor: not-allowed; }
   html body .fc-work { margin-top: 4px; }
 }
 @media print { .szh-pop, .sz-hide-btn { display: none !important; } .report-title .dd-btn { display: none !important; } .calc-note { display: none !important; } .ss-share { display: none !important; } .ss-chip { background: none !important; padding: 0 !important; } }
