@@ -421,7 +421,7 @@ async function _loadUsagePivotImpl() {
 
     if (!tbody || !thead) return;
 
-    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;">กำลังโหลด...</td></tr>';
+    if (typeof softLoad === 'function' && tbody.rows.length) softLoad(tbody.closest('table') || tbody, ''); else tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;">กำลังโหลด...</td></tr>';
 
     const [y, mo] = month.split('-').map(Number);
     const firstDay = `${month}-01`;
