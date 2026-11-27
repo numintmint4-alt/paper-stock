@@ -424,3 +424,29 @@
   function start() { scan(); setInterval(scan, 1500); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();
+
+/* =====================================================================
+   Matrix: เอาเมาส์วางที่เซล → ไฮไลท์ทั้งแถวและทั้งคอลัมน์ (สีอ่อน) ทุกหน้าที่มีตาราง Matrix
+   ===================================================================== */
+(function () {
+  const SEL = 'table.report-table, table.alert-matrix-new-table, table.yearly-pivot-table, #resBody table, #pivotBody table, #yearlyPivotBody table';
+  let lastTable = null;
+  function clear() {
+    if (!lastTable) return;
+    lastTable.querySelectorAll('.hl-line, .hl-cell').forEach(c => c.classList.remove('hl-line', 'hl-cell'));
+    lastTable = null;
+  }
+  document.addEventListener('mouseover', e => {
+    const td = e.target.closest && e.target.closest('td');
+    const tb = td && td.closest(SEL);
+    if (!tb || td.closest('tfoot') ) { clear(); return; }
+    if (td.classList.contains('hl-cell')) return;
+    clear(); lastTable = tb;
+    const tr = td.parentElement, ci = td.cellIndex;
+    Array.from(tr.cells).forEach(c => c.classList.add('hl-line'));
+    Array.from(tb.rows).forEach(r => { const c = r.cells[ci]; if (c && c.tagName === 'TD') c.classList.add('hl-line'); });
+    td.classList.add('hl-cell');
+  }, true);
+  document.addEventListener('mouseleave', clear, true);
+  document.addEventListener('mouseout', e => { if (!e.relatedTarget || !(e.relatedTarget.closest && e.relatedTarget.closest(SEL))) clear(); }, true);
+})();
