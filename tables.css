@@ -840,5 +840,21 @@
 
   html body .fc-grp-sel { appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%231677ff' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; box-shadow: 0 2px 6px rgba(27,79,209,.10); }
   html body .fc-grp-sel:hover { border-color: #1677ff; }
+  /* ===== ตารางพอดีกรอบ ไม่ต้องเลื่อนขวา · แถบเครื่องมือแถวเดียว ===== */
+  html body .fc-table col.c-g { width: 140px; } html body .fc-table col.c-s { width: 150px; }
+  html body .fc-table .fc-g { left: 24px !important; } html body .fc-table .fc-s { left: 164px !important; } html body .fc-table col.c-t { width: 50px; }
+  html body .fc-table { width: 100% !important; table-layout: fixed !important; }
+  html body .fc-table thead th:not(.fc-g):not(.fc-v-h):not(.fc-tot-h), html body .fc-table td.fc-c, html body .fc-table td.fc-in, html body .fc-table td.fc-note-td { min-width: 0 !important; width: auto !important; max-width: none !important; padding-left: 0 !important; padding-right: 0 !important; font-size: 10.5px !important; letter-spacing: -.2px; }
+  html body .fc-table .fc-tot, html body .fc-table .fc-tot-h { min-width: 0 !important; width: 50px !important; font-size: 10.5px !important; }
+  html body .fc-table td.fc-in input { font-size: 10.5px !important; }
+  html body .fc-tb-left > .fc-cur-g, html body .fc-tb-right .fc-inline { display: none !important; }
+  html body .fc-toolbar { flex-wrap: nowrap !important; align-items: center; gap: 10px; }
+  html body .fc-tb-left { flex-wrap: nowrap !important; min-width: 0; white-space: nowrap; }
+  html body .fc-tb-left .fc-muted { overflow: hidden; text-overflow: ellipsis; min-width: 0; font-size: 11.5px; }
+  html body .fc-tb-right { flex-wrap: nowrap !important; flex-shrink: 0; margin-left: auto; }
+  /* หมายเหตุประมาณการ ชิดตาราง */
+  html body #fcTables { padding-bottom: 0 !important; margin-bottom: 0 !important; }
+  html body #fcTables .fc-tbl-wrap { margin-bottom: 0 !important; }
+  html body #fcFooter { margin-top: 8px !important; }
 }
 @media print { .fc-rail, .fc-pgnav { display: none !important; } .fc-tbl-wrap.fc-pg-hide { display: block !important; } .szh-pop, .sz-hide-btn { display: none !important; } .report-title .dd-btn { display: none !important; } .calc-note { display: none !important; } .ss-share { display: none !important; } .ss-chip { background: none !important; padding: 0 !important; } }
