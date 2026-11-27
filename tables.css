@@ -257,7 +257,8 @@
   .pop-sub { width: 100% !important; margin: 4px 0; }
 
   /* ---- รายการที่บันทึกไว้ (เป็นแถว) ---- */
-  .snap-wrap { max-height: 340px; overflow: auto; border-radius: 12px; }
+  #snapshotList, .snapshot-list-wrap { display: block !important; width: 100% !important; max-width: none !important; grid-template-columns: none !important; }
+  .snap-wrap { width: 100% !important; max-height: 340px; overflow: auto; border-radius: 12px; }
   .snap-table { width: 100% !important; }
   .snap-table td { height: 38px; }
   .snap-mode { display: inline-block; padding: 1px 10px; border-radius: 999px; background: #eaf2ff; color: #0f3f95; font-size: 12px; font-weight: 700; }
@@ -289,7 +290,7 @@
   /* ======================= รอบ 4 ======================= */
   /* ---- ลูกศรสีฟ้าสด (วงกลมไล่สี) ---- */
   .grade-filter-btn .arrow { font-size: 0 !important; width: 22px; height: 22px; flex: none; border-radius: 50%; box-shadow: 0 2px 6px rgba(22,119,255,.4);
-    background: linear-gradient(135deg,#1677ff,#19a7f0) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>") center/12px no-repeat; }
+    background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>") center/12px no-repeat, linear-gradient(135deg,#1677ff,#19a7f0); }
   .dd-btn .dd-chev { color: #fff !important; background: linear-gradient(135deg,#1677ff,#19a7f0); border-radius: 50%; width: 22px; height: 22px; padding: 5px; box-sizing: border-box; box-shadow: 0 2px 6px rgba(22,119,255,.4); transition: transform .2s; }
   .dd-btn.open .dd-chev { transform: rotate(180deg); }
 
@@ -332,7 +333,7 @@
   .alert-date-tab-close { width: 22px; height: 22px; border-radius: 50% !important; margin: 0 6px 0 2px; border: 0 !important; background: #e3efff !important; color: #c53030 !important; display: grid; place-items: center; font-size: 12px !important; padding: 0 !important; line-height: 1; }
   .alert-date-tab-wrap.is-active { background: linear-gradient(90deg,#0b3f95,#1677ff) !important; border-color: transparent !important; box-shadow: 0 3px 8px rgba(22,119,255,.3); }
   .alert-date-tab-wrap.is-active .alert-date-tab { color: #fff !important; }
-  .alert-date-tab-wrap.is-active .alert-date-tab-close { background: rgba(255,255,255,.25) !important; color: #fff !important; }
+  .alert-date-tab-wrap.is-active .alert-date-tab-close, .alert-date-tab-wrap.is-active .alert-date-tab-close * { background: rgba(255,255,255,.25) !important; color: #fff !important; }
   .alert-date-add-btn { height: 34px; padding: 0 16px !important; font-size: 13px !important; font-weight: 800 !important; border: 1.5px dashed #1677ff !important; border-radius: 999px !important; background: var(--surface) !important; color: #1677ff !important; }
   .first-date-bar { display: flex !important; justify-content: flex-start !important; align-items: center; background: linear-gradient(90deg,#eaf3ff,#f6faff) !important; border: 1px dashed #8fb8f0 !important; padding: 10px 14px !important; margin-bottom: 14px; }
   .first-date-bar .fd-ic { width: 30px; height: 30px; border-radius: 50%; background: #dcebff; display: grid; place-items: center; color: #1677ff; flex: none; }
