@@ -277,7 +277,7 @@ function renderAlertMatrixView(rows) {
   html += `<td class="total-col-matrix">${grandTotal > 0 ? '+' + grandTotal.toFixed(2) : grandTotal.toFixed(2)}</td>`;
   html += '</tr></tbody></table>';
   matrixWrap.innerHTML = html;
-  window._alertMatrixSizes = sizes;
+  window._alertMatrixSizes = sizes; window._alertMatrixGrades = grades;
   applyAlertSizeHide();
 }
 
@@ -686,9 +686,12 @@ function _szSave(set) { try { localStorage.setItem(ALERT_SZ_KEY, JSON.stringify(
 function _szShowAll() { try { return localStorage.getItem(ALERT_SZ_ALL_KEY) === '1'; } catch (e) { return false; } }
 function _szSetShowAll(v) { try { localStorage.setItem(ALERT_SZ_ALL_KEY, v ? '1' : '0'); } catch (e) {} }
 
+function _grHidden() { try { return new Set(JSON.parse(localStorage.getItem('alertHiddenGrades') || '[]').map(String)); } catch (e) { return new Set(); } }
+function _grSave(set) { try { localStorage.setItem('alertHiddenGrades', JSON.stringify([...set])); } catch (e) {} }
+
 function applyAlertSizeHide() {
-  const sizes = window._alertMatrixSizes || [];
-  const hidden = _szHidden(), showAll = _szShowAll();
+  const sizes = window._alertMatrixSizes || [], grades = window._alertMatrixGrades || [];
+  const hidden = _szHidden(), hg = _grHidden(), showAll = _szShowAll();
   const tbl = document.querySelector('#alertMatrixWrap .alert-matrix-new-table');
   if (tbl) {
     tbl.querySelectorAll('tr').forEach(tr => {
@@ -697,15 +700,17 @@ function applyAlertSizeHide() {
         const c = cells[i + 1]; if (!c) return;
         c.classList.toggle('sz-hide', !showAll && hidden.has(String(sz)));
       });
+      const g = cells[0] && cells[0].classList.contains('grade-col-matrix') && !tr.classList.contains('total-row-matrix') && tr.parentNode.tagName === 'TBODY'
+        ? cells[0].textContent.trim() : null;
+      tr.classList.toggle('gr-hide', g !== null && !showAll && hg.has(g));
     });
   }
-  const n = sizes.filter(sz => hidden.has(String(sz))).length;
+  const n = sizes.filter(sz => hidden.has(String(sz))).length + grades.filter(g => hg.has(String(g))).length;
   const btn = document.getElementById('alertSizeHideBtn');
   if (btn) {
-    btn.title = n ? (showAll ? `ตอนนี้แสดง Size ครบ (มี ${n} Size ที่ตั้งซ่อนไว้)` : `ซ่อนอยู่ ${n} Size`) : 'ซ่อน Size ที่ไม่ใช้งาน';
+    btn.title = n ? (showAll ? `ตอนนี้แสดงครบ (มี ${n} รายการที่ตั้งซ่อนไว้)` : `ซ่อนอยู่ ${n} รายการ (Size/Gradegram)`) : 'ซ่อน Size / Gradegram ที่ไม่ใช้งาน';
     btn.innerHTML = '<span class="szh-ic">👁</span>' + (n ? ` <b class="szh-n">${n}</b>` : '');
     btn.classList.toggle('szh-on', n > 0 && !showAll);
-    if (window.enhanceEmoji) try { window.enhanceEmoji(btn); } catch (e) {}
   }
 }
 
@@ -713,13 +718,15 @@ function openAlertSizeHide(ev) {
   if (ev) ev.stopPropagation();
   let pop = document.getElementById('alertSizePop');
   if (pop) { pop.remove(); return; }
-  const sizes = window._alertMatrixSizes || [];
+  const sizes = window._alertMatrixSizes || [], grades = window._alertMatrixGrades || [];
   const btn = document.getElementById('alertSizeHideBtn'); if (!btn) return;
   pop = document.createElement('div'); pop.id = 'alertSizePop'; pop.className = 'szh-pop';
   const draw = () => {
-    const hidden = _szHidden(), showAll = _szShowAll();
-    pop.innerHTML = `<div class="szh-hd"><span>เลือก Size ที่ต้องการซ่อน</span><a class="szh-clear">ล้างทั้งหมด</a></div>
-      <div class="szh-chips">${sizes.map(sz => `<button type="button" class="szh-chip${hidden.has(String(sz)) ? ' h' : ''}" data-sz="${sz}">${sz}</button>`).join('') || '<span style="color:#94a3b8">ยังไม่มีข้อมูล Size</span>'}</div>
+    const hidden = _szHidden(), hg = _grHidden(), showAll = _szShowAll();
+    const chips = (arr, set, kind) => arr.map(v => `<button type="button" class="szh-chip${set.has(String(v)) ? ' h' : ''}" data-k="${kind}" data-sz="${esc(String(v))}">${esc(String(v))}</button>`).join('') || '<span style="color:#94a3b8">ยังไม่มีข้อมูล</span>';
+    pop.innerHTML = `<div class="szh-hd"><span>เลือกที่ต้องการซ่อน</span><a class="szh-clear">ล้างทั้งหมด</a></div>
+      <div class="szh-sec">Size</div><div class="szh-chips">${chips(sizes, hidden, 'sz')}</div>
+      <div class="szh-sec">Gradegram</div><div class="szh-chips">${chips(grades, hg, 'gr')}</div>
       <div class="szh-ft"><button type="button" class="szh-all${showAll ? ' on' : ''}">${showAll ? 'กลับไปซ่อน' : 'แสดงที่ซ่อนทั้งหมด'}</button><button type="button" class="szh-close">ปิด</button></div>`;
   };
   draw();
@@ -730,8 +737,8 @@ function openAlertSizeHide(ev) {
   pop.addEventListener('click', e => {
     e.stopPropagation();
     const chip = e.target.closest('.szh-chip');
-    if (chip) { const h = _szHidden(), k = chip.dataset.sz; h.has(k) ? h.delete(k) : h.add(k); _szSave(h); if (h.size && _szShowAll() === false) {} applyAlertSizeHide(); draw(); return; }
-    if (e.target.closest('.szh-clear')) { _szSave(new Set()); applyAlertSizeHide(); draw(); return; }
+    if (chip) { const g = chip.dataset.k === 'gr', h = g ? _grHidden() : _szHidden(), k = chip.dataset.sz; h.has(k) ? h.delete(k) : h.add(k); g ? _grSave(h) : _szSave(h); applyAlertSizeHide(); draw(); return; }
+    if (e.target.closest('.szh-clear')) { _szSave(new Set()); _grSave(new Set()); applyAlertSizeHide(); draw(); return; }
     if (e.target.closest('.szh-all')) { _szSetShowAll(!_szShowAll()); applyAlertSizeHide(); draw(); return; }
     if (e.target.closest('.szh-close')) pop.remove();
   });
