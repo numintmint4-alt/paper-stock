@@ -667,5 +667,29 @@
   .ld-dim::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: linear-gradient(90deg,#22d3ee,#1677ff,#6366f1,#22d3ee); background-size: 200% 100%; animation: ldbar 1s linear infinite; border-radius: 3px; }
   @keyframes ldbar { to { background-position: -200% 0; } }
 
+  /* ===== เมนูซ้ายมือ: ตัวเล็ก/กรอบเตี้ย รองรับ Tab เพิ่มในอนาคต ===== */
+  html body .sb-group { margin-bottom: 3px; }
+  html body .sb-group-head { padding: 7px 10px; font: 700 12.5px 'Sarabun', sans-serif; gap: 8px; border-radius: 10px; }
+  html body .sb-group-head .chev { width: 14px; height: 14px; }
+  html body .sb-group-head .gi { width: 16px; height: 16px; }
+  html body .sb-items { padding: 2px 0 1px 10px; margin-left: 8px; }
+  html body .sb-item { padding: 4px 8px; margin: 1px 0; gap: 8px; font: 500 12px/1.25 'Sarabun', sans-serif; border-radius: 8px; align-items: center; }
+  html body .sb-item .ii { width: 15px; height: 15px; margin-top: 0; }
+  html body .sb-item.active { font-weight: 700; box-shadow: 0 4px 12px rgba(24,150,255,.32); }
+
+  /* ===== หน้าระดับ Stock ===== */
+  html body #matrixBody .report-wrap { max-height: calc(100vh - 395px) !important; min-height: 240px; }
+  .calc-note { flex: 0 0 100%; font-size: 12.5px; font-weight: 800; color: #0b3f95; padding: 2px 0 6px 10px; border-left: 4px solid #1677ff; margin-bottom: 4px; line-height: 1.4; }
+  :root[data-theme="dark"] .calc-note { color: #a9d4ff; }
+  .bn-ctl .dd { display: inline-block; }
+  .bn-ctl .dd-btn { height: 28px; min-width: 0; padding: 0 6px 0 10px; border: 0; background: #fff; color: #0b3f95; font-size: 12.5px; }
+  .bn-ctl .dd-btn:hover { border: 0; }
+
+  /* ป๊อปอัป: แถววันที่ใช้ม้วนสูงสุด สีเข้ม */
+  html body .pop-table tr.pop-max > td { background: #1f78ff !important; color: #fff !important; font-weight: 800; }
+  html body .pop-table tr.pop-max > td:first-child { box-shadow: inset 5px 0 0 #0b3f95; }
+  html body .pop-table tr.pop-max .pop-maxtag { background: #fff; color: #0b3f95; }
+  html body .pop-table tr.pop-max .st-f, html body .pop-table tr.pop-max button { color: #0b3f95; }
+
 }
-@media print { .ss-share { display: none !important; } .ss-chip { background: none !important; padding: 0 !important; } }
+@media print { .report-title .dd-btn { display: none !important; } .calc-note { display: none !important; } .ss-share { display: none !important; } .ss-chip { background: none !important; padding: 0 !important; } }
