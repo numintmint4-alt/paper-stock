@@ -278,7 +278,7 @@ th { background: var(--surface-soft); color: var(--text); font: 700 12px inherit
 .snapshot-save-bar { display: flex; gap: 12px; align-items: flex-end; margin-top: 16px; padding: 14px; background: var(--surface-soft); border-radius: var(--radius-md); border: 1px solid var(--border); }
 .snapshot-save-bar label { font-size: 13px; color: var(--text-muted); font-weight: 600; }
 .snapshot-list-wrap { margin-top: 10px; }
-#snapshotList { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+#snapshotList { display: block; width: 100%; }
 .snapshot-card { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); transition: var(--transition); }
 .snapshot-card:hover { border-color: var(--primary); box-shadow: var(--shadow-md); transform: translateY(-1px); }
 .snapshot-card-info { flex: 1; min-width: 0; }
