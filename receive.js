@@ -457,61 +457,29 @@ function renderReceiveList(rows, dateThai, supHtml = '') {
 }
 
 async function openReceiveDetail(gradegram, size, dateThai) {
-  const receiveDate = getISODateFromInput('receiveDate');
-  if (!receiveDate) return;
-
-  const { grade } = parseGradegram(gradegram);
-
-  $('receiveDetailTitle').innerHTML = `${esc(gradegram)} · Size ${size} <span style="font-weight:400;color:#64748b;font-size:14px">(วันที่ ${dateThai})</span>`;
+  $('receiveDetailTitle').innerHTML = `${esc(gradegram)} · Size ${size} <span style="font-weight:400;opacity:.9;font-size:14px">(รายละเอียดการสั่งซื้อ · วันที่ ${dateThai})</span>`;
   openModal('modalReceiveDetail');
-  $('receiveDetailBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
-
-  try {
-    const { data, error } = await supabase.rpc('get_receive_detail', {
-      p_po_date: receiveDate,
-      p_grade: grade,
-      p_size: size
-    });
-    if (error) throw error;
-
-    const rows = data || [];
-    if (!rows.length) {
-      $('receiveDetailBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">ไม่พบรายละเอียด</p>';
-      return;
-    }
-
-    const totalQty = rows.reduce((s, r) => s + (Number(r.quantity) || 0), 0);
-    const totalKg  = rows.reduce((s, r) => s + (Number(r.kg_total) || 0), 0);
-
-    let html = `<div class="msg info" style="margin-bottom:10px">
-      📦 รวม ${totalQty} ม้วน · ${fmtKg(totalKg)} kg · ${rows.length} รายการ
-    </div>`;
-
-    html += '<table><thead><tr>';
-    html += '<th>#</th><th>PO No.</th><th>Supplier</th><th>Quantity</th>';
-    html += '<th>KG รวม</th><th>ราคา</th><th>หมายเหตุ</th><th>FSC</th>';
-    html += '</tr></thead><tbody>';
-
-    rows.forEach((r, i) => {
-      const fscBadge = r.is_fsc ? '<span class="badge ok">FSC</span>' : '-';
-      const priceTxt = r.price != null ? Number(r.price).toFixed(2) : '-';
-      html += `<tr>
-        <td>${i + 1}</td>
-        <td><b>${esc(r.po_no)}</b></td>
-        <td>${esc(r.supplier)}</td>
-        <td style="text-align:right">${r.quantity}</td>
-        <td style="text-align:right">${fmtKg(r.kg_total)}</td>
-        <td style="text-align:right">${priceTxt}</td>
-        <td>${esc(r.remark) || '-'}</td>
-        <td>${fscBadge}</td>
-      </tr>`;
-    });
-
-    html += '</tbody></table>';
-    $('receiveDetailBody').innerHTML = html;
-  } catch (err) {
-    $('receiveDetailBody').innerHTML = `<div class="msg err">${esc(err.message)}</div>`;
+  // ใช้ข้อมูลชุดเดียวกับที่ Matrix แสดงอยู่ (ตรงกับตัวเลขในเซลเสมอ)
+  const rows = (receiveCache || []).filter(r => (r.gradegram || r.grade) === gradegram && String(r.size) === String(size));
+  if (!rows.length) {
+    $('receiveDetailBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">ไม่พบรายละเอียด</p>';
+    return;
   }
+  const totalQty = rows.reduce((s, r) => s + (Number(r.quantity) || 0), 0);
+  const totalKg  = rows.reduce((s, r) => s + (Number(r.kg_total) || 0), 0);
+  const sups = new Set(rows.map(r => r.supplier || '-'));
+  const pos = new Set(rows.map(r => r.po_no));
+  let html = `<div class="pop-chips"><span class="pc">${pos.size} PO</span><span class="pc pc-f">รวม ${totalQty} ม้วน</span><span class="pc">${sups.size} Supplier</span>${totalKg ? `<span class="pc pc-k">${fmtKg(totalKg)} kg</span>` : ''}</div>`;
+  html += '<div class="pop-scroll"><table class="data-table pop-table"><thead><tr><th style="width:44px">#</th><th>PO No.</th><th>Supplier</th><th style="text-align:center">จำนวนม้วน</th><th>ประเภทม้วน</th><th>FSC</th><th>ราคา</th><th>หมายเหตุ / คุณภาพ</th></tr></thead><tbody>';
+  rows.forEach((r, i) => {
+    const cust = r.is_customer_roll ? `<span class="st st-f">ม้วนลูกค้า</span>` : `<span class="st st-w">ทั่วไป</span>`;
+    const fsc = r.is_fsc ? '<span class="st st-s">FSC</span>' : '-';
+    html += `<tr><td>${i + 1}</td><td><b>${esc(r.po_no)}</b></td><td>${esc(r.supplier) || '-'}</td>
+      <td style="text-align:center"><b>${r.quantity}</b></td><td>${cust}</td><td>${fsc}</td>
+      <td>${r.price != null ? Number(r.price).toFixed(2) : '-'}</td><td>${esc(r.remark) || '-'}</td></tr>`;
+  });
+  html += `<tr class="pop-total"><td colspan="3">รวม</td><td style="text-align:center">${totalQty}</td><td colspan="4"></td></tr></tbody></table></div>`;
+  $('receiveDetailBody').innerHTML = html;
 }
 
 function exportReceive() {
