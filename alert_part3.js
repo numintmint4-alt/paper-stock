@@ -1745,11 +1745,10 @@ async function _getUsedReservationQtyMap() {
 
   // 2. จาก DB เฉพาะวันที่ยังไม่อยู่ใน memory
   try {
-    const { data, error } = await supabase
+    const data = await _alertFetchAll(() => supabase
       .from('alert_active_inputs')
       .select('res_id, qty, receive_date')
-      .not('res_id', 'is', null);
-    if (error) throw error;
+      .not('res_id', 'is', null));
 
     (data || []).forEach(row => {
       if (memDates.has(row.receive_date)) return; // memory เป็นตัวแทนวันนั้นแล้ว
@@ -1771,23 +1770,40 @@ async function _getUsedReservationQtyMap() {
   return usedMap;
 }
 
+// ดึงข้อมูลทุกแถว (Supabase จำกัด 1,000 แถว/ครั้ง) — เรียงตาม id เพื่อให้แบ่งหน้าไม่ตกหล่น
+async function _alertFetchAll(build) {
+  const pageSize = 1000;
+  const run = async (withOrder) => {
+    const all = [];
+    for (let from = 0; ; from += pageSize) {
+      let q = build();
+      if (withOrder) q = q.order('id');
+      const { data, error } = await q.range(from, from + pageSize - 1);
+      if (error) throw error;
+      if (!data || !data.length) break;
+      all.push(...data);
+      if (data.length < pageSize) break;
+    }
+    return all;
+  };
+  try { return await run(true); } catch (e) { return await run(false); }
+}
+
 async function loadAlertReservations() {
   try {
     // 1. ดึงข้อมูลการจอง "ทุกสถานะ" (ให้ตรงกับหน้า Reservations ที่ไม่กรอง status)
     //    เพื่อให้แถวปรับลดหาแถวต้นทางเจอเสมอ แม้ต้นทางจะเปลี่ยนสถานะไปแล้ว
-    const { data: resData, error: resErr } = await supabase
+    const resData = await _alertFetchAll(() => supabase
       .from('roll_reservations')
-      .select('*');
-    if (resErr) throw resErr;
+      .select('*'));
 
     // 2. ดึง Audit Log (complete) เท่านั้น
     //    หมายเหตุ: การปรับลด (decrease) ถูกเก็บเป็น "แถวจองจำนวนติดลบ" ใน roll_reservations
     //    ซึ่งจัดการในขั้นที่ 4.5 แล้ว จึงไม่ต้องหักจาก Log ซ้ำ
-    const { data: logData, error: logErr } = await supabase
+    const logData = await _alertFetchAll(() => supabase
       .from('roll_reservation_logs')
       .select('*')
-      .eq('action_type', 'complete');
-    if (logErr) throw logErr;
+      .eq('action_type', 'complete'));
 
     // 3. จัดกลุ่มข้อมูลตาม grade|size
     const resMap = {};
@@ -1861,7 +1877,7 @@ async function loadAlertReservations() {
     const usedMap = await _getUsedReservationQtyMap();
 
     Object.keys(resMap).forEach(key => {
-      resMap[key] = resMap[key].map(r => {
+      const mapped = resMap[key].map(r => {
         const used = usedMap[String(r.id)] || 0;
         const netQty = Math.max(0, (Number(r.quantity) || 0) - used);
         return {
@@ -1869,7 +1885,9 @@ async function loadAlertReservations() {
           _used_qty: used,
           _net_qty: netQty
         };
-      }).filter(r => r._net_qty > 0); // ซ่อนรายการที่ใช้หมดแล้ว
+      });
+      resMap[key] = mapped.filter(r => r._net_qty > 0); // ซ่อนรายการที่ใช้หมดแล้ว
+      resMap[key]._hidden = mapped.filter(r => r._net_qty <= 0 && (Number(r.quantity) || 0) > 0); // เก็บไว้แจ้งผู้ใช้ว่าทำไมไม่แสดง
     });
 
     return resMap;
@@ -1892,6 +1910,11 @@ function getAlertReservedTotal(resMap, gradegram, size) {
 
 function buildReservationHtml(list) {
   if (!list || !list.length) {
+    const hid = (list && list._hidden) || [];
+    if (hid.length) {
+      const q = hid.reduce((t, r) => t + (Number(r.quantity) || 0), 0);
+      return `<p style="color:#64748b;margin:8px 0;text-align:center;">มียอดจอง ${q} ม้วน แต่ถูกนำไปใช้ในใบสั่งซื้อ (วันที่รับอื่น/ฉบับร่าง) หมดแล้ว</p>`;
+    }
     return '<p style="color:#94a3b8;margin:8px 0;text-align:center;">ไม่มีรายการจอง</p>';
   }
 
