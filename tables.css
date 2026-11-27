@@ -526,6 +526,50 @@
   :root[data-theme="dark"] .fc-table tr.fc-hl1 td.fc-c, :root[data-theme="dark"] .fc-table tr.fc-hl1 td.fc-tot, :root[data-theme="dark"] .fc-table tr.fc-hl2 td.fc-c, :root[data-theme="dark"] .fc-table tr.fc-hl2 td.fc-tot, :root[data-theme="dark"] .fc-table tr.fc-hl1 td.fc-g, :root[data-theme="dark"] .fc-table tr.fc-hl2 td.fc-g { background: #17305c !important; color: #cfe3ff !important; }
 
 
+
+  /* ===== ตรวจสอบรายการ (สั่งซื้อประจำวัน) ===== */
+  html body #modalAlertPODetail .modal { max-width: 780px !important; border-radius: 18px; overflow: hidden; padding: 0 !important; display: flex; flex-direction: column; }
+  html body #modalAlertPODetail .modal-head { background: linear-gradient(90deg,#0b3f95,#1677ff) !important; color: #fff !important; padding: 14px 20px !important; margin: 0 !important; border: 0 !important; }
+  html body #modalAlertPODetail .modal-head h3 { color: #fff !important; }
+  html body #modalAlertPODetail .modal-head button { background: #fff !important; color: #0b3f95 !important; border: 0 !important; border-radius: 99px !important; padding: 4px 16px !important; font-weight: 700; }
+  #alertPODetailBody { padding: 16px 20px 4px; overflow: auto; flex: 1; }
+  .pv-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 14px; }
+  .pv-st { background: linear-gradient(135deg,#f3f8ff,#e3efff); border: 1.5px solid #cfe0f7; border-radius: 14px; padding: 10px 14px; }
+  .pv-st small { display: block; color: #5b7299; font-size: 11px; }
+  .pv-st b { font-size: 24px; color: #0b3f95; }
+  .pv-st span { font-size: 12px; color: #5b7299; }
+  .pv-st-o { background: linear-gradient(135deg,#fff3e3,#ffe2c2); border-color: #ffd3a1; }
+  .pv-st-o b { color: #c2560a; }
+  .pv-day { margin-bottom: 14px; }
+  .pv-dh { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; background: #eaf3ff; border: 1.5px solid #cfe0f7; border-bottom: 0; border-radius: 14px 14px 0 0; padding: 9px 14px; font-size: 13px; font-weight: 700; color: #0f2a55; }
+  .pv-dh em { font-style: normal; display: flex; gap: 6px; flex-wrap: wrap; }
+  .pv-sp { display: inline-block; padding: 2px 11px; border-radius: 99px; font-size: 11.5px; font-weight: 800; color: #fff; }
+  .pv-EKP { background: linear-gradient(90deg,#ffa63d,#ff7a18); }
+  .pv-MKP { background: linear-gradient(90deg,#12b76a,#34d98b); }
+  .pv-SCGP { background: linear-gradient(90deg,#26277f,#0a84d6); }
+  .pv-OT { background: linear-gradient(90deg,#8a9bb8,#a3b1c6); }
+  html body #modalAlertPODetail table.pv-tbl { width: 100%; border-collapse: collapse; border: 1.5px solid #cfe0f7; font-size: 13px; }
+  html body #modalAlertPODetail table.pv-tbl th { background: #1257c9 !important; color: #fff !important; padding: 8px !important; font-size: 12px; text-align: left; border: 0 !important; }
+  html body #modalAlertPODetail table.pv-tbl th:nth-child(1), html body #modalAlertPODetail table.pv-tbl th:nth-child(3), html body #modalAlertPODetail table.pv-tbl th:nth-child(4) { text-align: center; }
+  html body #modalAlertPODetail table.pv-tbl td { padding: 6px 10px !important; border: 0 !important; border-bottom: 1px solid #e3ecf9 !important; border-right: 1px solid #e3ecf9 !important; background: #fff; color: #0f2a55; }
+  html body #modalAlertPODetail table.pv-tbl tr:nth-child(even) td { background: #f6faff; }
+  .pv-n { text-align: center; color: #7b8fb3 !important; }
+  .pv-c, .pv-q { text-align: center; }
+  .pv-q span { display: inline-block; min-width: 34px; background: #dcebff; color: #0b3f95; font-weight: 800; border-radius: 8px; padding: 2px 8px; }
+  .pv-g { font-size: 13.5px; }
+  .pv-sz { margin-left: 8px; background: #fff; border: 1.5px solid #b9d0f2; border-radius: 99px; padding: 1px 9px; font-size: 11.5px; color: #3a5a8f; }
+  .pv-tg { border-radius: 99px; padding: 2px 10px; font-size: 11.5px; font-weight: 700; }
+  .pv-tg-c { background: #e0f2fe; color: #0369a1; }
+  .pv-tg-q { background: #fff1d6; color: #b45309; }
+  .pv-note { color: #475f86; font-size: 12.5px; }
+  html body #modalAlertPODetail table.pv-tbl tr.pv-tot td { background: linear-gradient(90deg,#0b3f95,#1677ff) !important; color: #fff !important; font-weight: 800; border: 0 !important; }
+  .pv-tot .pv-q span { background: #fff; color: #0b3f95; }
+  html body #modalAlertPODetail .pv-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 14px 20px !important; margin: 0 !important; background: #f8fbff !important; border-top: 1px solid #e3ecf9 !important; }
+  .pv-ft-total { margin-right: auto; font-size: 13px; color: #5b7299; }
+  .pv-ft-total b { font-size: 18px; color: #0b3f95; }
+  html body #modalAlertPODetail .pv-actions button { border-radius: 99px; padding: 9px 20px; font-weight: 700; font-size: 13px; border: 1.5px solid #b9d0f2; background: #fff; color: #0b3f95; }
+  html body #modalAlertPODetail .pv-actions button.primary { background: linear-gradient(90deg,#12b76a,#34d98b) !important; color: #fff !important; border: 0; box-shadow: 0 4px 12px #12b76a55; }
+
   /* ---- ลดความรก: ช่องกรอกเรียบ + เลขศูนย์จาง ---- */
   .fc-table td.fc-in { padding: 2px 3px !important; }
   .fc-table td.fc-in input { height: 24px !important; border: 1px solid transparent !important; border-radius: 6px !important; background: #f1f6ff !important; font-weight: 700; color: #0b3f95; }
