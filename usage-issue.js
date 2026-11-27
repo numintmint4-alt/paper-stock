@@ -60,7 +60,7 @@ async function renderUsageIssue() {
   const from = $('uiFrom').value, to = $('uiTo').value;
   if (!from || !to) { body.innerHTML = '<p class="hint">เลือกช่วงวันที่ก่อน</p>'; return; }
   if (from > to) { body.innerHTML = '<div class="msg err">วันที่เริ่มต้นต้องไม่มากกว่าวันที่สิ้นสุด</div>'; return; }
-  body.innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลดข้อมูล...</p>';
+  softLoad(body, '<p class="ld-ph" style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลดข้อมูล...</p>');
 
   const group = $('uiGroup').value;        // day | grade | size
   const fGrade = $('uiGrade').value, fSize = $('uiSize').value;
