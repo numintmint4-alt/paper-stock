@@ -47,7 +47,8 @@
     bulb:'<path d="M9 18h6M10 21h4M12 3a6 6 0 00-4 10c1 1 1 2 1 3h6c0-1 0-2 1-3a6 6 0 00-4-10z"/>',
     ruler:'<path d="M3 17L17 3l4 4L7 21z"/><path d="M8 12l2 2M11 9l2 2M14 6l2 2"/>',
     help:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 115 0c0 1.5-2.5 2-2.5 4M12 17h.01"/>',
-    up:'<path d="M6 15l6-6 6 6"/>'
+    up:'<path d="M6 15l6-6 6 6"/>',
+    hourglass:'<path d="M7 3h10M7 21h10M7 3c0 5 5 6 5 9s-5 4-5 9M17 3c0 5-5 6-5 9s5 4 5 9"/>'
   };
   const M = {
     '📅':'cal','🗓':'cal','📊':'chart','📋':'clip','📄':'file','🧾':'file','📝':'edit','✏':'edit','🔖':'tag','🏷':'tag','💰':'tag',
@@ -55,7 +56,7 @@
     '👤':'user','👥':'users','✅':'ok:g','❌':'x:r','✕':'x:r','⚠':'warn:a','📦':'box','🔥':'flame:o','💾':'save','🔒':'lock','🔐':'lock',
     '🔽':'filter','➕':'plus','➖':'minus','🛒':'cart','🎯':'target','🆕':'spark','🌟':'spark','🎉':'spark','🔑':'key','🏢':'bld',
     '⚖':'scale','📌':'pin','👁':'eye','⚙':'gear','🛠':'gear','🔧':'gear','📎':'clipx','🏆':'trophy','🔢':'hash','💡':'bulb',
-    '📏':'ruler','❓':'help','🔼':'up','🟢':'dot:g','🔴':'dot:r','🟡':'dot:a','⚪':'dot:n','✗':'x:r'
+    '📏':'ruler','❓':'help','🔼':'up','🟢':'dot:g','🔴':'dot:r','🟡':'dot:a','⚪':'dot:n','✗':'x:r','⏳':'hourglass','⌛':'hourglass'
   };
   const keys = Object.keys(M).sort((a, b) => b.length - a.length).join('|');
   const RX = new RegExp('(' + keys + ')\\uFE0F?', 'g');
@@ -205,4 +206,122 @@
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
   setTimeout(refreshChips, 300);
+})();
+
+
+/* =====================================================================
+   ช่องเลือก (dropdown) / ปฏิทินเดือน / ปฏิทินวัน — หน้าตาเดียวกันทั้งเว็บ
+   (ค่าจริงยังอยู่ใน <select>/<input> เดิม จึงไม่กระทบโค้ดหน้าอื่น)
+   ===================================================================== */
+(function () {
+  const TH_M = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+  const TH_S = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const CHEV = '<svg class="dd-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+  const CAL = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>';
+  const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const synced = [];
+  let openMenu = null;
+
+  function closeAny() { if (openMenu) { openMenu.el.remove(); openMenu.btn.classList.remove('open'); openMenu = null; } }
+  document.addEventListener('mousedown', e => { if (openMenu && !openMenu.el.contains(e.target) && !openMenu.btn.contains(e.target)) closeAny(); }, true);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAny(); });
+  window.addEventListener('scroll', e => { if (openMenu && !openMenu.el.contains(e.target)) closeAny(); }, true);
+  window.addEventListener('resize', closeAny);
+
+  function place(el, btn, minW) {
+    const r = btn.getBoundingClientRect();
+    el.style.minWidth = Math.max(minW || 0, r.width) + 'px';
+    document.body.appendChild(el);
+    const h = el.offsetHeight, w = el.offsetWidth;
+    let top = r.bottom + 4; if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 4);
+    el.style.top = top + 'px'; el.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left)) + 'px';
+  }
+  function fire(el, names) { names.forEach(n => el.dispatchEvent(new Event(n, { bubbles: true }))); }
+
+  // ----- 1) <select> -> dropdown -----
+  function enhanceSelect(sel) {
+    if (sel.dataset.dd || sel.multiple) return;
+    sel.dataset.dd = '1';
+    const wrap = document.createElement('span'); wrap.className = 'dd';
+    const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'dd-btn';
+    sel.parentNode.insertBefore(wrap, sel); wrap.appendChild(sel); wrap.appendChild(btn);
+    sel.classList.add('dd-native'); sel.tabIndex = -1;
+    const w = sel.style.width; if (w) wrap.style.width = w;
+    const stamp = () => sel.value + '|' + sel.options.length + '|' + (sel.options[sel.selectedIndex] || {}).text;
+    const label = () => { const o = sel.options[sel.selectedIndex]; btn.innerHTML = '<span class="dd-lb">' + esc(o ? o.text.trim() : '') + '</span>' + CHEV; btn.dataset.st = stamp(); btn.disabled = sel.disabled; };
+    label();
+    btn.addEventListener('click', () => {
+      if (openMenu && openMenu.btn === btn) { closeAny(); return; }
+      closeAny();
+      const m = document.createElement('div'); m.className = 'dd-menu';
+      Array.from(sel.options).forEach((o, i) => {
+        if (o.hidden) return;
+        const it = document.createElement('div'); it.className = 'dd-it' + (i === sel.selectedIndex ? ' sel' : '') + (o.disabled ? ' dis' : '');
+        it.innerHTML = '<span>' + esc(o.text.trim()) + '</span>' + (i === sel.selectedIndex ? '<svg class="dd-ck" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>' : '');
+        it.addEventListener('click', () => { if (o.disabled) return; closeAny(); if (sel.selectedIndex !== i) { sel.selectedIndex = i; fire(sel, ['input', 'change']); } label(); });
+        m.appendChild(it);
+      });
+      place(m, btn, 150); btn.classList.add('open'); openMenu = { el: m, btn };
+      const s = m.querySelector('.sel'); if (s) s.scrollIntoView({ block: 'nearest' });
+    });
+    sel.addEventListener('change', label);
+    synced.push(() => { if (!sel.isConnected) return false; if (btn.dataset.st !== stamp() || btn.disabled !== sel.disabled) label(); return true; });
+  }
+
+  // ----- 2) input[type=month] -> ปฏิทินเลือกเดือน -----
+  function monthText(v) { const m = /^(\d{4})-(\d{2})/.exec(v || ''); return m ? TH_S[+m[2] - 1] + ' ' + (+m[1] + 543) : 'เลือกเดือน'; }
+  function openMonthPicker(inp, btn) {
+    closeAny();
+    let year = /^\d{4}/.test(inp.value) ? +inp.value.slice(0, 4) : new Date().getFullYear();
+    const box = document.createElement('div'); box.className = 'fc-mp ui-mp';
+    const nowYm = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0');
+    const draw = () => {
+      box.innerHTML = '<div class="fc-mp-head"><button type="button" data-y="-1">‹</button><b>' + (year + 543) + '</b><button type="button" data-y="1">›</button></div><div class="fc-mp-grid">' +
+        TH_S.map((nm, i) => { const ym = year + '-' + String(i + 1).padStart(2, '0'); return '<button type="button" class="' + (ym === inp.value ? 'sel' : '') + (ym === nowYm ? ' now' : '') + '" data-m="' + ym + '">' + nm + '</button>'; }).join('') +
+        '</div><div class="fc-mp-foot"><button type="button" data-clear="1">ล้างค่า</button><button type="button" data-now="1">เดือนนี้</button></div>';
+    };
+    draw();
+    box.addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      const set = v => { closeAny(); inp.value = v; btn.querySelector('.dd-lb').textContent = monthText(v); fire(inp, ['input', 'change']); };
+      if (b.dataset.y) { year += +b.dataset.y; draw(); } else if (b.dataset.m) set(b.dataset.m); else if (b.dataset.clear) set(''); else if (b.dataset.now) set(nowYm);
+    });
+    place(box, btn, 236); btn.classList.add('open'); openMenu = { el: box, btn };
+  }
+  function enhanceMonth(inp) {
+    if (inp.dataset.mp) return; inp.dataset.mp = '1';
+    const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'dd-btn mp-btn';
+    inp.type = 'hidden'; inp.parentNode.insertBefore(btn, inp.nextSibling);
+    const label = () => { btn.innerHTML = CAL + '<span class="dd-lb">' + esc(monthText(inp.value)) + '</span>' + CHEV; btn.dataset.st = inp.value; };
+    label();
+    btn.addEventListener('click', () => { if (openMenu && openMenu.btn === btn) { closeAny(); return; } openMonthPicker(inp, btn); });
+    synced.push(() => { if (!inp.isConnected) return false; if (btn.dataset.st !== inp.value) label(); return true; });
+  }
+
+  // ----- 3) input[type=date] -> flatpickr (หน้าตาเดียวกับช่องวันที่อื่น) -----
+  function enhanceDate(inp) {
+    if (inp.dataset.dp || typeof flatpickr === 'undefined') return; inp.dataset.dp = '1';
+    if (/^(exportPoDate|dt)/.test(inp.id)) return; // app.js แปลงเป็น flatpickr เองอยู่แล้ว
+    const v = inp.value;
+    inp.setAttribute('type', 'text'); inp.setAttribute('autocomplete', 'off'); inp.setAttribute('placeholder', 'YYYY-MM-DD');
+    inp.value = v;
+    const fp = flatpickr(inp, { locale: 'th', dateFormat: 'Y-m-d', allowInput: false, disableMobile: true, defaultDate: v || null });
+    synced.push(() => {
+      if (!inp.isConnected) return false;
+      const cur = fp.selectedDates[0] ? fp.formatDate(fp.selectedDates[0], 'Y-m-d') : '';
+      if (inp.value !== cur) fp.setDate(inp.value || null, false);
+      return true;
+    });
+  }
+
+  function scan() {
+    document.querySelectorAll('.filters select:not([data-dd]), .ui-filters select:not([data-dd])').forEach(enhanceSelect);
+    document.querySelectorAll('input[type="month"]:not([data-mp])').forEach(i => { if (!i.closest('.modal-bg.hidden')) enhanceMonth(i); });
+    document.querySelectorAll('input[type="date"]:not([data-dp])').forEach(enhanceDate);
+  }
+  function tick() {
+    for (let i = synced.length - 1; i >= 0; i--) { try { if (synced[i]() === false) synced.splice(i, 1); } catch (e) { synced.splice(i, 1); } }
+  }
+  function start() { scan(); setInterval(scan, 1200); setInterval(tick, 600); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();
