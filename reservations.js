@@ -248,22 +248,21 @@ async function loadReservations() {
         const nextDayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
         // 3. 🔥 ดึงข้อมูลการจองแบบสะสม "ทุกสถานะ" (เอา status='reserved' ออก เพื่อดูย้อนหลังได้)
-        const { data: resData, error: resErr } = await supabase
+        // ✅ ดึงแบบแบ่งหน้า (Supabase ตัดที่ 1,000 แถว) + เรียงด้วย id ให้หน้าไม่ซ้ำ/ไม่ตกหล่น
+        const resData = await fetchAllRowsResv(() => supabase
             .from('roll_reservations')
             .select('*')
-            .lte('reservation_date', filterDate); // เอาเฉพาะที่จองก่อนหรือในวันที่เลือก
-
-        if (resErr) throw resErr;
+            .lte('reservation_date', filterDate)   // เอาเฉพาะที่จองก่อนหรือในวันที่เลือก
+            .order('id', { ascending: true }));
 
         // 🔥 4. ดึง Audit Log (complete) แบบสะสม (แก้ปัญหา Timezone)
         // ใช้ .lt (Less Than) กับเวลา 00:00 ของ "วันถัดไป" ตามเวลาไทย (+07:00)
-        const { data: logData, error: logErr } = await supabase
+        const logData = await fetchAllRowsResv(() => supabase
             .from('roll_reservation_logs')
             .select('*')
             .eq('action_type', 'complete')
-            .lt('created_at', `${nextDayStr}T00:00:00+07:00`);
-
-        if (logErr) throw logErr;
+            .lt('created_at', `${nextDayStr}T00:00:00+07:00`)
+            .order('id', { ascending: true }));
 
         // 5. เก็บข้อมูลลง State
         resState.data = resData || [];
@@ -340,8 +339,9 @@ function renderReservationsTable() {
     //     resState.logs ถูกกรองมาเฉพาะ log ที่เกิดก่อนหรือเท่ากับวันที่เลือกแล้ว
     //     (created_at < nextDayStr) จึงหักลบได้ตรงตาม Historical State
     if (resState.logs && resState.logs.length > 0) {
+        const parentById = new Map(data.map(r => [r.id, r]));
         resState.logs.forEach(log => {
-            const parentRes = data.find(r => r.id === log.reservation_id);
+            const parentRes = parentById.get(log.reservation_id);
             if (parentRes) {
                 const key = `${parentRes.grade}|${parentRes.size}`;
                 if (!cellMap[key]) cellMap[key] = 0;
