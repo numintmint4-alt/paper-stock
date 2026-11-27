@@ -773,5 +773,10 @@
   html body #poListTbody td button { height: 24px !important; min-height: 0 !important; padding: 0 9px !important; font-size: 11.5px !important; line-height: 1 !important; border-radius: 999px; margin: 0 1px; }
   html body #poListTbody td .badge { padding: 2px 9px !important; font-size: 11px !important; line-height: 1.3; }
   html body #poListTbody td svg { width: 13px !important; height: 13px !important; }
+  /* ตัวอักษรแนวตั้งในตารางประมาณการ: เลิกใช้ rotate() (ทำให้ตัวอักษรเบลอ) · เลิกเงาตัวอักษร */
+  html body .fc-table td.fc-v > span { text-shadow: none !important; }
+  @supports (writing-mode: sideways-lr) {
+    html body .fc-table td.fc-v > span { writing-mode: sideways-lr; transform: none; }
+  }
 }
 @media print { .szh-pop, .sz-hide-btn { display: none !important; } .report-title .dd-btn { display: none !important; } .calc-note { display: none !important; } .ss-share { display: none !important; } .ss-chip { background: none !important; padding: 0 !important; } }
