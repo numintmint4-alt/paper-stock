@@ -504,3 +504,26 @@ window.softLoad = function (el, html) {
   document.addEventListener('change', () => setTimeout(tick, 50), true);
   document.addEventListener('click', () => setTimeout(tick, 80), true);
 })();
+
+
+/* แบนเนอร์สีฟ้าด้านบน: เลื่อนลง 1 ครั้งตอนอยู่บนสุด → พับเก็บ (ได้พื้นที่ทำงานเพิ่ม)
+   เลื่อนขึ้นตอนอยู่บนสุดอีกครั้ง → กลับมา · การเลื่อนส่วนอื่นเหมือนเดิม · เปลี่ยนหน้า → แสดงตามปกติ */
+(function () {
+  const bn = () => document.querySelector('.page-banner');
+  const atTop = () => (window.scrollY || document.documentElement.scrollTop || 0) <= 1;
+  const scrollableUp = el => { // มีตัวเลื่อนด้านในที่เลื่อนลงมาแล้วไหม (เช่น ตาราง Matrix)
+    for (let n = el; n && n !== document.body; n = n.parentElement) {
+      const cs = getComputedStyle(n);
+      if (/(auto|scroll)/.test(cs.overflowY) && n.scrollHeight > n.clientHeight && n.scrollTop > 0) return true;
+    }
+    return false;
+  };
+  window.addEventListener('wheel', e => {
+    const b = bn(); if (!b || e.ctrlKey) return;
+    if (e.target.closest && e.target.closest('.modal-bg, .dd-menu, .flatpickr-calendar')) return;
+    if (e.deltaY > 0 && atTop() && !b.classList.contains('bn-collapsed')) b.classList.add('bn-collapsed');
+    else if (e.deltaY < 0 && atTop() && b.classList.contains('bn-collapsed') && !scrollableUp(e.target)) b.classList.remove('bn-collapsed');
+  }, { passive: true });
+  const nav = window.onShellNavigate;
+  window.onShellNavigate = function (x) { const b = bn(); if (b) b.classList.remove('bn-collapsed'); if (nav) return nav.apply(this, arguments); };
+})();
