@@ -165,8 +165,7 @@
       return `<label class="item ${on ? 'checked' : ''}"><input type="checkbox" value="${esc(n)}" ${on ? 'checked' : ''} onchange="fcGramChange(this)"><span>${esc(n)}</span></label>`; }).join('');
     let btns = '';
     if (o.status === 'draft') {
-      btns = `<button type="button" onclick="fcSave(false)">💾 บันทึกร่าง</button>
-              <button type="button" class="primary" onclick="fcSave(true)">🔒 บันทึกและล็อก</button>`;
+      btns = `<button type="button" class="primary" onclick="fcSave(true)">🔒 บันทึกและล็อก</button>`;
     } else if (o.status === 'saved') {
       btns = `<button type="button" onclick="fcUnlock()" style="background:#fffbeb;color:#b45309;border-color:#fcd34d">✏️ แก้ไข (ใส่รหัสผ่าน)</button>
               <button type="button" class="primary" onclick="fcAttachPick()">📎 แนบเอกสารอนุมัติ (PDF)</button>`;
@@ -287,15 +286,20 @@
       const v = getv(s);
       return `<td class="fc-in"><input type="number" min="0" step="${act === 'cust' ? 'any' : '1'}" data-act="${act}" data-g="${g}" data-s="${s}"${i != null ? ` data-i="${i}"` : ''} value="${v == null || v === 0 && act !== 'cust' ? '' : v}" ${L ? 'disabled' : ''}></td>`;
     }).join('');
+    const V = (k, label, span) => `<td class="fc-v fc-v${k}" rowspan="${span}"><span>${label}</span></td>`;
+    const ws = (row, v) => row.replace(/^(<tr[^>]*>)/, '$1' + v);
+    const V0 = '<td class="fc-v fc-v0"></td>';
+    const saveBtn = (!L) ? `<button type="button" class="fc-tbl-save" data-act="savedraft" title="บันทึกร่าง (บันทึกทุกแกรมของกลุ่มนี้)">💾 บันทึกร่าง</button>` : '';
     const fm = esc(thMonth(S.month)), lm = P.levelMonth ? esc(thMonth(P.levelMonth)) : '…', em = P.estMonth ? esc(thMonth(P.estMonth)) : '…';
 
     let h = `<table class="fc-table" data-g="${g}"><thead>
-      <tr><th class="fc-title" colspan="${n + 3}"><div class="fc-title-in"><span>${g}</span><span class="fc-warnmsg hidden">⚠ ${NEG_MSG}</span></div></th></tr>
-      <tr><th class="fc-g fc-h" colspan="2">Size</th>${tbl.sizes.map(s => `<th data-s="${s}">${s}</th>`).join('')}<th class="fc-tot-h">Total</th></tr></thead><tbody>`;
+      <tr><th class="fc-title" colspan="${n + 4}"><div class="fc-title-in"><span>${g}</span><span class="fc-warnmsg hidden">⚠ ${NEG_MSG}</span>${saveBtn}</div></th></tr>
+      <tr><th class="fc-v-h"></th><th class="fc-g fc-h" colspan="2">รายการคำนวณ / Size</th>${tbl.sizes.map(s => `<th data-s="${s}">${s}</th>`).join('')}<th class="fc-tot-h">Total</th></tr></thead><tbody>`;
 
     // 1) การใช้ม้วน (ทั่วไป) ย้อนหลัง 3 เดือน
     ['m1', 'm2', 'm3'].forEach((p, i) => {
-      h += sub('u' + (i + 1), i === 0 ? 'การใช้ม้วน (ทั่วไป)<br>ย้อนหลัง 3 เดือน' : null, 3, monthBtn(p, P[p], L));
+      const _r = sub('u' + (i + 1), i === 0 ? 'การใช้ม้วน (ทั่วไป)<br>ย้อนหลัง 3 เดือน' : null, 3, monthBtn(p, P[p], L));
+      h += i === 0 ? ws(_r, V('A', 'ย้อนหลัง', 4)) : _r;
     });
     // 2) เฉลี่ย
     h += full('avg3', 'การใช้ม้วน (ทั่วไป) เฉลี่ย 3 เดือน', 'fc-calc fc-hl1');
@@ -306,7 +310,7 @@
         : `<input type="text" class="fc-gray fc-cust" data-act="custname" data-g="${g}" data-i="${i}" value="${esc(cur)}" placeholder="🔍 พิมพ์ค้นหาหรือเลือกลูกค้า" autocomplete="off" title="พิมพ์ส่วนหนึ่งของรหัสหรือชื่อลูกค้า แล้วเลือกจากรายการที่ขึ้นมา">` +
           (i >= 3 ? `<button type="button" class="fc-x" title="ลบแถวนี้" data-act="delcust" data-g="${g}" data-i="${i}">✕</button>` : '');
       const grp = i === 0 ? `จำนวนม้วนกระดาษ - กลุ่มลูกค้า<br>Forecast (Code)${L ? '' : `<br><button type="button" class="fc-mini" data-act="addcust" data-g="${g}">＋ เพิ่มแถว</button>`}` : null;
-      h += `<tr class="fc-row">${grp != null ? `<td class="fc-g" rowspan="${nc}">${grp}</td>` : ''}<td class="fc-s">${sel}</td>${inputs('cust', s => tbl.cells[s].cust[i], i)}<td class="fc-tot" data-r="cust${i}" data-t="1"></td></tr>`;
+      h += `<tr class="fc-row">${i === 0 ? V('B', 'Forecast', nc) : ''}${grp != null ? `<td class="fc-g" rowspan="${nc}">${grp}</td>` : ''}<td class="fc-s">${sel}</td>${inputs('cust', s => tbl.cells[s].cust[i], i)}<td class="fc-tot" data-r="cust${i}" data-t="1"></td></tr>`;
     }
     // 4) ระดับ Stock เดือน (เลือกเดือน + Snapshot)
     let snapSel = '';
@@ -315,29 +319,29 @@
       const opts = snapOptions(P.levelMonth);
       snapSel = `<select class="fc-gray fc-snap" data-act="snap">${opts.length ? opts.map(s => `<option value="${s.id}" ${String(s.id) === String(P.levelSnapId) ? 'selected' : ''}>${esc(shortTitle(s.title))} · ${s.mode === 'full' ? 'ม้วนเต็ม' : 'ใช้จริง'}</option>`).join('') : '<option value="">— ไม่มี Snapshot —</option>'}</select>`;
     }
-    h += `<tr class="fc-row"><td class="fc-g">ระดับ Stock เดือน :</td><td class="fc-s">${monthBtn('levelMonth', P.levelMonth, L)}${snapSel ? '<br>' + snapSel : ''}</td>${calc('stock_level')}</tr>`;
+    h += `<tr class="fc-row">${V('C', 'ระดับ Stock', 3)}<td class="fc-g">ระดับ Stock เดือน :</td><td class="fc-s">${monthBtn('levelMonth', P.levelMonth, L)}${snapSel ? '<br>' + snapSel : ''}</td>${calc('stock_level')}</tr>`;
     // 5) % ของระดับ Stock
     h += full('level_pct_qty', `<input type="number" class="fc-pct" min="0" max="100" step="1" data-act="pct" data-g="${g}" value="${tbl.cfg.pct}" ${L ? 'disabled' : ''}> % ของระดับ Stock เดือน : ${lm}`);
     // 6) ประมาณการ (ก่อนหัก Stock)
     h += full('est_before', `ประมาณการใช้ม้วนเดือน : <b>${fm}</b> (ก่อนหัก Stock)`, 'fc-calc fc-strong fc-hl2');
     // 7-9) Stock / รับม้วน / ยอดจอง
-    h += sub('stock_qty', 'Stock ณ วันที่ :', 1, dateIn('stockDate', P.stockDate, L));
+    h += ws(sub('stock_qty', 'Stock ณ วันที่ :', 1, dateIn('stockDate', P.stockDate, L)), V('D', 'ม้วนกระดาษคงเหลือ', 4));
     h += sub('receive_qty', 'รับม้วนกระดาษ ณ วันที่', 1, dateIn('recvDate', P.recvDate, L));
     h += sub('reserve_qty', 'ยอดจองคงเหลือ ณ วันที่ :', 1, dateIn('resvDate', P.resvDate, L));
     // 10) คงเหลือรวมยอดจอง
     h += full('total_avail', 'ม้วนกระดาษคงเหลือรวมยอดจอง', 'fc-calc fc-hl1');
     // 11) ประมาณการใช้ม้วนเดือน (Rev ล่าสุดที่บันทึก)
-    h += sub('est_month', 'ประมาณการใช้ม้วนเดือน :', 1, monthBtn('estMonth', P.estMonth, L) + (W.src.estRev != null ? ` <small class="fc-muted">Rev.${pad2(W.src.estRev)}</small>` : ''));
+    h += ws(sub('est_month', 'ประมาณการใช้ม้วนเดือน :', 1, monthBtn('estMonth', P.estMonth, L) + (W.src.estRev != null ? ` <small class="fc-muted">Rev.${pad2(W.src.estRev)}</small>` : '')), V('E', 'คำนวณ', 3));
     // 12) / 13)
     h += full('after_deduct', `ม้วนกระดาษคงเหลือ หักประมาณการใช้ม้วนเดือน : ${em} แล้ว`, 'fc-calc');
     h += full('est_after', `ประมาณการใช้ม้วนเดือน : <b>${fm}</b> (หลังหัก Stock)`, 'fc-calc fc-strong fc-hl2');
     // 14) ปรับเพิ่ม/ลด
-    h += `<tr class="fc-row fc-adj"><td class="fc-g" rowspan="2">ปรับเพิ่มหรือลดจำนวนตามความเหมาะสม<br>ประเมินจากสถานการณ์ปัจจุบัน</td><td class="fc-s">ปรับเพิ่มจำนวน +</td>${inputs('adjP', s => tbl.cells[s].adjP)}<td class="fc-tot" data-r="adjP" data-t="1"></td></tr>`;
+    h += `<tr class="fc-row fc-adj">${V('F', 'ปรับเพิ่ม/ลด', 2)}<td class="fc-g" rowspan="2">ปรับเพิ่มหรือลดจำนวนตามความเหมาะสม<br>ประเมินจากสถานการณ์ปัจจุบัน</td><td class="fc-s">ปรับเพิ่มจำนวน +</td>${inputs('adjP', s => tbl.cells[s].adjP)}<td class="fc-tot" data-r="adjP" data-t="1"></td></tr>`;
     h += `<tr class="fc-row fc-adj"><td class="fc-s">ปรับลดจำนวน −</td>${inputs('adjM', s => tbl.cells[s].adjM)}<td class="fc-tot" data-r="adjM" data-t="1"></td></tr>`;
     // 15) สรุป
-    h += full('order_qty', `สรุปประมาณการสั่งซื้อม้วนเดือน : <b>${fm}</b>`, 'fc-final');
+    h += ws(full('order_qty', `สรุปประมาณการสั่งซื้อม้วนเดือน : <b>${fm}</b>`, 'fc-final'), V0);
     // 16) หมายเหตุ
-    h += `<tr class="fc-row"><td class="fc-g" colspan="2">หมายเหตุ</td>${tbl.sizes.map(s => {
+    h += `<tr class="fc-row">${V0}<td class="fc-g" colspan="2">หมายเหตุ</td>${tbl.sizes.map(s => {
       const nt = tbl.cells[s].note;
       return `<td class="fc-note-td"><button type="button" class="fc-note ${nt ? 'has' : ''}" data-act="note" data-g="${g}" data-s="${s}" title="${esc(nt || (L ? '' : 'คลิกเพื่อใส่หมายเหตุ'))}">${nt ? '!' : (L ? '' : '＋')}</button></td>`;
     }).join('')}<td class="fc-tot"></td></tr>`;
@@ -484,6 +488,7 @@
     box.addEventListener('click', e => {
       const b = e.target.closest('[data-act]'); if (!b) return;
       const act = b.dataset.act, W = S.W; if (!W) return;
+      if (act === 'savedraft') { if (!W.locked) window.fcSave(false); return; }
       if (act === 'monthpick') {
         if (W.locked) return;
         const p = b.dataset.p;
