@@ -397,17 +397,11 @@ async function renderAlert() {
 
   if (alertReceiveDates.length === 0) {
     const html = `
-      <div class="alert-date-tabs" style="display:flex; align-items:center; justify-content:space-between; background:#f8fafc; border:1px solid #e2e8f0; padding:8px; border-radius:6px; margin-bottom:15px; flex-wrap:wrap; gap:8px;">
-        <div style="background: #fef3c7; border: 1px solid #fcd34d; color: #92400e; padding: 6px 12px; border-radius: 4px; font-size: 13px; font-weight: 600; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-          <span>⚠️ กรุณาเลือกวันที่รับสินค้า:</span>
-          <input type="text" id="firstReceiveDateInput"
-                 placeholder="วว/ดด/ปปปป"
-                 style="padding: 4px 8px; border: 1px solid #d97706; border-radius: 4px; font-family: inherit; font-size: 13px; color: #333; outline: none; width: 120px;">
-          <button type="button" onclick="setFirstAlertDate(getISODateFromInput('firstReceiveDateInput'))"
-                  style="background: #d97706; color: white; border: none; padding: 4px 12px; border-radius: 4px; font-size: 13px; cursor: pointer; font-weight: bold; transition: background 0.2s;">
-            ตกลง
-          </button>
-        </div>
+      <div class="alert-date-tabs first-date-bar">
+        <span class="fd-ic">📅</span>
+        <span class="fd-txt">เลือกวันที่รับสินค้าก่อน แล้วระบบจะวิเคราะห์ให้</span>
+        <input type="text" id="firstReceiveDateInput" placeholder="วว/ดด/ปปปป" autocomplete="off">
+        <button type="button" class="fd-ok" onclick="setFirstAlertDate(getISODateFromInput('firstReceiveDateInput'))">ตกลง</button>
       </div>
     `;
     $('alertBody').innerHTML = html;
