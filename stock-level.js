@@ -655,22 +655,30 @@ async function loadStockLevelSnapshots() {
     return;
   }
 
-  listEl.innerHTML = data.map(s => {
+  const fmtM = m => Array.isArray(m) ? (m.length > 3 ? m.length + ' เดือน' : m.join(', ')) : (m || '-');
+  const fmtG = g => Array.isArray(g) ? (g.length ? (g.length > 2 ? g.length + ' เกรด' : g.join(', ')) : 'ทั้งหมด') : (g || 'ทั้งหมด');
+  let rowsHtml = data.map(s => {
     const dt = new Date(s.created_at).toLocaleString('th-TH', {
       year: 'numeric', month: 'short', day: 'numeric',
       hour: '2-digit', minute: '2-digit'
     });
-    return `<div class="snapshot-card">
-      <div class="snapshot-card-info">
-        <div class="snapshot-card-title">${esc(s.title)}</div>
-        <div class="snapshot-card-meta">📅 ${dt}</div>
-      </div>
-      <div class="snapshot-card-actions">
-        <button onclick="viewSnapshot(${s.id})">👁 ดู</button>
-        <button class="danger" onclick="deleteSnapshot(${s.id}, '${esc(s.title)}')">🗑 ลบ</button>
-      </div>
-    </div>`;
+    const mode = s.mode === 'actual' ? 'ใช้จริง' : (s.mode === 'full' ? 'ม้วนเต็ม' : (s.mode || '-'));
+    return `<tr>
+      <td><b>${esc(s.title)}</b></td>
+      <td>${esc(String(fmtM(s.months)))}</td>
+      <td>${esc(String(s.customer || 'ทั้งหมด'))}</td>
+      <td>${esc(String(fmtG(s.grades)))}</td>
+      <td><span class="snap-mode">${esc(mode)}</span></td>
+      <td class="snap-dt">${dt}</td>
+      <td class="snap-act">
+        <button type="button" onclick="viewSnapshot(${s.id})">👁 ดู</button>
+        <button type="button" class="danger" onclick="deleteSnapshot(${s.id}, '${esc(s.title)}')">🗑 ลบ</button>
+      </td>
+    </tr>`;
   }).join('');
+  listEl.innerHTML = `<div class="snap-wrap"><table class="data-table snap-table"><thead><tr>
+    <th>ชื่อรายการ</th><th>เดือน</th><th>ลูกค้า</th><th>Gradegrams</th><th>โหมด</th><th>บันทึกเมื่อ</th><th style="width:150px;text-align:center">จัดการ</th>
+  </tr></thead><tbody>${rowsHtml}</tbody></table></div>`;
 }
 
 // ═══════════════════════════════════════════════════════════════
