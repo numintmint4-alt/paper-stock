@@ -856,5 +856,7 @@
   html body #fcTables { padding-bottom: 0 !important; margin-bottom: 0 !important; }
   html body #fcTables .fc-tbl-wrap { margin-bottom: 0 !important; }
   html body #fcFooter { margin-top: 8px !important; }
+  /* ซ่อน Alert History (ย้อนหลัง) ถาวร */
+  html body #alertHistoryCard { display: none !important; }
 }
 @media print { .fc-rail, .fc-pgnav { display: none !important; } .fc-tbl-wrap.fc-pg-hide { display: block !important; } .szh-pop, .sz-hide-btn { display: none !important; } .report-title .dd-btn { display: none !important; } .calc-note { display: none !important; } .ss-share { display: none !important; } .ss-chip { background: none !important; padding: 0 !important; } }
