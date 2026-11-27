@@ -563,15 +563,15 @@ function toggleDate(d) { $('rec-'+d).classList.toggle('hidden'); }
 function renderMaster() {
   const q = ($('masterSearch').value || '').toLowerCase();
   const rows = masterCache.filter(r => !q || (r.grade + r.gram + r.size + r.item_code).toLowerCase().includes(q));
-  let html = '<div style="max-height:550px;overflow:auto"><table><thead><tr><th>#</th><th>Gradegrams</th><th>Gram</th><th>Size</th><th>Item Code</th><th>Std Weight</th><th></th></tr></thead><tbody>';
+  let html = '<div class="set-scroll"><table class="data-table set-table"><thead><tr><th style="width:56px">#</th><th>Gradegrams</th><th>Gram</th><th>Size</th><th>Item Code</th><th>Std Weight</th><th style="width:190px;text-align:center">จัดการ</th></tr></thead><tbody>';
   if (!rows.length) html += '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:20px">ไม่มีข้อมูล</td></tr>';
   rows.forEach((r, i) => {
-    html += `<tr><td>${i+1}</td><td>${r.grade}</td><td>${r.gram}</td><td>${r.size}</td>
-      <td>${r.item_code}</td><td>${Number(r.std_weight_kg).toFixed(2)}</td>
-      <td class="admin-only">${isAdmin() ? `<button onclick="editMaster(${r.id})">แก้ไข</button> <button class="danger" onclick="delMaster(${r.id})">ลบ</button>` : '-'}</td></tr>`;
+    html += `<tr><td>${i+1}</td><td><b class="set-key">${r.grade}</b></td><td>${r.gram}</td><td>${r.size}</td>
+      <td>${r.item_code}</td><td class="n">${Number(r.std_weight_kg).toFixed(2)}</td>
+      <td class="admin-only set-act">${isAdmin() ? `<button type="button" class="sb-btn" onclick="editMaster(${r.id})">✏️ แก้ไข</button><button type="button" class="sb-btn danger" onclick="delMaster(${r.id})">ลบ</button>` : '-'}</td></tr>`;
   });
   html += '</tbody></table></div>';
-  html += `<div style="margin-top:8px;font-size:13px;color:#64748b">แสดง ${rows.length} / ${masterCache.length} แถว</div>`;
+  html += `<div class="set-count">แสดง ${rows.length} / ${masterCache.length} แถว</div>`;
   $('masterBody').innerHTML = html;
 }
 let editingMasterId = null;
@@ -1121,18 +1121,15 @@ async function loadUsers() {
   $('usersBody').innerHTML = '<p>กำลังโหลด...</p>';
   try {
     const { users } = await callAdmin('list');
-    let html = '<table><thead><tr><th>#</th><th>ชื่อผู้ใช้</th><th>ชื่อ-นามสกุล</th><th>สิทธิ์</th><th>เข้าใช้ล่าสุด</th><th></th></tr></thead><tbody>';
+    let html = '<div class="set-scroll"><table class="data-table set-table"><thead><tr><th style="width:56px">#</th><th>ชื่อผู้ใช้</th><th>ชื่อ-นามสกุล</th><th>สิทธิ์</th><th>เข้าใช้ล่าสุด</th><th style="width:300px;text-align:center">จัดการ</th></tr></thead><tbody>';
     users.forEach((u, i) => {
       const last = u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString('th-TH') : '-';
       html += `<tr><td>${i+1}</td><td><b>${esc(u.username)}</b></td><td>${esc(u.full_name) || '-'}</td>
-        <td><span class="badge ok">${u.role}</span></td>
+        <td><span class="set-role role-${esc(u.role)}">${esc(u.role)}</span></td>
         <td>${last}</td>
-        <td><button onclick='openChangeRole(${JSON.stringify(u)})'>เปลี่ยน Role</button>
-          <button onclick='openResetPass(${JSON.stringify(u)})'>Reset รหัส</button>
-          ${u.id !== currentUser.id ? `<button class="danger" onclick="delUser('${u.id}','${esc(u.username)}')">ลบ</button>` : ''}
-        </td></tr>`;
+        <td class="set-act"><button type="button" class="sb-btn" onclick='openChangeRole(${JSON.stringify(u)})'>เปลี่ยน Role</button><button type="button" class="sb-btn" onclick='openResetPass(${JSON.stringify(u)})'>Reset รหัส</button>${u.id !== currentUser.id ? `<button type="button" class="sb-btn danger" onclick="delUser('${u.id}','${esc(u.username)}')">ลบ</button>` : ''}</td></tr>`;
     });
-    html += '</tbody></table>';
+    html += '</tbody></table></div>';
     $('usersBody').innerHTML = html;
   } catch (e) {
     showMsg('usersMsg', 'โหลดไม่สำเร็จ: ' + e.message, 'err');
