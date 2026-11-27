@@ -532,3 +532,26 @@ window.softLoad = function (el, html) {
   const nav = window.onShellNavigate;
   window.onShellNavigate = function (x) { const b = bn(); if (b) b.classList.remove('bn-collapsed'); if (nav) return nav.apply(this, arguments); };
 })();
+
+
+/* เมนูซ้าย: ชื่อเมนูยาวเกินกรอบ → ลดขนาดอักษรเฉพาะรายการนั้นให้พอดี 1 บรรทัด */
+(function () {
+  let t = 0;
+  function fit() {
+    document.querySelectorAll('#sbNav .sb-item .it').forEach(el => {
+      if (!el.offsetParent) return;
+      el.style.fontSize = '';
+      let fs = parseFloat(getComputedStyle(el).fontSize), guard = 8;
+      while (el.scrollWidth > el.clientWidth + 0.5 && fs > 10.5 && guard-- > 0) { fs -= 0.5; el.style.fontSize = fs + 'px'; }
+    });
+  }
+  const sched = () => { cancelAnimationFrame(t); t = requestAnimationFrame(fit); };
+  const start = () => {
+    const nav = document.getElementById('sbNav'); if (!nav) return;
+    new MutationObserver(sched).observe(nav, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+    sched();
+  };
+  window.addEventListener('resize', sched);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+  window.fitSidebarLabels = fit;
+})();
