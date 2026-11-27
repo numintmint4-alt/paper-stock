@@ -541,10 +541,13 @@ async function openDrill(gradegram, size) {
   let html = `<div class="pop-chips"><span class="pc">${dates.length} วัน</span><span class="pc pc-f">รวม ${totRolls.toFixed(2)} ม้วน</span><span class="pc pc-k">${totKg.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} kg</span></div>`;
   html += '<div class="pop-scroll"><table class="data-table pop-table"><thead><tr><th>วันที่</th><th>kg รวม</th><th>Std Weight</th><th>จำนวนม้วน</th><th>รายการ</th><th></th></tr></thead><tbody>';
   if (!dates.length) html += '<tr><td colspan="6" style="text-align:center;color:#94a3b8">ไม่มีข้อมูล</td></tr>';
+  const _rollsOf = d => mode === 'full' ? Math.ceil(byDate[d].kg / std) : byDate[d].kg / std;
+  const _maxRolls = dates.length ? Math.max(...dates.map(_rollsOf)) : 0;
   dates.forEach(d => {
     const info = byDate[d];
-    const rolls = mode === 'full' ? Math.ceil(info.kg / std) : info.kg / std;
-    html += `<tr><td>${d}</td><td>${info.kg.toFixed(2)}</td><td>${std}</td>
+    const rolls = _rollsOf(d);
+    const isMax = dates.length > 1 && rolls === _maxRolls && _maxRolls > 0;
+    html += `<tr class="${isMax ? 'pop-max' : ''}"><td>${d}${isMax ? ' <span class="pop-maxtag">ใช้สูงสุด</span>' : ''}</td><td>${info.kg.toFixed(2)}</td><td>${std}</td>
       <td><b>${rolls.toFixed(2)}</b></td><td>${info.records.length}</td>
       <td><button type="button" class="pop-btn" onclick="toggleDate('${d}')">ดูรายการ</button></td></tr>
       <tr id="rec-${d}" class="hidden"><td colspan="6">
