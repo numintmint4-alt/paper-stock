@@ -165,7 +165,8 @@
       return `<label class="item ${on ? 'checked' : ''}"><input type="checkbox" value="${esc(n)}" ${on ? 'checked' : ''} onchange="fcGramChange(this)"><span>${esc(n)}</span></label>`; }).join('');
     let btns = '';
     if (o.status === 'draft') {
-      btns = `<button type="button" class="primary" onclick="fcSave(true)">🔒 บันทึกและล็อก</button>`;
+      btns = `<button type="button" class="fc-draft-btn" onclick="fcSave(false)" title="บันทึกร่าง (บันทึกทุกแกรมของกลุ่มนี้)">💾 บันทึกร่าง</button>
+              <button type="button" class="primary" onclick="fcSave(true)">🔒 บันทึกและล็อก</button>`;
     } else if (o.status === 'saved') {
       btns = `<button type="button" onclick="fcUnlock()" style="background:#fffbeb;color:#b45309;border-color:#fcd34d">✏️ แก้ไข (ใส่รหัสผ่าน)</button>
               <button type="button" class="primary" onclick="fcAttachPick()">📎 แนบเอกสารอนุมัติ (PDF)</button>`;
@@ -173,7 +174,7 @@
       btns = `<button type="button" class="primary" onclick="fcViewDoc()">📄 ดูเอกสารอนุมัติ</button>`;
     }
     const saved = o.saved_at ? ` · บันทึกเมื่อ ${new Date(o.saved_at).toLocaleString('th-TH')}` : '';
-    el.innerHTML = `<div class="fc-tb-left"><b>${esc(groupLabel(S.group))}</b><span class="fc-rev-tabs fc-rev-inline no-print" id="fcRevInline">${revChipsHTML()}</span> ${statusChip(o)}<span class="fc-muted">${saved}</span></div>
+    el.innerHTML = `<div class="fc-tb-left"><select class="fc-grp-sel" id="fcGrpSel" title="เลือกกลุ่มเกรด" onchange="fcSelectGroup(this.value)">${GROUP_DEFS.map(d => { const arr = S.orders[d.key] || [], last = arr[arr.length - 1]; const bd = !last ? '' : (last.status === 'approved' ? ' ✅' : (last.status === 'saved' ? ' 🔒' : '')); return `<option value="${d.key}" ${d.key === S.group ? 'selected' : ''}>${esc(d.label)}${bd}</option>`; }).join('')}</select><span class="fc-cur-g" id="fcCurGram"></span><span class="fc-rev-tabs fc-rev-inline no-print" id="fcRevInline">${revChipsHTML()}</span> ${statusChip(o)}<span class="fc-muted">${saved}</span></div>
       <div class="fc-tb-right">
         <div class="fc-inline">แสดงแกรม
           <div class="grade-filter-box" id="fcGramBox">
@@ -293,7 +294,6 @@
     const fm = esc(thMonth(S.month)), lm = P.levelMonth ? esc(thMonth(P.levelMonth)) : '…', em = P.estMonth ? esc(thMonth(P.estMonth)) : '…';
 
     let h = `<table class="fc-table" data-g="${g}" style="min-width:${22 + 140 + 170 + 54 + n * 32}px"><colgroup><col class="c-v"><col class="c-g"><col class="c-s">${tbl.sizes.map(() => '<col>').join('')}<col class="c-t"></colgroup><thead>
-      <tr><th class="fc-title" colspan="${n + 4}"><div class="fc-title-in"><span>${g}</span><span class="fc-warnmsg hidden">⚠ ${NEG_MSG}</span>${saveBtn}</div></th></tr>
       <tr><th class="fc-v-h"></th><th class="fc-g fc-h" colspan="2">รายการคำนวณ / Size</th>${tbl.sizes.map(s => `<th data-s="${s}">${s}</th>`).join('')}<th class="fc-tot-h">Total</th></tr></thead><tbody>`;
 
     // 1) การใช้ม้วน (ทั่วไป) ย้อนหลัง 3 เดือน
@@ -378,24 +378,32 @@
 
   // ═════════════ แสดงทีละตาราง + ติ่งแกรมด้านซ้าย ═════════════
   function pageNames() { return [...document.querySelectorAll('#fcTables .fc-tbl-wrap')].map(w => w.dataset.gw); }
+  function updateWarn() {
+    const el = $id('fcWarn'), W = S.W; if (!el) return;
+    if (!W) { el.classList.add('hidden'); return; }
+    const bad = Object.keys(W.tables).filter(n => W.tables[n] && W.tables[n]._neg > 0 && (!S.paged || n === S.page));
+    if (!bad.length) { el.classList.add('hidden'); el.textContent = ''; railOffset(); return; }
+    el.textContent = '⚠ ' + (S.paged ? S.page : bad.join(', ')) + ': ' + NEG_MSG;
+    el.classList.remove('hidden'); railOffset();
+  }
   function markRail(name, on) { const b = document.querySelector('#fcRail .it[data-n="' + (window.CSS && CSS.escape ? CSS.escape(name) : name) + '"]'); if (b) b.classList.toggle('warn', !!on); }
+  function railOffset() { const r = $id('fcRail'), w = document.querySelector('#fcTables .fc-tbl-wrap:not(.fc-pg-hide)'); if (!r || !w || !r.parentElement) return; const d = w.getBoundingClientRect().top - r.parentElement.getBoundingClientRect().top; r.style.marginTop = Math.max(0, Math.round(d)) + 'px'; }
+  window.addEventListener('resize', () => { try { railOffset(); } catch (_) {} });
   function applyPage(names) {
     names = names || pageNames();
     const rail = $id('fcRail'), W = S.W;
     document.querySelectorAll('#fcTables .fc-tbl-wrap').forEach(w => {
       w.classList.toggle('fc-pg-hide', S.paged && w.dataset.gw !== S.page);
-      const tin = w.querySelector('.fc-title-in'); let nav = tin && tin.querySelector('.fc-pgnav');
-      if (tin && !nav) { nav = document.createElement('span'); nav.className = 'fc-pgnav no-print'; tin.appendChild(nav); }
-      if (nav) { const i = names.indexOf(w.dataset.gw);
-        nav.innerHTML = S.paged ? `<button type="button" data-pg="-1" title="ตารางก่อนหน้า (PageUp)" ${i <= 0 ? 'disabled' : ''}>‹</button><b>${i + 1} / ${names.length}</b><button type="button" data-pg="1" title="ตารางถัดไป (PageDown)" ${i >= names.length - 1 ? 'disabled' : ''}>›</button>` : ''; }
     });
+    const cg = $id('fcCurGram'); if (cg) cg.textContent = S.paged && S.page ? '› ' + S.page : '';
+    updateWarn();
     if (!rail) return;
     if (!W || names.length < 1) { rail.innerHTML = ''; return; }
     rail.classList.toggle('fc-rail-all', !S.paged);
     rail.innerHTML = names.map(n => { const t = W.tables[n];
       return `<button type="button" class="it ${S.paged && n === S.page ? 'on' : ''} ${t && t._neg > 0 ? 'warn' : ''}" data-n="${esc(n)}" title="${esc(n)}">${esc(n)}</button>`; }).join('') +
       `<button type="button" class="fc-rail-mode" title="${S.paged ? 'แสดงทุกตารางเรียงต่อกัน' : 'แสดงทีละตาราง'}">${S.paged ? '☰ ทุกตาราง' : '▣ ทีละตาราง'}</button>`;
-    const on = rail.querySelector('.it.on'); if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest' });
+    railOffset();
   }
   function goPage(name, keepScroll) {
     if (!name || !pageNames().includes(name)) return;
@@ -424,8 +432,7 @@
       const rs = tbl._el.querySelector(`input[data-act="adjM"][data-s="${s}"]`); if (rs) rs.classList.toggle('fc-neg-in', bad);
     });
     Object.keys(tot).forEach(r => { const td = tbl._tds[r + '|t']; if (td) { td.textContent = fmtTot(r, tot[r]); td.classList.toggle('fc-zero', !tot[r] || Math.abs(tot[r]) < 1e-9); } });
-    const wm = tbl._el.querySelector('.fc-warnmsg'); if (wm) wm.classList.toggle('hidden', neg === 0);
-    tbl._neg = neg; markRail(tbl.label, neg > 0);
+    tbl._neg = neg; markRail(tbl.label, neg > 0); updateWarn();
     if (!silent && neg > tbl._neg) toast('⚠️ ' + NEG_MSG, 'warn', 4500);
     tbl._neg = neg;
   }
@@ -575,7 +582,7 @@
 
     // ติ่งแกรม / ปุ่ม ‹ › / สลับโหมด
     document.addEventListener('click', e => {
-      const it = e.target.closest && e.target.closest('#fcRail .it'); if (it) { if (!S.paged) { S.paged = true; try { localStorage.setItem('fcPaged', '1'); } catch (_) {} } goPage(it.dataset.n); return; }
+      const it = e.target.closest && e.target.closest('#fcRail .it'); if (it) { if (!S.paged) { S.paged = true; try { localStorage.setItem('fcPaged', '1'); } catch (_) {} } goPage(it.dataset.n, true); return; }
       const pg = e.target.closest && e.target.closest('.fc-pgnav button[data-pg]'); if (pg) { stepPage(Number(pg.dataset.pg)); return; }
       if (e.target.closest && e.target.closest('#fcRail .fc-rail-mode')) {
         S.paged = !S.paged; try { localStorage.setItem('fcPaged', S.paged ? '1' : '0'); } catch (_) {}
