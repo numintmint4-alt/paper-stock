@@ -790,5 +790,25 @@
   html body .fc-rev-inline .fc-rev-tab.fc-rev-add { background: transparent !important; border: 1.5px dashed #8fb2e6 !important; color: #1677ff !important; }
   html body .fc-rev-inline .fc-rev-tab.fc-rev-add:disabled { opacity: .45; color: #64748b !important; cursor: not-allowed; }
   html body .fc-work { margin-top: 4px; }
+  /* ---------- หน้าประมาณการ: ติ่งแกรมด้านซ้าย + แสดงทีละตาราง ---------- */
+  html body .fc-work { display: flex; align-items: flex-start; gap: 0; }
+  html body .fc-rail { width: 76px; flex-shrink: 0; display: flex; flex-direction: column; gap: 5px; padding-top: 56px; position: sticky; top: 74px; max-height: calc(100vh - 96px); overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
+  html body .fc-rail::-webkit-scrollbar { display: none; }
+  html body .fc-rail:empty { display: none; }
+  html body .fc-rail .it { padding: 7px 4px 7px 8px; border: 1.5px solid #b9d0f2; border-right: none; border-radius: 12px 0 0 12px; background: #f4f8ff; color: #0b3f95; font: 700 12px 'Sarabun', sans-serif; text-align: center; cursor: pointer; white-space: nowrap; box-shadow: none; transition: background .12s, transform .12s; }
+  html body .fc-rail .it:hover:not(.on) { background: #eaf3ff; border-color: #1677ff; }
+  html body .fc-rail .it.on { background: linear-gradient(90deg, #1677ff, #0b3f95); color: #fff; border-color: #1677ff; box-shadow: 0 3px 8px rgba(22,119,255,.4); transform: translateX(3px); }
+  html body .fc-rail .it.warn:not(.on) { border-color: #f59e0b; background: #fff8ea; }
+  html body .fc-rail .it.warn::after { content: ' ●'; color: #f59e0b; font-size: 9px; }
+  html body .fc-rail.fc-rail-all .it { opacity: .85; }
+  html body .fc-rail .fc-rail-mode { margin-top: 6px; padding: 5px 4px; border: 1.5px dashed #8fb2e6; border-radius: 10px; background: transparent; color: #1677ff; font: 600 11px 'Sarabun', sans-serif; cursor: pointer; box-shadow: none; white-space: nowrap; margin-right: 4px; }
+  html body .fc-tbl-wrap.fc-pg-hide { display: none !important; }
+  html body .fc-title-in { position: relative; }
+  html body .fc-pgnav { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #fff; }
+  html body .fc-pgnav b { background: rgba(255,255,255,.2); border-radius: 8px; padding: 1px 10px; }
+  html body .fc-pgnav button { width: 24px; height: 24px; padding: 0; border-radius: 8px; border: 1px solid rgba(255,255,255,.45); background: rgba(255,255,255,.16); color: #fff; font-size: 15px; line-height: 1; cursor: pointer; box-shadow: none; }
+  html body .fc-pgnav button:hover:not(:disabled) { background: rgba(255,255,255,.32); }
+  html body .fc-pgnav button:disabled { opacity: .35; cursor: default; }
+  html body .fc-work .fc-toolbar { padding-left: 14px; }
 }
-@media print { .szh-pop, .sz-hide-btn { display: none !important; } .report-title .dd-btn { display: none !important; } .calc-note { display: none !important; } .ss-share { display: none !important; } .ss-chip { background: none !important; padding: 0 !important; } }
+@media print { .fc-rail, .fc-pgnav { display: none !important; } .fc-tbl-wrap.fc-pg-hide { display: block !important; } .szh-pop, .sz-hide-btn { display: none !important; } .report-title .dd-btn { display: none !important; } .calc-note { display: none !important; } .ss-share { display: none !important; } .ss-chip { background: none !important; padding: 0 !important; } }
