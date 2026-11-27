@@ -230,7 +230,7 @@ async function loadReservations() {
 
     if (!tbody || !thead) return;
 
-    tbody.innerHTML = '<tr><td colspan="100%" style="text-align:center;padding:20px;">กำลังโหลด...</td></tr>';
+    if (typeof softLoad === 'function' && tbody.rows.length) softLoad(tbody.closest('table') || tbody, ''); else tbody.innerHTML = '<tr><td colspan="100%" style="text-align:center;padding:20px;">กำลังโหลด...</td></tr>';
 
     try {
         await ensureMasterDataLoaded();
