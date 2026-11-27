@@ -1358,6 +1358,7 @@ table tbody tr:hover > td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
   .fc-rev-tabs, .fc-toolbar, .fc-topbar { display: none !important; }
   .fc-tables, .fc-tbl-wrap { max-height: none !important; overflow: visible !important; }
   .fc-table { page-break-inside: avoid; font-size: 9px; }
+  .fc-table .fc-v, .fc-table .fc-v-h, .fc-tbl-save { display: none !important; }
   .fc-gray { background: transparent !important; border: none !important; padding: 0; }
 }
 
