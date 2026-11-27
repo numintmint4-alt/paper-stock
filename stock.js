@@ -363,7 +363,7 @@ async function renderStockMatrix() {
     <div class="report-subtitle">(ทุกเกรด${custLabel}${locLabel}${statusLabel})</div>
   `;
 
-  $('stockBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>';
+  softLoad($('stockBody'), '<p class="ld-ph" style="text-align:center;color:#94a3b8;padding:20px">กำลังโหลด...</p>');
 
   try {
     const normalizedGrades = stockSelectedGrades.map(g => normalizeGrade(g));
