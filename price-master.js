@@ -244,23 +244,22 @@ function renderPMList() {
     return;
   }
 
-  let html = topBar + '<div class="data-scroll"><table class="data-table"><thead><tr>';
-  html += '<th>Gradegram</th><th>ราคาปกติ</th><th>ปั้ม F</th><th>ปั้ม BT</th><th>ปั้ม KTP</th><th>NC ลด</th><th>NC (auto)</th><th></th>';
+  let html = topBar + '<div class="set-scroll"><table class="data-table set-table"><thead><tr>';
+  html += '<th>Gradegram</th><th>ราคาปกติ</th><th>ปั้ม F</th><th>ปั้ม BT</th><th>ปั้ม KTP</th><th>NC ลด</th><th>NC (auto)</th><th style="width:190px;text-align:center">จัดการ</th>';
   html += '</tr></thead><tbody>';
 
   pmCache.forEach(row => {
     const ncAuto = (Number(row.price_normal) || 0) - (Number(row.nc_discount) || 0);
     html += `<tr>
-      <td><b>${esc(row.gradegram)}</b></td>
+      <td><b class="set-key">${esc(row.gradegram)}</b></td>
       <td style="text-align:right">${Number(row.price_normal || 0).toFixed(2)}</td>
       <td style="text-align:right">${Number(row.price_f || 0).toFixed(2)}</td>
       <td style="text-align:right">${Number(row.price_bt || 0).toFixed(2)}</td>
       <td style="text-align:right">${Number(row.price_ktp || 0).toFixed(2)}</td>
       <td style="text-align:right">${Number(row.nc_discount || 0).toFixed(2)}</td>
       <td style="text-align:right;color:#dc2626;font-weight:700">${ncAuto.toFixed(2)}</td>
-      <td>
-        <button onclick="openPMForm(${row.id})">✏️ Edit</button>
-        <button class="danger" onclick="deletePM(${row.id})">🗑 ลบ</button>
+      <td class="set-act">
+        <button type="button" class="sb-btn" onclick="openPMForm(${row.id})">✏️ แก้ไข</button><button type="button" class="sb-btn danger" onclick="deletePM(${row.id})">ลบ</button>
       </td>
     </tr>`;
   });
