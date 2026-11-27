@@ -293,7 +293,7 @@
     const saveBtn = (!L) ? `<button type="button" class="fc-tbl-save" data-act="savedraft" title="บันทึกร่าง (บันทึกทุกแกรมของกลุ่มนี้)">💾 บันทึกร่าง</button>` : '';
     const fm = esc(thMonth(S.month)), lm = P.levelMonth ? esc(thMonth(P.levelMonth)) : '…', em = P.estMonth ? esc(thMonth(P.estMonth)) : '…';
 
-    let h = `<table class="fc-table" data-g="${g}" style="min-width:${22 + 140 + 170 + 54 + n * 32}px"><colgroup><col class="c-v"><col class="c-g"><col class="c-s">${tbl.sizes.map(() => '<col>').join('')}<col class="c-t"></colgroup><thead>
+    let h = `<table class="fc-table" data-g="${g}" style="min-width:${22 + 140 + 150 + 50 + n * 28}px"><colgroup><col class="c-v"><col class="c-g"><col class="c-s">${tbl.sizes.map(() => '<col>').join('')}<col class="c-t"></colgroup><thead>
       <tr><th class="fc-v-h"></th><th class="fc-g fc-h" colspan="2">รายการคำนวณ / Size</th>${tbl.sizes.map(s => `<th data-s="${s}">${s}</th>`).join('')}<th class="fc-tot-h">Total</th></tr></thead><tbody>`;
 
     // 1) การใช้ม้วน (ทั่วไป) ย้อนหลัง 3 เดือน
