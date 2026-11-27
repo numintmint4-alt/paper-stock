@@ -149,8 +149,8 @@
   .alert-matrix-new-table td.total-col-matrix, .alert-matrix-new-table th.total-col-matrix { min-width: 68px !important; font-size: 12.5px !important; }
   .alert-matrix-new-table .matrix-cell { padding: 1px 2px !important; min-width: 50px; }
   .alert-matrix-new-table .matrix-value { display: inline-block !important; min-width: 40px !important; padding: 2px 5px !important; border-radius: 999px !important; font-size: 12px !important; line-height: 1.35; }
-  .alert-matrix-new-table .matrix-cell.has-order .matrix-value { box-shadow: 0 0 0 1.5px #1677ff; }
-  .alert-matrix-new-table .matrix-cell.order-incomplete .matrix-value { box-shadow: 0 0 0 1.5px #f59e0b; }
+  .alert-matrix-new-table .matrix-cell.has-order .matrix-value { box-shadow: 0 0 0 1.2px #1677ff; }
+  .alert-matrix-new-table .matrix-cell.order-incomplete .matrix-value { box-shadow: 0 0 0 1.2px #f59e0b; }
   .alert-matrix-new-table .matrix-cart-svg { top: -6px !important; right: -6px !important; width: 14px !important; height: 14px !important; padding: 2px !important; }
 
   /* ---- ฟิลเตอร์: แคบลง ให้อยู่แถวเดียว ---- */
@@ -669,11 +669,11 @@
 
   /* ===== เมนูซ้ายมือ: ตัวเล็ก/กรอบเตี้ย รองรับ Tab เพิ่มในอนาคต ===== */
   html body .sb-group { margin-bottom: 3px; }
-  html body .sb-group-head { padding: 7px 10px; font: 700 12.5px 'Sarabun', sans-serif; gap: 8px; border-radius: 10px; }
+  html body .sb-group-head { padding: 9px 11px; font: 700 12.5px 'Sarabun', sans-serif; gap: 8px; border-radius: 10px; }
   html body .sb-group-head .chev { width: 14px; height: 14px; }
   html body .sb-group-head .gi { width: 16px; height: 16px; }
   html body .sb-items { padding: 2px 0 1px 10px; margin-left: 8px; }
-  html body .sb-item { padding: 4px 8px; margin: 1px 0; gap: 8px; font: 500 12px/1.25 'Sarabun', sans-serif; border-radius: 8px; align-items: center; }
+  html body .sb-item { padding: 6px 9px; margin: 2px 0; gap: 9px; font: 500 12.5px/1.3 'Sarabun', sans-serif; border-radius: 8px; align-items: center; }
   html body .sb-item .ii { width: 15px; height: 15px; margin-top: 0; }
   html body .sb-item.active { font-weight: 700; box-shadow: 0 4px 12px rgba(24,150,255,.32); }
 
@@ -697,15 +697,20 @@
   html body:has(.page-banner.bn-collapsed) #matrixBody .report-wrap { max-height: calc(100vh - 250px) !important; }
 
   /* ---------- สั่งซื้อประจำวัน: เซลใน Matrix เล็กลง ~80% (กรอบเท่าเดิม) + ปุ่มซ่อน Size ---------- */
-  html body #alertMatrixWrap .alert-matrix-new-table td, html body #alertMatrixWrap .alert-matrix-new-table th { height: 28px; font-size: 11px; padding: 2px 2px; }
-  html body #alertMatrixWrap .alert-matrix-new-table td.grade-col-matrix, html body #alertMatrixWrap .alert-matrix-new-table th.grade-col-matrix { min-width: 92px !important; font-size: 11.5px; padding-left: 8px; }
-  html body #alertMatrixWrap .alert-matrix-new-table td.total-col-matrix, html body #alertMatrixWrap .alert-matrix-new-table th.total-col-matrix { min-width: 66px !important; font-size: 11px; }
-  html body #alertMatrixWrap .alert-matrix-new-table .matrix-cell { padding: 2px 2px; }
-  html body #alertMatrixWrap .alert-matrix-new-table .matrix-value { min-width: 48px; padding: 2px 6px; border-radius: 8px; font-size: 11px; }
+  html body #alertMatrixWrap .alert-matrix-new-table td, html body #alertMatrixWrap .alert-matrix-new-table th { height: 24px !important; font-size: 9px !important; padding: 1px 2px !important; }
+  html body #alertMatrixWrap .alert-matrix-new-table thead th { height: 26px !important; font-size: 9.5px !important; padding: 0 2px !important; }
+  html body #alertMatrixWrap .alert-matrix-new-table tr.total-row-matrix td { font-size: 9.5px !important; padding: 2px 3px !important; height: 26px !important; }
+  html body #alertMatrixWrap .alert-matrix-new-table td.grade-col-matrix, html body #alertMatrixWrap .alert-matrix-new-table th.grade-col-matrix { min-width: 78px !important; font-size: 9.5px !important; padding-left: 8px; }
+  html body #alertMatrixWrap .alert-matrix-new-table td.total-col-matrix, html body #alertMatrixWrap .alert-matrix-new-table th.total-col-matrix { min-width: 56px !important; font-size: 9px !important; }
+  html body #alertMatrixWrap .alert-matrix-new-table .matrix-cell { padding: 1px 2px; }
+  html body #alertMatrixWrap .alert-matrix-new-table .matrix-value { min-width: 36px !important; padding: 1px 4px !important; border-radius: 7px !important; font-size: 8.5px !important; line-height: 1.3 !important; }
   html body #alertMatrixWrap .alert-matrix-new-table .matrix-cell.has-order .matrix-value, html body #alertMatrixWrap .alert-matrix-new-table .matrix-cell.order-incomplete .matrix-value { box-shadow: 0 0 0 1.5px #1677ff; }
   html body #alertMatrixWrap .alert-matrix-new-table .matrix-cell.order-incomplete .matrix-value { box-shadow: 0 0 0 1.5px #f59e0b; }
-  html body #alertMatrixWrap .alert-matrix-new-table .matrix-cart-svg { top: -6px; right: -6px; width: 14px !important; height: 14px !important; padding: 2px; }
+  html body #alertMatrixWrap .alert-matrix-new-table .matrix-cart-svg { top: -5px; right: -5px; width: 12px !important; height: 12px !important; padding: 1.5px; }
   html body #alertMatrixWrap .alert-matrix-new-table .sz-hide { display: none !important; }
+  html body #alertMatrixWrap .alert-matrix-new-table tr.gr-hide { display: none !important; }
+  .szh-sec { font-weight: 700; color: #0b3f95; margin: 8px 0 5px; font-size: 12px; }
+  .szh-chips { max-height: 150px !important; }
   .sz-hide-btn { padding-left: 11px !important; padding-right: 11px !important; }
   .sz-hide-btn .szh-n { background: #1677ff; color: #fff; border-radius: 99px; padding: 0 6px; font-size: 11px; margin-left: 3px; }
   .sz-hide-btn.szh-on { background: #eaf3ff !important; border-color: #1677ff !important; color: #0b3f95 !important; }
@@ -718,5 +723,12 @@
   .szh-ft { display: flex; gap: 6px; margin-top: 10px; }
   .szh-pop .szh-all, .szh-pop .szh-close { border: 1.5px solid #b9d0f2; border-radius: 999px; background: #fff; color: #0b3f95; font-weight: 600; font-size: 12px; padding: 5px 14px; cursor: pointer; box-shadow: none; }
   .szh-pop .szh-all.on { background: #eaf3ff; border-color: #1677ff; }
+  /* เมนูซ้าย: กว้างขึ้นเล็กน้อย ไม่ตัดเป็น 2 บรรทัด (ถ้ายาวเกิน JS จะลดขนาดอักษรให้พอดี) */
+  html body { --sb-w: 286px; }
+  html body.sb-collapsed { --sb-w: var(--sb-w-collapsed); }
+  html body .sb-item .it { white-space: nowrap !important; word-break: normal !important; overflow: hidden; }
+  html body .sidebar .nav { overflow-x: hidden; }
+  html body .filters:has(#alertSizeHideBtn) { column-gap: 7px !important; }
+  html body .filters:has(#alertSizeHideBtn) > label { gap: 4px; }
 }
 @media print { .szh-pop, .sz-hide-btn { display: none !important; } .report-title .dd-btn { display: none !important; } .calc-note { display: none !important; } .ss-share { display: none !important; } .ss-chip { background: none !important; padding: 0 !important; } }
