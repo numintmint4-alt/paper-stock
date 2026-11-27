@@ -16,7 +16,8 @@
     W: null, grams: [],
     snaps: null, savedMonths: [],
     customers: [], custLoading: false,
-    fp: [], seq: 0, saving: false, bound: false, pwResolve: null
+    fp: [], seq: 0, saving: false, bound: false, pwResolve: null,
+    paged: (function () { try { return localStorage.getItem('fcPaged') !== '0'; } catch (e) { return true; } })(), page: ''
   };
 
   const $id = id => document.getElementById(id);
@@ -371,7 +372,39 @@
     });
     box.querySelectorAll('.fc-tbl-wrap').forEach(w => { if (sxs[w.dataset.gw]) w.scrollLeft = sxs[w.dataset.gw]; });
     if (Math.abs(window.scrollY - wy) > 1) window.scrollTo(0, wy);
+    if (!names.includes(S.page)) S.page = names[0];
+    applyPage(names);
   }
+
+  // ═════════════ แสดงทีละตาราง + ติ่งแกรมด้านซ้าย ═════════════
+  function pageNames() { return [...document.querySelectorAll('#fcTables .fc-tbl-wrap')].map(w => w.dataset.gw); }
+  function markRail(name, on) { const b = document.querySelector('#fcRail .it[data-n="' + (window.CSS && CSS.escape ? CSS.escape(name) : name) + '"]'); if (b) b.classList.toggle('warn', !!on); }
+  function applyPage(names) {
+    names = names || pageNames();
+    const rail = $id('fcRail'), W = S.W;
+    document.querySelectorAll('#fcTables .fc-tbl-wrap').forEach(w => {
+      w.classList.toggle('fc-pg-hide', S.paged && w.dataset.gw !== S.page);
+      const tin = w.querySelector('.fc-title-in'); let nav = tin && tin.querySelector('.fc-pgnav');
+      if (tin && !nav) { nav = document.createElement('span'); nav.className = 'fc-pgnav no-print'; tin.appendChild(nav); }
+      if (nav) { const i = names.indexOf(w.dataset.gw);
+        nav.innerHTML = S.paged ? `<button type="button" data-pg="-1" title="ตารางก่อนหน้า (PageUp)" ${i <= 0 ? 'disabled' : ''}>‹</button><b>${i + 1} / ${names.length}</b><button type="button" data-pg="1" title="ตารางถัดไป (PageDown)" ${i >= names.length - 1 ? 'disabled' : ''}>›</button>` : ''; }
+    });
+    if (!rail) return;
+    if (!W || names.length < 1) { rail.innerHTML = ''; return; }
+    rail.classList.toggle('fc-rail-all', !S.paged);
+    rail.innerHTML = names.map(n => { const t = W.tables[n];
+      return `<button type="button" class="it ${S.paged && n === S.page ? 'on' : ''} ${t && t._neg > 0 ? 'warn' : ''}" data-n="${esc(n)}" title="${esc(n)}">${esc(n)}</button>`; }).join('') +
+      `<button type="button" class="fc-rail-mode" title="${S.paged ? 'แสดงทุกตารางเรียงต่อกัน' : 'แสดงทีละตาราง'}">${S.paged ? '☰ ทุกตาราง' : '▣ ทีละตาราง'}</button>`;
+    const on = rail.querySelector('.it.on'); if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest' });
+  }
+  function goPage(name, keepScroll) {
+    if (!name || !pageNames().includes(name)) return;
+    S.page = name; applyPage();
+    if (S.paged && !keepScroll) { const b = $id('fcTables'); if (b) { const y = b.getBoundingClientRect().top + window.scrollY - 150; window.scrollTo({ top: Math.max(0, y) }); } }
+    else if (!S.paged) { const w = document.querySelector('#fcTables .fc-tbl-wrap[data-gw="' + (window.CSS && CSS.escape ? CSS.escape(name) : name) + '"]'); if (w) w.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
+  }
+  function stepPage(d) { const ns = pageNames(), i = ns.indexOf(S.page), j = i + d; if (j >= 0 && j < ns.length) { goPage(ns[j]); return true; } return false; }
+  window.fcGoPage = goPage;
 
   function recalcTable(tbl, silent) {
     const W = S.W; if (!W || !tbl._el) return;
@@ -392,6 +425,7 @@
     });
     Object.keys(tot).forEach(r => { const td = tbl._tds[r + '|t']; if (td) { td.textContent = fmtTot(r, tot[r]); td.classList.toggle('fc-zero', !tot[r] || Math.abs(tot[r]) < 1e-9); } });
     const wm = tbl._el.querySelector('.fc-warnmsg'); if (wm) wm.classList.toggle('hidden', neg === 0);
+    tbl._neg = neg; markRail(tbl.label, neg > 0);
     if (!silent && neg > tbl._neg) toast('⚠️ ' + NEG_MSG, 'warn', 4500);
     tbl._neg = neg;
   }
@@ -539,6 +573,33 @@
     $id('fcPdfInput').addEventListener('change', fcAttachUpload);
     ['fcPwInput', 'fcPwNote'].forEach(id => $id(id)?.addEventListener('keypress', e => { if (e.key === 'Enter') window.fcPwConfirm(); }));
 
+    // ติ่งแกรม / ปุ่ม ‹ › / สลับโหมด
+    document.addEventListener('click', e => {
+      const it = e.target.closest && e.target.closest('#fcRail .it'); if (it) { if (!S.paged) { S.paged = true; try { localStorage.setItem('fcPaged', '1'); } catch (_) {} } goPage(it.dataset.n); return; }
+      const pg = e.target.closest && e.target.closest('.fc-pgnav button[data-pg]'); if (pg) { stepPage(Number(pg.dataset.pg)); return; }
+      if (e.target.closest && e.target.closest('#fcRail .fc-rail-mode')) {
+        S.paged = !S.paged; try { localStorage.setItem('fcPaged', S.paged ? '1' : '0'); } catch (_) {}
+        applyPage(); }
+    });
+    // PageDown / PageUp = ตารางถัดไป/ก่อนหน้า (เฉพาะโหมดทีละตาราง)
+    document.addEventListener('keydown', e => {
+      if (!S.paged || (e.key !== 'PageDown' && e.key !== 'PageUp')) return;
+      if (!$id('tab-forecast') || $id('tab-forecast').classList.contains('hidden')) return;
+      if (e.target.closest && e.target.closest('.modal-bg, textarea, .dd-menu')) return;
+      if (stepPage(e.key === 'PageDown' ? 1 : -1)) e.preventDefault();
+    });
+    // เลื่อนล้อลงสุดหน้า 1 ครั้ง → ไปตารางถัดไป
+    let wheelLock = 0;
+    window.addEventListener('wheel', e => {
+      if (!S.paged || e.ctrlKey || e.deltaY <= 0 || e.defaultPrevented) return;
+      const tab = $id('tab-forecast'); if (!tab || tab.classList.contains('hidden')) return;
+      if (e.target.closest && e.target.closest('.modal-bg, .dd-menu, .flatpickr-calendar, .grade-dropdown, textarea')) return;
+      const el = document.documentElement, bottom = window.innerHeight + window.scrollY >= el.scrollHeight - 3;
+      const bn = document.querySelector('.page-banner'); if (bn && !bn.classList.contains('bn-collapsed') && window.scrollY <= 1) return;   // ให้แบนเนอร์พับก่อน
+      if (!bottom || Date.now() < wheelLock) return;
+      if (stepPage(1)) wheelLock = Date.now() + 600;
+    }, { passive: true });
+
     // เลื่อนช่องกรอกด้วยคีย์บอร์ด: Enter / ↓ = ลงช่องถัดไปใน Size เดียวกัน · Shift+Enter / ↑ = ขึ้น
     // ถึงแถวสุดท้ายของตาราง → ข้ามไปแถวแรกของตารางแกรมถัดไป (และย้อนกลับตารางก่อนหน้าได้)
     document.addEventListener('keydown', e => {
@@ -555,9 +616,10 @@
       const i = same.indexOf(inp);
       let next = same[i + dir];
       if (!next) {
-        const tables = [...document.querySelectorAll('#fcTables .fc-table')].filter(t => t.offsetParent);
+        const tables = [...document.querySelectorAll('#fcTables .fc-table')];
         let k = tables.indexOf(tbl) + dir;
         while (k >= 0 && k < tables.length && !next) {
+          if (S.paged && !tables[k].offsetParent) goPage(tables[k].dataset.g, true);
           const all = colInputs(tables[k]);
           const sizes = [...new Set(all.map(x => x.dataset.s))];
           if (sizes.length) {
@@ -572,7 +634,7 @@
       if (!next) return;
       next.focus();
       try { next.select(); } catch (_) {}
-      if (next.closest('.fc-table') !== tbl) next.scrollIntoView({ block: 'center' });
+      if (next.closest('.fc-table') !== tbl) { if (S.paged) window.scrollTo({ top: Math.max(0, next.closest('.fc-tbl-wrap').getBoundingClientRect().top + window.scrollY - 150) }); next.scrollIntoView({ block: 'nearest' }); }
     });
   }
 
