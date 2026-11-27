@@ -810,5 +810,35 @@
   html body .fc-pgnav button:hover:not(:disabled) { background: rgba(255,255,255,.32); }
   html body .fc-pgnav button:disabled { opacity: .35; cursor: default; }
   html body .fc-work .fc-toolbar { padding-left: 14px; }
+  /* ติ่งแกรม: แยกออกจากตาราง (ไม่ติดมุม) · ตัวที่เลือกมีหัวลูกศรชี้ไปที่ตาราง */
+  html body .fc-rail { width: 88px; padding-right: 12px; }
+  html body .fc-rail .it { border: 1.5px solid #b9d0f2 !important; border-radius: 12px !important; transform: none !important; position: relative; }
+  html body .fc-rail .it.on { border-color: #1677ff !important; }
+  html body .fc-rail .it.on::after { content: ''; position: absolute; right: -7px; top: 50%; margin-top: -6px; border-style: solid; border-width: 6px 0 6px 7px; border-color: transparent transparent transparent #0b3f95; }
+  html body .fc-rail .it.warn:not(.on)::after { content: ' ●'; }
+  html body .fc-rail .fc-rail-mode { margin-right: 0; }
+  /* เอาแถบน้ำเงินชื่อตารางออก: บันทึกร่าง/เตือนยอดติดลบ ย้ายไปแถบเครื่องมือ */
+  html body .fc-tb-left > .fc-cur-g { color: #1677ff; font-weight: 800; font-size: 15px; margin-left: -4px; }
+  html body .fc-toolbar .fc-draft-btn { background: #eaf3ff; border: 1.5px solid #1677ff; color: #0b3f95; font-weight: 700; }
+  html body .fc-warn-bar { margin: 0 0 10px 14px; background: #fff4e5; border: 1.5px solid #f59e0b; color: #b45309; border-radius: 10px; padding: 5px 12px; font-size: 12.5px; font-weight: 600; display: inline-block; }
+  html body .fc-warn-bar.hidden { display: none; }
+  html body .fc-rail { padding-top: 6px; }
+  /* ===== ติ่งแกรมติดตาราง (แยกด้วยเงา) · ไม่มีแท็บกลุ่มด้านบน ===== */
+  html body #fcGradeTabs { display: none !important; }
+  html body .fc-work { gap: 0; }
+  html body .fc-rail { width: 84px; padding: 0 !important; gap: 0; position: sticky; top: 74px; z-index: 3; }
+  html body .fc-rail .it { border: 1px solid #d7e5ff !important; border-right: 0 !important; border-bottom: 0 !important; border-radius: 0 !important; padding: 10px 6px; background: #f4f8ff; box-shadow: inset -7px 0 9px -7px rgba(11,63,149,.22); }
+  html body .fc-rail .it:first-child { border-radius: 14px 0 0 0 !important; }
+  html body .fc-rail .it:nth-last-child(2) { border-radius: 0 0 0 14px !important; border-bottom: 1px solid #d7e5ff !important; }
+  html body .fc-rail .it:only-of-type { border-radius: 14px 0 0 14px !important; }
+  html body .fc-rail .it.on { background: linear-gradient(90deg,#1677ff,#0b3f95); color: #fff; border-color: #1677ff !important; box-shadow: none; position: relative; z-index: 4; margin-right: -2px; }
+  html body .fc-rail .it.on::after { display: none; }
+  html body .fc-rail .it.warn:not(.on) { background: #fff8ea; }
+  html body .fc-rail .fc-rail-mode { margin: 10px 8px 0 0; }
+  html body .fc-tbl-wrap { border-top-left-radius: 0 !important; }
+  html body .fc-grp-sel { border: 1.5px solid #b9d0f2; border-radius: 10px; padding: 4px 28px 4px 12px; font: 800 14px 'Sarabun', sans-serif; background-color: #fff; color: #0b3f95; cursor: pointer; }
+
+  html body .fc-grp-sel { appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%231677ff' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; box-shadow: 0 2px 6px rgba(27,79,209,.10); }
+  html body .fc-grp-sel:hover { border-color: #1677ff; }
 }
 @media print { .fc-rail, .fc-pgnav { display: none !important; } .fc-tbl-wrap.fc-pg-hide { display: block !important; } .szh-pop, .sz-hide-btn { display: none !important; } .report-title .dd-btn { display: none !important; } .calc-note { display: none !important; } .ss-share { display: none !important; } .ss-chip { background: none !important; padding: 0 !important; } }
