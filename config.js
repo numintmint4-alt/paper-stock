@@ -26,8 +26,8 @@ window.APP_CONFIG = {
     ]},
     { id: 'use', title: 'การใช้ม้วนกระดาษ', icon: 'factory', img: 'img/machine.jpg', items: [
       { tab: 'usage-pivot',    title: 'รายงานการใช้ม้วนกระดาษตามผลผลิต',         icon: 'chart' },
-      { tab: 'reservations',   title: 'ตารางรายการจองม้วนกระดาษ',                icon: 'calcheck' },
-      { tab: 'usage-issue',   title: 'รายงานการเบิกใช้ม้วนกระดาษ',              icon: 'inbox' }
+      { tab: 'usage-issue',   title: 'รายงานการเบิกใช้ม้วนกระดาษ',              icon: 'inbox' },
+      { tab: 'reservations',   title: 'ตารางรายการจองม้วนกระดาษ',                icon: 'calcheck' }
     ]},
     { id: 'set', title: 'ตั้งค่า', icon: 'gear', img: 'img/fsc.jpg', items: [
       { tab: 'settings', sec: 'accMaster',      title: 'Data Master',  icon: 'database' },
