@@ -697,13 +697,13 @@
   html body:has(.page-banner.bn-collapsed) #matrixBody .report-wrap { max-height: calc(100vh - 250px) !important; }
 
   /* ---------- สั่งซื้อประจำวัน: เซลใน Matrix เล็กลง ~80% (กรอบเท่าเดิม) + ปุ่มซ่อน Size ---------- */
-  html body #alertMatrixWrap .alert-matrix-new-table td, html body #alertMatrixWrap .alert-matrix-new-table th { height: 25px !important; font-size: 10px !important; padding: 1px 1px !important; width: 46px; min-width: 46px; }
+  html body #alertMatrixWrap .alert-matrix-new-table td, html body #alertMatrixWrap .alert-matrix-new-table th { height: 25px !important; font-size: 10px !important; padding: 1px 1px !important; width: 38px; min-width: 38px; }
   html body #alertMatrixWrap .alert-matrix-new-table thead th { height: 26px !important; font-size: 10.5px !important; padding: 0 2px !important; }
   html body #alertMatrixWrap .alert-matrix-new-table tr.total-row-matrix td { font-size: 10px !important; padding: 2px 3px !important; height: 26px !important; }
   html body #alertMatrixWrap .alert-matrix-new-table td.grade-col-matrix, html body #alertMatrixWrap .alert-matrix-new-table th.grade-col-matrix { min-width: 76px !important; font-size: 10.5px !important; padding-left: 8px; }
   html body #alertMatrixWrap .alert-matrix-new-table td.total-col-matrix, html body #alertMatrixWrap .alert-matrix-new-table th.total-col-matrix { min-width: 58px !important; font-size: 10px !important; }
   html body #alertMatrixWrap .alert-matrix-new-table .matrix-cell { padding: 1px 2px; }
-  html body #alertMatrixWrap .alert-matrix-new-table .matrix-value { min-width: 38px !important; padding: 1px 3px !important; border-radius: 7px !important; font-size: 10px !important; line-height: 1.3 !important; }
+  html body #alertMatrixWrap .alert-matrix-new-table .matrix-value { min-width: 0 !important; padding: 1px 3px !important; border-radius: 7px !important; font-size: 10px !important; line-height: 1.3 !important; }
   html body #alertMatrixWrap .alert-matrix-new-table .matrix-cell.has-order .matrix-value, html body #alertMatrixWrap .alert-matrix-new-table .matrix-cell.order-incomplete .matrix-value { box-shadow: 0 0 0 1.5px #1677ff; }
   html body #alertMatrixWrap .alert-matrix-new-table .matrix-cell.order-incomplete .matrix-value { box-shadow: 0 0 0 1.5px #f59e0b; }
   html body #alertMatrixWrap .alert-matrix-new-table .matrix-cart-svg { top: -5px; right: -5px; width: 12px !important; height: 12px !important; padding: 1.5px; }
@@ -748,5 +748,9 @@
   /* แถบบนที่โปร่งแสง+เบลอ ทำให้ตัวหนังสือฟุ้ง → ทึบขึ้น */
   :root[data-theme="light"] .topbar { background: rgba(255,255,255,.96) !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
   html body .page-banner h1 { text-shadow: 0 1px 2px rgba(0,20,80,.35); }
+  /* กรอบ Matrix สั่งซื้อประจำวัน: สูงขึ้นจนหน้าแรกเห็นแค่ตัวเลขสรุป + ปุ่มสร้าง PO / ล้างค่า */
+  html body #alertMatrixWrap.alert-matrix-wrap { max-height: max(380px, calc(100vh - 300px)) !important; }
+  html body:has(.page-banner.bn-collapsed) #alertMatrixWrap.alert-matrix-wrap { max-height: max(380px, calc(100vh - 138px)) !important; }
+  html body #alertMatrixWrap .alert-matrix-new-table th:not(.grade-col-matrix):not(.total-col-matrix), html body #alertMatrixWrap .alert-matrix-new-table td:not(.grade-col-matrix):not(.total-col-matrix), html body #alertMatrixWrap .alert-matrix-new-table tr.total-row-matrix td:not(.grade-col-matrix):not(.total-col-matrix) { min-width: 40px !important; max-width: none !important; width: 40px; }
 }
 @media print { .szh-pop, .sz-hide-btn { display: none !important; } .report-title .dd-btn { display: none !important; } .calc-note { display: none !important; } .ss-share { display: none !important; } .ss-chip { background: none !important; padding: 0 !important; } }
