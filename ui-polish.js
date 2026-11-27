@@ -518,12 +518,17 @@ window.softLoad = function (el, html) {
     }
     return false;
   };
+  let lockUntil = 0;
   window.addEventListener('wheel', e => {
     const b = bn(); if (!b || e.ctrlKey) return;
     if (e.target.closest && e.target.closest('.modal-bg, .dd-menu, .flatpickr-calendar')) return;
-    if (e.deltaY > 0 && atTop() && !b.classList.contains('bn-collapsed')) b.classList.add('bn-collapsed');
-    else if (e.deltaY < 0 && atTop() && b.classList.contains('bn-collapsed') && !scrollableUp(e.target)) b.classList.remove('bn-collapsed');
-  }, { passive: true });
+    if (Date.now() < lockUntil) { if (atTop()) e.preventDefault(); return; }   // กันหน้าเลื่อนซ้ำระหว่างแบนเนอร์กำลังพับ
+    if (e.deltaY > 0 && atTop() && !b.classList.contains('bn-collapsed')) {
+      e.preventDefault(); lockUntil = Date.now() + 450; b.classList.add('bn-collapsed');
+    } else if (e.deltaY < 0 && atTop() && b.classList.contains('bn-collapsed') && !scrollableUp(e.target)) {
+      e.preventDefault(); lockUntil = Date.now() + 450; b.classList.remove('bn-collapsed');
+    }
+  }, { passive: false });
   const nav = window.onShellNavigate;
   window.onShellNavigate = function (x) { const b = bn(); if (b) b.classList.remove('bn-collapsed'); if (nav) return nav.apply(this, arguments); };
 })();
