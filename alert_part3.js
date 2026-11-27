@@ -446,7 +446,7 @@ async function _renderAlertCore() {
     </div>
   `;
 
-  $('alertBody').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px">กำลังวิเคราะห์...</p>';
+  softLoad($('alertBody'), '<p class="ld-ph" style="text-align:center;color:#94a3b8;padding:20px">กำลังวิเคราะห์...</p>');
 
   try {
     // V.18.6: ให้ยอดรับม้วนตรงกับ PO ล่าสุดก่อนคำนวณ (เหมือนหน้า Purchase Summary)
@@ -498,6 +498,9 @@ async function _renderAlertCore() {
 
     const display = result;
 
+    // โหลดค่าที่กรอกไว้ก่อนวาดหน้า → ตารางขึ้นทีเดียว ไม่ว่างแล้วค่อยเติม
+    await _loadActiveInputsToMemory();
+
     let html = `<div id="alertDateTabsBox" class="alert-date-tabs"></div>`;
 
     if (!display.length) {
@@ -516,9 +519,6 @@ async function _renderAlertCore() {
     $('alertBody').innerHTML = html;
 
     alertCache = display;
-
-    // 🔥 โหลด inputs ของวันปัจจุบันจาก DB
-    await _loadActiveInputsToMemory();
 
     alertAllSupsInData = [...new Set(
       display.map(r => {
@@ -1284,7 +1284,7 @@ async function loadAlertHistory() {
   }
 
   const body = $('alertHistoryBody');
-  if (body) body.innerHTML = '<p style="text-align:center;color:#94a3b8;padding:30px">กำลังโหลด...</p>';
+  softLoad(body, '<p class="ld-ph" style="text-align:center;color:#94a3b8;padding:30px">กำลังโหลด...</p>');
 
   try {
     const snapshot = await loadAlertSnapshot(date);
