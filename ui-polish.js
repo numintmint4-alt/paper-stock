@@ -555,3 +555,27 @@ window.softLoad = function (el, html) {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
   window.fitSidebarLabels = fit;
 })();
+
+
+/* Matrix หน้า "สั่งซื้อม้วนกระดาษประจำวัน": ปรับความสูงกรอบให้พอดีจอ (รวมแถวตัวเลขสรุป + ปุ่มสร้าง PO/ล้างค่า)
+   คำนวณใหม่เมื่อ: เปลี่ยนขนาดหน้าต่าง · พับ/กางแบนเนอร์ · วาดตารางใหม่ */
+(function () {
+  const RESERVE = 92;   // ที่เผื่อใต้กรอบ: แถว 165/16/567 + ปุ่ม
+  let raf = 0;
+  function fit() {
+    const w = document.getElementById('alertMatrixWrap');
+    if (!w || !w.offsetParent) return;
+    const top = w.getBoundingClientRect().top + (window.scrollY || 0);
+    const h = Math.max(360, Math.floor(window.innerHeight - top - RESERVE));
+    w.style.setProperty('max-height', h + 'px', 'important');
+  }
+  const sched = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(fit); };
+  window.addEventListener('resize', sched);
+  const start = () => {
+    new MutationObserver(sched).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+    document.addEventListener('transitionend', e => { if (e.target.classList && e.target.classList.contains('page-banner')) sched(); }, true);
+    sched();
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+  window.fitAlertMatrix = fit;
+})();
