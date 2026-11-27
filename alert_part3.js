@@ -778,11 +778,10 @@ function renderAlertPODetail(items) {
       <div class="pv-day">
         <div class="pv-dh"><span>📅 วันที่รับ <b>${fmtDate(dateKey)}</b> · ${dayItems.length} รายการ</span><em>${supList}</em></div>
         <table class="pv-tbl">
-          <colgroup><col style="width:52px"><col style="width:210px"><col style="width:100px"><col style="width:90px"><col></colgroup>
+          <colgroup><col style="width:52px"><col style="width:240px"><col style="width:100px"><col></colgroup>
           <thead><tr>
             <th class="pv-c">#</th>
             <th>Gradegram-Size</th>
-            <th class="pv-c">Sup.</th>
             <th class="pv-c">จำนวน</th>
             <th>หมายเหตุ</th>
           </tr></thead>
@@ -805,13 +804,12 @@ function renderAlertPODetail(items) {
       html += `<tr>
         <td class="pv-c pv-n">${idx + 1}</td>
         <td><b class="pv-g">${esc(it.gradegram_size)}</b></td>
-        <td class="pv-c">${it.sup ? supPill(it.sup) : ''}</td>
         <td class="pv-q"><span>${it.quantity}</span></td>
         <td>${tags.join(' ')}</td>
       </tr>`;
     });
 
-    html += `<tr class="pv-tot"><td colspan="5"><div class="pv-tot-in"><span class="pv-tot-l">รวมวันนี้ <small>${dayItems.length} รายการ</small></span><span class="pv-tot-q"><b>${dayTotal}</b> ม้วน</span></div></td></tr>
+    html += `<tr class="pv-tot"><td colspan="4"><div class="pv-tot-in"><span class="pv-tot-l">รวมวันนี้ <small>${dayItems.length} รายการ</small></span><span class="pv-tot-q"><b>${dayTotal}</b> ม้วน</span></div></td></tr>
       </tbody></table>
       </div>`;
   });
