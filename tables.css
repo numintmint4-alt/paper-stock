@@ -285,6 +285,82 @@
   :root[data-theme="dark"] .ss-bar { background: #17305c; }
   .ss-table tbody tr:hover td { background: var(--tbl-hover); }
 
+
+  /* ======================= รอบ 4 ======================= */
+  /* ---- ลูกศรสีฟ้าสด (วงกลมไล่สี) ---- */
+  .grade-filter-btn .arrow { font-size: 0 !important; width: 22px; height: 22px; flex: none; border-radius: 50%; box-shadow: 0 2px 6px rgba(22,119,255,.4);
+    background: linear-gradient(135deg,#1677ff,#19a7f0) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>") center/12px no-repeat; }
+  .dd-btn .dd-chev { color: #fff !important; background: linear-gradient(135deg,#1677ff,#19a7f0); border-radius: 50%; width: 22px; height: 22px; padding: 5px; box-sizing: border-box; box-shadow: 0 2px 6px rgba(22,119,255,.4); transition: transform .2s; }
+  .dd-btn.open .dd-chev { transform: rotate(180deg); }
+
+  /* ---- ฟิลเตอร์เลือกหลายรายการ ---- */
+  .grade-filter-btn { gap: 6px !important; }
+  .gf-tags { display: inline-flex; gap: 4px; align-items: center; min-width: 0; }
+  .grade-filter-btn.has-tags > span:first-child { display: none !important; }
+  .gf-tag { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 3px 0 9px; border-radius: 99px; background: #dcebff; color: #0f3f95; font-size: 12px; font-weight: 800; white-space: nowrap; max-width: 90px; }
+  .gf-tag.more { padding: 0 9px; background: #1677ff; color: #fff; }
+  .gf-tag b { width: 16px; height: 16px; border-radius: 50%; background: #fff; color: #1677ff; display: grid; place-items: center; font-size: 12px; line-height: 1; flex: none; }
+  .gf-tag b:hover { background: #ffe3e3; color: #c53030; }
+  .grade-dropdown { border-radius: 18px !important; overflow: hidden; min-width: 270px !important; max-width: 360px !important; }
+  .gd-head { background: linear-gradient(90deg,#0b3f95,#1677ff); color: #fff; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; font-weight: 800; font-size: 13px; }
+  .gd-count { background: rgba(255,255,255,.22); border-radius: 99px; padding: 1px 10px; font-size: 11px; }
+  .gd-search { padding: 10px 12px 4px; }
+  .gd-search input { width: 100% !important; max-width: none !important; height: 34px !important; border-radius: 12px !important; background: var(--surface-soft); border: 1px solid var(--border-strong) !important; padding: 0 12px !important; font-size: 13px; }
+  .grade-actions { background: transparent !important; border-bottom: 0 !important; padding: 8px 12px !important; gap: 6px !important; }
+  .grade-actions button { flex: none !important; border-radius: 99px !important; padding: 3px 12px !important; font-size: 12px !important; font-weight: 800 !important; background: #eaf2ff !important; color: #0f3f95 !important; border: 1px solid #cfe0f7 !important; }
+  .grade-actions button:last-child { background: #fff3f3 !important; color: #c53030 !important; border-color: #f5b5b5 !important; }
+  .grade-list { max-height: 260px !important; padding: 0 !important; }
+  .gd-group { display: flex; justify-content: space-between; padding: 6px 14px; font-size: 11px; font-weight: 800; letter-spacing: .06em; color: var(--text-muted); background: var(--surface-soft); cursor: pointer; position: sticky; top: 0; z-index: 1; }
+  .gd-group b { color: #1677ff; font-weight: 800; }
+  .grade-list .item { padding: 7px 14px !important; font-weight: 600; }
+  .grade-list .item.checked { background: #eaf2ff !important; color: #0f3f95 !important; font-weight: 800 !important; }
+  .grade-list .item input[type="checkbox"] { appearance: none; -webkit-appearance: none; width: 17px !important; height: 17px !important; border-radius: 5px; border: 1.5px solid #9cc2f5; background: #fff center/12px no-repeat; cursor: pointer; flex: none; margin: 0; }
+  .grade-list .item input[type="checkbox"]:checked { background-color: #1677ff; border-color: #1677ff;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'><path d='M5 12l5 5 9-10'/></svg>"); }
+  .gd-foot { display: flex; justify-content: space-between; align-items: center; padding: 9px 12px; border-top: 1px solid var(--border); background: var(--surface-soft); font-size: 12px; font-weight: 700; color: var(--text-muted); }
+  .gd-ok { height: 28px; padding: 0 16px !important; border-radius: 99px !important; border: 0 !important; background: linear-gradient(90deg,#0b3f95,#1677ff) !important; color: #fff !important; font-weight: 800; font-size: 12px; cursor: pointer; }
+  :root[data-theme="dark"] .gf-tag { background: #17305c; color: #cfe3ff; }
+  :root[data-theme="dark"] .grade-actions button { background: #17305c !important; color: #cfe3ff !important; border-color: #2a4a80 !important; }
+  :root[data-theme="dark"] .grade-actions button:last-child { background: #3a1d28 !important; color: #ff9aa8 !important; border-color: #6a2a3a !important; }
+  :root[data-theme="dark"] .grade-list .item.checked { background: #17305c !important; color: #cfe3ff !important; }
+
+  /* ---- แถววันที่รับสินค้า (สั่งซื้อประจำวัน) ---- */
+  .alert-date-tabs { border-radius: 14px !important; padding: 8px 12px !important; background: var(--surface-soft) !important; border: 1px solid var(--border) !important; min-height: 50px; gap: 10px; }
+  .alert-date-label { font-size: 12.5px !important; color: var(--text) !important; font-weight: 800; display: inline-flex; align-items: center; gap: 6px; }
+  .alert-date-tab-wrap { height: 34px; border-radius: 999px !important; border: 1.5px solid #b9d0f2 !important; background: var(--surface) !important; align-items: center; }
+  .alert-date-tab { height: 34px; padding: 0 6px 0 14px !important; font-size: 13px !important; font-weight: 800 !important; background: transparent !important; color: #0f3f95 !important; display: inline-flex; align-items: center; gap: 6px; }
+  .alert-date-tab-close { width: 22px; height: 22px; border-radius: 50% !important; margin: 0 6px 0 2px; border: 0 !important; background: #e3efff !important; color: #c53030 !important; display: grid; place-items: center; font-size: 12px !important; padding: 0 !important; line-height: 1; }
+  .alert-date-tab-wrap.is-active { background: linear-gradient(90deg,#0b3f95,#1677ff) !important; border-color: transparent !important; box-shadow: 0 3px 8px rgba(22,119,255,.3); }
+  .alert-date-tab-wrap.is-active .alert-date-tab { color: #fff !important; }
+  .alert-date-tab-wrap.is-active .alert-date-tab-close { background: rgba(255,255,255,.25) !important; color: #fff !important; }
+  .alert-date-add-btn { height: 34px; padding: 0 16px !important; font-size: 13px !important; font-weight: 800 !important; border: 1.5px dashed #1677ff !important; border-radius: 999px !important; background: var(--surface) !important; color: #1677ff !important; }
+  .first-date-bar { display: flex !important; justify-content: flex-start !important; align-items: center; background: linear-gradient(90deg,#eaf3ff,#f6faff) !important; border: 1px dashed #8fb8f0 !important; padding: 10px 14px !important; margin-bottom: 14px; }
+  .first-date-bar .fd-ic { width: 30px; height: 30px; border-radius: 50%; background: #dcebff; display: grid; place-items: center; color: #1677ff; flex: none; }
+  .first-date-bar .fd-txt { font-weight: 800; color: #0f3f95; font-size: 13px; }
+  .first-date-bar input { margin-left: auto; height: 34px; width: 130px; border: 1.5px solid #b9d0f2; border-radius: 12px; padding: 0 12px; font: 600 13px inherit; background: var(--surface); color: var(--text); }
+  .fd-ok { height: 34px; padding: 0 18px; border-radius: 999px; border: 0; background: linear-gradient(90deg,#0b3f95,#1677ff); color: #fff; font-weight: 800; font-size: 13px; cursor: pointer; }
+  :root[data-theme="dark"] .first-date-bar { background: linear-gradient(90deg,#12284f,#0f2040) !important; border-color: #2a4a80 !important; }
+  :root[data-theme="dark"] .first-date-bar .fd-txt, :root[data-theme="dark"] .alert-date-tab { color: #cfe3ff !important; }
+  :root[data-theme="dark"] .first-date-bar .fd-ic { background: #17305c; }
+
+  /* ---- หน้าตั้งค่า (Data Master / Price Master / ผู้ใช้) ---- */
+  .set-scroll { max-height: 62vh; overflow: auto; border-radius: 12px; }
+  .set-table { width: 100% !important; }
+  .set-table td { height: 40px; padding: 0 12px !important; }
+  .set-table td.n { text-align: right; }
+  .set-key { color: var(--tbl-head-tx); }
+  .set-act { text-align: center; white-space: nowrap; }
+  .sb-btn { height: 26px; padding: 0 12px !important; border-radius: 999px !important; font-size: 12px !important; font-weight: 800 !important; border: 1px solid #9cc2f5 !important; color: #0f3f95 !important; background: #f2f8ff !important; margin: 0 3px; cursor: pointer; box-shadow: none !important; }
+  .sb-btn.danger { border-color: #f5b5b5 !important; color: #c53030 !important; background: #fff3f3 !important; }
+  .sb-btn:hover { filter: brightness(.97); }
+  .set-count { margin-top: 10px; font-size: 12px; font-weight: 700; color: var(--text-muted); }
+  .set-role { display: inline-block; padding: 2px 12px; border-radius: 99px; font-size: 12px; font-weight: 800; background: #dff3ff; color: #0a6a9a; }
+  .set-role.role-admin { background: #e3e9ff; color: #2a3fa0; }
+  :root[data-theme="dark"] .sb-btn { background: #17305c !important; color: #cfe3ff !important; border-color: #3a5a94 !important; }
+  :root[data-theme="dark"] .sb-btn.danger { background: #3a1d28 !important; color: #ff9aa8 !important; border-color: #6a2a3a !important; }
+  :root[data-theme="dark"] .set-role { background: #12405c; color: #8fe0ff; } :root[data-theme="dark"] .set-role.role-admin { background: #232f66; color: #b9c6ff; }
+  #tab-settings .filters input#masterSearch { width: 260px !important; }
+
   /* เส้นคอลัมน์ตารางอื่นๆ ที่ยังไม่มีเส้น */
   table:not([class]) { border-collapse: collapse; }
   table:not([class]) td, .alert-flat-table td, .add-items-table td, .yearly-pivot-table td, .fc-table td { border-right: 1px solid var(--tbl-vline) !important; border-bottom: 1px solid var(--tbl-vline) !important; }
