@@ -653,5 +653,19 @@
   input.matrix-row-qty::-webkit-outer-spin-button, input.matrix-row-qty::-webkit-inner-spin-button, .qty-input::-webkit-outer-spin-button, .qty-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   input.matrix-row-qty, .qty-input { -moz-appearance: textfield; appearance: textfield; text-align: center; }
 
+  /* ช่องกรอกในหน้าต่างหลังคลิกเซล: สูง/ขอบ/มุมเท่าเมนูเลือก */
+  html body #alertMatrixCellBody .matrix-order-row input.matrix-row-qty, html body #alertMatrixCellBody .matrix-order-row input.matrix-row-note {
+    height: 34px !important; box-sizing: border-box; padding: 0 10px !important; border: 1.5px solid var(--border-strong) !important; border-radius: 12px !important;
+    background: var(--surface) !important; font: 700 12.5px/1 inherit !important; color: var(--text); width: 100%; box-shadow: none !important; }
+  html body #alertMatrixCellBody .matrix-order-row input.matrix-row-qty { color: #1677ff; text-align: center; }
+  html body #alertMatrixCellBody .matrix-order-row input.matrix-row-qty:hover, html body #alertMatrixCellBody .matrix-order-row input.matrix-row-note:hover { border-color: #1677ff !important; }
+  html body #alertMatrixCellBody .matrix-order-row input.matrix-row-qty:focus, html body #alertMatrixCellBody .matrix-order-row input.matrix-row-note:focus { border-color: #1677ff !important; box-shadow: 0 0 0 3px rgba(22,119,255,.18) !important; outline: 0; }
+  html body #alertMatrixCellBody .matrix-order-row input::placeholder { color: #9fb0cc; font-weight: 600; }
+
+  /* โหลดซ้ำ: คงของเดิมไว้จางๆ แล้วสลับเป็นผลใหม่ (ไม่กระพริบเป็นหน้าว่าง) */
+  .ld-dim { opacity: .5; pointer-events: none; transition: opacity .15s ease; position: relative; }
+  .ld-dim::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: linear-gradient(90deg,#22d3ee,#1677ff,#6366f1,#22d3ee); background-size: 200% 100%; animation: ldbar 1s linear infinite; border-radius: 3px; }
+  @keyframes ldbar { to { background-position: -200% 0; } }
+
 }
 @media print { .ss-share { display: none !important; } .ss-chip { background: none !important; padding: 0 !important; } }
