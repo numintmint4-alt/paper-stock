@@ -544,14 +544,16 @@
   .pv-dh { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; background: #eaf3ff; border: 1.5px solid #cfe0f7; border-bottom: 0; border-radius: 14px 14px 0 0; padding: 9px 14px; font-size: 13px; font-weight: 700; color: #0f2a55; }
   .pv-dh em { font-style: normal; display: flex; gap: 6px; flex-wrap: wrap; }
   .pv-sp { display: inline-block; padding: 2px 11px; border-radius: 99px; font-size: 11.5px; font-weight: 800; color: #fff; }
-  .pv-EKP { background: linear-gradient(90deg,#f97316,#d9480f); }
-  .pv-MKP { background: linear-gradient(90deg,#059669,#047857); }
+  .pv-EKP { background: linear-gradient(90deg,#ff8a00,#ff5e00); }
+  .pv-MKP { background: linear-gradient(90deg,#00b85c,#00a14b); }
   .pv-SCGP { background: linear-gradient(90deg,#26277f,#0a84d6); }
   .pv-OT { background: linear-gradient(90deg,#8a9bb8,#a3b1c6); }
   html body #modalAlertPODetail table.pv-tbl { table-layout: fixed; width: 100%; border-collapse: collapse; border: 1.5px solid #cfe0f7; font-size: 13px; }
-  html body #modalAlertPODetail table.pv-tbl th { background: #1257c9 !important; color: #fff !important; padding: 8px !important; font-size: 12px; text-align: left; text-transform: none; border: 0 !important; }
+  html body #modalAlertPODetail table.pv-tbl th { background: linear-gradient(90deg, #0b3f95, #1677ff) !important; color: #fff !important; height: 40px; padding: 0 8px !important; font: 800 13px/1 inherit !important; text-align: center; text-transform: none; letter-spacing: 0; border: 0 !important; border-right: 1px solid rgba(255,255,255,.28) !important; vertical-align: middle; }
+  html body #modalAlertPODetail table.pv-tbl th:last-child { border-right: 0 !important; }
   html body #modalAlertPODetail table.pv-tbl th.pv-c { text-align: center; }
-  html body #modalAlertPODetail table.pv-tbl td { padding: 6px 10px !important; border: 0 !important; border-bottom: 1px solid #e3ecf9 !important; border-right: 1px solid #e3ecf9 !important; background: #fff; color: #0f2a55; }
+  html body #modalAlertPODetail table.pv-tbl td { padding: 6px 10px !important; border: 0 !important; border-bottom: 1px solid var(--tbl-line, #e3ecf9) !important; border-right: 1px solid var(--tbl-vline, #b4c9e6) !important; background: #fff; color: #0f2a55; }
+  html body #modalAlertPODetail table.pv-tbl td:last-child { border-right: 0 !important; }
   html body #modalAlertPODetail table.pv-tbl tr:nth-child(even) td { background: #f6faff; }
   .pv-n { text-align: center; color: #7b8fb3 !important; }
   .pv-c, .pv-q { text-align: center; }
@@ -562,12 +564,12 @@
   .pv-tg-c { background: #e0f2fe; color: #0369a1; }
   .pv-tg-q { background: #fff1d6; color: #b45309; }
   .pv-note { color: #475f86; font-size: 12.5px; }
-  html body #modalAlertPODetail table.pv-tbl tr.pv-tot td { background: linear-gradient(90deg,#eaf3ff,#d6e8ff) !important; border: 0 !important; border-top: 2px solid #1677ff !important; padding: 10px 14px !important; }
+  html body #modalAlertPODetail table.pv-tbl tr.pv-tot td { background: linear-gradient(90deg,#eaf3ff,#d6e8ff) !important; border: 0 !important; border-top: 2px solid #1677ff !important; padding: 7px 14px !important; }
   .pv-tot-in { display: flex; justify-content: space-between; align-items: center; }
   .pv-tot-l { font-weight: 800; color: #0b3f95; font-size: 14px; }
   .pv-tot-l small { margin-left: 8px; font-weight: 600; color: #5b7299; font-size: 12px; }
-  .pv-tot-q { background: linear-gradient(90deg,#0b3f95,#1677ff); color: #fff; border-radius: 99px; padding: 5px 20px; font-size: 13px; font-weight: 700; box-shadow: 0 3px 10px #1677ff55; }
-  .pv-tot-q b { font-size: 20px; margin-right: 4px; }
+  .pv-tot-q { background: linear-gradient(90deg,#0b3f95,#1677ff); color: #fff; border-radius: 99px; padding: 3px 14px; font-size: 12px; font-weight: 700; box-shadow: 0 2px 6px #1677ff44; }
+  .pv-tot-q b { font-size: 14px; margin-right: 3px; }
   html body #modalAlertPODetail .pv-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 14px 20px !important; margin: 0 !important; background: #f8fbff !important; border-top: 1px solid #e3ecf9 !important; }
   .pv-ft-total { margin-right: auto; font-size: 13px; color: #5b7299; }
   .pv-ft-total b { font-size: 18px; color: #0b3f95; }
