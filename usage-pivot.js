@@ -184,6 +184,10 @@ async function initUsagePivotTab() {
 
     await loadUsageMasterData();
 
+    // ✅ โหลดตารางทันที (ไม่รอรายชื่อลูกค้าที่ดึงทั้งตารางจึงช้า) — รายชื่อลูกค้าโหลดคู่ขนานด้านล่าง
+    renderSnapshotHistory();
+    const _pivotFirstLoad = loadUsagePivot();
+
     // แสดงรายชื่อลูกค้าในหน้ารายเดือนเป็น Code (Name)
     const list = document.getElementById('pivotCustomerList');
     if (list && usagePivotState.pivotCustomers.length === 0) {
@@ -226,9 +230,7 @@ async function initUsagePivotTab() {
         }
     }
 
-    renderSnapshotHistory();
-
-    await loadUsagePivot();
+    await _pivotFirstLoad;
 }
 
 // ===== helpers: Customer dropdown (monthly) =====
