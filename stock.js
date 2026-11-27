@@ -424,12 +424,11 @@ async function renderStockMatrix() {
     const colKeys = [...colSet].sort((a, b) => a - b);
 
     function buildCellText(v) {
-      const parts = [];
-      if (v.full > 0)    parts.push(`${v.full}`);
-      if (v.scrap > 0)   parts.push(`+${v.scrap}`);
-      if (v.waiting > 0) parts.push(`·${v.waiting}`);
-      if (!parts.length) return '';
-      return parts.join('').replace(/^\+/, '');
+      let h = '';
+      if (v.full > 0)    h += `<b class="nf">${v.full}</b>`;
+      if (v.scrap > 0)   h += `<b class="ns">${v.full > 0 ? '+' : '+'}${v.scrap}</b>`;
+      if (v.waiting > 0) h += `<b class="nw">·${v.waiting}</b>`;
+      return h;
     }
 
     function buildTotalText(v) {
@@ -485,9 +484,9 @@ async function renderStockMatrix() {
 
     html += `<div class="report-foot">
       <b>📊 สรุป:</b>
-      ม้วนเต็ม <b style="color:#166534">${totalFull.toLocaleString()}</b> ·
-      ม้วนเศษ <b style="color:#d97706">${totalScrap.toLocaleString()}</b> ·
-      รอกรอ <b style="color:#0369a1">${totalWaiting.toLocaleString()}</b> ·
+      ม้วนเต็ม <b class="nf">${totalFull.toLocaleString()}</b> ·
+      ม้วนเศษ <b class="ns">${totalScrap.toLocaleString()}</b> ·
+      รอกรอ <b class="nw">${totalWaiting.toLocaleString()}</b> ·
       รวม <b style="color:#1e293b">${totalAll.toLocaleString()}</b> ม้วน
       <br>
       <span style="font-size:11px;color:#94a3b8">คลิก Cell เพื่อดู SN · วันที่: ${dateThai}</span>
@@ -538,6 +537,24 @@ async function openStockDetail(gradegram, size) {
       return;
     }
 
+    // วันที่รับม้วนเข้า (buy_date) — ถ้า RPC ไม่ส่งมา ดึงจาก stock_balance ด้วย SN
+    if (rows.some(r => r.buy_date === undefined)) {
+      try {
+        const sns = rows.map(r => r.sn).filter(Boolean);
+        const bd = {};
+        for (let k = 0; k < sns.length; k += 200) {
+          const { data: bdata } = await supabase.from('stock_balance').select('sn, buy_date').eq('stock_date', stockDate).in('sn', sns.slice(k, k + 200));
+          (bdata || []).forEach(x => { bd[x.sn] = x.buy_date; });
+        }
+        rows.forEach(r => { r.buy_date = bd[r.sn]; });
+      } catch (e) { console.warn('buy_date lookup failed', e); }
+    }
+    const fmtRecv = v => {
+      if (!v) return '-';
+      const d = new Date(v); if (isNaN(d)) return esc(String(v));
+      return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + (d.getFullYear() + 543);
+    };
+
     const fullCount    = rows.filter(r => r.roll_status === 'full').length;
     const scrapCount   = rows.filter(r => r.roll_status === 'scrap').length;
     const waitingCount = rows.filter(r => r.roll_status === 'waiting').length;
@@ -553,7 +570,7 @@ async function openStockDetail(gradegram, size) {
 
     html += '<div class="pop-scroll"><table class="data-table pop-table"><thead><tr>';
     html += '<th>#</th><th>SN</th><th>Diameter</th><th>Kgs</th><th>Meter</th>';
-    html += '<th>Supplier</th><th>QLT</th><th>Customer</th><th>Loc</th><th>สถานะ</th>';
+    html += '<th>Supplier</th><th>QLT</th><th>Customer</th><th>Loc</th><th>วันที่รับเข้า</th><th>สถานะ</th>';
     html += '</tr></thead><tbody>';
 
     rows.forEach((r, i) => {
@@ -575,6 +592,7 @@ async function openStockDetail(gradegram, size) {
         <td>${esc(r.qlt) || '-'}</td>
         <td>${custTxt}</td>
         <td>${esc(r.loc) || '-'}</td>
+        <td>${fmtRecv(r.buy_date)}</td>
         <td>${st.txt}</td>
       </tr>`;
     });
