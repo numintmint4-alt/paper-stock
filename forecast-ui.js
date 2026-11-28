@@ -1,968 +1,840 @@
-/* =====================================================================
-   tables.css — รอบ 2: ตาราง Matrix แบบใหม่ (หัวแคปซูล + ป้ายสี)
-   ใช้เฉพาะบนจอ (ตอนพิมพ์ใช้สไตล์เดิมทั้งหมด) โหลดหลัง theme3.css
-   ===================================================================== */
-@media screen {
-  :root {
-    --tbl-head-bg: #dcebff; --tbl-head-tx: #0a4ec2; --tbl-zebra: rgba(22,119,255,.035); --tbl-hover: rgba(22,119,255,.08);
-    --tbl-line: #e6eef9; --tbl-tot-bg: #e4f6fd; --tbl-tot-tx: #0a63c9;
-    --pl1-bg:#d6e8ff; --pl1-tx:#0f3f95; --pl2-bg:#6aa8ff; --pl2-tx:#ffffff; --pl3-bg:#1f5fd6; --pl3-tx:#ffffff;
-    --pr-bg:#ffe0e2; --pr-tx:#c01f2a; --py-bg:#fff3c4; --py-tx:#8a6a00; --pg-bg:#d9f6e6; --pg-tx:#15803d;
+// ═══════════════════════════════════════════════════════════════
+//  forecast-ui.js — ประมาณการสั่งซื้อม้วนกระดาษ  [3/3 หน้าจอ + เหตุการณ์]
+//  • แท็บเกรด CA KA KI KK KW FSC  +  แท็บ Rev ซ้อนด้านข้าง (Rev.00, Rev.01, …)
+//  • 1 ตาราง = 1 Gradegram (Size ดึงจาก Master paper_specs)
+//  • สถานะ: draft (แก้ไขได้) → saved (ล็อก, แก้ต้องใส่รหัสผ่าน) → approved (แนบ PDF แล้ว, ล็อกทั้งหมด)
+//  • ไม่เรียก supabase ตรงๆ — ผ่าน FC.api เท่านั้น  ·  ต้องโหลดหลัง forecast-calc.js และ forecast-api.js
+// ═══════════════════════════════════════════════════════════════
+(function () {
+  'use strict';
+  const { GROUPS, GROUP_DEFS, groupLabel, DEFAULT_PARAMS, SRC_OF, CALC_ROWS, NEG_MSG, pad2, num, thMonth, nextMonthStr, errText,
+          fmtCell, fmtTot, shortTitle, buildTables, getV, fcCalcCell, toast, api } = window.FC;
+
+  const S = {
+    month: '', group: 'CA_THIN',
+    orders: {}, selId: {}, hasOrders: false,
+    W: null, grams: [],
+    snaps: null, savedMonths: [],
+    customers: [], custLoading: false,
+    fp: [], seq: 0, saving: false, bound: false, pwResolve: null,
+    paged: true, page: ''
+  };
+
+  const $id = id => document.getElementById(id);
+  window.FC.state = S;     // ให้ forecast-export.js อ่านใบที่เปิดอยู่
+  const { LOADERS, emptySrc } = api;
+
+  // ═════════════ Stock Level Snapshot / เดือนที่บันทึกแล้ว ═════════════
+  async function ensureSnaps(force) { if (S.snaps && !force) return; S.snaps = await api.fetchSnaps(); }
+  const snapMonths = () => new Set((S.snaps || []).flatMap(s => s.months || []));
+  const snapOptions = m => (S.snaps || []).filter(s => (s.months || []).includes(m));
+  function defaultSnap(opts) { return opts.find(s => s.mode === 'full') || opts[0] || null; }  // ปกติใช้ม้วนเต็ม
+  async function loadSavedMonths(group) { S.savedMonths = await api.fetchSavedMonths(group, S.month); }
+
+  // ═════════════ โหลดแหล่งข้อมูลเข้า W.src ═════════════
+  async function loadSource(name) {
+    const W = S.W; if (!W) return;
+    const box = $id('fcTables'); if (box) box.classList.add('fc-busy');
+    try { await LOADERS[name](W); }
+    catch (e) { console.error('loadSource', name, e); toast(`โหลดข้อมูล (${name}) ไม่สำเร็จ: ${errText(e)}`, 'err', 6000); }
+    finally { if (box) box.classList.remove('fc-busy'); }
   }
-  :root[data-theme="dark"] {
-    --tbl-head-bg: #14315f; --tbl-head-tx: #a9d4ff; --tbl-zebra: rgba(120,170,255,.045); --tbl-hover: rgba(120,170,255,.10);
-    --tbl-line: #1d2f55; --tbl-tot-bg: #123656; --tbl-tot-tx: #7fd6ff;
-    --pl1-bg:#1d3f77; --pl1-tx:#cfe3ff; --pl2-bg:#2f6fe0; --pl2-tx:#ffffff; --pl3-bg:#5aa7ff; --pl3-tx:#06193d;
-    --pr-bg:#4f2128; --pr-tx:#ffb3b8; --py-bg:#4a4014; --py-tx:#ffe08a; --pg-bg:#14513a; --pg-tx:#8ff0bd;
+  async function loadAllSources(W) {
+    await Promise.all(Object.keys(LOADERS).map(async n => {
+      try { await LOADERS[n](W); } catch (e) { console.error('loadSource', n, e); toast(`โหลดข้อมูล (${n}) ไม่สำเร็จ: ${errText(e)}`, 'err', 6000); }
+    }));
   }
 
-  /* ---------- ตาราง Matrix ทั่วไป (ระดับ Stock / Stock คงเหลือ / Receive) ---------- */
-  .report-table, .alert-matrix-new-table { border-collapse: separate !important; border-spacing: 0 !important; font-variant-numeric: tabular-nums; }
-  .report-table th, .report-table td, .alert-matrix-new-table th, .alert-matrix-new-table td { border: 0 !important; border-bottom: 1px solid var(--tbl-line) !important; }
-
-  /* หัวคอลัมน์: แถบน้ำเงินไล่สี (ตามแบบที่ 1) */
-  .report-table thead th, .alert-matrix-new-table thead th {
-    height: 46px; padding: 0 4px !important; line-height: 1; vertical-align: middle;
-    background: linear-gradient(90deg, #0b3f95, #1677ff) !important; color: #fff !important;
-    font: 800 16px/1 inherit !important; text-transform: none; letter-spacing: 0; text-shadow: none;
-    border: 0 !important; border-radius: 0;
-  }
-  :root[data-theme="dark"] .report-table thead th, :root[data-theme="dark"] .alert-matrix-new-table thead th { background: linear-gradient(90deg, #0a3a8a, #0f6be0) !important; }
-  .report-table thead th.grade-col, .alert-matrix-new-table thead th.grade-col-matrix {
-    text-align: left; padding-left: 16px !important; padding-right: 12px !important; font-size: 13px !important; white-space: nowrap;
-    overflow: visible !important; text-overflow: clip !important; border-top-left-radius: 14px;
-  }
-  .report-table thead th.total-col, .alert-matrix-new-table thead th.total-col-matrix {
-    background: linear-gradient(90deg, #0a4aa8, #19c3f0) !important; font-size: 15px !important; border-top-right-radius: 14px;
+  async function ensureCustomers() {
+    if (S.customers.length || S.custLoading) return;
+    S.custLoading = true;
+    try { S.customers = await api.fetchCustomers(); } catch (e) { console.warn('load customers', e); }
+    S.custLoading = false;
+    syncCustDatalist();
+    if (S.W && !S.W.locked) renderTables();
   }
 
-  /* คอลัมน์ชื่อ Gradegrams และคอลัมน์รวม */
-  .report-table td.grade-col, .alert-matrix-new-table td.grade-col-matrix {
-    background: var(--surface) !important; color: var(--tbl-head-tx); font-weight: 800; font-size: 14px; padding-left: 14px !important;
+  // ═════════════ โหลดเดือน / เอกสาร ═════════════
+  const curOrder = () => {
+    const arr = S.orders[S.group] || [];
+    return arr.find(o => o.id === S.selId[S.group]) || arr[arr.length - 1] || null;
+  };
+
+  async function loadMonth(keepId) {
+    const box = $id('fcTables');
+    if (box) softLoad(box, '<div class="fc-loading ld-ph">กำลังโหลด…</div>');
+    const seq = ++S.seq;
+    let data;
+    try { data = await api.fetchOrders(S.month); }
+    catch (error) {
+      if (seq !== S.seq) return;
+      if (box) box.innerHTML = `<div class="msg err">${esc(errText(error))}</div>`;
+      return;
+    }
+    if (seq !== S.seq) return;
+    S.orders = {}; GROUPS.forEach(g => { S.orders[g] = []; });
+    (data || []).forEach(o => { if (S.orders[o.grade_group]) S.orders[o.grade_group].push(o); });
+    S.hasOrders = (data || []).length > 0;
+    GROUPS.forEach(g => {
+      const arr = S.orders[g];
+      if (keepId && arr.some(o => o.id === keepId)) S.selId[g] = keepId;
+      else if (!arr.some(o => o.id === S.selId[g])) S.selId[g] = arr.length ? arr[arr.length - 1].id : null;
+    });
+    paintHeader();
+    const o = curOrder();
+    if (!o) { S.W = null; renderEmpty(); return; }
+    await openOrder(o);
   }
-  .report-table td.total-col, .alert-matrix-new-table td.total-col-matrix {
-    background: var(--tbl-tot-bg) !important; color: var(--tbl-tot-tx) !important; font-weight: 800; font-size: 14px;
+
+  async function openOrder(o) {
+    const seq = ++S.seq;
+    const box = $id('fcTables');
+    if (box) box.innerHTML = '<div class="fc-loading">กำลังโหลด…</div>';
+    const W = { o, locked: o.status !== 'draft', params: Object.assign({}, DEFAULT_PARAMS, o.params || {}),
+                remark: o.remark || '', tables: {}, names: [], src: emptySrc() };
+    try {
+      const d = await api.fetchOrderDetail(o.id);
+      buildTables(W, d.tables, d.cells);
+      if (!W.locked) {
+        await Promise.all([ensureSnaps(), loadSavedMonths(o.grade_group)]);
+        await loadAllSources(W);
+      }
+    } catch (e) {
+      console.error(e);
+      if (seq === S.seq && box) box.innerHTML = `<div class="msg err">โหลดไม่สำเร็จ: ${esc(errText(e))}</div>`;
+      return;
+    }
+    if (seq !== S.seq) return;
+    S.W = W; S.grams = [];
+    paintHeader(); renderToolbar(); renderTables(); renderFooter();
+    ensureCustomers();
   }
-  .report-table tbody tr:nth-child(even):not(.total-row), .alert-matrix-new-table tbody tr:nth-child(even):not(.total-row-matrix) { background: var(--tbl-zebra); }
-  .report-table tbody tr:hover:not(.total-row), .alert-matrix-new-table tbody tr:hover:not(.total-row-matrix) { background: var(--tbl-hover); }
-  .report-table tbody td:not(.grade-col):not(.total-col), .alert-matrix-new-table tbody td:not(.grade-col-matrix):not(.total-col-matrix) { background: transparent; }
-  .report-table td { padding: 5px 3px; height: 44px; }
-  .alert-matrix-new-table td { height: 44px; }
-  /* คอลัมน์ชื่อ Gradegrams กว้างพอ ไม่ตัดข้อความ */
-  .report-table th.grade-col, .report-table td.grade-col { min-width: 104px !important; max-width: none !important; width: 104px; }
-  #receiveBody .report-table th.grade-col, #receiveBody .report-table td.grade-col { width: 104px !important; min-width: 104px !important; max-width: 104px !important; }
-  .alert-matrix-new-table th.grade-col-matrix, .alert-matrix-new-table td.grade-col-matrix { min-width: 116px !important; }
-  .alert-matrix-new-table td.total-col-matrix, .alert-matrix-new-table th.total-col-matrix { min-width: 84px !important; }
-  /* หน้า Stock คงเหลือ: ช่องเป็นข้อความรวม (เต็ม+เศษ·รอ) กว้างตามเนื้อหา สีเดียว */
-  #stockBody .report-wrap { overflow-x: auto; }
-  #stockBody .report-table { width: max-content; min-width: 100%; table-layout: auto; }
-  #stockBody .report-table thead th:not(.grade-col):not(.total-col), #stockBody .report-table tbody td:not(.grade-col):not(.total-col):not(.empty) {
-    min-width: 58px !important; max-width: none !important; width: auto !important; padding: 5px 6px; }
-  #stockBody .report-table td[data-lv] .cell-main, #stockBody .report-table td .cell-main { background: var(--pl1-bg); color: var(--pl1-tx); font-size: 13px; padding: 0 9px; white-space: nowrap; }
-  #stockBody .report-table td.total-col, #stockBody .report-table th.total-col { min-width: 70px !important; max-width: none !important; width: auto !important; }
-  .report-table td.empty, .alert-matrix-new-table td.empty-cell { color: var(--text-light); background: transparent; }
 
-  /* แถวรวม */
-  .report-table .total-row td, .alert-matrix-new-table tr.total-row-matrix td {
-    background: var(--tbl-tot-bg) !important; color: var(--tbl-tot-tx) !important; font-weight: 800; font-size: 14px !important; border-bottom: 0 !important;
+  // ตุ่มสีสถานะของกลุ่ม: เขียว = อนุมัติแล้ว · เหลือง = แบบร่าง/รอแนบเอกสาร · เทา = ยังไม่ได้จัดทำ
+  function grpStatus(g) {
+    const arr = S.orders[g] || [], last = arr[arr.length - 1];
+    if (!last) return { c: 'n', t: 'ยังไม่ได้จัดทำ' };
+    if (last.status === 'approved') return { c: 'g', t: 'อนุมัติแล้ว' };
+    if (last.status === 'saved') return { c: 'y', t: 'รอแนบเอกสาร' };
+    return { c: 'y', t: 'แบบร่าง' };
   }
-  .report-table .total-row td.total-col, .alert-matrix-new-table tr.total-row-matrix td.total-col-matrix { background: linear-gradient(135deg,#1677ff,#19c3f0) !important; color: #fff !important; }
-
-  /* ช่องตัวเลข = ป้ายสีตามปริมาณ (JS ใส่ data-lv และห่อ .pill) */
-  .report-table td.clickable { background: transparent !important; }
-  .report-table td .pill, .report-table td[data-lv] .cell-main {
-    display: inline-grid; place-items: center; min-width: 28px; height: 26px; padding: 0 8px; border-radius: 9px; font-weight: 800; font-size: 13.5px; transition: transform .12s;
+  function grpDropdownHTML() {
+    const cur = GROUP_DEFS.find(d => d.key === S.group) || GROUP_DEFS[0], cs = grpStatus(cur.key);
+    return `<span class="fc-gd" id="fcGrpDd"><button type="button" class="fc-gd-btn" onclick="fcGrpToggle(event)" title="เลือกกลุ่มเกรด"><i class="fc-dot ${cs.c}"></i>${esc(cur.label)}<em>▾</em></button><div class="fc-gd-menu" id="fcGrpMenu">${GROUP_DEFS.map(d => { const st = grpStatus(d.key); return `<button type="button" class="fc-gd-it ${d.key === S.group ? 'on' : ''}" onclick="fcGrpPick('${d.key}')"><i class="fc-dot ${st.c}"></i>${esc(d.label)}<small>${st.t}</small></button>`; }).join('')}</div></span>`;
   }
-  .report-table td[data-lv="1"] .pill, .report-table td[data-lv="1"] .cell-main { background: var(--pl1-bg); color: var(--pl1-tx); }
-  .report-table td[data-lv="2"] .pill, .report-table td[data-lv="2"] .cell-main { background: var(--pl2-bg); color: var(--pl2-tx); }
-  .report-table td[data-lv="3"] .pill, .report-table td[data-lv="3"] .cell-main { background: var(--pl3-bg); color: var(--pl3-tx); }
-  .report-table td.clickable:hover .pill { transform: translateY(-1px) scale(1.06); }
-  #receiveBody .report-table td .cell-main { font-size: 14px; }
+  window.fcGrpToggle = function (ev) { if (ev) ev.stopPropagation(); const m = $id('fcGrpMenu'); if (m) m.classList.toggle('open'); };
+  window.fcGrpPick = function (g) { const m = $id('fcGrpMenu'); if (m) m.classList.remove('open'); window.fcSelectGroup(g); };
+  document.addEventListener('click', e => { const m = $id('fcGrpMenu'); if (m && m.classList.contains('open') && !e.target.closest('#fcGrpDd')) m.classList.remove('open'); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { const m = $id('fcGrpMenu'); if (m) m.classList.remove('open'); } });
 
-  /* ---------- ตาราง Alert (สั่งซื้อประจำวัน) ---------- */
-  .alert-matrix-new-table .matrix-cell { background: transparent !important; box-shadow: none !important; padding: 5px 4px; }
-  .alert-matrix-new-table .matrix-cell:hover { filter: none; box-shadow: none !important; }
-  .alert-matrix-new-table .matrix-value {
-    position: relative; display: inline-block; min-width: 62px; padding: 5px 9px; border-radius: 10px; font-weight: 800; font-size: 13.5px;
+  // ═════════════ ส่วนหัวหน้า (แท็บเกรด / Rev / ปุ่ม) ═════════════
+  function paintHeader() {
+    const mb = $id('fcMonthBtn'); if (mb) mb.textContent = thMonth(S.month) || '(เลือกเดือน)';
+    const cb = $id('fcCreateBtn'); if (cb) { cb.disabled = S.hasOrders; cb.title = S.hasOrders ? 'เดือนนี้จัดทำประมาณการแล้ว' : ''; }
+    // แท็บเกรด
+    const gt = $id('fcGradeTabs');
+    if (gt) gt.innerHTML = GROUP_DEFS.map(d => {
+      const g = d.key, arr = S.orders[g] || [], last = arr[arr.length - 1];
+      const badge = !last ? '' : (last.status === 'approved' ? ' ✅' : (last.status === 'saved' ? ' 🔒' : ''));
+      return `<button type="button" class="sub-tab ${g === 'FSC' ? 'fc-fsc' : ''} ${g === S.group ? 'active' : ''}" title="${esc(d.hint || d.label)}" onclick="fcSelectGroup('${g}')">${esc(d.label)}${badge}</button>`;
+    }).join('');
+    // ชิป Rev อยู่ในแถวหัวข้อ (ถัดจากชื่อกลุ่มเกรด) — สร้างใหม่ทุกครั้งที่ paintHeader
+    const ri = $id('fcRevInline'); if (ri) ri.innerHTML = revChipsHTML();
   }
-  .alert-matrix-new-table .matrix-red .matrix-value    { background: var(--pr-bg); color: var(--pr-tx); }
-  .alert-matrix-new-table .matrix-yellow .matrix-value { background: var(--py-bg); color: var(--py-tx); }
-  .alert-matrix-new-table .matrix-green .matrix-value  { background: var(--pg-bg); color: var(--pg-tx); }
-  .alert-matrix-new-table .matrix-cell.has-order .matrix-value { box-shadow: 0 0 0 2px #1677ff; }
-  .alert-matrix-new-table .matrix-cell.order-incomplete .matrix-value { box-shadow: 0 0 0 2px #f59e0b; }
-  .alert-matrix-new-table .matrix-cart-svg {
-    position: absolute; top: -8px; right: -8px; width: 18px !important; height: 18px !important; margin: 0 !important; padding: 3px; border-radius: 50%;
-    background: #1677ff; color: #fff !important; box-shadow: 0 2px 6px rgba(22,119,255,.45);
+
+  function revChipsHTML() {
+    const arr = S.orders[S.group] || [];
+    if (!arr.length) return '';
+    const cur = curOrder(), last = arr[arr.length - 1];
+    const canAdd = last.status === 'approved';
+    return arr.map(o => `<button type="button" class="fc-rev-tab st-${o.status} ${cur && o.id === cur.id ? 'active' : ''}"
+        title="${o.status === 'draft' ? 'ร่าง' : (o.status === 'saved' ? 'ล็อกแล้ว (รอแนบเอกสารอนุมัติ)' : 'อนุมัติแล้ว')}"
+        onclick="fcSelectRev('${o.id}')"><i class="d"></i>Rev.${pad2(o.rev)}${o.status === 'approved' ? ' ✓' : (o.status === 'saved' ? ' 🔒' : ' ร่าง')}</button>`).join('') +
+      `<button type="button" class="fc-rev-tab fc-rev-add" ${canAdd ? '' : 'disabled'}
+        title="${canAdd ? 'เพิ่ม Rev ใหม่ (คัดลอกข้อมูลจาก Rev ล่าสุด)' : 'ต้องแนบเอกสารอนุมัติของ Rev ล่าสุดก่อน จึงจะเพิ่ม Rev ใหม่ได้'}"
+        onclick="fcAddRev()">+ Rev.</button>`;
   }
-  .alert-matrix-new-table .matrix-cell.order-incomplete .matrix-cart-svg { background: #f59e0b; color: #fff !important; }
-  .alert-matrix-new-table .matrix-cell.has-order, .alert-matrix-new-table .matrix-cell.order-incomplete { background: transparent !important; }
 
-  /* ---------- ตารางรายการทั่วไป ---------- */
-  .data-table { border-collapse: separate; border-spacing: 0; }
-  .data-table th { background: linear-gradient(90deg,#0d47a8,#1677ff) !important; color: #fff !important; text-transform: none; font-size: 13px; letter-spacing: 0; padding: 11px 12px; }
-  .data-table th:first-child { border-top-left-radius: 12px; } .data-table th:last-child { border-top-right-radius: 12px; }
-  .data-table td { border: 0; border-bottom: 1px solid var(--tbl-line); }
-  .data-table tbody tr:nth-child(even) td { background: var(--tbl-zebra); }
-  :root[data-theme="dark"] .data-table th { background: linear-gradient(90deg,#0a3a8a,#1456bd) !important; }
-
-  /* ---------- เส้นคอลัมน์ (แนวตั้ง) ทุกตาราง ---------- */
-  :root { --tbl-vline: #b4c9e6; }
-  :root[data-theme="dark"] { --tbl-vline: #3a5a94; }
-  .report-table tbody td, .alert-matrix-new-table tbody td, .data-table tbody td, #res-table tbody td { border-right: 1px solid var(--tbl-vline) !important; }
-  .report-table tbody td:last-child, .alert-matrix-new-table tbody td:last-child, .data-table tbody td:last-child, #res-table tbody td:last-child { border-right: 0 !important; }
-  .report-table thead th, .alert-matrix-new-table thead th, .data-table thead th { border-right: 1px solid rgba(255,255,255,.28) !important; }
-  .report-table thead th:last-child, .alert-matrix-new-table thead th:last-child, .data-table thead th:last-child { border-right: 0 !important; }
-  .data-table td { border-right: 1px solid var(--tbl-vline); }
-  #res-table tbody td.grade-col { border-right: 1px solid var(--tbl-vline) !important; }
-
-
-  /* ======================= รอบ 3 ======================= */
-  /* ---- Matrix ทุกหน้า: กระชับ พอดีจอ เลื่อนได้ (เหมือนตารางการจอง) ---- */
-  #matrixBody .report-wrap, #stockBody .report-wrap, #receiveBody .report-wrap {
-    overflow: auto !important; max-height: 68vh; min-height: 220px; width: 100%; border-radius: 14px; }
-  .alert-matrix-wrap { max-height: 68vh !important; border-radius: 14px; }
-  :is(#matrixBody,#stockBody,#receiveBody) .report-table { width: max-content !important; min-width: 100% !important; table-layout: auto !important; font-size: 12.5px !important; }
-  :is(#matrixBody,#stockBody,#receiveBody) .report-table thead th { height: 32px !important; font-size: 13px !important; padding: 0 3px !important; position: sticky; top: 0; z-index: 6; }
-  :is(#matrixBody,#stockBody,#receiveBody) .report-table thead th.grade-col { font-size: 12px !important; padding-left: 10px !important; z-index: 8; left: 0; }
-  :is(#matrixBody,#stockBody,#receiveBody) .report-table thead th.total-col { z-index: 8; right: 0; font-size: 13px !important; }
-  :is(#matrixBody,#stockBody,#receiveBody) .report-table td { height: 28px !important; padding: 1px 2px !important; font-size: 12.5px !important; }
-  :is(#matrixBody,#stockBody,#receiveBody) .report-table th.grade-col, :is(#matrixBody,#stockBody,#receiveBody) .report-table td.grade-col {
-    width: 92px !important; min-width: 92px !important; max-width: 92px !important; font-size: 12.5px !important; padding-left: 10px !important; position: sticky; left: 0; z-index: 4; }
-  :is(#matrixBody,#stockBody,#receiveBody) .report-table th.total-col, :is(#matrixBody,#stockBody,#receiveBody) .report-table td.total-col {
-    width: 60px !important; min-width: 60px !important; max-width: 60px !important; font-size: 12.5px !important; position: sticky; right: 0; z-index: 4; overflow: visible; }
-  #matrixBody .report-table thead th:not(.grade-col):not(.total-col), #matrixBody .report-table tbody td:not(.grade-col):not(.total-col),
-  #receiveBody .report-table thead th:not(.grade-col):not(.total-col), #receiveBody .report-table tbody td:not(.grade-col):not(.total-col) {
-    width: 38px !important; min-width: 38px !important; max-width: 38px !important; font-size: 12.5px !important; }
-  /* ตัวเลขเป็นเม็ดสีเล็ก แคบกว่าคอลัมน์ */
-  .report-table td .pill, .report-table td[data-lv] .cell-main { min-width: 24px !important; width: 26px; height: 20px !important; padding: 0 !important; border-radius: 999px !important; font-size: 12px !important; display: inline-grid !important; place-items: center; }
-  /* หน้า Stock คงเหลือ / รายงานสั่งซื้อ: ไม่มีพื้นหลังสี ตัวเลขล้วน */
-  #stockBody .report-table td .cell-main, #stockBody .report-table td .pill, #receiveBody .report-table td .cell-main, #receiveBody .report-table td .pill {
-    background: transparent !important; color: var(--text) !important; width: auto !important; min-width: 0 !important; padding: 0 !important; font-weight: 700; }
-  #stockBody .report-table thead th:not(.grade-col):not(.total-col), #stockBody .report-table tbody td:not(.grade-col):not(.total-col):not(.empty) { min-width: 44px !important; padding: 1px 4px !important; }
-
-  /* ---- สั่งซื้อประจำวัน (Alert matrix) ---- */
-  .alert-matrix-new-table thead th { height: 32px !important; font-size: 13px !important; padding: 0 3px !important; }
-  .alert-matrix-new-table thead th.grade-col-matrix { font-size: 12px !important; }
-  .alert-matrix-new-table thead th.total-col-matrix { font-size: 13px !important; }
-  .alert-matrix-new-table td { height: 28px !important; }
-  .alert-matrix-new-table th.grade-col-matrix, .alert-matrix-new-table td.grade-col-matrix { min-width: 96px !important; font-size: 12.5px !important; }
-  .alert-matrix-new-table td.total-col-matrix, .alert-matrix-new-table th.total-col-matrix { min-width: 68px !important; font-size: 12.5px !important; }
-  .alert-matrix-new-table .matrix-cell { padding: 1px 2px !important; min-width: 50px; }
-  .alert-matrix-new-table .matrix-value { display: inline-block !important; min-width: 40px !important; padding: 2px 5px !important; border-radius: 999px !important; font-size: 12px !important; line-height: 1.35; }
-  .alert-matrix-new-table .matrix-cell.has-order .matrix-value { box-shadow: 0 0 0 1.2px #1677ff; }
-  .alert-matrix-new-table .matrix-cell.order-incomplete .matrix-value { box-shadow: 0 0 0 1.2px #f59e0b; }
-  .alert-matrix-new-table .matrix-cart-svg { top: -6px !important; right: -6px !important; width: 14px !important; height: 14px !important; padding: 2px !important; }
-
-  /* ---- ฟิลเตอร์: แคบลง ให้อยู่แถวเดียว ---- */
-  .card .filters { padding: 8px 10px !important; gap: 6px 7px !important; }
-  .filters label { font-size: 12px !important; }
-  .grade-filter-btn { min-width: 118px !important; height: 34px; padding: 0 10px !important; font-size: 12.5px; border-radius: 12px; }
-  .grade-filter-btn span:first-child { max-width: 100px !important; }
-  .filters label, .filters span { gap: 4px; }
-  html body .card .filters input.flatpickr-input, html body .card .filters input[type="text"] { width: 100px !important; min-width: 0 !important; max-width: 100px !important; }
-  .filters input[type="number"] { width: 90px !important; }
-  #alertStockDate, #alertReceiveDate, #alertDate { width: 100px !important; max-width: 100px !important; font-size: 12.5px !important; padding: 4px 6px !important; }
-  #filterYear { width: 84px !important; }
-  .filters button { padding: 0 9px !important; }
-  .filters input.flatpickr-input, .filters input[type="text"] { padding: 4px 6px !important; }
-  .grade-filter-btn { min-width: 104px !important; }
-  .grade-filter-btn span:first-child { max-width: 84px !important; }
-
-  /* ---- Dropdown / ปุ่มเลือกเดือน ---- */
-  .dd { position: relative; display: inline-block; }
-  .dd-native { position: absolute !important; opacity: 0 !important; pointer-events: none !important; width: 1px !important; height: 1px !important; left: 0; top: 0; }
-  .dd-btn { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 84px; height: 34px; padding: 0 8px 0 10px; border: 1.5px solid var(--border-strong); border-radius: 12px;
-    background: var(--surface); color: var(--text); font: 700 12.5px/1 inherit; cursor: pointer; white-space: nowrap; }
-  .dd-btn:hover { border-color: #1677ff; }
-  .dd-btn.open { border-color: #1677ff; box-shadow: 0 0 0 3px rgba(22,119,255,.18); }
-  .dd-btn:disabled { opacity: .5; cursor: not-allowed; }
-  .dd-btn .dd-chev { color: #1677ff; flex: none; }
-  .dd-lb { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
-  .filters label { white-space: nowrap; }
-  .dd-btn.mp-btn { gap: 7px; justify-content: flex-start; } .dd-btn.mp-btn .dd-chev { margin-left: auto; }
-  .dd-btn.mp-btn svg:first-child { color: #1677ff; }
-  .dd-menu { position: fixed; z-index: 100001; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 12px 30px rgba(20,60,140,.25); padding: 6px; max-height: 320px; overflow: auto; }
-  .dd-it { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; border-radius: 9px; font: 600 13px/1.2 inherit; color: var(--text); cursor: pointer; }
-  .dd-it:hover { background: var(--primary-soft); }
-  .dd-it.sel { background: linear-gradient(90deg,#0b3f95,#1677ff); color: #fff; font-weight: 800; }
-  .dd-it.dis { opacity: .4; cursor: not-allowed; }
-  /* รายการกรองหลายตัวเลือกเดิม (Gradegrams/ลูกค้า) ให้เข้าธีม */
-  .grade-dropdown { border-radius: 14px !important; box-shadow: 0 12px 30px rgba(20,60,140,.25) !important; border: 1px solid var(--border) !important; overflow: hidden; }
-  .grade-actions button { border-radius: 999px !important; font-weight: 700; }
-  .grade-list label, .grade-list .grade-item { border-radius: 9px; }
-  .grade-list label:hover, .grade-list .grade-item:hover { background: var(--primary-soft); }
-  .grade-list input[type="checkbox"] { accent-color: #1677ff; width: 16px; height: 16px; }
-
-  /* ---- ปฏิทิน (flatpickr + ปฏิทินเลือกเดือน) ---- */
-  .flatpickr-calendar { border-radius: 16px !important; border: 1px solid #d3e4fb !important; box-shadow: 0 12px 30px rgba(20,60,140,.25) !important; overflow: hidden; width: 280px !important; }
-  .flatpickr-calendar:before, .flatpickr-calendar:after { display: none !important; }
-  .flatpickr-months { background: linear-gradient(90deg,#0b3f95,#1677ff); height: 46px; align-items: center; }
-  .flatpickr-months .flatpickr-month { color: #fff !important; fill: #fff; height: 46px; }
-  .flatpickr-current-month { color: #fff; padding-top: 9px; font-weight: 800; }
-  .flatpickr-current-month .flatpickr-monthDropdown-months, .flatpickr-current-month input.cur-year { color: #fff !important; font-weight: 800; background: transparent !important; }
-  .flatpickr-monthDropdown-months option { color: #1a2b4c; background: #fff; }
-  .flatpickr-months .flatpickr-prev-month, .flatpickr-months .flatpickr-next-month { color: #fff !important; fill: #fff !important; height: 46px; padding: 14px 12px; }
-  .flatpickr-months .flatpickr-prev-month svg, .flatpickr-months .flatpickr-next-month svg { fill: #fff !important; }
-  .flatpickr-weekday { color: #5a6f95 !important; font-weight: 800 !important; background: transparent !important; }
-  .flatpickr-days { padding: 4px 6px 8px; width: 100% !important; }
-  .dayContainer { width: 100% !important; min-width: 0 !important; max-width: 100% !important; }
-  span.flatpickr-day { border: 0 !important; border-radius: 50% !important; max-width: 36px; height: 34px; line-height: 34px; color: #26406f; font-weight: 600; }
-  span.flatpickr-day:hover { background: #eaf2ff !important; }
-  span.flatpickr-day.today { box-shadow: inset 0 0 0 1.5px #1677ff; background: transparent; }
-  span.flatpickr-day.selected, span.flatpickr-day.selected:hover { background: #1677ff !important; color: #fff !important; font-weight: 800; box-shadow: none; }
-  span.flatpickr-day.prevMonthDay, span.flatpickr-day.nextMonthDay { color: #b5c3da; }
-  :root[data-theme="dark"] .flatpickr-calendar { background: #10223f !important; border-color: #2a4a80 !important; }
-  :root[data-theme="dark"] span.flatpickr-day { color: #d6e6ff; }
-  :root[data-theme="dark"] span.flatpickr-day:hover { background: #1d3a6e !important; }
-  :root[data-theme="dark"] span.flatpickr-day.prevMonthDay, :root[data-theme="dark"] span.flatpickr-day.nextMonthDay { color: #5f7399; }
-  :root[data-theme="dark"] .flatpickr-weekday { color: #8fb0e8 !important; }
-  .fc-mp { width: 260px !important; padding: 0 !important; border-radius: 16px !important; overflow: hidden; border: 1px solid #d3e4fb !important; box-shadow: 0 12px 30px rgba(20,60,140,.25) !important; background: var(--surface) !important; }
-  .fc-mp-head { margin: 0 !important; height: 44px; padding: 0 10px; background: linear-gradient(90deg,#0b3f95,#1677ff); color: #fff; font-weight: 800; }
-  .fc-mp-head button { width: 28px; height: 28px; border: 0 !important; border-radius: 50% !important; background: rgba(255,255,255,.2) !important; color: #fff; font-size: 16px; padding: 0 !important; line-height: 1; }
-  .fc-mp-grid { padding: 10px; gap: 6px !important; }
-  .fc-mp-grid button { border: 0 !important; background: #f3f8ff !important; color: #26406f; border-radius: 10px !important; padding: 9px 0 !important; font-weight: 700 !important; }
-  .fc-mp-grid button:hover:not(:disabled) { background: #dcebff !important; }
-  .fc-mp-grid button.now { box-shadow: inset 0 0 0 1.5px #1677ff; }
-  .fc-mp-grid button.sel { background: linear-gradient(90deg,#0b3f95,#1677ff) !important; color: #fff !important; box-shadow: none; }
-  .fc-mp-foot { display: flex; justify-content: space-between; margin: 0 !important; padding: 4px 14px 10px; }
-  .fc-mp-foot button { border: 0 !important; background: transparent !important; color: #1677ff; font-weight: 700; }
-  :root[data-theme="dark"] .fc-mp { border-color: #2a4a80 !important; }
-  :root[data-theme="dark"] .fc-mp-grid button { background: #17305c !important; color: #d6e6ff; }
-
-  /* ---- Popup (คลิกเซล / รายละเอียด) ---- */
-  .modal-head { margin: -26px -26px 16px !important; padding: 14px 22px !important; background: linear-gradient(90deg,#0b3f95,#1677ff); border-bottom: 0 !important; }
-  .modal-head h3 { margin: 0 !important; color: #fff !important; font-size: 18px; font-weight: 800; }
-  .modal-head h3 span, .modal-head h3 small { color: #d6e6ff !important; }
-  .modal-head button { background: rgba(255,255,255,.2) !important; border: 0 !important; color: #fff !important; border-radius: 999px !important; padding: 5px 16px !important; font-weight: 800; box-shadow: none !important; }
-  .modal-head button:hover { background: rgba(255,255,255,.32) !important; }
-  .pop-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
-  .pc { padding: 4px 14px; border-radius: 999px; font-size: 12px; font-weight: 800; background: #eaf2ff; color: #0f3f95; }
-  .pc-f { background: #dff3ff; color: #0a6a9a; } .pc-s { background: #e3e9ff; color: #2a3fa0; } .pc-w { background: #eef2f8; color: #5a6f95; }
-  .pc-k { background: linear-gradient(90deg,#0a4aa8,#19c3f0); color: #fff; }
-  :root[data-theme="dark"] .pc { background: #17305c; color: #cfe3ff; }
-  :root[data-theme="dark"] .pc-f { background: #12405c; color: #8fe0ff; } :root[data-theme="dark"] .pc-s { background: #232f66; color: #b9c6ff; } :root[data-theme="dark"] .pc-w { background: #243049; color: #a9b8d4; }
-  .pop-scroll { max-height: 60vh; overflow: auto; border-radius: 12px; }
-  .pop-table { width: 100% !important; font-size: 13px; }
-  .pop-table td { height: 32px; padding: 0 12px !important; }
-  .pop-table td.n { text-align: right; }
-  #stockDetailBody tr.full-row, #stockDetailBody tr.scrap-row, #stockDetailBody tr.waiting-row { background: transparent !important; }
-  .st { display: inline-flex; align-items: center; gap: 6px; padding: 1px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
-  .st i { width: 7px; height: 7px; border-radius: 50%; display: block; }
-  .st-f { background: #dff3ff; color: #0a6a9a; } .st-f i { background: #19a7f0; }
-  .st-s { background: #e3e9ff; color: #2a3fa0; } .st-s i { background: #4a63e0; }
-  .st-w { background: #eef2f8; color: #5a6f95; } .st-w i { background: #9aa9c4; }
-  :root[data-theme="dark"] .st-f { background: #12405c; color: #8fe0ff; } :root[data-theme="dark"] .st-s { background: #232f66; color: #b9c6ff; } :root[data-theme="dark"] .st-w { background: #243049; color: #a9b8d4; }
-  .pop-btn { border: 1px solid #9cc2f5 !important; color: #0f3f95 !important; border-radius: 999px !important; padding: 2px 12px !important; font-size: 12px; font-weight: 700; background: #f2f8ff !important; cursor: pointer; }
-  :root[data-theme="dark"] .pop-btn { background: #17305c !important; color: #cfe3ff !important; border-color: #3a5a94 !important; }
-  .pop-sub { width: 100% !important; margin: 4px 0; }
-
-  /* ---- รายการที่บันทึกไว้ (เป็นแถว) ---- */
-  #snapshotList, .snapshot-list-wrap { display: block !important; width: 100% !important; max-width: none !important; grid-template-columns: none !important; }
-  .snap-wrap { width: 100% !important; max-height: 340px; overflow: auto; border-radius: 12px; }
-  .snap-table { width: 100% !important; }
-  .snap-table td { height: 38px; }
-  .snap-mode { display: inline-block; padding: 1px 10px; border-radius: 999px; background: #eaf2ff; color: #0f3f95; font-size: 12px; font-weight: 700; }
-  .snap-dt { color: var(--text-muted); font-size: 12px; }
-  .snap-act { text-align: center; white-space: nowrap; }
-  .snap-act button { padding: 3px 12px !important; border-radius: 999px !important; font-size: 12px; margin: 0 2px; }
-
-  /* ---- ตารางสรุป Supplier (แบบ B) ---- */
-  .supplier-summary.ss-new { background: var(--surface) !important; border-radius: 16px !important; border: 1px solid var(--border) !important; padding: 16px 18px !important; box-shadow: 0 4px 18px rgba(20,80,180,.10); }
-  #receiveBody .supplier-summary.ss-new h4, #summaryBody .supplier-summary.ss-new h4, .supplier-summary.ss-new h4 { font-size: 16px !important; margin: 0 0 12px; color: var(--tbl-head-tx); font-weight: 800; }
-  .supplier-summary.ss-new .ss-table, #receiveBody .supplier-summary.ss-new .ss-table, #summaryBody .supplier-summary.ss-new .ss-table { border-collapse: separate !important; border-spacing: 0; width: 100% !important; min-width: 0 !important; max-width: 760px; font-size: 13px !important; border-radius: 12px; overflow: hidden; table-layout: auto !important; }
-  .ss-table th, #receiveBody .ss-table th, #summaryBody .ss-table th { background: linear-gradient(90deg,#0b3f95,#1677ff) !important; color: #fff !important; height: 34px; padding: 0 12px !important; text-align: left; font-size: 13px; text-transform: none; border-right: 1px solid rgba(255,255,255,.28); }
-  .ss-table td, #receiveBody .ss-table td, #summaryBody .ss-table td { height: 36px; padding: 0 12px !important; font-size: 13px !important; border-right: 1px solid var(--tbl-vline); border-bottom: 1px solid var(--tbl-line); text-align: left; font-weight: 600; }
-  .ss-table th.n, .ss-table td.n { text-align: right !important; }
-  .ss-table th:last-child, .ss-table td:last-child { border-right: 0; }
-  .ss-table tbody tr:nth-child(even) td { background: var(--tbl-zebra); }
-  .ss-table tr.total-row td { background: linear-gradient(90deg,#0a4aa8,#19c3f0) !important; color: #fff !important; font-weight: 800; border-bottom: 0; border-right: 1px solid rgba(255,255,255,.3); }
-  .ss-chip { display: inline-block; padding: 2px 12px; border-radius: 999px; background: #e3f0ff; color: #0f3f95; font-weight: 800; font-size: 12px; }
-  :root[data-theme="dark"] .ss-chip { background: #17305c; color: #cfe3ff; }
-  .ss-bar-row { display: flex; align-items: center; gap: 8px; }
-  .ss-bar { flex: 1; height: 9px; border-radius: 99px; background: #e3eefc; position: relative; overflow: hidden; min-width: 90px; }
-  .ss-bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 99px; background: linear-gradient(90deg,#6aa8ff,#1677ff); animation: ssgrow .7s ease-out; }
-  .ss-bar-row b { font-size: 12px; color: var(--tbl-head-tx); width: 36px; text-align: right; }
-  @keyframes ssgrow { from { width: 0 !important; } }
-  :root[data-theme="dark"] .ss-bar { background: #17305c; }
-  .ss-table tbody tr:hover td { background: var(--tbl-hover); }
-
-
-  /* ======================= รอบ 4 ======================= */
-  /* ---- ลูกศรสีฟ้าสด (วงกลมไล่สี) ---- */
-  .grade-filter-btn .arrow { font-size: 0 !important; width: 22px; height: 22px; flex: none; border-radius: 50%; box-shadow: 0 2px 6px rgba(22,119,255,.4);
-    background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>") center/12px no-repeat, linear-gradient(135deg,#1677ff,#19a7f0); }
-  .dd-btn .dd-chev { color: #fff !important; background: linear-gradient(135deg,#1677ff,#19a7f0); border-radius: 50%; width: 22px; height: 22px; padding: 5px; box-sizing: border-box; box-shadow: 0 2px 6px rgba(22,119,255,.4); transition: transform .2s; }
-  .dd-btn.open .dd-chev { transform: rotate(180deg); }
-
-  /* ---- ฟิลเตอร์เลือกหลายรายการ ---- */
-  .grade-filter-btn { gap: 6px !important; }
-  .gf-tags { display: inline-flex; gap: 4px; align-items: center; min-width: 0; }
-  .grade-filter-btn.has-tags > span:first-child { display: none !important; }
-  .gf-tag { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 3px 0 9px; border-radius: 99px; background: #dcebff; color: #0f3f95; font-size: 12px; font-weight: 800; white-space: nowrap; max-width: 90px; }
-  .gf-tag.more { padding: 0 9px; background: #1677ff; color: #fff; }
-  .gf-tag b { width: 16px; height: 16px; border-radius: 50%; background: #fff; color: #1677ff; display: grid; place-items: center; font-size: 12px; line-height: 1; flex: none; }
-  .gf-tag b:hover { background: #ffe3e3; color: #c53030; }
-  .grade-dropdown { border-radius: 18px !important; overflow: hidden; min-width: 270px !important; max-width: 360px !important; }
-  .gd-head { background: linear-gradient(90deg,#0b3f95,#1677ff); color: #fff; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; font-weight: 800; font-size: 13px; }
-  .gd-count { background: rgba(255,255,255,.22); border-radius: 99px; padding: 1px 10px; font-size: 11px; }
-  .gd-search { padding: 10px 12px 4px; }
-  .gd-search input { width: 100% !important; max-width: none !important; height: 34px !important; border-radius: 12px !important; background: var(--surface-soft); border: 1px solid var(--border-strong) !important; padding: 0 12px !important; font-size: 13px; }
-  .grade-actions { background: transparent !important; border-bottom: 0 !important; padding: 8px 12px !important; gap: 6px !important; }
-  .grade-actions button { flex: none !important; border-radius: 99px !important; padding: 3px 12px !important; font-size: 12px !important; font-weight: 800 !important; background: #eaf2ff !important; color: #0f3f95 !important; border: 1px solid #cfe0f7 !important; }
-  .grade-actions button:last-child { background: #fff3f3 !important; color: #c53030 !important; border-color: #f5b5b5 !important; }
-  .grade-list { max-height: 260px !important; padding: 0 !important; }
-  .gd-group { display: flex; justify-content: space-between; padding: 6px 14px; font-size: 11px; font-weight: 800; letter-spacing: .06em; color: var(--text-muted); background: var(--surface-soft); cursor: pointer; position: sticky; top: 0; z-index: 1; }
-  .gd-group b { color: #1677ff; font-weight: 800; }
-  .grade-list .item { padding: 7px 14px !important; font-weight: 600; }
-  .grade-list .item.checked { background: #eaf2ff !important; color: #0f3f95 !important; font-weight: 800 !important; }
-  .grade-list .item input[type="checkbox"] { appearance: none; -webkit-appearance: none; width: 17px !important; height: 17px !important; border-radius: 5px; border: 1.5px solid #9cc2f5; background: #fff center/12px no-repeat; cursor: pointer; flex: none; margin: 0; }
-  .grade-list .item input[type="checkbox"]:checked { background-color: #1677ff; border-color: #1677ff;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'><path d='M5 12l5 5 9-10'/></svg>"); }
-  .gd-foot { display: flex; justify-content: space-between; align-items: center; padding: 9px 12px; border-top: 1px solid var(--border); background: var(--surface-soft); font-size: 12px; font-weight: 700; color: var(--text-muted); }
-  .gd-ok { height: 28px; padding: 0 16px !important; border-radius: 99px !important; border: 0 !important; background: linear-gradient(90deg,#0b3f95,#1677ff) !important; color: #fff !important; font-weight: 800; font-size: 12px; cursor: pointer; }
-  :root[data-theme="dark"] .gf-tag { background: #17305c; color: #cfe3ff; }
-  :root[data-theme="dark"] .grade-actions button { background: #17305c !important; color: #cfe3ff !important; border-color: #2a4a80 !important; }
-  :root[data-theme="dark"] .grade-actions button:last-child { background: #3a1d28 !important; color: #ff9aa8 !important; border-color: #6a2a3a !important; }
-  :root[data-theme="dark"] .grade-list .item.checked { background: #17305c !important; color: #cfe3ff !important; }
-
-  /* ---- แถววันที่รับสินค้า (สั่งซื้อประจำวัน) ---- */
-  .alert-date-tabs { border-radius: 14px !important; padding: 8px 12px !important; background: var(--surface-soft) !important; border: 1px solid var(--border) !important; min-height: 50px; gap: 10px; }
-  .alert-date-label { font-size: 12.5px !important; color: var(--text) !important; font-weight: 800; display: inline-flex; align-items: center; gap: 6px; }
-  .alert-date-tab-wrap { height: 34px; border-radius: 999px !important; border: 1.5px solid #b9d0f2 !important; background: var(--surface) !important; align-items: center; }
-  .alert-date-tab { height: 34px; padding: 0 6px 0 14px !important; font-size: 13px !important; font-weight: 800 !important; background: transparent !important; color: #0f3f95 !important; display: inline-flex; align-items: center; gap: 6px; }
-  .alert-date-tab-close { width: 22px; height: 22px; border-radius: 50% !important; margin: 0 6px 0 2px; border: 0 !important; background: #e3efff !important; color: #c53030 !important; display: grid; place-items: center; font-size: 12px !important; padding: 0 !important; line-height: 1; }
-  .alert-date-tab-wrap.is-active { background: linear-gradient(90deg,#0b3f95,#1677ff) !important; border-color: transparent !important; box-shadow: 0 3px 8px rgba(22,119,255,.3); }
-  .alert-date-tab-wrap.is-active .alert-date-tab { color: #fff !important; }
-  .alert-date-tab-wrap.is-active .alert-date-tab-close, .alert-date-tab-wrap.is-active .alert-date-tab-close * { background: rgba(255,255,255,.25) !important; color: #fff !important; }
-  .alert-date-add-btn { height: 34px; padding: 0 16px !important; font-size: 13px !important; font-weight: 800 !important; border: 1.5px dashed #1677ff !important; border-radius: 999px !important; background: var(--surface) !important; color: #1677ff !important; }
-  .first-date-bar { display: flex !important; justify-content: flex-start !important; align-items: center; background: linear-gradient(90deg,#eaf3ff,#f6faff) !important; border: 1px dashed #8fb8f0 !important; padding: 10px 14px !important; margin-bottom: 14px; }
-  .first-date-bar .fd-ic { width: 30px; height: 30px; border-radius: 50%; background: #dcebff; display: grid; place-items: center; color: #1677ff; flex: none; }
-  .first-date-bar .fd-txt { font-weight: 800; color: #0f3f95; font-size: 13px; }
-  .first-date-bar input { margin-left: auto; height: 34px; width: 130px; border: 1.5px solid #b9d0f2; border-radius: 12px; padding: 0 12px; font: 600 13px inherit; background: var(--surface); color: var(--text); }
-  .fd-ok { height: 34px; padding: 0 18px; border-radius: 999px; border: 0; background: linear-gradient(90deg,#0b3f95,#1677ff); color: #fff; font-weight: 800; font-size: 13px; cursor: pointer; }
-  :root[data-theme="dark"] .first-date-bar { background: linear-gradient(90deg,#12284f,#0f2040) !important; border-color: #2a4a80 !important; }
-  :root[data-theme="dark"] .first-date-bar .fd-txt, :root[data-theme="dark"] .alert-date-tab { color: #cfe3ff !important; }
-  :root[data-theme="dark"] .first-date-bar .fd-ic { background: #17305c; }
-
-  /* ---- หน้าตั้งค่า (Data Master / Price Master / ผู้ใช้) ---- */
-  .set-scroll { max-height: 62vh; overflow: auto; border-radius: 12px; }
-  .set-table { width: 100% !important; }
-  .set-table td { height: 40px; padding: 0 12px !important; }
-  .set-table td.n { text-align: right; }
-  .set-key { color: var(--tbl-head-tx); }
-  .set-act { text-align: center; white-space: nowrap; }
-  .sb-btn { height: 26px; padding: 0 12px !important; border-radius: 999px !important; font-size: 12px !important; font-weight: 800 !important; border: 1px solid #9cc2f5 !important; color: #0f3f95 !important; background: #f2f8ff !important; margin: 0 3px; cursor: pointer; box-shadow: none !important; }
-  .sb-btn.danger { border-color: #f5b5b5 !important; color: #c53030 !important; background: #fff3f3 !important; }
-  .sb-btn:hover { filter: brightness(.97); }
-  .set-count { margin-top: 10px; font-size: 12px; font-weight: 700; color: var(--text-muted); }
-  .set-role { display: inline-block; padding: 2px 12px; border-radius: 99px; font-size: 12px; font-weight: 800; background: #dff3ff; color: #0a6a9a; }
-  .set-role.role-admin { background: #e3e9ff; color: #2a3fa0; }
-  :root[data-theme="dark"] .sb-btn { background: #17305c !important; color: #cfe3ff !important; border-color: #3a5a94 !important; }
-  :root[data-theme="dark"] .sb-btn.danger { background: #3a1d28 !important; color: #ff9aa8 !important; border-color: #6a2a3a !important; }
-  :root[data-theme="dark"] .set-role { background: #12405c; color: #8fe0ff; } :root[data-theme="dark"] .set-role.role-admin { background: #232f66; color: #b9c6ff; }
-  #tab-settings .filters input#masterSearch { width: 260px !important; }
-
-
-  /* ---- ปรับฟิลเตอร์เลือกหลายรายการ: หัวอ่านชัด + แถวแคบลง ---- */
-  .grade-dropdown { min-width: 240px !important; max-width: 270px !important; }
-  .gd-head, .gd-head * { color: #fff !important; }
-  .gd-head { padding: 8px 12px !important; }
-  .gd-head .gd-count { background: rgba(255,255,255,.25) !important; }
-  .gd-search { padding: 8px 10px 2px !important; }
-  .gd-search input { display: block; width: 100% !important; box-sizing: border-box !important; height: 28px !important; font-size: 12px !important; }
-  .grade-actions { padding: 6px 10px !important; }
-  .grade-actions button { padding: 2px 10px !important; font-size: 11.5px !important; line-height: 1.5; }
-  .grade-list { max-height: 230px !important; }
-  .grade-list .item { padding: 3px 12px !important; min-height: 0 !important; line-height: 1.3; font-size: 12.5px; gap: 8px; }
-  .grade-list .item input[type="checkbox"] { width: 15px !important; height: 15px !important; }
-  .gd-group { padding: 3px 12px !important; font-size: 10.5px !important; }
-  .gd-foot { padding: 6px 10px !important; }
-  .gd-ok { height: 26px !important; }
-
-
-  html body .grade-dropdown .item > span, html body .grade-dropdown .gd-group > span, html body .grade-dropdown .gd-group > b { height: auto !important; min-height: 0 !important; padding: 0 !important; margin: 0 !important; line-height: 1.3 !important; display: inline !important; }
-  html body .grade-dropdown .item > input[type="checkbox"] { padding: 0 !important; margin: 0 !important; height: 15px !important; width: 15px !important; }
-  html body .grade-dropdown .gd-group { height: auto !important; min-height: 0 !important; display: flex; align-items: center; }
-  html body .card .grade-dropdown .gd-search input, html body .grade-dropdown .gd-search input { width: 100% !important; max-width: 100% !important; }
-
-
-  /* ---- ไฮไลท์วันที่ใช้ม้วนกระดาษสูงสุดใน popup ---- */
-  .pop-table tr.pop-max > td { background: #dcebff !important; font-weight: 800; color: #0b3f95; }
-  .pop-table tr.pop-max > td:first-child { box-shadow: inset 4px 0 0 #1677ff; }
-  .pop-maxtag { display: inline-block; margin-left: 8px; padding: 1px 10px; border-radius: 99px; background: linear-gradient(90deg,#0b3f95,#1677ff); color: #fff; font-size: 11px; font-weight: 800; vertical-align: 1px; }
-  :root[data-theme="dark"] .pop-table tr.pop-max > td { background: #17305c !important; color: #cfe3ff; }
-
-
-  /* ======== popup สั่งซื้อประจำวัน (ดีไซน์ใหม่) ======== */
-  #modalAlertMatrixCell .modal { max-width: 860px !important; width: 94vw; }
-  #alertMatrixCellBody .matrix-cell-summary { background: transparent !important; border: 0 !important; padding: 0 !important; margin: 0 0 12px !important; box-shadow: none !important; }
-  #alertMatrixCellBody .matrix-cell-summary-title { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 800; color: #1677ff !important; margin-bottom: 8px; }
-  #alertMatrixCellBody .alert-status-badge { background: #dcebff !important; color: #0f3f95 !important; border-radius: 99px; padding: 2px 12px; font-size: 12px; font-weight: 800; }
-  #alertMatrixCellBody .matrix-cell-grid { display: grid !important; grid-template-columns: repeat(4, 1fr) !important; gap: 10px !important; }
-  #alertMatrixCellBody .matrix-cell-row { flex-direction: column !important; align-items: flex-start !important; gap: 2px; background: var(--surface-soft); border: 1px solid var(--border) !important; border-radius: 12px; padding: 8px 12px !important; }
-  #alertMatrixCellBody .matrix-cell-row .label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
-  #alertMatrixCellBody .matrix-cell-row .value { font-size: 18px; font-weight: 800; color: #0b3f95; }
-  #alertMatrixCellBody .matrix-alert-big { margin-top: 10px; border-radius: 12px !important; padding: 10px !important; font-size: 17px !important; font-weight: 800 !important; }
-  #alertMatrixCellBody .matrix-alert-big.green { background: linear-gradient(90deg,#d9f7e4,#eafaf0) !important; border: 1px solid #9be2b6 !important; color: #0f7a3d !important; }
-  #alertMatrixCellBody .matrix-alert-big.red { background: linear-gradient(90deg,#ffe0e0,#fff0f0) !important; border: 1px solid #f5a8a8 !important; color: #c53030 !important; }
-  #alertMatrixCellBody .matrix-alert-big.yellow { background: linear-gradient(90deg,#e3efff,#f2f8ff) !important; border: 1px solid #b9d0f2 !important; color: #0f3f95 !important; }
-  #alertMatrixCellBody .res-box { background: var(--surface-soft) !important; border: 1px solid var(--border) !important; border-radius: 12px !important; padding: 9px 14px !important; }
-  #alertMatrixCellBody .res-box .matrix-cell-summary-title { color: var(--text-muted) !important; margin-bottom: 0; }
-  #alertMatrixCellBody .res-box .alert-status-badge { background: #dcebff !important; color: #0f3f95 !important; }
-  #alertMatrixCellBody .matrix-order-form { border: 0 !important; padding: 0 !important; background: transparent !important; }
-  #alertMatrixCellBody .matrix-order-form-header h4, #alertMatrixCellBody .matrix-order-form h4 { color: #1677ff !important; font-weight: 800; }
-  #alertMatrixCellBody .add-row-btn { border: 1.5px dashed #1677ff !important; color: #1677ff !important; background: var(--surface) !important; border-radius: 99px !important; padding: 3px 16px !important; font-weight: 800; }
-  #alertMatrixCellBody .matrix-order-rows { max-height: 46vh; gap: 0 !important; border: 1px solid var(--border); border-radius: 12px; overflow: auto; }
-  #alertMatrixCellBody .matrix-order-row { display: grid !important; grid-template-columns: 62px 84px 1.2fr 1fr 1fr 1.3fr 30px; gap: 8px; align-items: end; border: 0 !important; border-bottom: 1px solid var(--border) !important; border-radius: 0 !important; padding: 8px 10px !important; background: var(--surface) !important; }
-  #alertMatrixCellBody .matrix-order-row:nth-child(even) { background: var(--surface-soft) !important; }
-  #alertMatrixCellBody .matrix-order-row-head, #alertMatrixCellBody .matrix-order-row .form-row { display: contents !important; }
-  #alertMatrixCellBody .matrix-order-row-head .row-label { align-self: center; padding-bottom: 6px; white-space: nowrap; }
-  #alertMatrixCellBody .matrix-order-row-head .row-res-tag { display: none; }
-  #alertMatrixCellBody .row-remove-btn { order: 20; width: 26px; height: 26px; padding: 0 !important; border-radius: 50% !important; background: #ffe3e3 !important; color: #c53030 !important; border: 0 !important; margin-bottom: 4px; }
-  #alertMatrixCellBody .matrix-order-row .form-field label { font-size: 11px; font-weight: 800; color: var(--text-muted); }
-  #alertMatrixCellBody .matrix-order-form .form-field input, #alertMatrixCellBody .matrix-order-form .form-field select { height: 30px; border-radius: 10px !important; border: 1.5px solid #b9d0f2 !important; padding: 0 8px !important; width: 100% !important; font-size: 13px; }
-  #alertMatrixCellBody .matrix-order-form .form-field input.qty-input { color: #1677ff; text-align: center; }
-  #alertMatrixCellBody .form-actions button { border-radius: 99px !important; padding: 7px 24px !important; }
-  #alertMatrixCellBody .form-actions button.primary { background: linear-gradient(90deg,#0b3f95,#1677ff) !important; color: #fff !important; border: 0 !important; }
-  #alertMatrixCellBody .matrix-order-prompt { background: var(--surface-soft) !important; border: 1px dashed #8fb8f0 !important; border-radius: 12px !important; }
-  #alertMatrixCellBody .matrix-order-prompt p { color: #0f3f95 !important; }
-
-  /* ======== สีม้วนเต็ม / เศษ / รอกรอ (สว่างสด) ======== */
-  .nf { color: #1677ff; font-weight: 800; } .ns { color: #38bdf8; font-weight: 800; } .nw { color: #a3b1c6; font-weight: 800; }
-  #stockBody .report-table td .cell-main .nf, #stockBody .report-table td .cell-main .ns, #stockBody .report-table td .cell-main .nw { font-weight: 800; }
-  #stockBody .report-table td .cell-main { color: inherit !important; }
-  .pc-f { background: #d6e8ff !important; color: #1677ff !important; } .pc-s { background: #d9f3ff !important; color: #0ea5e9 !important; } .pc-w { background: #eef1f6 !important; color: #8b9bb2 !important; }
-  .st-f { background: #d6e8ff !important; color: #1677ff !important; } .st-f i { background: #1677ff !important; }
-  .st-s { background: #d9f3ff !important; color: #0ea5e9 !important; } .st-s i { background: #38bdf8 !important; }
-  .st-w { background: #eef1f6 !important; color: #8b9bb2 !important; } .st-w i { background: #a3b1c6 !important; }
-  :root[data-theme="dark"] .st-f, :root[data-theme="dark"] .pc-f { background: #17305c !important; color: #6db0ff !important; }
-  :root[data-theme="dark"] .st-s, :root[data-theme="dark"] .pc-s { background: #10405a !important; color: #7fd6ff !important; }
-  :root[data-theme="dark"] .st-w, :root[data-theme="dark"] .pc-w { background: #2a3447 !important; color: #b4c0d4 !important; }
-  :root[data-theme="dark"] .nf { color: #5aa2ff; } :root[data-theme="dark"] .ns { color: #6fd0ff; } :root[data-theme="dark"] .nw { color: #9aa9c0; }
-  #modalStockDetail .modal { max-width: 1180px !important; width: 95vw; }
-  #modalReceiveDetail .modal { max-width: 960px !important; width: 94vw; }
-  .pop-table tr.pop-total td { background: #dcebff !important; font-weight: 800; color: #0b3f95; }
-
-
-  /* ---- hover ไฮไลท์แถว+คอลัมน์ใน Matrix ---- */
-  html body table tbody td.hl-line.hl-line.hl-line { background-color: #e6f0ff !important; }
-  html body table tbody td.hl-cell.hl-cell.hl-cell.hl-line { background-color: #cfe1ff !important; }
-  :root[data-theme="dark"] body table tbody td.hl-line.hl-line.hl-line { background-color: #1c3563 !important; }
-  :root[data-theme="dark"] body table tbody td.hl-cell.hl-cell.hl-cell.hl-line { background-color: #26457f !important; }
-  #alertMatrixCellBody .dd { display: block; width: 100%; }
-  #alertMatrixCellBody .dd-btn { width: 100%; }
-
-
-  /* ======== แท็บ ALL / CA / KA / KI / KK / KW / FSC (ทุกหน้า) ======== */
-  html body .sub-tabs .sub-tab, html body #fcGradeTabs .sub-tab { border: 1.5px solid #b9d0f2 !important; border-radius: 999px !important; padding: 4px 22px !important; font-weight: 800 !important; font-size: 13px !important; color: #0b3f95 !important; background: var(--surface) !important; box-shadow: none !important; transition: all .15s; }
-  html body .sub-tabs .sub-tab:hover, html body #fcGradeTabs .sub-tab:not(.active):hover { background: #eaf3ff !important; border-color: #1677ff !important; color: #1677ff !important; }
-  html body .sub-tabs .sub-tab.active, html body #fcGradeTabs .sub-tab.active { background: linear-gradient(90deg,#0b3f95,#1677ff) !important; border-color: transparent !important; color: #fff !important; box-shadow: 0 3px 8px rgba(22,119,255,.3) !important; }
-  :root[data-theme="dark"] html body .sub-tabs .sub-tab, :root[data-theme="dark"] .sub-tabs .sub-tab { color: #cfe3ff !important; border-color: #2a4a80 !important; }
-  :root[data-theme="dark"] .sub-tabs .sub-tab.active { color: #fff !important; }
-
-
-  html body #btn-tab-fsc, html body #btn-tab-fsc-res, html body #btn-tab-fsc-yearly, html body .sub-tab.fc-fsc { border: 1.5px solid #b9d0f2 !important; color: #0b3f95 !important; background: var(--surface) !important; background-color: var(--surface) !important; box-shadow: none !important; }
-  html body #btn-tab-fsc.active, html body #btn-tab-fsc-res.active, html body #btn-tab-fsc-yearly.active, html body .sub-tab.fc-fsc.active { background: linear-gradient(90deg,#0b3f95,#1677ff) !important; border-color: transparent !important; color: #fff !important; box-shadow: 0 3px 8px rgba(22,119,255,.3) !important; }
-
-
-  /* ======== ตารางผลผลิตรายเดือน (สไตล์เดียวกับตารางการจอง) ======== */
-  #pivotBody table th { text-align: center !important; }
-  #pivotBody table tbody td { height: 30px; text-align: center; border-right: 1px solid var(--tbl-vline) !important; padding-top: 3px !important; padding-bottom: 3px !important; }
-  #pivotBody table tbody tr:nth-child(even) td:not(:first-child):not(:last-child) { background: var(--surface-soft); }
-  #pivotBody table tbody td:first-child { background: var(--primary-soft) !important; text-align: left; font-weight: 800; color: var(--tbl-head-tx, #0b3f95); padding-left: 12px; }
-  #pivotBody table tbody td:last-child { background: var(--primary-soft) !important; font-weight: 800 !important; color: var(--tbl-head-tx, #0b3f95); border-right: 0 !important; }
-
-  /* ======== ตารางผลผลิตรายปี (สไตล์เดียวกับตารางการจอง) ======== */
-  .yearly-pivot-table { border-radius: 14px !important; border: 1px solid var(--border) !important; box-shadow: none !important; background: var(--surface) !important; }
-  .yearly-pivot-table .yearly-pivot-header-grade { background: linear-gradient(90deg,#0b3f95,#1677ff) !important; font-size: 15px !important; text-align: center !important; padding: 9px 16px !important; border-bottom: 0 !important; }
-  .yearly-pivot-table thead th:not(.yearly-pivot-header-grade) { background: linear-gradient(90deg,#0b3f95,#1677ff) !important; text-align: center; }
-  .yearly-pivot-table tbody td { border-right: 1px solid var(--tbl-vline) !important; height: 30px; padding-top: 3px !important; padding-bottom: 3px !important; }
-  .yearly-pivot-table tbody tr:nth-child(even) td:not(.yearly-pivot-month-col):not(.yearly-pivot-total-col) { background: var(--surface-soft); }
-  .yearly-pivot-table .yearly-pivot-month-col, .yearly-pivot-table .yearly-pivot-total-col { background: var(--primary-soft) !important; color: var(--tbl-head-tx, #0b3f95) !important; }
-  .yearly-pivot-table .yearly-pivot-row-total td { background: #dcebff !important; border-top: 0 !important; }
-  :root[data-theme="dark"] .yearly-pivot-table .yearly-pivot-row-total td { background: #17305c !important; }
-
-  .yearly-pivot-table thead th.yearly-pivot-month-col, .yearly-pivot-table thead th.yearly-pivot-total-col { background: linear-gradient(90deg,#0b3f95,#1677ff) !important; color: #fff !important; text-align: center !important; padding-left: 4px !important; }
-  .yearly-pivot-table .yearly-pivot-row-total .yearly-pivot-month-col, .yearly-pivot-table .yearly-pivot-row-total .yearly-pivot-total-col { background: #dcebff !important; }
-  :root[data-theme="dark"] .yearly-pivot-table .yearly-pivot-row-total .yearly-pivot-month-col, :root[data-theme="dark"] .yearly-pivot-table .yearly-pivot-row-total .yearly-pivot-total-col { background: #17305c !important; }
-
-
-  #stockBody .report-table td .cell-main { display: inline-flex !important; flex-direction: row !important; align-items: baseline; justify-content: center; white-space: nowrap; width: auto !important; height: auto !important; gap: 0; }
-  #stockBody .report-table td .cell-main b { display: inline !important; }
-
-
-  /* ======== หน้าจัดทำประมาณการ (ดีไซน์ใหม่) ======== */
-  .fc-table { border-collapse: separate !important; border-spacing: 0; border-radius: 14px; overflow: visible; border: 1px solid var(--border); }
-  .fc-table .fc-title { background: linear-gradient(90deg,#0b3f95,#1677ff) !important; border-bottom: 0 !important; text-align: center !important; font-size: 16px !important; padding: 8px 14px !important; border-radius: 14px 14px 0 0; }
-  .fc-title-in { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-  .fc-title-in > span:first-child { position: sticky; left: 36px; }
-  .fc-tbl-save { height: 28px; padding: 0 16px !important; border-radius: 99px !important; border: 0 !important; background: #fff !important; color: #0b3f95 !important; font-weight: 800; font-size: 12px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,.2); position: sticky; right: 10px; margin-left: auto; }
-  .fc-table thead th:not(.fc-title) { background: linear-gradient(90deg,#0b3f95,#1677ff) !important; color: #fff !important; }
-  .fc-table thead th.fc-tot-h { background: linear-gradient(90deg,#0b3f95,#1677ff) !important; }
-  .fc-table .fc-v-h { width: 24px; min-width: 24px; max-width: 24px; padding: 0 !important; position: sticky; left: 0; z-index: 6; }
-  .fc-table td.fc-v { width: 24px !important; min-width: 24px !important; max-width: 24px !important; padding: 0 !important; position: sticky; left: 0; z-index: 4; color: #fff !important; border-right: 1px solid rgba(255,255,255,.6) !important; border-bottom: 2px solid #fff !important; text-align: center; vertical-align: middle; }
-  .fc-table td.fc-v > span { writing-mode: vertical-rl; transform: rotate(180deg); display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: .02em; white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,.25); }
-  .fc-table td.fc-vA { background: linear-gradient(180deg,#3ba4ff,#1677ff) !important; }
-  .fc-table td.fc-vB { background: linear-gradient(180deg,#ff6ec4,#ff3d9a) !important; }
-  .fc-table td.fc-vC { background: linear-gradient(180deg,#ffa63d,#ff7a18) !important; }
-  .fc-table td.fc-vD { background: linear-gradient(180deg,#34d98b,#12b76a) !important; }
-  .fc-table td.fc-vE { background: linear-gradient(180deg,#22d3ee,#0ea5e9) !important; }
-  .fc-table td.fc-vF { background: linear-gradient(180deg,#ffe14d,#ffc400) !important; color: #6b4300 !important; }
-  .fc-table td.fc-vF > span { text-shadow: none; }
-  .fc-table td.fc-v0 { background: var(--primary-soft) !important; }
-  .fc-table .fc-g { left: 24px !important; background: var(--primary-soft) !important; color: var(--tbl-head-tx, #0b3f95) !important; }
-  .fc-table .fc-s { left: 239px !important; background: var(--surface-soft) !important; color: var(--text) !important; }
-  .fc-table td { border-right: 1px solid var(--tbl-vline) !important; border-color: var(--tbl-vline); }
-  .fc-table tr.fc-hl1 td.fc-c, .fc-table tr.fc-hl1 td.fc-tot, .fc-table tr.fc-hl2 td.fc-c, .fc-table tr.fc-hl2 td.fc-tot { background: #dcebff !important; color: #0b3f95 !important; border-top: 0 !important; border-bottom: 0 !important; }
-  .fc-table tr.fc-hl1 td.fc-g, .fc-table tr.fc-hl2 td.fc-g { background: #dcebff !important; color: #0b3f95 !important; border-top: 0 !important; }
-  .fc-table tr.fc-final td { background: linear-gradient(90deg,#0b3f95,#1677ff) !important; color: #fff !important; border: 0 !important; font-size: 15px; }
-  .fc-table tr.fc-final td.fc-g { background: #0b3f95 !important; color: #fff !important; }
-  .fc-table tr.fc-final td.fc-v0 { background: #0b3f95 !important; }
-  .fc-table td.fc-in input, .fc-pct { border: 1.5px solid #b9d0f2 !important; border-radius: 10px !important; background: #fff !important; }
-  .fc-table td.fc-in input:focus, .fc-pct:focus { border-color: #1677ff !important; outline: 0 !important; box-shadow: 0 0 0 3px rgba(22,119,255,.2) !important; }
-  .fc-table .fc-note { border-radius: 50% !important; width: 26px; height: 26px; background: #eaf3ff !important; color: #1677ff !important; border: 0 !important; font-weight: 800; padding: 0 !important; }
-  .fc-table .fc-note.has { background: #1677ff !important; color: #fff !important; }
-  .fc-table td.fc-neg, .fc-table td.fc-neg-val { color: #d64545 !important; }
-  .fc-table .fc-gray, .fc-table .fc-pick { border: 1.5px solid #b9d0f2 !important; border-radius: 99px !important; background: #fff !important; color: #0b3f95 !important; font-weight: 800; }
-  .fc-table .fc-mini { border: 1.5px dashed #1677ff !important; color: #1677ff !important; background: #fff !important; border-radius: 99px !important; font-weight: 800; padding: 1px 12px !important; }
-  :root[data-theme="dark"] .fc-table tr.fc-hl1 td.fc-c, :root[data-theme="dark"] .fc-table tr.fc-hl1 td.fc-tot, :root[data-theme="dark"] .fc-table tr.fc-hl2 td.fc-c, :root[data-theme="dark"] .fc-table tr.fc-hl2 td.fc-tot, :root[data-theme="dark"] .fc-table tr.fc-hl1 td.fc-g, :root[data-theme="dark"] .fc-table tr.fc-hl2 td.fc-g { background: #17305c !important; color: #cfe3ff !important; }
-
-
-
-  /* ===== ตรวจสอบรายการ (สั่งซื้อประจำวัน) ===== */
-  html body #modalAlertPODetail .modal { max-width: 780px !important; border-radius: 18px; overflow: hidden; padding: 0 !important; display: flex; flex-direction: column; }
-  html body #modalAlertPODetail .modal-head { background: linear-gradient(90deg,#0b3f95,#1677ff) !important; color: #fff !important; padding: 14px 20px !important; margin: 0 !important; border: 0 !important; }
-  html body #modalAlertPODetail .modal-head h3 { color: #fff !important; }
-  html body #modalAlertPODetail .modal-head button { background: #fff !important; color: #0b3f95 !important; border: 0 !important; border-radius: 99px !important; padding: 4px 16px !important; font-weight: 700; }
-  #alertPODetailBody { padding: 16px 20px 4px; overflow: auto; flex: 1; }
-  .pv-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 14px; }
-  .pv-st { background: linear-gradient(135deg,#f3f8ff,#e3efff); border: 1.5px solid #cfe0f7; border-radius: 14px; padding: 10px 14px; }
-  .pv-st small { display: block; color: #5b7299; font-size: 11px; }
-  .pv-st b { font-size: 24px; color: #0b3f95; }
-  .pv-st span { font-size: 12px; color: #5b7299; }
-  .pv-st-o { background: linear-gradient(135deg,#fff3e3,#ffe2c2); border-color: #ffd3a1; }
-  .pv-st-o b { color: #c2560a; }
-  .pv-day { margin-bottom: 14px; }
-  .pv-dh { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; background: #eaf3ff; border: 1.5px solid #cfe0f7; border-bottom: 0; border-radius: 14px 14px 0 0; padding: 9px 14px; font-size: 13px; font-weight: 700; color: #0f2a55; }
-  .pv-dh em { font-style: normal; display: flex; gap: 6px; flex-wrap: wrap; }
-  .pv-sp { display: inline-block; padding: 2px 11px; border-radius: 99px; font-size: 11.5px; font-weight: 800; color: #fff; }
-  .pv-EKP { background: linear-gradient(90deg,#ff8a00,#ff5e00); }
-  .pv-MKP { background: linear-gradient(90deg,#00b85c,#00a14b); }
-  .pv-SCGP { background: linear-gradient(90deg,#26277f,#0a84d6); }
-  .pv-OT { background: linear-gradient(90deg,#8a9bb8,#a3b1c6); }
-  html body #modalAlertPODetail table.pv-tbl { table-layout: fixed; width: 100%; border-collapse: collapse; border: 1.5px solid #cfe0f7; font-size: 13px; }
-  html body #modalAlertPODetail table.pv-tbl th { background: linear-gradient(90deg, #0b3f95, #1677ff) !important; color: #fff !important; height: 40px; padding: 0 8px !important; font: 800 13px/1 inherit !important; text-align: center; text-transform: none; letter-spacing: 0; border: 0 !important; border-right: 1px solid rgba(255,255,255,.28) !important; vertical-align: middle; }
-  html body #modalAlertPODetail table.pv-tbl th:last-child { border-right: 0 !important; }
-  html body #modalAlertPODetail table.pv-tbl th.pv-c { text-align: center; }
-  html body #modalAlertPODetail table.pv-tbl td { padding: 6px 10px !important; border: 0 !important; border-bottom: 1px solid var(--tbl-line, #e3ecf9) !important; border-right: 1px solid var(--tbl-vline, #b4c9e6) !important; background: #fff; color: #0f2a55; }
-  html body #modalAlertPODetail table.pv-tbl td:last-child { border-right: 0 !important; }
-  html body #modalAlertPODetail table.pv-tbl tr:nth-child(even) td { background: #f6faff; }
-  .pv-n { text-align: center; color: #7b8fb3 !important; }
-  .pv-c, .pv-q { text-align: center; }
-  .pv-q span { display: inline-block; min-width: 34px; background: #dcebff; color: #0b3f95; font-weight: 800; border-radius: 8px; padding: 2px 8px; }
-  .pv-g { font-size: 13.5px; }
-  .pv-sz { margin-left: 8px; background: #fff; border: 1.5px solid #b9d0f2; border-radius: 99px; padding: 1px 9px; font-size: 11.5px; color: #3a5a8f; }
-  .pv-tg { border-radius: 99px; padding: 2px 10px; font-size: 11.5px; font-weight: 700; }
-  .pv-tg-c { background: #e0f2fe; color: #0369a1; }
-  .pv-tg-q { background: #fff1d6; color: #b45309; }
-  .pv-note { color: #475f86; font-size: 12.5px; }
-  html body #modalAlertPODetail table.pv-tbl tr.pv-tot td { background: linear-gradient(90deg,#eaf3ff,#d6e8ff) !important; border: 0 !important; border-top: 2px solid #1677ff !important; padding: 7px 14px !important; }
-  .pv-tot-in { display: flex; justify-content: space-between; align-items: center; }
-  .pv-tot-l { font-weight: 800; color: #0b3f95; font-size: 14px; }
-  .pv-tot-l small { margin-left: 8px; font-weight: 600; color: #5b7299; font-size: 12px; }
-  .pv-tot-q { background: linear-gradient(90deg,#0b3f95,#1677ff); color: #fff; border-radius: 99px; padding: 3px 14px; font-size: 12px; font-weight: 700; box-shadow: 0 2px 6px #1677ff44; }
-  .pv-tot-q b { font-size: 14px; margin-right: 3px; }
-  html body #modalAlertPODetail .pv-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 14px 20px !important; margin: 0 !important; background: #f8fbff !important; border-top: 1px solid #e3ecf9 !important; }
-  .pv-ft-total { margin-right: auto; font-size: 13px; color: #5b7299; }
-  .pv-ft-total b { font-size: 18px; color: #0b3f95; }
-  html body #modalAlertPODetail .pv-actions button { border-radius: 99px; padding: 9px 20px; font-weight: 700; font-size: 13px; border: 1.5px solid #b9d0f2; background: #fff; color: #0b3f95; }
-  html body #modalAlertPODetail .pv-actions button.primary { background: linear-gradient(90deg,#12b76a,#34d98b) !important; color: #fff !important; border: 0; box-shadow: 0 4px 12px #12b76a55; }
-
-  /* ---- ลดความรก: ช่องกรอกเรียบ + เลขศูนย์จาง ---- */
-  .fc-table td.fc-in { padding: 2px 3px !important; }
-  .fc-table td.fc-in input { height: 24px !important; border: 1px solid transparent !important; border-radius: 6px !important; background: #f1f6ff !important; font-weight: 700; color: #0b3f95; }
-  .fc-table td.fc-in input:hover { border-color: #b9d0f2 !important; background: #fff !important; }
-  .fc-table td.fc-in input:focus { border-color: #1677ff !important; background: #fff !important; }
-  .fc-table td.fc-in input:placeholder-shown { background: #f6f9ff !important; }
-  html body .fc-table tr td.fc-zero { color: #c5d0e0 !important; font-weight: 400 !important; }
-  html body .fc-table tr.fc-final td.fc-zero { color: rgba(255,255,255,.55) !important; font-weight: 700 !important; }
-  .fc-table td { border-right-color: #dbe7f8 !important; }
-  .fc-table td.fc-c, .fc-table td.fc-tot { font-size: 12.5px; }
-  .fc-table td.fc-v > span { font-size: 12px; }
-  .fc-table td.fc-s .fc-gray, .fc-table td.fc-s .fc-pick, .fc-table td.fc-s .fc-snap { height: 26px; font-size: 12px; padding: 0 10px; }
-  .fc-table .fc-cust { border-radius: 8px !important; border: 1px solid #cfe0f7 !important; background: #fff !important; font-weight: 600; }
-  .fc-table .fc-tot { background: #eaf3ff !important; }
-  :root[data-theme="dark"] .fc-table td.fc-in input { background: #1a2a48 !important; color: #cfe3ff; }
-  :root[data-theme="dark"] .fc-table td.fc-zero { color: #4a5a78 !important; }
-
-  /* เส้นคอลัมน์ตารางอื่นๆ ที่ยังไม่มีเส้น */
-  table:not([class]) { border-collapse: collapse; }
-  table:not([class]) td, .alert-flat-table td, .add-items-table td, .yearly-pivot-table td, .fc-table td { border-right: 1px solid var(--tbl-vline) !important; border-bottom: 1px solid var(--tbl-vline) !important; }
-  table:not([class]) th, .alert-flat-table th, .add-items-table th, .yearly-pivot-table th, .fc-table th { border-right: 1px solid rgba(255,255,255,.28) !important; }
-  table:not([class]) td:last-child, table:not([class]) th:last-child, .alert-flat-table td:last-child, .alert-flat-table th:last-child, .add-items-table td:last-child, .add-items-table th:last-child, .yearly-pivot-table td:last-child, .yearly-pivot-table th:last-child, .fc-table td:last-child, .fc-table th:last-child { border-right: 0 !important; }
-
-  /* ===================== ประมาณการสั่งซื้อ: ดีไซน์ใหม่ (เทค/สดใส) พอดีหน้าจอ ===================== */
-  html body .fc-tbl-wrap { border: 0 !important; border-radius: 22px !important; background: #fff; box-shadow: 0 14px 40px rgba(27,79,209,.16), 0 0 0 1px #d7e5ff; overflow-x: auto; overflow-y: hidden; }
-  html body .fc-table { table-layout: fixed !important; width: 100% !important; border: 0 !important; border-radius: 0 !important; font-variant-numeric: tabular-nums; }
-  html body .fc-table col.c-v { width: 22px; } html body .fc-table col.c-g { width: 152px; } html body .fc-table col.c-s { width: 170px; } html body .fc-table col.c-t { width: 54px; }
-  html body .fc-table td, html body .fc-table th { border: 0 !important; border-bottom: 1px solid #edf2fb !important; height: 34px; padding: 0 2px !important; white-space: nowrap; overflow: hidden; text-overflow: clip; min-width: 0 !important; max-width: none !important; width: auto !important; }
-  /* ชื่อกลุ่ม + แถบสีรุ้ง */
-  html body .fc-table th.fc-title { background: radial-gradient(120% 260% at 15% 0%, #1f6bff 0, #0a2a8a 55%, #071a5c 100%) !important; height: 46px; padding: 0 !important; border: 0 !important; position: sticky; left: 0; overflow: visible; }
-  html body .fc-table th.fc-title::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: linear-gradient(90deg,#22d3ee,#6366f1,#ec4899,#f59e0b); }
-  html body .fc-title-in { display: flex !important; width: 100% !important; justify-content: center; align-items: center; position: relative; padding: 0 !important; height: 43px; font-size: 17px; font-weight: 800; letter-spacing: .5px; color: #fff; }
-  html body .fc-title-in > span:first-child { position: static; }
-  html body .fc-tbl-save { position: absolute; right: 16px; top: 8px; }
-  html body .fc-warnmsg { position: absolute; left: 16px; font-size: 12px; }
-  /* หัวขนาด */
-  html body .fc-table thead tr + tr th { background: #0d2f8f !important; color: #cfe3ff !important; font-weight: 700; font-size: 12px; height: 32px; }
-  html body .fc-table thead th[data-s] { background: linear-gradient(180deg,#143fb5,#0d2f8f) !important; color: #fff !important; }
-  html body .fc-table thead th.fc-tot-h { background: linear-gradient(180deg,#22d3ee,#0ea5e9) !important; color: #fff !important; }
-  html body .fc-table thead th.fc-g { text-align: left; padding-left: 12px !important; }
-  html body .fc-table thead th.fc-v-h { background: #0d2f8f !important; }
-  /* แถบสีซ้าย */
-  html body .fc-table td.fc-v { padding: 0 !important; border-bottom: 0 !important; }
-  html body .fc-table td.fc-v > span { font-size: 11px; }
-  /* ป้ายรายการ */
-  html body .fc-table td.fc-g, html body .fc-table td.fc-s { white-space: normal; line-height: 1.15; font-size: 11.5px; font-weight: 700; padding: 0 8px !important; text-align: left; background: #f4f8ff !important; color: #12326f !important; }
-  html body .fc-table td.fc-g { left: 22px !important; }
-  html body .fc-table td.fc-s { left: 162px !important; border-right: 1px solid #e3ecfb !important; }
-  html body .fc-table td.fc-g[colspan="2"] { border-right: 1px solid #e3ecfb !important; }
-  /* ตัวเลข */
-  html body .fc-table td.fc-c { font-size: 11.5px; font-weight: 600; color: #1b3a75; }
-  html body .fc-table td.fc-tot { background: #eef5ff !important; color: #0b3f95; font-weight: 800; font-size: 12px; }
-  html body .fc-table tr.fc-hl1 td, html body .fc-table tr.fc-hl2 td { background: #e4f0ff !important; color: #0b3f95 !important; font-weight: 800; border-top: 0 !important; }
-  html body .fc-table tr.fc-hl1 td.fc-v, html body .fc-table tr.fc-hl2 td.fc-v { background: unset; }
-  html body .fc-table td.fc-neg { background: #ffe3e6 !important; box-shadow: none !important; color: #d1243b !important; }
-  /* ช่องกรอก */
-  html body .fc-table td.fc-in { padding: 0 2px !important; }
-  html body .fc-table td.fc-in input { width: 100% !important; height: 24px !important; border: 0 !important; border-radius: 8px !important; background: #f1f6ff !important; text-align: center; font-size: 11.5px; font-weight: 700; color: #0b3f95; padding: 0 !important; box-shadow: none !important; }
-  html body .fc-table td.fc-in input:hover { background: #fff !important; box-shadow: 0 0 0 1.5px #b9d0f2 !important; }
-  html body .fc-table td.fc-in input:focus { background: #fff !important; box-shadow: 0 0 0 2px #1677ff !important; }
-  html body .fc-table .fc-gray, html body .fc-table .fc-pick, html body .fc-table .fc-snap, html body .fc-table .fc-cust { height: 24px !important; border: 1px solid #cfe0fb !important; border-radius: 99px !important; background: #fff !important; box-shadow: 0 1px 3px rgba(27,79,209,.14); font-size: 11.5px !important; font-weight: 700; padding: 0 10px !important; color: #2a4a8f !important; max-width: 100%; }
-  html body .fc-table td.fc-s .fc-gray, html body .fc-table td.fc-s .fc-pick, html body .fc-table td.fc-s .fc-snap, html body .fc-table td.fc-s .fc-cust { width: 100%; }
-  html body .fc-table .fc-note { width: 22px !important; height: 22px !important; font-size: 12px; }
-  html body .fc-table .fc-mini { font-size: 11px; padding: 0 10px !important; }
-  /* แถวสรุป */
-  html body .fc-table tr.fc-final { background: linear-gradient(90deg,#0b2a8a,#1677ff 60%,#22d3ee); }
-  html body .fc-table tr.fc-final td { background: transparent !important; color: #fff !important; height: 40px; font-size: 14px; font-weight: 800; border: 0 !important; text-shadow: 0 1px 2px rgba(0,0,0,.25); }
-  html body .fc-table tr.fc-final td.fc-g { font-size: 12.5px; text-align: left; }
-  html body .fc-table tr.fc-final td.fc-v0 { background: #0b2a8a !important; }
-  html body .fc-table tr.fc-adj td { height: 34px; }
-
-  /* ช่องจำนวน: ซ่อนลูกศรขึ้น-ลง (ไม่ให้โผล่ตอนเอาเมาส์วาง) */
-  input.matrix-row-qty::-webkit-outer-spin-button, input.matrix-row-qty::-webkit-inner-spin-button, .qty-input::-webkit-outer-spin-button, .qty-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-  input.matrix-row-qty, .qty-input { -moz-appearance: textfield; appearance: textfield; text-align: center; }
-
-  /* ช่องกรอกในหน้าต่างหลังคลิกเซล: สูง/ขอบ/มุมเท่าเมนูเลือก */
-  html body #alertMatrixCellBody .matrix-order-row input.matrix-row-qty, html body #alertMatrixCellBody .matrix-order-row input.matrix-row-note {
-    height: 34px !important; box-sizing: border-box; padding: 0 10px !important; border: 1.5px solid var(--border-strong) !important; border-radius: 12px !important;
-    background: var(--surface) !important; font: 700 12.5px/1 inherit !important; color: var(--text); width: 100%; box-shadow: none !important; }
-  html body #alertMatrixCellBody .matrix-order-row input.matrix-row-qty { color: #1677ff; text-align: center; }
-  html body #alertMatrixCellBody .matrix-order-row input.matrix-row-qty:hover, html body #alertMatrixCellBody .matrix-order-row input.matrix-row-note:hover { border-color: #1677ff !important; }
-  html body #alertMatrixCellBody .matrix-order-row input.matrix-row-qty:focus, html body #alertMatrixCellBody .matrix-order-row input.matrix-row-note:focus { border-color: #1677ff !important; box-shadow: 0 0 0 3px rgba(22,119,255,.18) !important; outline: 0; }
-  html body #alertMatrixCellBody .matrix-order-row input::placeholder { color: #9fb0cc; font-weight: 600; }
-
-  /* โหลดซ้ำ: คงของเดิมไว้จางๆ แล้วสลับเป็นผลใหม่ (ไม่กระพริบเป็นหน้าว่าง) */
-  .ld-dim { opacity: .5; pointer-events: none; transition: opacity .15s ease; position: relative; }
-  .ld-dim::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: linear-gradient(90deg,#22d3ee,#1677ff,#6366f1,#22d3ee); background-size: 200% 100%; animation: ldbar 1s linear infinite; border-radius: 3px; }
-  @keyframes ldbar { to { background-position: -200% 0; } }
-
-  /* ===== เมนูซ้ายมือ: ตัวเล็ก/กรอบเตี้ย รองรับ Tab เพิ่มในอนาคต ===== */
-  html body .sb-group { margin-bottom: 3px; }
-  html body .sb-group-head { padding: 9px 11px; font: 700 12.5px 'Sarabun', sans-serif; gap: 8px; border-radius: 10px; }
-  html body .sb-group-head .chev { width: 14px; height: 14px; }
-  html body .sb-group-head .gi { width: 16px; height: 16px; }
-  html body .sb-items { padding: 2px 0 1px 10px; margin-left: 8px; }
-  html body .sb-item { padding: 4px 9px; margin: 2px 0; gap: 9px; font: 500 12.5px/1.3 'Sarabun', sans-serif; border-radius: 8px; align-items: center; }
-  html body .sb-item .ii { width: 15px; height: 15px; margin-top: 0; }
-  html body .sb-item.active { font-weight: 700; box-shadow: 0 4px 12px rgba(24,150,255,.32); }
-
-  /* ===== หน้าระดับ Stock ===== */
-  html body #matrixBody .report-wrap { max-height: calc(100vh - 395px) !important; min-height: 240px; }
-  .calc-note { flex: 0 0 100%; font-size: 12.5px; font-weight: 800; color: #0b3f95; padding: 2px 0 6px 10px; border-left: 4px solid #1677ff; margin-bottom: 4px; line-height: 1.4; }
-  :root[data-theme="dark"] .calc-note { color: #a9d4ff; }
-  .bn-ctl .dd { display: inline-block; }
-  .bn-ctl .dd-btn { height: 28px; min-width: 0; padding: 0 6px 0 10px; border: 0; background: #fff; color: #0b3f95; font-size: 12.5px; }
-  .bn-ctl .dd-btn:hover { border: 0; }
-
-  /* ป๊อปอัป: แถววันที่ใช้ม้วนสูงสุด สีเข้ม */
-  html body .pop-table tr.pop-max > td { background: #1f78ff !important; color: #fff !important; font-weight: 800; }
-  html body .pop-table tr.pop-max > td:first-child { box-shadow: inset 5px 0 0 #0b3f95; }
-  html body .pop-table tr.pop-max .pop-maxtag { background: #fff; color: #0b3f95; }
-  html body .pop-table tr.pop-max .st-f, html body .pop-table tr.pop-max button { color: #0b3f95; }
-
-  /* พับแบนเนอร์ด้านบน */
-  html body .page-banner { min-height: 144px; align-items: flex-start; max-height: 320px; transition: max-height .35s ease, min-height .35s ease, margin .35s ease, opacity .25s ease; }
-  html body .page-banner.bn-collapsed { max-height: 0 !important; min-height: 0 !important; margin-top: 0 !important; margin-bottom: 0 !important; opacity: 0; border-width: 0 !important; box-shadow: none !important; pointer-events: none; }
-  html body:has(.page-banner.bn-collapsed) #matrixBody .report-wrap { max-height: calc(100vh - 250px) !important; }
-
-  /* ---------- สั่งซื้อประจำวัน: เซลใน Matrix เล็กลง ~80% (กรอบเท่าเดิม) + ปุ่มซ่อน Size ---------- */
-  html body #alertMatrixWrap .alert-matrix-new-table td, html body #alertMatrixWrap .alert-matrix-new-table th { height: 25px !important; font-size: 10px !important; padding: 1px 1px !important; width: 38px; min-width: 38px; }
-  html body #alertMatrixWrap .alert-matrix-new-table thead th { height: 26px !important; font-size: 10.5px !important; padding: 0 2px !important; }
-  html body #alertMatrixWrap .alert-matrix-new-table tr.total-row-matrix td { font-size: 10px !important; padding: 2px 3px !important; height: 26px !important; }
-  html body #alertMatrixWrap .alert-matrix-new-table td.grade-col-matrix, html body #alertMatrixWrap .alert-matrix-new-table th.grade-col-matrix { min-width: 76px !important; font-size: 10.5px !important; padding-left: 8px; }
-  html body #alertMatrixWrap .alert-matrix-new-table td.total-col-matrix, html body #alertMatrixWrap .alert-matrix-new-table th.total-col-matrix { min-width: 58px !important; font-size: 10px !important; }
-  html body #alertMatrixWrap .alert-matrix-new-table .matrix-cell { padding: 1px 2px; }
-  html body #alertMatrixWrap .alert-matrix-new-table .matrix-value { min-width: 0 !important; padding: 1px 3px !important; border-radius: 7px !important; font-size: 10px !important; line-height: 1.3 !important; }
-  html body #alertMatrixWrap .alert-matrix-new-table .matrix-cell.has-order .matrix-value, html body #alertMatrixWrap .alert-matrix-new-table .matrix-cell.order-incomplete .matrix-value { box-shadow: 0 0 0 1.5px #1677ff; }
-  html body #alertMatrixWrap .alert-matrix-new-table .matrix-cell.order-incomplete .matrix-value { box-shadow: 0 0 0 1.5px #f59e0b; }
-  html body #alertMatrixWrap .alert-matrix-new-table .matrix-cart-svg { top: -5px; right: -5px; width: 12px !important; height: 12px !important; padding: 1.5px; }
-  html body #alertMatrixWrap .alert-matrix-new-table .sz-hide { display: none !important; }
-  html body #alertMatrixWrap .alert-matrix-new-table tr.gr-hide { display: none !important; }
-  .szh-sec { font-weight: 700; color: #0b3f95; margin: 8px 0 5px; font-size: 12px; }
-  .szh-chips { max-height: 150px !important; }
-  .sz-hide-btn { padding-left: 11px !important; padding-right: 11px !important; }
-  .sz-hide-btn .szh-n { background: #1677ff; color: #fff; border-radius: 99px; padding: 0 6px; font-size: 11px; margin-left: 3px; }
-  .sz-hide-btn.szh-on { background: #eaf3ff !important; border-color: #1677ff !important; color: #0b3f95 !important; }
-  .szh-pop { position: fixed; z-index: 9999; width: 320px; background: #fff; border: 1.5px solid #b9d0f2; border-radius: 14px; box-shadow: 0 12px 32px rgba(11,63,149,.25); padding: 12px; font-size: 12.5px; color: #1d2b44; }
-  .szh-hd { display: flex; justify-content: space-between; align-items: center; font-weight: 700; margin-bottom: 8px; }
-  .szh-clear { color: #1677ff; cursor: pointer; font-weight: 600; }
-  .szh-chips { display: flex; flex-wrap: wrap; gap: 5px; max-height: 190px; overflow: auto; }
-  .szh-pop .szh-chip { padding: 3px 10px; border-radius: 999px; border: 1.5px solid #b9d0f2; background: #fff; color: #1d2b44; font-weight: 600; font-size: 12px; cursor: pointer; box-shadow: none; }
-  .szh-pop .szh-chip.h { background: #1677ff; border-color: #1677ff; color: #fff; }
-  .szh-ft { display: flex; gap: 6px; margin-top: 10px; }
-  .szh-pop .szh-all, .szh-pop .szh-close { border: 1.5px solid #b9d0f2; border-radius: 999px; background: #fff; color: #0b3f95; font-weight: 600; font-size: 12px; padding: 5px 14px; cursor: pointer; box-shadow: none; }
-  .szh-pop .szh-all.on { background: #eaf3ff; border-color: #1677ff; }
-  /* เมนูซ้าย: กว้างขึ้นเล็กน้อย ไม่ตัดเป็น 2 บรรทัด (ถ้ายาวเกิน JS จะลดขนาดอักษรให้พอดี) */
-  html body { --sb-w: 304px; }
-  html body.sb-collapsed { --sb-w: var(--sb-w-collapsed); }
-  html body .sb-item .it { white-space: nowrap !important; word-break: normal !important; overflow: visible; line-height: 1.55; padding: 1px 0; }
-  html body .sidebar .nav { overflow-x: hidden; }
-  html body .filters:has(#alertSizeHideBtn) { column-gap: 5px !important; }
-  html body .filters:has(#alertSizeHideBtn) > button:not(.sz-hide-btn) { padding-left: 12px !important; padding-right: 12px !important; }
-  html body .filters:has(#alertSizeHideBtn) > label > input[type="text"] { width: 88px !important; min-width: 0 !important; padding-left: 8px !important; padding-right: 6px !important; }
-  html body .filters:has(#alertSizeHideBtn) > label { gap: 4px; }
-  html body #alertMatrixWrap .alert-matrix-new-table { width: max-content !important; min-width: 0 !important; table-layout: auto; }
-  html body #alertMatrixWrap .alert-matrix-new-table th.grade-col-matrix, html body #alertMatrixWrap .alert-matrix-new-table td.grade-col-matrix, html body #alertMatrixWrap .alert-matrix-new-table th.total-col-matrix, html body #alertMatrixWrap .alert-matrix-new-table td.total-col-matrix { width: auto; }
-  /* เมนูซ้าย: ตัวอักษรคมขึ้น */
-  html body .sb-item { font-size: 13px; }
-  :root[data-theme="light"] html body .sb-item, html body :root[data-theme="light"] .sb-item { color: #f2f7ff; }
-  :root[data-theme="light"] .sb-item { color: #f2f7ff; }
-  :root[data-theme="light"] .sb-item .ii { color: #b8d6ff; }
-  :root[data-theme="light"] .sb-group-head { color: #fff; }
-  :root[data-theme="light"] .sb-brand small { color: #cfe3ff; }
-  /* ---------- ตัวหนังสือคมชัดทั้งเว็บ ---------- */
-  /* แถบบนที่โปร่งแสง+เบลอ ทำให้ตัวหนังสือฟุ้ง → ทึบขึ้น */
-  :root[data-theme="light"] .topbar { background: rgba(255,255,255,.96) !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
-  html body .page-banner h1 { text-shadow: 0 1px 2px rgba(0,20,80,.35); }
-  /* กรอบ Matrix สั่งซื้อประจำวัน: สูงขึ้นจนหน้าแรกเห็นแค่ตัวเลขสรุป + ปุ่มสร้าง PO / ล้างค่า */
-  html body #alertMatrixWrap.alert-matrix-wrap { max-height: max(380px, calc(100vh - 300px)) !important; }
-  html body:has(.page-banner.bn-collapsed) #alertMatrixWrap.alert-matrix-wrap { max-height: max(380px, calc(100vh - 138px)) !important; }
-  html body #alertMatrixWrap .alert-matrix-new-table th:not(.grade-col-matrix):not(.total-col-matrix), html body #alertMatrixWrap .alert-matrix-new-table td:not(.grade-col-matrix):not(.total-col-matrix), html body #alertMatrixWrap .alert-matrix-new-table tr.total-row-matrix td:not(.grade-col-matrix):not(.total-col-matrix) { min-width: 40px !important; max-width: none !important; width: 40px; }
-  /* เมนูซ้าย: เลิกใช้ backdrop-filter + ทำให้พื้นหลังส่วนรายการทึบ (ช่วยให้ตัวหนังสือถูกวาดแบบคมชัด) */
-  html body .sidebar { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
-  :root[data-theme="light"] html body .sidebar .sb-nav, :root[data-theme="light"] .sidebar .sb-nav {
-    background:
-      radial-gradient(420px 260px at -28px 0, rgba(60,170,255,.30), transparent 70%) fixed,
-      radial-gradient(360px 300px at 343px 100%, rgba(25,195,240,.34), transparent 70%) fixed,
-      linear-gradient(180deg,#06214f 0%,#0a3f94 62%,#0b57c9 100%) fixed;
+  function renderEmpty() {
+    const box = $id('fcTables');
+    if (box) box.innerHTML = `<div class="fc-empty">
+        <div style="font-size:42px">📝</div>
+        <div>ยังไม่ได้จัดทำประมาณการสั่งซื้อ เดือน <b>${esc(thMonth(S.month))}</b></div>
+        <div class="fc-empty-sub">กดปุ่ม <b>“จัดทำประมาณการสั่งซื้อ”</b> ด้านบน ระบบจะสร้างตารางเปล่า Rev.00 ให้ทุกกลุ่ม (CA บาง, CA หนา, KA, KI, KK, KW, FSC)</div>
+      </div>`;
+    ['fcToolbar', 'fcFooter'].forEach(id => { const el = $id(id); if (el) el.innerHTML = ''; });
   }
-  /* เมนูซ้าย: ใส่ "สีพื้นทึบ" ใต้ไล่สี เพื่อให้ Chrome ถือว่าชั้นนี้ทึบ และวาดตัวหนังสือแบบคมชัด */
-  :root[data-theme="light"] html body .sidebar, :root[data-theme="light"] .sidebar { background-color: #0a3f94 !important; }
-  :root[data-theme="light"] html body .sidebar .sb-nav, :root[data-theme="light"] .sidebar .sb-nav { background-color: #0a3f94 !important; }
-  /* คอลัมน์ GRADEGRAMS แคบลง */
-  html body #alertMatrixWrap .alert-matrix-new-table th.grade-col-matrix, html body #alertMatrixWrap .alert-matrix-new-table td.grade-col-matrix { width: 78px !important; min-width: 78px !important; max-width: 78px !important; padding-left: 8px !important; padding-right: 2px !important; }
-  html body #alertMatrixWrap .alert-matrix-new-table tr.total-row-matrix td.grade-col-matrix { padding-left: 0 !important; }
-  /* ซ่อน Size แล้วตารางยังเต็มความกว้างกรอบ (คอลัมน์ที่เหลือขยายเฉลี่ย) · ถ้า Size เยอะจนล้น ก็เลื่อนซ้าย-ขวาตามเดิม */
-  html body #alertMatrixWrap .alert-matrix-new-table { width: 100% !important; min-width: max-content !important; }
-  /* รายการการสั่งซื้อม้วนกระดาษ: ลดความสูงแถว */
-  html body #poListTbody td { padding: 3px 8px !important; height: 32px; font-size: 12.5px; line-height: 1.3; }
-  html body #poListTbody td button { height: 24px !important; min-height: 0 !important; padding: 0 9px !important; font-size: 11.5px !important; line-height: 1 !important; border-radius: 999px; margin: 0 1px; }
-  html body #poListTbody td .badge { padding: 2px 9px !important; font-size: 11px !important; line-height: 1.3; }
-  html body #poListTbody td svg { width: 13px !important; height: 13px !important; }
-  /* ตัวอักษรแนวตั้งในตารางประมาณการ: เลิกใช้ rotate() (ทำให้ตัวอักษรเบลอ) · เลิกเงาตัวอักษร */
-  html body .fc-table td.fc-v > span { text-shadow: none !important; }
-  @supports (writing-mode: sideways-lr) {
-    html body .fc-table td.fc-v > span { writing-mode: sideways-lr; transform: none; }
-  }
-  /* ---------- หน้าประมาณการ: ชิป Rev อยู่ในแถวหัวข้อ ถัดจากชื่อกลุ่มเกรด ---------- */
-  html body .fc-tb-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  html body .fc-tb-left > b { font-size: 15px; font-weight: 800; }
-  html body .fc-rev-inline { display: inline-flex !important; flex-direction: row !important; align-items: center; gap: 6px; width: auto !important; padding: 0 !important; }
-  html body .fc-rev-inline .fc-rev-tab { writing-mode: horizontal-tb !important; transform: none !important; padding: 4px 12px !important; border: 1.5px solid #b9d0f2 !important; border-radius: 10px !important;
-    background: #f4f8ff !important; color: #0b3f95 !important; font: 700 12.5px 'Sarabun', sans-serif; display: inline-flex; align-items: center; gap: 6px; box-shadow: none !important; filter: none; }
-  html body .fc-rev-inline .fc-rev-tab .d { width: 7px; height: 7px; border-radius: 50%; background: #f59e0b; display: inline-block; }
-  html body .fc-rev-inline .fc-rev-tab.st-approved .d { background: #16a34a; }
-  html body .fc-rev-inline .fc-rev-tab.st-saved .d { background: #64748b; }
-  html body .fc-rev-inline .fc-rev-tab:hover:not(:disabled):not(.active) { background: #eaf3ff !important; border-color: #1677ff !important; }
-  html body .fc-rev-inline .fc-rev-tab.active { background: #1677ff !important; border-color: #1677ff !important; color: #fff !important; box-shadow: 0 3px 8px rgba(22,119,255,.38) !important; }
-  html body .fc-rev-inline .fc-rev-tab.active .d { background: #fff; }
-  html body .fc-rev-inline .fc-rev-tab.fc-rev-add { background: transparent !important; border: 1.5px dashed #8fb2e6 !important; color: #1677ff !important; }
-  html body .fc-rev-inline .fc-rev-tab.fc-rev-add:disabled { opacity: .45; color: #64748b !important; cursor: not-allowed; }
-  html body .fc-work { margin-top: 4px; }
-  /* ---------- หน้าประมาณการ: ติ่งแกรมด้านซ้าย + แสดงทีละตาราง ---------- */
-  html body .fc-work { display: flex; align-items: flex-start; gap: 0; }
-  html body .fc-rail { width: 76px; flex-shrink: 0; display: flex; flex-direction: column; gap: 5px; padding-top: 56px; position: sticky; top: 74px; max-height: calc(100vh - 96px); overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
-  html body .fc-rail::-webkit-scrollbar { display: none; }
-  html body .fc-rail:empty { display: none; }
-  html body .fc-rail .it { padding: 7px 4px 7px 8px; border: 1.5px solid #b9d0f2; border-right: none; border-radius: 12px 0 0 12px; background: #f4f8ff; color: #0b3f95; font: 700 12px 'Sarabun', sans-serif; text-align: center; cursor: pointer; white-space: nowrap; box-shadow: none; transition: background .12s, transform .12s; }
-  html body .fc-rail .it:hover:not(.on) { background: #eaf3ff; border-color: #1677ff; }
-  html body .fc-rail .it.on { background: linear-gradient(90deg, #1677ff, #0b3f95); color: #fff; border-color: #1677ff; box-shadow: 0 3px 8px rgba(22,119,255,.4); transform: translateX(3px); }
-  html body .fc-rail .it.warn:not(.on) { border-color: #f59e0b; background: #fff8ea; }
-  html body .fc-rail .it.warn::after { content: ' ●'; color: #f59e0b; font-size: 9px; }
-  html body .fc-rail.fc-rail-all .it { opacity: .85; }
-  html body .fc-rail .fc-rail-mode { margin-top: 6px; padding: 5px 4px; border: 1.5px dashed #8fb2e6; border-radius: 10px; background: transparent; color: #1677ff; font: 600 11px 'Sarabun', sans-serif; cursor: pointer; box-shadow: none; white-space: nowrap; margin-right: 4px; }
-  html body .fc-tbl-wrap.fc-pg-hide { display: none !important; }
-  html body .fc-title-in { position: relative; }
-  html body .fc-pgnav { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #fff; }
-  html body .fc-pgnav b { background: rgba(255,255,255,.2); border-radius: 8px; padding: 1px 10px; }
-  html body .fc-pgnav button { width: 24px; height: 24px; padding: 0; border-radius: 8px; border: 1px solid rgba(255,255,255,.45); background: rgba(255,255,255,.16); color: #fff; font-size: 15px; line-height: 1; cursor: pointer; box-shadow: none; }
-  html body .fc-pgnav button:hover:not(:disabled) { background: rgba(255,255,255,.32); }
-  html body .fc-pgnav button:disabled { opacity: .35; cursor: default; }
-  html body .fc-work .fc-toolbar { padding-left: 14px; }
-  /* ติ่งแกรม: แยกออกจากตาราง (ไม่ติดมุม) · ตัวที่เลือกมีหัวลูกศรชี้ไปที่ตาราง */
-  html body .fc-rail { width: 88px; padding-right: 12px; }
-  html body .fc-rail .it { border: 1.5px solid #b9d0f2 !important; border-radius: 12px !important; transform: none !important; position: relative; }
-  html body .fc-rail .it.on { border-color: #1677ff !important; }
-  html body .fc-rail .it.on::after { content: ''; position: absolute; right: -7px; top: 50%; margin-top: -6px; border-style: solid; border-width: 6px 0 6px 7px; border-color: transparent transparent transparent #0b3f95; }
-  html body .fc-rail .it.warn:not(.on)::after { content: ' ●'; }
-  html body .fc-rail .fc-rail-mode { margin-right: 0; }
-  /* เอาแถบน้ำเงินชื่อตารางออก: บันทึกร่าง/เตือนยอดติดลบ ย้ายไปแถบเครื่องมือ */
-  html body .fc-tb-left > .fc-cur-g { color: #1677ff; font-weight: 800; font-size: 15px; margin-left: -4px; }
-  html body .fc-toolbar .fc-draft-btn { background: #eaf3ff; border: 1.5px solid #1677ff; color: #0b3f95; font-weight: 700; }
-  html body .fc-warn-bar { margin: 0 0 10px 14px; background: #fff4e5; border: 1.5px solid #f59e0b; color: #b45309; border-radius: 10px; padding: 5px 12px; font-size: 12.5px; font-weight: 600; display: inline-block; }
-  html body .fc-warn-bar.hidden { display: none; }
-  html body .fc-rail { padding-top: 6px; }
-  /* ===== ติ่งแกรมติดตาราง (แยกด้วยเงา) · ไม่มีแท็บกลุ่มด้านบน ===== */
-  html body #fcGradeTabs { display: none !important; }
-  html body .fc-work { gap: 0; }
-  html body .fc-rail { width: 84px; padding: 0 !important; gap: 0; position: sticky; top: 74px; z-index: 3; }
-  html body .fc-rail .it { border: 1px solid #d7e5ff !important; border-right: 0 !important; border-bottom: 0 !important; border-radius: 0 !important; padding: 10px 6px; background: #f4f8ff; box-shadow: inset -7px 0 9px -7px rgba(11,63,149,.22); }
-  html body .fc-rail .it:first-child { border-radius: 14px 0 0 0 !important; }
-  html body .fc-rail .it:last-child { border-radius: 0 0 0 14px !important; border-bottom: 1px solid #d7e5ff !important; }
-  html body .fc-rail .it:only-of-type { border-radius: 14px 0 0 14px !important; }
-  html body .fc-rail .it.on { background: linear-gradient(90deg,#1677ff,#0b3f95); color: #fff; border-color: #1677ff !important; box-shadow: none; position: relative; z-index: 4; margin-right: -2px; }
-  html body .fc-rail .it.on::after { display: none; }
-  html body .fc-rail .it.warn:not(.on) { background: #fff8ea; }
-  html body .fc-rail .fc-rail-mode { margin: 10px 8px 0 0; }
-  html body .fc-tbl-wrap { border-top-left-radius: 0 !important; }
-  html body .fc-grp-sel { border: 1.5px solid #b9d0f2; border-radius: 10px; padding: 4px 28px 4px 12px; font: 800 14px 'Sarabun', sans-serif; background-color: #fff; color: #0b3f95; cursor: pointer; }
 
-  html body .fc-grp-sel { appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%231677ff' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; box-shadow: 0 2px 6px rgba(27,79,209,.10); }
-  html body .fc-grp-sel:hover { border-color: #1677ff; }
-  /* ===== ตารางพอดีกรอบ ไม่ต้องเลื่อนขวา · แถบเครื่องมือแถวเดียว ===== */
-  html body .fc-table col.c-g { width: 152px; } html body .fc-table col.c-s { width: 172px; }
-  html body .fc-table .fc-g { left: 24px !important; } html body .fc-table .fc-s { left: 176px !important; } html body .fc-table col.c-t { width: 50px; }
-  html body .fc-table { width: 100% !important; table-layout: fixed !important; }
-  html body .fc-table thead th:not(.fc-g):not(.fc-v-h):not(.fc-tot-h), html body .fc-table td.fc-c, html body .fc-table td.fc-in, html body .fc-table td.fc-note-td { min-width: 0 !important; width: auto !important; max-width: none !important; padding-left: 0 !important; padding-right: 0 !important; font-size: 10.5px !important; letter-spacing: -.2px; }
-  html body .fc-table .fc-tot, html body .fc-table .fc-tot-h { min-width: 0 !important; width: 50px !important; font-size: 10.5px !important; }
-  html body .fc-table td.fc-in input { font-size: 10.5px !important; }
-  html body .fc-tb-left > .fc-cur-g, html body .fc-tb-right .fc-inline { display: none !important; }
-  html body .fc-toolbar { flex-wrap: nowrap !important; align-items: center; gap: 10px; }
-  html body .fc-tb-left { flex-wrap: nowrap !important; min-width: 0; white-space: nowrap; }
-  html body .fc-tb-left .fc-muted { overflow: hidden; text-overflow: ellipsis; min-width: 0; font-size: 11.5px; }
-  html body .fc-tb-right { flex-wrap: nowrap !important; flex-shrink: 0; margin-left: auto; }
-  /* หมายเหตุประมาณการ ชิดตาราง */
-  html body #fcTables { padding-bottom: 0 !important; margin-bottom: 0 !important; }
-  html body #fcTables .fc-tbl-wrap { margin-bottom: 0 !important; }
-  html body #fcFooter { margin-top: 8px !important; }
-  /* ซ่อน Alert History (ย้อนหลัง) ถาวร */
-  html body #alertHistoryCard { display: none !important; }
-  /* ===== หน้าต่างสร้าง/แก้ไข PO แบบใหม่ ===== */
-  html body #modalPOForm .modal { padding: 0 !important; border-radius: 24px !important; overflow: hidden auto !important; box-shadow: 0 30px 80px rgba(7,26,92,.35) !important; }
-  html body #modalPOForm .modal-head { margin: 0 !important; padding: 0 24px !important; height: 60px; display: flex; align-items: center; justify-content: space-between; border-bottom: 0 !important; background: radial-gradient(120% 260% at 15% 0%, #1f6bff 0, #0a2a8a 55%, #071a5c 100%) !important; position: sticky; top: 0; z-index: 20; }
-  html body #modalPOForm .modal-head::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: linear-gradient(90deg,#22d3ee,#6366f1,#ec4899,#f59e0b); }
-  html body #modalPOForm .modal-head h3 { color: #fff !important; font-size: 19px; font-weight: 800; margin: 0; }
-  html body #modalPOForm .modal-head button { background: rgba(255,255,255,.18) !important; color: #fff !important; border: 1px solid rgba(255,255,255,.4) !important; border-radius: 99px !important; padding: 5px 18px !important; font-weight: 700; box-shadow: none !important; }
-  html body #modalPOForm .modal-head button:hover { background: rgba(255,255,255,.3) !important; }
-  html body #poFormBody { padding: 18px 24px 4px; }
-  html body #poFormBody .po-info-bar { background: linear-gradient(180deg,#f4f9ff,#eaf3ff) !important; border: 1.5px solid #cfe0f7 !important; border-radius: 18px !important; padding: 14px 18px !important; margin-bottom: 14px; }
-  html body #poFormBody .po-info-bar .po-info-row { border-bottom: 1px dashed #bcd2f2 !important; }
-  html body #poFormBody .po-info-bar .po-info-row b { color: #0b3f95 !important; }
-  html body #poFormBody .po-info-bar .po-info-badge { background: #fff4dc !important; color: #b45309 !important; border: 0 !important; font-weight: 700; padding: 3px 14px !important; }
-  html body #poFormBody .po-info-bar .po-info-field label { color: #475b7e !important; }
-  html body #poFormBody .po-info-bar .po-info-input { height: 34px; border: 1.5px solid #b9d0f2 !important; border-radius: 99px !important; padding: 0 16px !important; background-color: #fff; box-shadow: none; }
-  html body #poFormBody .po-info-bar select.po-info-input { appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%231677ff' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 34px !important; }
-  html body #poFormBody .po-info-bar .po-info-input:focus { border-color: #1677ff !important; box-shadow: 0 0 0 3px rgba(22,119,255,.2) !important; }
-  html body #poFormBody .po-info-bar .po-info-meta { color: #475b7e !important; border-top: 0 !important; padding-top: 2px !important; }
-  html body #poFormBody .po-info-bar .po-info-meta b { background: #fff; border: 1px solid #cfe0f7; border-radius: 99px; padding: 1px 10px; color: #0b3f95 !important; }
-  html body #poFormBody .report-wrap { border: 1.5px solid #cfe0f7 !important; border-radius: 16px !important; }
-  html body #poFormBody .add-items-table { border-collapse: separate; border-spacing: 0; }
-  html body #poFormBody .add-items-table thead th { background: linear-gradient(90deg,#0b3f95,#1677ff) !important; border: 0 !important; height: 34px; padding: 0 6px; letter-spacing: .3px; }
-  html body #poFormBody .add-items-table tbody td { border: 0 !important; border-bottom: 1px solid #e6eefb !important; height: 38px; padding: 3px 6px; text-align: center; }
-  html body #poFormBody .add-items-table tbody tr:nth-child(even) td { background: #f8fbff; }
-  html body #poFormBody .add-items-table tbody tr:hover td { background: #e4efff !important; }
-  html body #poFormBody .add-items-table :is(select, input[type="number"], input[type="text"]) { height: 28px; border: 1.5px solid #b9d0f2 !important; border-radius: 99px !important; background-color: #fff; padding: 0 12px !important; font-weight: 600; }
-  html body #poFormBody .add-items-table input[type="number"] { text-align: center; }
-  html body #poFormBody .add-items-table select { appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%231677ff' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 26px !important; }
-  html body #poFormBody .add-items-table :is(select, input):focus { border-color: #1677ff !important; box-shadow: 0 0 0 3px rgba(22,119,255,.18) !important; }
-  html body #poFormBody .add-items-table td:nth-child(6) input { background: #fff1f1 !important; border-color: #ffd0d0 !important; color: #d64545 !important; font-weight: 800; }
-  html body #poFormBody .add-items-table button.danger { width: 28px; height: 28px; padding: 0 !important; border-radius: 50% !important; background: #fff0f0 !important; color: #ef4444 !important; font-weight: 800; border: 0 !important; }
-  html body #poFormBody .add-items-table button.danger:hover:not(:disabled) { background: #ef4444 !important; color: #fff !important; }
-  html body #poFormBody > div > button[onclick="addEditRow()"], html body #poFormBody button[onclick="addEditRow()"] { border: 1.5px dashed #1677ff !important; border-radius: 99px !important; background: #fff !important; color: #1677ff !important; padding: 7px 20px !important; font-weight: 800; }
-  html body #poFormBody .form-actions { position: sticky; bottom: 0; background: #fff !important; border-top: 1px solid #e6eefb !important; margin: 14px -24px 0 !important; padding: 14px 24px 18px !important; display: flex; justify-content: flex-end; gap: 10px; }
-  html body #poFormBody .form-actions button { border: 1.5px solid #b9d0f2; border-radius: 12px !important; padding: 9px 22px !important; font-weight: 700; background: #fff; color: #0b3f95; cursor: pointer; }
-  html body #poFormBody .form-actions button[onclick="repricePO()"] { background: #fff8ea !important; border-color: #f59e0b !important; color: #b45309 !important; }
-  html body #poFormBody .form-actions button.primary { background: linear-gradient(90deg,#1677ff,#0b3f95) !important; color: #fff !important; border: 0 !important; box-shadow: 0 6px 16px rgba(22,119,255,.4); }
-  /* หัวตาราง: "รายการคำนวณ / SIZE" ครอบคลุมตั้งแต่คอลัมน์ซ้ายสุด */
-  html body .fc-table thead th.fc-h { left: 0 !important; text-align: left; padding-left: 16px !important; background: linear-gradient(90deg,#0d2f8f,#0b3f95) !important; z-index: 6; }
-  /* ===== ปุ่ม/แท็บในหน้าประมาณการ ขนาดและรูปแบบเดียวกัน ===== */
-  html body .fc-toolbar .fc-grp-sel, html body .fc-rev-inline .fc-rev-tab, html body .fc-toolbar .fc-chip, html body .fc-toolbar .fc-tb-right > button { height: 32px !important; box-sizing: border-box; border-radius: 99px !important; font: 700 12.5px 'Sarabun', sans-serif !important; padding: 0 16px !important; display: inline-flex; align-items: center; gap: 6px; line-height: 1; white-space: nowrap; }
-  html body .fc-toolbar .fc-grp-sel { padding-right: 30px !important; box-shadow: none; }
-  html body .fc-rev-inline .fc-rev-tab.active, html body .fc-toolbar .fc-tb-right > button.primary { background: linear-gradient(90deg,#1677ff,#0b3f95) !important; color: #fff !important; border: 0 !important; box-shadow: 0 4px 10px rgba(22,119,255,.35) !important; }
-  html body .fc-toolbar .fc-tb-right > button:not(.primary) { border: 1.5px solid #b9d0f2; background: #fff; color: #0b3f95; }
-  html body .fc-toolbar .fc-tb-right > button.fc-draft-btn { background: #eaf3ff; border-color: #1677ff; }
-  html body .fc-toolbar .fc-chip { padding: 0 14px !important; }
-  html body .fc-rail .it { height: 32px; padding: 0 6px !important; display: flex; align-items: center; justify-content: center; font: 700 12.5px 'Sarabun', sans-serif !important; box-sizing: border-box; }
-  html body .fc-rail .fc-rail-mode { height: 32px; padding: 0 8px; font: 700 12px 'Sarabun', sans-serif; border-radius: 99px; display: flex; align-items: center; justify-content: center; }
-  /* ชิป Rev ฝังท้ายช่องเลือกเดือน */
-  html body .fc-pick-wrap { position: relative; display: block; width: 100%; }
-  html body .fc-pick-wrap .fc-pick { width: 100%; text-align: left; padding-left: 12px !important; padding-right: 52px !important; white-space: nowrap; font-size: 11.5px !important; }
-  html body .fc-pick-wrap .fc-rev-in { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); font-style: normal; background: #e3f8ec; color: #15803d; border-radius: 99px; font-weight: 800; font-size: 10.5px; padding: 2px 8px; pointer-events: none; line-height: 1.3; }
-  /* สระ/วรรณยุกต์ไม่โดนตัด: breadcrumb + ข้อความบันทึกเมื่อ */
-  html body .tb-crumb, html body .tb-crumb b, html body .tb-crumb span { line-height: 1.8 !important; padding-top: 3px; padding-bottom: 3px; }
-  html body .fc-tb-left .fc-muted { line-height: 1.8 !important; padding-top: 3px; padding-bottom: 3px; }
-  /* แถวหัวข้อสรุปขยายชิดซ้ายสุด คั่นช่วงการคำนวณ */
-  html body .fc-table td.fc-gl { left: 0 !important; z-index: 5; padding-left: 14px !important; text-align: left; }
-  html body .fc-table tr.fc-divider td { border-top: 1px solid #cfe0f7; }
-  html body .fc-table tr.fc-divider td.fc-gl { white-space: nowrap; }
-  html body .fc-table tr.fc-divider.fc-hl2 td { background-color: #d3e6ff; }
-  /* ประมาณการหลังหัก Stock: ติดลบ = แดง · มากกว่า 0 แต่น้อยกว่า 1 = เหลือง · ตั้งแต่ 1 ขึ้นไป = ปกติ */
-  html body .fc-table td.fc-low-val { color: #b45309 !important; background: #fff2c4 !important; font-weight: 800; }
-  /* ฟิลเตอร์กลุ่มเกรดแบบใหม่ + ตุ่มสีสถานะ */
-  html body .fc-gd { position: relative; display: inline-block; }
-  html body .fc-gd-btn { height: 32px; box-sizing: border-box; border: 1.5px solid #b9d0f2; border-radius: 99px; background: #fff; color: #0b3f95; font: 700 12.5px 'Sarabun', sans-serif; padding: 0 14px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
-  html body .fc-gd-btn:hover { border-color: #1677ff; }
-  html body .fc-gd-btn em { font-style: normal; color: #1677ff; font-size: 11px; }
-  html body .fc-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
-  html body .fc-dot.g { background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,.22); }
-  html body .fc-dot.y { background: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,.25); }
-  html body .fc-dot.n { background: #b6c2d3; box-shadow: 0 0 0 3px rgba(182,194,211,.3); }
-  html body .fc-gd-menu { display: none; position: absolute; left: 0; top: 38px; z-index: 60; width: 236px; background: #fff; border: 1.5px solid #cfe0f7; border-radius: 16px; box-shadow: 0 14px 34px rgba(27,79,209,.22); padding: 6px; }
-  html body .fc-gd-menu.open { display: block; }
-  html body .fc-gd-it { display: flex; align-items: center; gap: 10px; width: 100%; height: 34px; padding: 0 12px; border: 0; border-radius: 10px; background: transparent; color: #0b3f95; font: 700 13px 'Sarabun', sans-serif; cursor: pointer; text-align: left; }
-  html body .fc-gd-it small { margin-left: auto; font-size: 11px; font-weight: 600; color: #64748b; }
-  html body .fc-gd-it:hover:not(.on) { background: #eef5ff; }
-  html body .fc-gd-it.on { background: linear-gradient(90deg,#1677ff,#0b3f95); color: #fff; }
-  html body .fc-gd-it.on small { color: #dbeafe; }
-  /* ความคมชัดตัวอักษร: เลิกพื้นหลัง fixed และเลเยอร์ translateZ ที่ทำให้ Chrome ปรับตัวอักษรเป็นแบบเบลอเมื่อซูมไม่เต็ม (125%/150%) */
-  html, body, html body * { background-attachment: scroll !important; }
-  html body .fc-tbl-wrap { transform: none !important; }
-  /* หน้าจอแคบ/ซูมสูง: แถบเครื่องมือขึ้นบรรทัดใหม่ ไม่ซ้อนทับกัน */
-  html body .fc-toolbar { flex-wrap: wrap !important; row-gap: 8px; }
-  html body .fc-tb-left { flex-wrap: wrap !important; row-gap: 8px; }
-  html body .fc-tb-right { flex-wrap: wrap !important; row-gap: 8px; }
-  /* ตัวอักษรใหญ่ขึ้น 1 ระดับ ให้อ่านชัดที่ซูม 100% */
-  html body .sb-item .it { font-size: 13.5px !important; }
-  html body .fc-table td.fc-g, html body .fc-table td.fc-s, html body .fc-table td.fc-gl { font-size: 12.5px !important; }
-  html body .fc-table td.fc-v span { font-size: 11.5px !important; }
-    html body .fc-table thead th { font-size: 12.5px !important; }
-  html body .fc-table td.fc-c, html body .fc-table td.fc-in, html body .fc-table td.fc-in input { font-size: 11.5px !important; }
-  html body .fc-table .fc-pick, html body .fc-table .fc-gray, html body .fc-table .fc-snapname { font-size: 12.5px !important; }
-  html body .fc-rail .it, html body .fc-gd-btn, html body .fc-rev-inline .fc-rev-tab, html body .fc-toolbar .fc-tb-right > button { font-size: 13px !important; }
-  /* ตัวอักษรเพิ่มอีก 1 ระดับ + ลดความสูงแถว */
-  html body .sb-item .it { font-size: 14px !important; }
-  html body .fc-table td.fc-g, html body .fc-table td.fc-s, html body .fc-table td.fc-gl { font-size: 13px !important; }
-  html body .fc-table td.fc-v span { font-size: 12px !important; }
-    html body .fc-table thead th { font-size: 13px !important; }
-  html body .fc-table td.fc-c, html body .fc-table td.fc-in, html body .fc-table td.fc-in input, html body .fc-table .fc-tot { font-size: 11.5px !important; }
-  html body .fc-table .fc-pick, html body .fc-table .fc-gray, html body .fc-table .fc-snapname { font-size: 13px !important; }
-  html body .fc-rail .it, html body .fc-gd-btn, html body .fc-rev-inline .fc-rev-tab, html body .fc-toolbar .fc-tb-right > button { font-size: 13.5px !important; }
-  html body .fc-table tbody tr.fc-row > td { height: 32px !important; }
-  /* เมนูซ้าย: หัวข้อกลุ่มใหญ่ขึ้น · หัวข้อย่อยพอดี */
-  html body .sb-group-head, html body .sb-group-head .gt { font-size: 15px !important; }
-  html body .sb-group-head .gi { width: 18px; height: 18px; }
-  html body .sb-item .it { font-size: 13.5px !important; }
-  html body .fc-table .fc-pick.fc-lv { white-space: nowrap !important; font-size: 11.5px !important; padding-left: 6px !important; padding-right: 6px !important; letter-spacing: -.1px; overflow: hidden; text-overflow: clip; }
-}
-@media print { .fc-rail, .fc-pgnav { display: none !important; } .fc-tbl-wrap.fc-pg-hide { display: block !important; } .szh-pop, .sz-hide-btn { display: none !important; } .report-title .dd-btn { display: none !important; } .calc-note { display: none !important; } .ss-share { display: none !important; } .ss-chip { background: none !important; padding: 0 !important; } }
+  function statusChip(o) {
+    if (o.status === 'approved') return '<span class="fc-chip ok">✅ อนุมัติแล้ว (แนบเอกสารแล้ว)</span>';
+    if (o.status === 'saved') return '<span class="fc-chip lock">🔒 บันทึกและล็อกแล้ว — รอแนบเอกสารอนุมัติ</span>';
+    return '<span class="fc-chip draft">✏️ ร่าง — กำลังจัดทำ</span>';
+  }
+
+  function gramLabel() {
+    const n = S.grams.length;
+    return n === 0 ? 'ทั้งหมด' : (n === 1 ? S.grams[0] : `เลือก ${n} แกรม`);
+  }
+  function renderToolbar() {
+    const el = $id('fcToolbar'), W = S.W; if (!el || !W) return;
+    const o = W.o;
+    const gramItems = W.names.map(n => { const on = S.grams.includes(n);
+      return `<label class="item ${on ? 'checked' : ''}"><input type="checkbox" value="${esc(n)}" ${on ? 'checked' : ''} onchange="fcGramChange(this)"><span>${esc(n)}</span></label>`; }).join('');
+    let btns = '';
+    if (o.status === 'draft') {
+      btns = `<button type="button" class="fc-draft-btn" onclick="fcSave(false)" title="บันทึกร่าง (บันทึกทุกแกรมของกลุ่มนี้)">💾 บันทึกร่าง</button>
+              <button type="button" class="primary" onclick="fcSave(true)">🔒 บันทึกและล็อก</button>`;
+    } else if (o.status === 'saved') {
+      btns = `<button type="button" onclick="fcUnlock()" style="background:#fffbeb;color:#b45309;border-color:#fcd34d">✏️ แก้ไข (ใส่รหัสผ่าน)</button>
+              <button type="button" class="primary" onclick="fcAttachPick()">📎 แนบเอกสารอนุมัติ (PDF)</button>`;
+    } else {
+      btns = `<button type="button" class="primary" onclick="fcViewDoc()">📄 ดูเอกสารอนุมัติ</button>`;
+    }
+    const saved = o.saved_at ? ` · บันทึกเมื่อ ${new Date(o.saved_at).toLocaleString('th-TH')}` : '';
+    el.innerHTML = `<div class="fc-tb-left">${grpDropdownHTML()}<span class="fc-cur-g" id="fcCurGram"></span><span class="fc-rev-tabs fc-rev-inline no-print" id="fcRevInline">${revChipsHTML()}</span> ${statusChip(o)}<span class="fc-muted">${saved}</span></div>
+      <div class="fc-tb-right">
+        <div class="fc-inline">แสดงแกรม
+          <div class="grade-filter-box" id="fcGramBox">
+            <button type="button" class="grade-filter-btn" onclick="fcGramToggle(event)"><span id="fcGramLabel">${esc(gramLabel())}</span><span class="arrow">▼</span></button>
+            <div class="grade-dropdown fc-gram-drop hidden" id="fcGramDrop">
+              <div class="grade-actions">
+                <button type="button" onclick="fcGramAll()">✓ เลือกทั้งหมด</button>
+                <button type="button" onclick="fcGramClear()">✗ ล้างทั้งหมด</button>
+              </div>
+              <div class="grade-list" id="fcGramList">${gramItems}</div>
+            </div>
+          </div>
+        </div>
+        <button type="button" onclick="fcExport()" title="ส่งออกใบนี้เป็นไฟล์ Excel">📤 Export Excel</button>
+        ${btns}
+      </div>`;
+  }
+
+  function renderFooter() {
+    const el = $id('fcFooter'), W = S.W; if (!el || !W) return;
+    el.innerHTML = `<label class="fc-remark-lbl">📝 หมายเหตุประมาณการ (${esc(groupLabel(S.group))} Rev.${pad2(W.o.rev)})</label>
+      <textarea id="fcRemark" rows="2" placeholder="ระบุหมายเหตุ (ถ้ามี) ก่อนกดบันทึกและล็อก" ${W.locked ? 'disabled' : ''}>${esc(W.remark)}</textarea>`;
+    $id('fcRemark').addEventListener('input', e => { if (S.W) S.W.remark = e.target.value; });
+  }
+
+  // ═════════════ ตาราง ═════════════
+  const monthBtn = (p, val, L) =>
+    `<button type="button" class="fc-gray fc-pick" data-act="monthpick" data-p="${p}" ${L ? 'disabled' : ''}>${val ? esc(thMonth(val)) : '(เลือกเดือน)'}</button>`;
+  const dateIn = (p, val, L) =>
+    `<input type="text" class="fc-gray fc-date" data-p="${p}" name="no_autofill_fc_${p}" autocomplete="new-password" value="${esc(val || '')}" placeholder="(เลือกวันที่)" readonly ${L ? 'disabled' : ''}>`;
+
+  // ช่องลูกค้า = dropdown พิมพ์ค้นหาได้ (กล่องรายการลอยใต้ช่อง กรองตามที่พิมพ์ รองรับลูกศร/Enter/Esc)
+  function syncCustDatalist() { /* เลิกใช้ datalist แล้ว — คงฟังก์ชันไว้เพื่อไม่ให้จุดเรียกเดิมพัง */ }
+  const DD = { input: null, items: [], idx: -1 };
+  function ddEl() {
+    let el = document.getElementById('fcCustDd');
+    if (!el) { el = document.createElement('div'); el.id = 'fcCustDd'; el.className = 'fc-dd hidden'; document.body.appendChild(el); }
+    return el;
+  }
+  function ddClose() { const el = document.getElementById('fcCustDd'); if (el) el.classList.add('hidden'); DD.input = null; DD.idx = -1; }
+  function ddRender(filterText) {
+    const el = ddEl(), inp = DD.input; if (!inp) return;
+    const q = String(filterText || '').trim().toLowerCase();
+    const used = new Set(((S.W && S.W.tables[inp.dataset.g]) ? S.W.tables[inp.dataset.g].cfg.customers : []).filter((x, k) => k !== Number(inp.dataset.i)));
+    DD.items = S.customers.filter(c => !q || c.toLowerCase().includes(q));
+    if (!DD.items.length) { el.innerHTML = '<div class="fc-dd-empty">ไม่พบลูกค้าที่ตรงกับที่พิมพ์</div>'; }
+    else el.innerHTML = DD.items.slice(0, 200).map((c, i) =>
+      `<div class="fc-dd-it${used.has(c) ? ' used' : ''}${i === DD.idx ? ' on' : ''}" data-v="${esc(c)}">${esc(c)}${used.has(c) ? ' <small>(เลือกแล้ว)</small>' : ''}</div>`).join('')
+      + (DD.items.length > 200 ? `<div class="fc-dd-empty">แสดง 200 จาก ${DD.items.length} รายการ — พิมพ์เพิ่มเพื่อกรอง</div>` : '');
+    const r = inp.getBoundingClientRect();
+    el.style.left = Math.max(4, r.left) + 'px'; el.style.minWidth = Math.max(220, r.width) + 'px';
+    const below = window.innerHeight - r.bottom, h = 260;
+    if (below < h && r.top > below) { el.style.top = 'auto'; el.style.bottom = (window.innerHeight - r.top + 4) + 'px'; }
+    else { el.style.bottom = 'auto'; el.style.top = (r.bottom + 4) + 'px'; }
+    el.classList.remove('hidden');
+  }
+  function ddPick(v) {
+    const inp = DD.input; if (!inp) return;
+    inp.value = v; ddClose();
+    inp.blur();   // ปล่อยโฟกัสก่อน แล้วค่อยแจ้ง change (กัน error ตอนวาดตารางใหม่ขณะช่องยังโฟกัสอยู่)
+    setTimeout(() => inp.dispatchEvent(new Event('change', { bubbles: true })), 0);
+  }
+  document.addEventListener('focusin', e => {
+    const t = e.target; if (!t || !t.matches || !t.matches('input[data-act="custname"]')) return;
+    DD.input = t; DD.idx = -1; t.select(); ddRender('');
+  });
+  document.addEventListener('input', e => {
+    const t = e.target; if (!t || !t.matches || !t.matches('input[data-act="custname"]')) return;
+    DD.input = t; DD.idx = -1; ddRender(t.value);
+  });
+  document.addEventListener('keydown', e => {
+    const t = e.target; if (!t || !t.matches || !t.matches('input[data-act="custname"]')) return;
+    const el = document.getElementById('fcCustDd'); if (!el || el.classList.contains('hidden')) return;
+    const n = Math.min(DD.items.length, 200);
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault(); if (!n) return;
+      DD.idx = (DD.idx + (e.key === 'ArrowDown' ? 1 : -1) + n) % n;
+      el.querySelectorAll('.fc-dd-it').forEach((x, i) => x.classList.toggle('on', i === DD.idx));
+      const on = el.querySelector('.fc-dd-it.on'); if (on) on.scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter') {
+      if (DD.idx >= 0 && DD.items[DD.idx]) { e.preventDefault(); ddPick(DD.items[DD.idx]); }
+      else if (DD.items.length === 1) { e.preventDefault(); ddPick(DD.items[0]); }
+    } else if (e.key === 'Escape') { ddClose(); }
+  });
+  document.addEventListener('mousedown', e => {
+    const it = e.target.closest && e.target.closest('#fcCustDd .fc-dd-it');
+    if (it) { e.preventDefault(); ddPick(it.dataset.v); return; }
+    if (!(e.target.closest && (e.target.closest('#fcCustDd') || e.target.closest('input[data-act="custname"]')))) ddClose();
+  }, true);
+  window.addEventListener('scroll', () => { if (DD.input) ddRender(DD.input.value); }, true);
+  window.addEventListener('resize', ddClose);
+
+  // แปลงข้อความที่พิมพ์เป็นชื่อลูกค้าในรายการ: ตรงเป๊ะ → ใช้เลย, พิมพ์บางส่วนแล้วเจอตัวเดียว → ใช้ตัวนั้น
+  function resolveCustomer(text) {
+    const q = String(text || '').trim();
+    if (!q) return { ok: true, value: '' };
+    if (S.customers.includes(q)) return { ok: true, value: q };
+    const ql = q.toLowerCase();
+    const hits = S.customers.filter(c => c.toLowerCase().includes(ql));
+    if (hits.length === 1) return { ok: true, value: hits[0] };
+    return { ok: false, count: hits.length };
+  }
+
+  function tableHTML(W, tbl) {
+    const L = W.locked, P = W.params, g = esc(tbl.label), n = tbl.sizes.length, nc = tbl.cfg.customers.length;
+    const calc = r => tbl.sizes.map(s => `<td class="fc-c" data-r="${r}" data-s="${s}"></td>`).join('') + `<td class="fc-tot" data-r="${r}" data-t="1"></td>`;
+    const full = (r, label, cls) => `<tr class="fc-row ${cls || ''}"><td class="fc-g" colspan="2">${label}</td>${calc(r)}</tr>`;
+    const fullL = (r, label, cls) => `<tr class="fc-row fc-divider ${cls || ''}"><td class="fc-g fc-gl" colspan="3">${label}</td>${calc(r)}</tr>`;
+    const sub = (r, grp, span, subHtml, cls) => `<tr class="fc-row ${cls || ''}">${grp != null ? `<td class="fc-g" rowspan="${span}">${grp}</td>` : ''}<td class="fc-s">${subHtml}</td>${calc(r)}</tr>`;
+    const inputs = (act, getv, i) => tbl.sizes.map(s => {
+      const v = getv(s);
+      return `<td class="fc-in"><input type="number" min="0" step="${act === 'cust' ? 'any' : '1'}" data-act="${act}" data-g="${g}" data-s="${s}"${i != null ? ` data-i="${i}"` : ''} value="${v == null || v === 0 && act !== 'cust' ? '' : v}" ${L ? 'disabled' : ''}></td>`;
+    }).join('');
+    const V = (k, label, span) => `<td class="fc-v fc-v${k}" rowspan="${span}"><span>${label}</span></td>`;
+    const ws = (row, v) => row.replace(/^(<tr[^>]*>)/, '$1' + v);
+    const V0 = '<td class="fc-v fc-v0"></td>';
+    const saveBtn = (!L) ? `<button type="button" class="fc-tbl-save" data-act="savedraft" title="บันทึกร่าง (บันทึกทุกแกรมของกลุ่มนี้)">💾 บันทึกร่าง</button>` : '';
+    const fm = esc(thMonth(S.month)), lm = P.levelMonth ? esc(thMonth(P.levelMonth)) : '…', em = P.estMonth ? esc(thMonth(P.estMonth)) : '…';
+
+    let h = `<table class="fc-table" data-g="${g}" style="min-width:${22 + 152 + 172 + 50 + n * 28}px"><colgroup><col class="c-v"><col class="c-g"><col class="c-s">${tbl.sizes.map(() => '<col>').join('')}<col class="c-t"></colgroup><thead>
+      <tr><th class="fc-g fc-h" colspan="3">รายการคำนวณ / Size</th>${tbl.sizes.map(s => `<th data-s="${s}">${s}</th>`).join('')}<th class="fc-tot-h">Total</th></tr></thead><tbody>`;
+
+    // 1) การใช้ม้วน (ทั่วไป) ย้อนหลัง 3 เดือน
+    ['m1', 'm2', 'm3'].forEach((p, i) => {
+      const _r = sub('u' + (i + 1), i === 0 ? 'การใช้ม้วน (ทั่วไป)<br>ย้อนหลัง 3 เดือน' : null, 3, monthBtn(p, P[p], L));
+      h += i === 0 ? ws(_r, V('A', 'ย้อนหลัง', 3)) : _r;
+    });
+    // 2) เฉลี่ย
+    h += fullL('avg3', 'การใช้ม้วน (ทั่วไป) เฉลี่ย 3 เดือน', 'fc-calc fc-hl1');
+    // 3) กลุ่มลูกค้า Forecast
+    for (let i = 0; i < nc; i++) {
+      const cur = tbl.cfg.customers[i] || '';
+      const sel = L ? `<span class="fc-gray fc-static" title="${esc(cur)}">${esc(cur) || '-'}</span>`
+        : `<input type="text" class="fc-gray fc-cust" data-act="custname" data-g="${g}" data-i="${i}" value="${esc(cur)}" placeholder="🔍 ค้นหาลูกค้า" autocomplete="off" title="พิมพ์ส่วนหนึ่งของรหัสหรือชื่อลูกค้า แล้วเลือกจากรายการที่ขึ้นมา">` +
+          (i >= 3 ? `<button type="button" class="fc-x" title="ลบแถวนี้" data-act="delcust" data-g="${g}" data-i="${i}">✕</button>` : '');
+      const grp = i === 0 ? `จำนวนม้วนกระดาษ -<br>กลุ่มลูกค้า Forecast${L ? '' : `<br><button type="button" class="fc-mini" data-act="addcust" data-g="${g}">＋ เพิ่มแถว</button>`}` : null;
+      h += `<tr class="fc-row">${i === 0 ? V('B', 'Forecast', nc) : ''}${grp != null ? `<td class="fc-g" rowspan="${nc}">${grp}</td>` : ''}<td class="fc-s">${sel}</td>${inputs('cust', s => tbl.cells[s].cust[i], i)}<td class="fc-tot" data-r="cust${i}" data-t="1"></td></tr>`;
+    }
+    // 4) ระดับ Stock เดือน (เลือกเดือน + Snapshot)
+    let snapSel = '', lvExtra = '';
+    const _mode = m => m === 'full' ? 'ม้วนเต็ม' : 'ใช้จริง';
+    if (L) { if (P.levelMode) lvExtra = _mode(P.levelMode); }
+    else if (P.levelMonth) {
+      const opts = snapOptions(P.levelMonth);
+      const cur = opts.find(s => String(s.id) === String(P.levelSnapId)) || opts[0];
+      if (opts.length <= 1) { if (cur) lvExtra = _mode(cur.mode); else snapSel = '<span class="fc-muted">— ไม่มี Snapshot —</span>'; }
+      else snapSel = `<select class="fc-gray fc-snap" data-act="snap">${opts.map(s => `<option value="${s.id}" ${String(s.id) === String(P.levelSnapId) ? 'selected' : ''}>${esc(shortTitle(s.title))} · ${_mode(s.mode)}</option>`).join('')}</select>`;
+    }
+    const lvBtn = `<button type="button" class="fc-gray fc-pick fc-lv" data-act="monthpick" data-p="levelMonth" ${L ? 'disabled' : ''}>${P.levelMonth ? esc(thMonth(P.levelMonth)) + (lvExtra ? ' · ' + lvExtra : '') : '(เลือกเดือน)'}</button>`;
+    h += `<tr class="fc-row">${V('C', 'ระดับ Stock', 2)}<td class="fc-g">ระดับ Stock เดือน :</td><td class="fc-s">${lvBtn}${snapSel ? '<br>' + snapSel : ''}</td>${calc('stock_level')}</tr>`;
+    // 5) % ของระดับ Stock
+    h += full('level_pct_qty', `<input type="number" class="fc-pct" min="0" max="100" step="1" data-act="pct" data-g="${g}" value="${tbl.cfg.pct}" ${L ? 'disabled' : ''}> % ของระดับ Stock เดือน : ${lm}`);
+    // 6) ประมาณการ (ก่อนหัก Stock)
+    h += fullL('est_before', `ประมาณการใช้ม้วนเดือน : <b>${fm}</b> (ก่อนหัก Stock)`, 'fc-calc fc-strong fc-hl2');
+    // 7-9) Stock / รับม้วน / ยอดจอง
+    h += ws(sub('stock_qty', 'Stock ณ วันที่ :', 1, dateIn('stockDate', P.stockDate, L)), V('D', 'Stock คงเหลือ', 3));
+    h += sub('receive_qty', 'รับม้วนกระดาษ ณ วันที่', 1, dateIn('recvDate', P.recvDate, L));
+    h += sub('reserve_qty', 'ยอดจองคงเหลือ ณ วันที่ :', 1, dateIn('resvDate', P.resvDate, L));
+    // 10) คงเหลือรวมยอดจอง
+    h += fullL('total_avail', 'ม้วนกระดาษคงเหลือรวมยอดจอง', 'fc-calc fc-hl1');
+    // 11) ประมาณการใช้ม้วนเดือน (Rev ล่าสุดที่บันทึก)
+    h += ws(sub('est_month', '<span style="white-space:nowrap">ประมาณการใช้ม้วนเดือน :</span>', 1, `<span class="fc-pick-wrap">${monthBtn('estMonth', P.estMonth, L)}${W.src.estRev != null ? `<i class="fc-rev-in">Rev.${pad2(W.src.estRev)}</i>` : ''}</span>`), V('E', 'คำนวณ', 2));
+    // 12) / 13)
+    h += full('after_deduct', `ม้วนกระดาษคงเหลือ<br>หลังจากหักประมาณการใช้เดือน : ${em}`, 'fc-calc');
+    h += fullL('est_after', `ประมาณการใช้ม้วนเดือน : <b>${fm}</b> (หลังหัก Stock)`, 'fc-calc fc-strong fc-hl2');
+    // 14) ปรับเพิ่ม/ลด
+    h += `<tr class="fc-row fc-adj">${V('F', 'ปรับเพิ่ม/ลด', 2)}<td class="fc-g" rowspan="2">ปรับเพิ่มหรือลดจำนวน<br>ตามสถานการณ์ปัจจุบัน</td><td class="fc-s">ปรับเพิ่มจำนวน +</td>${inputs('adjP', s => tbl.cells[s].adjP)}<td class="fc-tot" data-r="adjP" data-t="1"></td></tr>`;
+    h += `<tr class="fc-row fc-adj"><td class="fc-s">ปรับลดจำนวน −</td>${inputs('adjM', s => tbl.cells[s].adjM)}<td class="fc-tot" data-r="adjM" data-t="1"></td></tr>`;
+    // 15) สรุป
+    h += fullL('order_qty', `สรุปประมาณการสั่งซื้อม้วนเดือน : <b>${fm}</b>`, 'fc-final');
+    // 16) หมายเหตุ
+    h += `<tr class="fc-row">${V0}<td class="fc-g" colspan="2">หมายเหตุ</td>${tbl.sizes.map(s => {
+      const nt = tbl.cells[s].note;
+      return `<td class="fc-note-td"><button type="button" class="fc-note ${nt ? 'has' : ''}" data-act="note" data-g="${g}" data-s="${s}" title="${esc(nt || (L ? '' : 'คลิกเพื่อใส่หมายเหตุ'))}">${nt ? '!' : (L ? '' : '＋')}</button></td>`;
+    }).join('')}<td class="fc-tot"></td></tr>`;
+    return h + '</tbody></table>';
+  }
+
+  function renderTables() {
+    syncCustDatalist();
+    const box = $id('fcTables'), W = S.W; if (!box || !W) return;
+    const sxs = {}; box.querySelectorAll('.fc-tbl-wrap').forEach(w => { sxs[w.dataset.gw] = w.scrollLeft; });
+    const wy = window.scrollY;
+    S.fp.forEach(f => { try { f.destroy(); } catch (e) { /* ignore */ } }); S.fp = [];
+    const names = S.grams.length ? W.names.filter(n => S.grams.includes(n)) : W.names;
+    if (!names.length) { box.innerHTML = '<div class="fc-empty"><div>ไม่พบ Gradegram ของกลุ่มนี้ใน Master Data</div></div>'; return; }
+    box.innerHTML = names.map(n => `<div class="fc-tbl-wrap" data-gw="${esc(n)}">${tableHTML(W, W.tables[n])}</div>`).join('');
+    // วันที่ (flatpickr เหมือนหน้าอื่น)
+    box.querySelectorAll('input.fc-date:not([disabled])').forEach(el => {
+      const p = el.dataset.p;
+      S.fp.push(flatpickr(el, { locale: 'th', dateFormat: 'Y-m-d', defaultDate: el.value || null, allowInput: false, disableMobile: true,
+        onChange: (d, str) => { if (S.W && str !== (S.W.params[p] || '')) setParam(p, str); } }));
+    });
+    names.forEach(n => {
+      const tbl = W.tables[n], el = box.querySelector(`table[data-g="${CSS.escape(n)}"]`);
+      tbl._tds = {};
+      el.querySelectorAll('td[data-r]').forEach(td => { tbl._tds[td.dataset.r + '|' + (td.dataset.t ? 't' : td.dataset.s)] = td; });
+      tbl._el = el;
+      recalcTable(tbl, true);
+    });
+    box.querySelectorAll('.fc-tbl-wrap').forEach(w => { if (sxs[w.dataset.gw]) w.scrollLeft = sxs[w.dataset.gw]; });
+    if (Math.abs(window.scrollY - wy) > 1) window.scrollTo(0, wy);
+    if (!names.includes(S.page)) S.page = names[0];
+    applyPage(names);
+  }
+
+  // ═════════════ แสดงทีละตาราง + ติ่งแกรมด้านซ้าย ═════════════
+  function pageNames() { return [...document.querySelectorAll('#fcTables .fc-tbl-wrap')].map(w => w.dataset.gw); }
+  function updateWarn() {
+    const el = $id('fcWarn'), W = S.W; if (!el) return;
+    if (!W) { el.classList.add('hidden'); return; }
+    const bad = Object.keys(W.tables).filter(n => W.tables[n] && W.tables[n]._neg > 0 && (!S.paged || n === S.page));
+    if (!bad.length) { el.classList.add('hidden'); el.textContent = ''; railOffset(); return; }
+    el.textContent = '⚠ ' + (S.paged ? S.page : bad.join(', ')) + ': ' + NEG_MSG;
+    el.classList.remove('hidden'); railOffset();
+  }
+  function markRail(name, on) { const b = document.querySelector('#fcRail .it[data-n="' + (window.CSS && CSS.escape ? CSS.escape(name) : name) + '"]'); if (b) b.classList.toggle('warn', !!on); }
+  function railOffset() { const r = $id('fcRail'), w = document.querySelector('#fcTables .fc-tbl-wrap:not(.fc-pg-hide)'); if (!r || !w || !r.parentElement) return; const d = w.getBoundingClientRect().top - r.parentElement.getBoundingClientRect().top; r.style.marginTop = Math.max(0, Math.round(d)) + 'px'; }
+  window.addEventListener('resize', () => { try { railOffset(); } catch (_) {} });
+  function applyPage(names) {
+    names = names || pageNames();
+    const rail = $id('fcRail'), W = S.W;
+    document.querySelectorAll('#fcTables .fc-tbl-wrap').forEach(w => {
+      w.classList.toggle('fc-pg-hide', S.paged && w.dataset.gw !== S.page);
+    });
+    const cg = $id('fcCurGram'); if (cg) cg.textContent = S.paged && S.page ? '› ' + S.page : '';
+    updateWarn();
+    if (!rail) return;
+    if (!W || names.length < 1) { rail.innerHTML = ''; return; }
+    rail.classList.toggle('fc-rail-all', !S.paged);
+    rail.innerHTML = names.map(n => { const t = W.tables[n];
+      return `<button type="button" class="it ${S.paged && n === S.page ? 'on' : ''} ${t && t._neg > 0 ? 'warn' : ''}" data-n="${esc(n)}" title="${esc(n)}">${esc(n)}</button>`; }).join('');
+    railOffset();
+  }
+  function goPage(name, keepScroll) {
+    if (!name || !pageNames().includes(name)) return;
+    S.page = name; applyPage();
+    if (S.paged && !keepScroll) { const b = $id('fcTables'); if (b) { const y = b.getBoundingClientRect().top + window.scrollY - 150; window.scrollTo({ top: Math.max(0, y) }); } }
+    else if (!S.paged) { const w = document.querySelector('#fcTables .fc-tbl-wrap[data-gw="' + (window.CSS && CSS.escape ? CSS.escape(name) : name) + '"]'); if (w) w.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
+  }
+  function stepPage(d) { const ns = pageNames(), i = ns.indexOf(S.page), j = i + d; if (j >= 0 && j < ns.length) { goPage(ns[j]); return true; } return false; }
+  window.fcGoPage = goPage;
+
+  function recalcTable(tbl, silent) {
+    const W = S.W; if (!W || !tbl._el) return;
+    const tot = {}; let neg = 0;
+    const put = (r, s, v) => { const td = tbl._tds[r + '|' + s]; if (td) { td.textContent = fmtCell(r, v); td.classList.toggle('fc-zero', !v || Math.abs(v) < 1e-9); } };
+    tbl.sizes.forEach(s => {
+      const v = getV(W, tbl, s), c = tbl.cells[s];
+      CALC_ROWS.forEach(r => { put(r, s, v[r]); if (v[r] != null) tot[r] = (tot[r] || 0) + v[r]; });
+      c.cust.forEach((x, i) => { tot['cust' + i] = (tot['cust' + i] || 0) + num(x); });
+      tot.adjP = (tot.adjP || 0) + c.adjP; tot.adjM = (tot.adjM || 0) + c.adjM;
+      const bad = v.order_qty != null && v.order_qty < 0;
+      if (bad) neg++;
+      ['est_after', 'after_deduct', 'est_before'].forEach(r => { const td = tbl._tds[r + '|' + s]; if (td) td.classList.toggle('fc-neg-val', (v[r] || 0) < -1e-9); });
+      { const td = tbl._tds['est_after|' + s]; if (td) { const x = v.est_after || 0; td.classList.toggle('fc-low-val', x > 1e-9 && x < 1); } }
+      ['est_before', 'est_after'].forEach(r => { const td = tbl._tds[r + '|' + s]; if (!td) return; const x = v[r] || 0;
+        td.classList.toggle('fc-lvl-red', x < -1e-9); td.classList.toggle('fc-lvl-yel', x >= -1e-9 && x < 1 - 1e-9); });
+      const td15 = tbl._tds['order_qty|' + s]; if (td15) { td15.classList.toggle('fc-neg', bad); td15.title = bad ? NEG_MSG : ''; }
+      const rs = tbl._el.querySelector(`input[data-act="adjM"][data-s="${s}"]`); if (rs) rs.classList.toggle('fc-neg-in', bad);
+    });
+    Object.keys(tot).forEach(r => { const td = tbl._tds[r + '|t']; if (td) { td.textContent = fmtTot(r, tot[r]); td.classList.toggle('fc-zero', !tot[r] || Math.abs(tot[r]) < 1e-9); } });
+    tbl._neg = neg; markRail(tbl.label, neg > 0); updateWarn();
+    if (!silent && neg > tbl._neg) toast('⚠️ ' + NEG_MSG, 'warn', 4500);
+    tbl._neg = neg;
+  }
+
+  // ═════════════ เปลี่ยนค่าในช่องสีเทา ═════════════
+  async function setParam(p, v) {
+    const W = S.W; if (!W || W.locked) return;
+    W.params[p] = v;
+    if (p === 'levelMonth') {
+      const sn = v ? defaultSnap(snapOptions(v)) : null;
+      applySnap(W, sn);
+      await loadSource('level');
+    } else if (p === 'levelSnapId') {
+      applySnap(W, (S.snaps || []).find(s => String(s.id) === String(v)) || null);
+      await loadSource('level');
+    } else if (SRC_OF[p]) await loadSource(SRC_OF[p]);
+    renderTables();
+  }
+  function applySnap(W, sn) {
+    W.params.levelSnapId = sn ? sn.id : null;
+    W.params.levelSnapTitle = sn ? sn.title : '';
+    W.params.levelMode = sn ? sn.mode : '';
+  }
+
+  // ตัวเลือกเดือน+ปี (ปีแสดงเป็น พ.ศ.)
+  function closePicker() { const el = $id('fcMp'); if (el) el.remove(); document.removeEventListener('mousedown', onDocDown, true); }
+  function onDocDown(e) { const el = $id('fcMp'); if (el && !el.contains(e.target) && !e.target.closest('[data-act="monthpick"],#fcMonthBtn')) closePicker(); }
+  function openMonthPicker(anchor, opt) {
+    closePicker();
+    let year = opt.value ? Number(opt.value.slice(0, 4)) : new Date().getFullYear();
+    const box = document.createElement('div'); box.id = 'fcMp'; box.className = 'fc-mp';
+    const draw = () => {
+      box.innerHTML = `<div class="fc-mp-head"><button type="button" data-y="-1">◀</button><b>${year + 543}</b><button type="button" data-y="1">▶</button></div>
+        <div class="fc-mp-grid">${THAI_MONTHS_SHORT.map((nm, i) => {
+          const ym = `${year}-${pad2(i + 1)}`, ok = !opt.allowed || opt.allowed.has(ym);
+          return `<button type="button" class="${ym === opt.value ? 'sel' : ''}" data-m="${ym}" ${ok ? '' : 'disabled'}>${nm}</button>`;
+        }).join('')}</div>
+        ${opt.hint ? `<div class="fc-mp-hint">${opt.hint}</div>` : ''}
+        ${opt.clearable ? '<div class="fc-mp-foot"><button type="button" data-clear="1">ล้างค่า</button></div>' : ''}`;
+    };
+    draw();
+    box.addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b || b.disabled) return;
+      if (b.dataset.y) { year += Number(b.dataset.y); draw(); }
+      else if (b.dataset.m) { closePicker(); opt.onPick(b.dataset.m); }
+      else if (b.dataset.clear) { closePicker(); opt.onPick(''); }
+    });
+    document.body.appendChild(box);
+    const r = anchor.getBoundingClientRect();
+    box.style.top = Math.min(window.innerHeight - 290, r.bottom + 4) + 'px';
+    box.style.left = Math.max(8, Math.min(window.innerWidth - 250, r.left)) + 'px';
+    setTimeout(() => document.addEventListener('mousedown', onDocDown, true), 0);
+  }
+
+  // ═════════════ เหตุการณ์ในตาราง ═════════════
+  function bindOnce() {
+    if (S.bound) return; S.bound = true;
+    const box = $id('fcTables');
+
+    box.addEventListener('input', e => {
+      const t = e.target, act = t.dataset.act, W = S.W;
+      if (!act || !W || W.locked) return;
+      const tbl = W.tables[t.dataset.g]; if (!tbl) return;
+      if (act === 'cust') {
+        const v = t.value === '' ? null : Number(t.value);
+        tbl.cells[Number(t.dataset.s)].cust[Number(t.dataset.i)] = (v == null || isNaN(v)) ? null : v;
+      } else if (act === 'adjP' || act === 'adjM') {
+        const v = Math.max(0, Math.floor(Number(t.value) || 0));
+        tbl.cells[Number(t.dataset.s)][act] = v;
+      } else if (act === 'pct') {
+        tbl.cfg.pct = t.value === '' ? 0 : Math.min(100, Math.max(0, Number(t.value)));
+      } else return;
+      recalcTable(tbl);
+    });
+
+    box.addEventListener('change', e => {
+      const t = e.target, act = t.dataset.act, W = S.W;
+      if (!act || !W || W.locked) return;
+      const tbl = W.tables[t.dataset.g];
+      if (act === 'custname') {
+        const i = Number(t.dataset.i);
+        const r = resolveCustomer(t.value);
+        if (!r.ok) {
+          toast(r.count > 1 ? `พบลูกค้า ${r.count} รายที่ตรงกัน กรุณาพิมพ์ให้เจาะจงขึ้นหรือเลือกจากรายการ` : 'ไม่พบลูกค้านี้ในรายชื่อ กรุณาเลือกจากรายการที่แสดง', 'warn');
+          t.value = tbl.cfg.customers[i] || ''; return;
+        }
+        const v = r.value;
+        if (v && tbl.cfg.customers.some((x, k) => k !== i && x === v)) { toast('ลูกค้านี้ถูกเลือกในตารางนี้แล้ว', 'warn'); t.value = tbl.cfg.customers[i] || ''; return; }
+        tbl.cfg.customers[i] = v; renderTables();
+      } else if (act === 'snap') setParam('levelSnapId', t.value || null);
+    });
+
+    box.addEventListener('click', e => {
+      const b = e.target.closest('[data-act]'); if (!b) return;
+      const act = b.dataset.act, W = S.W; if (!W) return;
+      if (act === 'savedraft') { if (!W.locked) window.fcSave(false); return; }
+      if (act === 'monthpick') {
+        if (W.locked) return;
+        const p = b.dataset.p;
+        const opt = { value: W.params[p], clearable: true, onPick: ym => setParam(p, ym) };
+        if (p === 'levelMonth') { opt.allowed = snapMonths(); opt.hint = 'เลือกได้เฉพาะเดือนที่บันทึก Snapshot ไว้ในหน้า Stock Level'; }
+        if (p === 'estMonth') { opt.allowed = new Set(S.savedMonths); opt.hint = 'เลือกได้เฉพาะเดือนที่บันทึกประมาณการไว้แล้ว (ไม่ใช่เดือนที่กำลังจัดทำ)'; }
+        openMonthPicker(b, opt);
+        return;
+      }
+      if (W.locked && act !== 'note') return;
+      const tbl = W.tables[b.dataset.g];
+      if (act === 'note') {
+        const s = Number(b.dataset.s), c = tbl.cells[s];
+        if (W.locked) { if (c.note) alert(`หมายเหตุ ${tbl.label} Size ${s}:\n\n${c.note}`); return; }
+        const v = prompt(`หมายเหตุ ${tbl.label} · Size ${s}`, c.note || '');
+        if (v === null) return;
+        c.note = v.trim(); b.textContent = c.note ? '!' : '＋'; b.classList.toggle('has', !!c.note); b.title = c.note || 'คลิกเพื่อใส่หมายเหตุ';
+      } else if (act === 'addcust') {
+        tbl.cfg.customers.push('');
+        tbl.sizes.forEach(s => tbl.cells[s].cust.push(null));
+        renderTables();
+      } else if (act === 'delcust') {
+        const i = Number(b.dataset.i);
+        if (i < 3) return;
+        if (tbl.sizes.some(s => num(tbl.cells[s].cust[i])) && !confirm('แถวนี้มีจำนวนม้วนอยู่ ยืนยันลบ?')) return;
+        tbl.cfg.customers.splice(i, 1);
+        tbl.sizes.forEach(s => tbl.cells[s].cust.splice(i, 1));
+        renderTables();
+      }
+    });
+
+    // ไฮไลท์ทั้งคอลัมน์ Size ที่เมาส์ชี้ (เหมือนไฮไลท์แถว)
+    let hlTbl = null, hlS = null;
+    const clearColHl = () => { if (hlTbl) hlTbl.querySelectorAll('.fc-col-hl').forEach(el => el.classList.remove('fc-col-hl')); hlTbl = null; hlS = null; };
+    document.addEventListener('mouseover', e => {
+      const c = e.target.closest && e.target.closest('.fc-table td.fc-c, .fc-table td.fc-in');
+      if (!c) return clearColHl();
+      const el = c.dataset.s ? c : c.querySelector('[data-s]');
+      const s = el && el.dataset.s; const tb = c.closest('.fc-table');
+      if (!s || !tb) return clearColHl();
+      if (tb === hlTbl && s === hlS) return;
+      clearColHl(); hlTbl = tb; hlS = s;
+      tb.querySelectorAll('[data-s]').forEach(x => { if (x.dataset.s === s) (x.closest('td,th') || x).classList.add('fc-col-hl'); });
+    });
+    document.addEventListener('mouseleave', clearColHl);
+    document.addEventListener('click', e => {
+      const d = $id('fcGramDrop'); if (d && !d.classList.contains('hidden') && !e.target.closest('#fcGramBox')) d.classList.add('hidden');
+    });
+    $id('fcPdfInput').addEventListener('change', fcAttachUpload);
+    ['fcPwInput', 'fcPwNote'].forEach(id => $id(id)?.addEventListener('keypress', e => { if (e.key === 'Enter') window.fcPwConfirm(); }));
+
+    // ติ่งแกรม / ปุ่ม ‹ › / สลับโหมด
+    document.addEventListener('click', e => {
+      const it = e.target.closest && e.target.closest('#fcRail .it'); if (it) { if (!S.paged) { S.paged = true; try { localStorage.setItem('fcPaged', '1'); } catch (_) {} } goPage(it.dataset.n, true); return; }
+      const pg = e.target.closest && e.target.closest('.fc-pgnav button[data-pg]'); if (pg) { stepPage(Number(pg.dataset.pg)); return; }
+      if (e.target.closest && e.target.closest('#fcRail .fc-rail-mode')) {
+        S.paged = !S.paged; try { localStorage.setItem('fcPaged', S.paged ? '1' : '0'); } catch (_) {}
+        applyPage(); }
+    });
+    // PageDown / PageUp = ตารางถัดไป/ก่อนหน้า (เฉพาะโหมดทีละตาราง)
+    document.addEventListener('keydown', e => {
+      if (!S.paged || (e.key !== 'PageDown' && e.key !== 'PageUp')) return;
+      if (!$id('tab-forecast') || $id('tab-forecast').classList.contains('hidden')) return;
+      if (e.target.closest && e.target.closest('.modal-bg, textarea, .dd-menu')) return;
+      if (stepPage(e.key === 'PageDown' ? 1 : -1)) e.preventDefault();
+    });
+    // เลื่อนล้อลงสุดหน้า 1 ครั้ง → ไปตารางถัดไป
+    let wheelLock = 0;
+    window.addEventListener('wheel', e => {
+      if (!S.paged || e.ctrlKey || e.deltaY <= 0 || e.defaultPrevented) return;
+      const tab = $id('tab-forecast'); if (!tab || tab.classList.contains('hidden')) return;
+      if (e.target.closest && e.target.closest('.modal-bg, .dd-menu, .flatpickr-calendar, .grade-dropdown, textarea')) return;
+      const el = document.documentElement, bottom = window.innerHeight + window.scrollY >= el.scrollHeight - 3;
+      const bn = document.querySelector('.page-banner'); if (bn && !bn.classList.contains('bn-collapsed') && window.scrollY <= 1) return;   // ให้แบนเนอร์พับก่อน
+      if (!bottom || Date.now() < wheelLock) return;
+      if (stepPage(1)) wheelLock = Date.now() + 600;
+    }, { passive: true });
+
+    // เลื่อนช่องกรอกด้วยคีย์บอร์ด: Enter / ↓ = ลงช่องถัดไปใน Size เดียวกัน · Shift+Enter / ↑ = ขึ้น
+    // ถึงแถวสุดท้ายของตาราง → ข้ามไปแถวแรกของตารางแกรมถัดไป (และย้อนกลับตารางก่อนหน้าได้)
+    document.addEventListener('keydown', e => {
+      const inp = e.target;
+      if (!inp || inp.tagName !== 'INPUT' || !inp.closest || !inp.closest('.fc-table td.fc-in')) return;
+      if (e.isComposing || e.ctrlKey || e.altKey || e.metaKey) return;
+      let dir = 0;
+      if (e.key === 'ArrowDown' || (e.key === 'Enter' && !e.shiftKey)) dir = 1;
+      else if (e.key === 'ArrowUp' || (e.key === 'Enter' && e.shiftKey)) dir = -1;
+      if (!dir) return;
+      const tbl = inp.closest('.fc-table'), sz = inp.dataset.s;
+      const colInputs = t => [...t.querySelectorAll('td.fc-in input:not(:disabled)')].filter(x => x.offsetParent);
+      const same = colInputs(tbl).filter(x => x.dataset.s === sz);
+      const i = same.indexOf(inp);
+      let next = same[i + dir];
+      if (!next) {
+        const tables = [...document.querySelectorAll('#fcTables .fc-table')];
+        let k = tables.indexOf(tbl) + dir;
+        while (k >= 0 && k < tables.length && !next) {
+          if (S.paged && !tables[k].offsetParent) goPage(tables[k].dataset.g, true);
+          const all = colInputs(tables[k]);
+          const sizes = [...new Set(all.map(x => x.dataset.s))];
+          if (sizes.length) {
+            const pick = sizes.includes(sz) ? sz : sizes.reduce((a, b) => Math.abs(Number(b) - Number(sz)) < Math.abs(Number(a) - Number(sz)) ? b : a);
+            const col = all.filter(x => x.dataset.s === pick);
+            next = dir > 0 ? col[0] : col[col.length - 1];
+          }
+          k += dir;
+        }
+      }
+      e.preventDefault();
+      if (!next) return;
+      next.focus();
+      try { next.select(); } catch (_) {}
+      if (next.closest('.fc-table') !== tbl) { if (S.paged) window.scrollTo({ top: Math.max(0, next.closest('.fc-tbl-wrap').getBoundingClientRect().top + window.scrollY - 150) }); next.scrollIntoView({ block: 'nearest' }); }
+    });
+  }
+
+  // ═════════════ บันทึก / ล็อก / แก้ไข / แนบ / Rev ═════════════
+  function anyNegative(W) {
+    return W.names.some(n => { const t = W.tables[n]; return t.sizes.some(s => (getV(W, t, s).order_qty || 0) < 0); });
+  }
+  function buildPayload(W) {
+    return W.names.map(n => {
+      const t = W.tables[n];
+      return { gradegram: n, config: { pct: t.cfg.pct, customers: t.cfg.customers },
+        cells: t.sizes.map(s => { const c = t.cells[s], v = getV(W, t, s);
+          return Object.assign({ size: s }, v, { cust: c.cust, adj_plus: c.adjP, adj_minus: c.adjM, note: c.note || null }); }) };
+    });
+  }
+
+  window.fcSave = async function (lock) {
+    const W = S.W; if (!W || W.locked || S.saving) return;
+    if (anyNegative(W)) { toast('❌ ' + NEG_MSG, 'err', 6000); W.names.forEach(n => recalcTable(W.tables[n], true)); return; }
+    if (lock) {
+      const P = W.params, miss = [];
+      if (!P.m1 && !P.m2 && !P.m3) miss.push('การใช้ม้วนย้อนหลัง');
+      if (!P.levelSnapId) miss.push('ระดับ Stock เดือน');
+      if (!P.stockDate) miss.push('Stock ณ วันที่');
+      if (!P.recvDate) miss.push('รับม้วนกระดาษ ณ วันที่');
+      if (!P.resvDate) miss.push('ยอดจองคงเหลือ ณ วันที่');
+      let msg = `ยืนยัน "บันทึกและล็อก" ${groupLabel(S.group)} Rev.${pad2(W.o.rev)} เดือน ${thMonth(S.month)} ?\n\nหลังล็อกจะแก้ไขไม่ได้ (ต้องใส่รหัสผ่านก่อน)`;
+      if (miss.length) msg = `⚠️ ยังไม่ได้เลือก: ${miss.join(', ')}\n\n` + msg;
+      if (!confirm(msg)) return;
+    }
+    S.saving = true;
+    try {
+      await api.saveOrder(W.o.id, W.params, W.remark, buildPayload(W), lock);
+      toast(lock ? '🔒 บันทึกและล็อกเรียบร้อย — แนบเอกสารอนุมัติ (PDF) เมื่อลงนามครบ' : '💾 บันทึกร่างเรียบร้อย', 'ok', 4000);
+      await loadMonth(W.o.id);
+    } catch (e) { console.error(e); toast('บันทึกไม่สำเร็จ: ' + errText(e), 'err', 6000); }
+    finally { S.saving = false; }
+  };
+
+  // ขอรหัสผ่าน (Modal)
+  function askPassword(title, message) {
+    if (S.pwResolve) { S.pwResolve(null); S.pwResolve = null; }
+    $id('fcPwTitle').textContent = title; $id('fcPwMsg').innerHTML = message;
+    $id('fcPwInput').value = ''; $id('fcPwNote').value = ''; $id('fcPwErr').innerHTML = '';
+    openModal('modalFcPassword');
+    setTimeout(() => $id('fcPwInput').focus(), 50);
+    return new Promise(res => { S.pwResolve = res; });
+  }
+  window.fcPwConfirm = function () {
+    const pw = $id('fcPwInput').value, note = $id('fcPwNote').value.trim();
+    if (!pw) { $id('fcPwErr').innerHTML = '<div class="msg err">กรุณากรอกรหัสผ่าน</div>'; return; }
+    if (!note) { $id('fcPwErr').innerHTML = '<div class="msg err">กรุณาระบุหมายเหตุเหตุผลที่แก้ไข</div>'; return; }
+    closeModal('modalFcPassword');
+    if (S.pwResolve) { S.pwResolve({ password: pw, note }); S.pwResolve = null; }
+  };
+  window.fcPwCancel = function () {
+    closeModal('modalFcPassword');
+    if (S.pwResolve) { S.pwResolve(null); S.pwResolve = null; }
+  };
+
+  window.fcUnlock = async function () {
+    const W = S.W; if (!W || W.o.status !== 'saved') return;
+    const r = await askPassword('🔒 ยืนยันรหัสผ่านเพื่อแก้ไข',
+      `ปลดล็อก <b>${esc(groupLabel(S.group))} Rev.${pad2(W.o.rev)}</b> เดือน ${esc(thMonth(S.month))}<br>กรอกรหัสผ่านประมาณการสั่งซื้อ และระบุเหตุผลที่แก้ไข`);
+    if (!r) return;
+    try {
+      await api.unlockOrder(W.o.id, r.password, r.note);
+      toast('✏️ ปลดล็อกแล้ว แก้ไขได้ — อย่าลืมกดบันทึกและล็อกอีกครั้ง', 'ok', 4000);
+      await loadMonth(W.o.id);
+    } catch (e) { toast('ปลดล็อกไม่สำเร็จ: ' + errText(e), 'err', 6000); }
+  };
+
+  window.fcAttachPick = function () {
+    const W = S.W; if (!W || W.o.status !== 'saved') return;
+    $id('fcPdfInput').value = ''; $id('fcPdfInput').click();
+  };
+  async function fcAttachUpload(ev) {
+    const f = ev.target.files && ev.target.files[0], W = S.W;
+    if (!f || !W || W.o.status !== 'saved') return;
+    if (!(f.type === 'application/pdf' || /\.pdf$/i.test(f.name))) { toast('กรุณาเลือกไฟล์ PDF เท่านั้น', 'warn'); return; }
+    if (f.size > 15 * 1024 * 1024) { toast('ไฟล์ใหญ่เกิน 15 MB', 'warn'); return; }
+    if (!confirm(`แนบเอกสารอนุมัติ "${f.name}" ให้ ${groupLabel(S.group)} Rev.${pad2(W.o.rev)} ?\n\nหลังแนบ จะล็อกทั้งหมด แก้ไขไม่ได้ (ทำได้เฉพาะ + เพิ่ม Rev)`)) return;
+    toast('กำลังอัปโหลด PDF…', 'info', 8000);
+    try {
+      await api.attachDoc(W.o.id, S.month, S.group, W.o.rev, f);
+      toast('✅ แนบเอกสารอนุมัติเรียบร้อย — เพิ่ม Rev ได้จากแท็บด้านข้าง', 'ok', 5000);
+      await loadMonth(W.o.id);
+    } catch (e) { console.error(e); toast('แนบไฟล์ไม่สำเร็จ: ' + errText(e), 'err', 6000); }
+  }
+  window.fcViewDoc = async function () {
+    const W = S.W; if (!W || !W.o.doc_path) return;
+    try { window.open(await api.docUrl(W.o.doc_path), '_blank'); }
+    catch (error) { toast('เปิดไฟล์ไม่สำเร็จ: ' + error.message, 'err'); }
+  };
+
+  window.fcAddRev = async function () {
+    const arr = S.orders[S.group] || [], last = arr[arr.length - 1];
+    if (!last || last.status !== 'approved') return;
+    if (!confirm(`เพิ่ม Rev.${pad2(last.rev + 1)} ของ ${groupLabel(S.group)} เดือน ${thMonth(S.month)} ?\n\nระบบจะคัดลอกข้อมูลจาก Rev.${pad2(last.rev)} มาให้แก้ไขต่อ`)) return;
+    try {
+      const data = await api.addRev(S.month, S.group);
+      toast(`➕ เพิ่ม Rev.${pad2(data.rev)} แล้ว`, 'ok');
+      await loadMonth(data.id);
+    } catch (e) { toast('เพิ่ม Rev ไม่สำเร็จ: ' + errText(e), 'err', 6000); }
+  };
+
+  window.fcCreateOrders = async function () {
+    if (!S.month) return toast('กรุณาเลือกเดือนที่จะจัดทำประมาณการ', 'warn');
+    if (S.hasOrders) return;
+    if (!confirm(`จัดทำประมาณการสั่งซื้อ เดือน ${thMonth(S.month)} ?\n\nระบบจะสร้างตารางเปล่า Rev.00 ให้ทุกกลุ่ม (CA บาง, CA หนา, KA, KI, KK, KW, FSC)`)) return;
+    try {
+      await api.createOrders(S.month);
+      toast('🆕 สร้างตารางประมาณการเรียบร้อย', 'ok');
+      await loadMonth();
+    } catch (e) { toast('สร้างไม่สำเร็จ: ' + errText(e), 'err', 6000); }
+  };
+
+  window.fcPickForecastMonth = function (anchor) {
+    openMonthPicker(anchor, { value: S.month, onPick: ym => { if (ym && ym !== S.month) { S.month = ym; S.selId = {}; loadMonth(); } } });
+  };
+  window.fcSelectGroup = function (g) { S.group = g; S.grams = []; paintHeader(); const o = curOrder(); if (o) openOrder(o); else { S.W = null; renderEmpty(); } };
+  window.fcSelectRev = function (id) { S.selId[S.group] = id; const o = curOrder(); paintHeader(); if (o) openOrder(o); };
+  // เลือกแกรมที่จะแสดง (ติ๊กได้หลายตัว · ไม่ติ๊กเลย = ทั้งหมด)
+  function gramRefresh() {
+    const lb = $id('fcGramLabel'); if (lb) lb.textContent = gramLabel();
+    document.querySelectorAll('#fcGramList .item').forEach(el => {
+      const cb = el.querySelector('input'); cb.checked = S.grams.includes(cb.value); el.classList.toggle('checked', cb.checked);
+    });
+    renderTables();
+  }
+  window.fcGramToggle = function (ev) { ev.stopPropagation(); const d = $id('fcGramDrop'); if (d) d.classList.toggle('hidden'); };
+  window.fcGramChange = function (cb) {
+    const v = cb.value;
+    S.grams = cb.checked ? (S.grams.includes(v) ? S.grams : S.grams.concat([v])) : S.grams.filter(x => x !== v);
+    gramRefresh();
+  };
+  window.fcGramAll = function () { S.grams = S.W ? S.W.names.slice() : []; gramRefresh(); };
+  window.fcGramClear = function () { S.grams = []; gramRefresh(); };
+
+  // ═════════════ ตั้งค่ารหัสผ่าน (หน้า ตั้งค่า — Admin) ═════════════
+  window.initForecastPwSettings = async function () {
+    const box = $id('fcPwBody'); if (!box) return;
+    box.innerHTML = '<p class="hint">กำลังโหลด…</p>';
+    let has;
+    try { has = await api.hasPassword(); }
+    catch (error) { box.innerHTML = `<div class="msg err">${esc(errText(error))}</div>`; return; }
+    box.innerHTML = `<div class="msg ${has ? 'ok' : 'err'}" style="margin-bottom:12px">${has ? '✅ ตั้งรหัสผ่านไว้แล้ว' : '⚠️ ยังไม่ได้ตั้งรหัสผ่าน — จะปลดล็อกแก้ไขประมาณการไม่ได้'}</div>
+      <div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));max-width:760px">
+        ${has ? '<label>รหัสผ่านเดิม <input type="password" id="fcPwOld" autocomplete="new-password"></label>' : ''}
+        <label>รหัสผ่านใหม่ (อย่างน้อย 4 ตัว) <input type="password" id="fcPwNew" autocomplete="new-password"></label>
+        <label>ยืนยันรหัสผ่านใหม่ <input type="password" id="fcPwNew2" autocomplete="new-password"></label>
+      </div>
+      <div class="filters" style="margin-top:12px"><button class="primary" onclick="fcSavePassword()">💾 ${has ? 'เปลี่ยน' : 'ตั้ง'}รหัสผ่าน</button></div>
+      <div id="fcPwSetMsg"></div>`;
+  };
+  window.fcSavePassword = async function () {
+    const n1 = $id('fcPwNew').value, n2 = $id('fcPwNew2').value, old = $id('fcPwOld')?.value || '';
+    const msg = (h, t) => { $id('fcPwSetMsg').innerHTML = `<div class="msg ${t}" style="margin-top:10px">${h}</div>`; };
+    if (n1.length < 4) return msg('รหัสผ่านใหม่ต้องมีอย่างน้อย 4 ตัว', 'err');
+    if (n1 !== n2) return msg('รหัสผ่านใหม่ไม่ตรงกัน', 'err');
+    try { await api.setPassword(old, n1); }
+    catch (error) { return msg(esc(errText(error)), 'err'); }
+    toast('✅ บันทึกรหัสผ่านเรียบร้อย', 'ok');
+    window.initForecastPwSettings();
+  };
+
+  // ═════════════ จุดเข้า (เรียกจาก Tab Router ใน app.js) ═════════════
+  window.initForecastTab = async function () {
+    if (!S.month) S.month = nextMonthStr();
+    try { if (!masterCache || !masterCache.length) await loadMaster(); } catch (e) { console.error(e); }
+    bindOnce();
+    await loadMonth();
+  };
+})();
