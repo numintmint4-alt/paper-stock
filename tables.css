@@ -912,5 +912,10 @@
   /* สระ/วรรณยุกต์ไม่โดนตัด: breadcrumb + ข้อความบันทึกเมื่อ */
   html body .tb-crumb, html body .tb-crumb b, html body .tb-crumb span { line-height: 1.8 !important; padding-top: 3px; padding-bottom: 3px; }
   html body .fc-tb-left .fc-muted { line-height: 1.8 !important; padding-top: 3px; padding-bottom: 3px; }
+  /* แถวหัวข้อสรุปขยายชิดซ้ายสุด คั่นช่วงการคำนวณ */
+  html body .fc-table td.fc-gl { left: 0 !important; z-index: 5; padding-left: 14px !important; text-align: left; }
+  html body .fc-table tr.fc-divider td { border-top: 1px solid #cfe0f7; }
+  html body .fc-table tr.fc-divider.fc-hl2 td { background-color: #d3e6ff; }
+  html body .fc-table td.fc-vA span { font-size: 9.5px !important; letter-spacing: -.2px; }
 }
 @media print { .fc-rail, .fc-pgnav { display: none !important; } .fc-tbl-wrap.fc-pg-hide { display: block !important; } .szh-pop, .sz-hide-btn { display: none !important; } .report-title .dd-btn { display: none !important; } .calc-note { display: none !important; } .ss-share { display: none !important; } .ss-chip { background: none !important; padding: 0 !important; } }
