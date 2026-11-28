@@ -936,5 +936,12 @@
   html body .fc-gd-it:hover:not(.on) { background: #eef5ff; }
   html body .fc-gd-it.on { background: linear-gradient(90deg,#1677ff,#0b3f95); color: #fff; }
   html body .fc-gd-it.on small { color: #dbeafe; }
+  /* ความคมชัดตัวอักษร: เลิกพื้นหลัง fixed และเลเยอร์ translateZ ที่ทำให้ Chrome ปรับตัวอักษรเป็นแบบเบลอเมื่อซูมไม่เต็ม (125%/150%) */
+  html, body, html body * { background-attachment: scroll !important; }
+  html body .fc-tbl-wrap { transform: none !important; }
+  /* หน้าจอแคบ/ซูมสูง: แถบเครื่องมือขึ้นบรรทัดใหม่ ไม่ซ้อนทับกัน */
+  html body .fc-toolbar { flex-wrap: wrap !important; row-gap: 8px; }
+  html body .fc-tb-left { flex-wrap: wrap !important; row-gap: 8px; }
+  html body .fc-tb-right { flex-wrap: wrap !important; row-gap: 8px; }
 }
 @media print { .fc-rail, .fc-pgnav { display: none !important; } .fc-tbl-wrap.fc-pg-hide { display: block !important; } .szh-pop, .sz-hide-btn { display: none !important; } .report-title .dd-btn { display: none !important; } .calc-note { display: none !important; } .ss-share { display: none !important; } .ss-chip { background: none !important; padding: 0 !important; } }
