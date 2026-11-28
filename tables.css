@@ -964,5 +964,7 @@
   html body .sb-group-head .gi { width: 18px; height: 18px; }
   html body .sb-item .it { font-size: 13.5px !important; }
   html body .fc-table .fc-pick.fc-lv { white-space: nowrap !important; font-size: 11.5px !important; padding-left: 6px !important; padding-right: 6px !important; letter-spacing: -.1px; overflow: hidden; text-overflow: clip; }
+  /* ทดลองฟอนต์ Anuphan เฉพาะหน้าจัดทำประมาณการ */
+  html body #tab-forecast, html body #tab-forecast *, html body #tab-forecast input, html body #tab-forecast button, html body #tab-forecast select, html body #tab-forecast textarea { font-family: 'Anuphan', 'Sarabun', sans-serif !important; }
 }
 @media print { .fc-rail, .fc-pgnav { display: none !important; } .fc-tbl-wrap.fc-pg-hide { display: block !important; } .szh-pop, .sz-hide-btn { display: none !important; } .report-title .dd-btn { display: none !important; } .calc-note { display: none !important; } .ss-share { display: none !important; } .ss-chip { background: none !important; padding: 0 !important; } }
