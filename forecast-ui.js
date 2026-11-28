@@ -299,7 +299,7 @@
     // 1) การใช้ม้วน (ทั่วไป) ย้อนหลัง 3 เดือน
     ['m1', 'm2', 'm3'].forEach((p, i) => {
       const _r = sub('u' + (i + 1), i === 0 ? 'การใช้ม้วน (ทั่วไป)<br>ย้อนหลัง 3 เดือน' : null, 3, monthBtn(p, P[p], L));
-      h += i === 0 ? ws(_r, V('A', 'ย้อนหลัง', 4)) : _r;
+      h += i === 0 ? ws(_r, V('A', 'การใช้ม้วนย้อนหลัง', 4)) : _r;
     });
     // 2) เฉลี่ย
     h += full('avg3', 'การใช้ม้วน (ทั่วไป) เฉลี่ย 3 เดือน', 'fc-calc fc-hl1');
@@ -325,7 +325,7 @@
     // 6) ประมาณการ (ก่อนหัก Stock)
     h += full('est_before', `ประมาณการใช้ม้วนเดือน : <b>${fm}</b><br>(ก่อนหัก Stock)`, 'fc-calc fc-strong fc-hl2');
     // 7-9) Stock / รับม้วน / ยอดจอง
-    h += ws(sub('stock_qty', 'Stock ณ วันที่ :', 1, dateIn('stockDate', P.stockDate, L)), V('D', 'ม้วนกระดาษคงเหลือ', 4));
+    h += ws(sub('stock_qty', 'Stock ณ วันที่ :', 1, dateIn('stockDate', P.stockDate, L)), V('D', 'Stock คงเหลือ', 4));
     h += sub('receive_qty', 'รับม้วนกระดาษ ณ วันที่', 1, dateIn('recvDate', P.recvDate, L));
     h += sub('reserve_qty', 'ยอดจองคงเหลือ ณ วันที่ :', 1, dateIn('resvDate', P.resvDate, L));
     // 10) คงเหลือรวมยอดจอง
