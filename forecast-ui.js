@@ -110,6 +110,23 @@
     ensureCustomers();
   }
 
+  // ตุ่มสีสถานะของกลุ่ม: เขียว = อนุมัติแล้ว · เหลือง = แบบร่าง/รอแนบเอกสาร · เทา = ยังไม่ได้จัดทำ
+  function grpStatus(g) {
+    const arr = S.orders[g] || [], last = arr[arr.length - 1];
+    if (!last) return { c: 'n', t: 'ยังไม่ได้จัดทำ' };
+    if (last.status === 'approved') return { c: 'g', t: 'อนุมัติแล้ว' };
+    if (last.status === 'saved') return { c: 'y', t: 'รอแนบเอกสาร' };
+    return { c: 'y', t: 'แบบร่าง' };
+  }
+  function grpDropdownHTML() {
+    const cur = GROUP_DEFS.find(d => d.key === S.group) || GROUP_DEFS[0], cs = grpStatus(cur.key);
+    return `<span class="fc-gd" id="fcGrpDd"><button type="button" class="fc-gd-btn" onclick="fcGrpToggle(event)" title="เลือกกลุ่มเกรด"><i class="fc-dot ${cs.c}"></i>${esc(cur.label)}<em>▾</em></button><div class="fc-gd-menu" id="fcGrpMenu">${GROUP_DEFS.map(d => { const st = grpStatus(d.key); return `<button type="button" class="fc-gd-it ${d.key === S.group ? 'on' : ''}" onclick="fcGrpPick('${d.key}')"><i class="fc-dot ${st.c}"></i>${esc(d.label)}<small>${st.t}</small></button>`; }).join('')}</div></span>`;
+  }
+  window.fcGrpToggle = function (ev) { if (ev) ev.stopPropagation(); const m = $id('fcGrpMenu'); if (m) m.classList.toggle('open'); };
+  window.fcGrpPick = function (g) { const m = $id('fcGrpMenu'); if (m) m.classList.remove('open'); window.fcSelectGroup(g); };
+  document.addEventListener('click', e => { const m = $id('fcGrpMenu'); if (m && m.classList.contains('open') && !e.target.closest('#fcGrpDd')) m.classList.remove('open'); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { const m = $id('fcGrpMenu'); if (m) m.classList.remove('open'); } });
+
   // ═════════════ ส่วนหัวหน้า (แท็บเกรด / Rev / ปุ่ม) ═════════════
   function paintHeader() {
     const mb = $id('fcMonthBtn'); if (mb) mb.textContent = thMonth(S.month) || '(เลือกเดือน)';
@@ -174,7 +191,7 @@
       btns = `<button type="button" class="primary" onclick="fcViewDoc()">📄 ดูเอกสารอนุมัติ</button>`;
     }
     const saved = o.saved_at ? ` · บันทึกเมื่อ ${new Date(o.saved_at).toLocaleString('th-TH')}` : '';
-    el.innerHTML = `<div class="fc-tb-left"><select class="fc-grp-sel" id="fcGrpSel" title="เลือกกลุ่มเกรด" onchange="fcSelectGroup(this.value)">${GROUP_DEFS.map(d => { const arr = S.orders[d.key] || [], last = arr[arr.length - 1]; const bd = !last ? '' : (last.status === 'approved' ? ' ✅' : (last.status === 'saved' ? ' 🔒' : '')); return `<option value="${d.key}" ${d.key === S.group ? 'selected' : ''}>${esc(d.label)}${bd}</option>`; }).join('')}</select><span class="fc-cur-g" id="fcCurGram"></span><span class="fc-rev-tabs fc-rev-inline no-print" id="fcRevInline">${revChipsHTML()}</span> ${statusChip(o)}<span class="fc-muted">${saved}</span></div>
+    el.innerHTML = `<div class="fc-tb-left">${grpDropdownHTML()}<span class="fc-cur-g" id="fcCurGram"></span><span class="fc-rev-tabs fc-rev-inline no-print" id="fcRevInline">${revChipsHTML()}</span> ${statusChip(o)}<span class="fc-muted">${saved}</span></div>
       <div class="fc-tb-right">
         <div class="fc-inline">แสดงแกรม
           <div class="grade-filter-box" id="fcGramBox">
@@ -426,6 +443,7 @@
       const bad = v.order_qty != null && v.order_qty < 0;
       if (bad) neg++;
       ['est_after', 'after_deduct', 'est_before'].forEach(r => { const td = tbl._tds[r + '|' + s]; if (td) td.classList.toggle('fc-neg-val', (v[r] || 0) < -1e-9); });
+      { const td = tbl._tds['est_after|' + s]; if (td) { const x = v.est_after || 0; td.classList.toggle('fc-low-val', x > 1e-9 && x < 1); } }
       ['est_before', 'est_after'].forEach(r => { const td = tbl._tds[r + '|' + s]; if (!td) return; const x = v[r] || 0;
         td.classList.toggle('fc-lvl-red', x < -1e-9); td.classList.toggle('fc-lvl-yel', x >= -1e-9 && x < 1 - 1e-9); });
       const td15 = tbl._tds['order_qty|' + s]; if (td15) { td15.classList.toggle('fc-neg', bad); td15.title = bad ? NEG_MSG : ''; }
