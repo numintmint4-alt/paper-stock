@@ -17,7 +17,7 @@
     snaps: null, savedMonths: [],
     customers: [], custLoading: false,
     fp: [], seq: 0, saving: false, bound: false, pwResolve: null,
-    paged: (function () { try { return localStorage.getItem('fcPaged') !== '0'; } catch (e) { return true; } })(), page: ''
+    paged: true, page: ''
   };
 
   const $id = id => document.getElementById(id);
@@ -402,8 +402,7 @@
     if (!W || names.length < 1) { rail.innerHTML = ''; return; }
     rail.classList.toggle('fc-rail-all', !S.paged);
     rail.innerHTML = names.map(n => { const t = W.tables[n];
-      return `<button type="button" class="it ${S.paged && n === S.page ? 'on' : ''} ${t && t._neg > 0 ? 'warn' : ''}" data-n="${esc(n)}" title="${esc(n)}">${esc(n)}</button>`; }).join('') +
-      `<button type="button" class="fc-rail-mode" title="${S.paged ? 'แสดงทุกตารางเรียงต่อกัน' : 'แสดงทีละตาราง'}">${S.paged ? '☰ ทุกตาราง' : '▣ ทีละตาราง'}</button>`;
+      return `<button type="button" class="it ${S.paged && n === S.page ? 'on' : ''} ${t && t._neg > 0 ? 'warn' : ''}" data-n="${esc(n)}" title="${esc(n)}">${esc(n)}</button>`; }).join('');
     railOffset();
   }
   function goPage(name, keepScroll) {
