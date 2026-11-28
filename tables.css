@@ -963,5 +963,6 @@
   html body .sb-group-head, html body .sb-group-head .gt { font-size: 15px !important; }
   html body .sb-group-head .gi { width: 18px; height: 18px; }
   html body .sb-item .it { font-size: 13.5px !important; }
+  html body .fc-table .fc-pick.fc-lv { white-space: nowrap !important; font-size: 11.5px !important; padding-left: 6px !important; padding-right: 6px !important; letter-spacing: -.1px; overflow: hidden; text-overflow: clip; }
 }
 @media print { .fc-rail, .fc-pgnav { display: none !important; } .fc-tbl-wrap.fc-pg-hide { display: block !important; } .szh-pop, .sz-hide-btn { display: none !important; } .report-title .dd-btn { display: none !important; } .calc-note { display: none !important; } .ss-share { display: none !important; } .ss-chip { background: none !important; padding: 0 !important; } }
