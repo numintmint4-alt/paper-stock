@@ -829,7 +829,7 @@
   html body .fc-rail { width: 84px; padding: 0 !important; gap: 0; position: sticky; top: 74px; z-index: 3; }
   html body .fc-rail .it { border: 1px solid #d7e5ff !important; border-right: 0 !important; border-bottom: 0 !important; border-radius: 0 !important; padding: 10px 6px; background: #f4f8ff; box-shadow: inset -7px 0 9px -7px rgba(11,63,149,.22); }
   html body .fc-rail .it:first-child { border-radius: 14px 0 0 0 !important; }
-  html body .fc-rail .it:nth-last-child(2) { border-radius: 0 0 0 14px !important; border-bottom: 1px solid #d7e5ff !important; }
+  html body .fc-rail .it:last-child { border-radius: 0 0 0 14px !important; border-bottom: 1px solid #d7e5ff !important; }
   html body .fc-rail .it:only-of-type { border-radius: 14px 0 0 14px !important; }
   html body .fc-rail .it.on { background: linear-gradient(90deg,#1677ff,#0b3f95); color: #fff; border-color: #1677ff !important; box-shadow: none; position: relative; z-index: 4; margin-right: -2px; }
   html body .fc-rail .it.on::after { display: none; }
