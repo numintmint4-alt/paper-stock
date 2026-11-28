@@ -310,7 +310,7 @@
       const sel = L ? `<span class="fc-gray fc-static" title="${esc(cur)}">${esc(cur) || '-'}</span>`
         : `<input type="text" class="fc-gray fc-cust" data-act="custname" data-g="${g}" data-i="${i}" value="${esc(cur)}" placeholder="🔍 พิมพ์ค้นหาหรือเลือกลูกค้า" autocomplete="off" title="พิมพ์ส่วนหนึ่งของรหัสหรือชื่อลูกค้า แล้วเลือกจากรายการที่ขึ้นมา">` +
           (i >= 3 ? `<button type="button" class="fc-x" title="ลบแถวนี้" data-act="delcust" data-g="${g}" data-i="${i}">✕</button>` : '');
-      const grp = i === 0 ? `จำนวนม้วนกระดาษ - กลุ่มลูกค้า<br>Forecast (Code)${L ? '' : `<br><button type="button" class="fc-mini" data-act="addcust" data-g="${g}">＋ เพิ่มแถว</button>`}` : null;
+      const grp = i === 0 ? `จำนวนม้วนกระดาษ -<br>กลุ่มลูกค้า Forecast${L ? '' : `<br><button type="button" class="fc-mini" data-act="addcust" data-g="${g}">＋ เพิ่มแถว</button>`}` : null;
       h += `<tr class="fc-row">${i === 0 ? V('B', 'Forecast', nc) : ''}${grp != null ? `<td class="fc-g" rowspan="${nc}">${grp}</td>` : ''}<td class="fc-s">${sel}</td>${inputs('cust', s => tbl.cells[s].cust[i], i)}<td class="fc-tot" data-r="cust${i}" data-t="1"></td></tr>`;
     }
     // 4) ระดับ Stock เดือน (เลือกเดือน + Snapshot)
