@@ -915,6 +915,7 @@
   /* แถวหัวข้อสรุปขยายชิดซ้ายสุด คั่นช่วงการคำนวณ */
   html body .fc-table td.fc-gl { left: 0 !important; z-index: 5; padding-left: 14px !important; text-align: left; }
   html body .fc-table tr.fc-divider td { border-top: 1px solid #cfe0f7; }
+  html body .fc-table tr.fc-divider td.fc-gl { white-space: nowrap; }
   html body .fc-table tr.fc-divider.fc-hl2 td { background-color: #d3e6ff; }
   html body .fc-table td.fc-vA span { font-size: 9.5px !important; letter-spacing: -.2px; }
 }
