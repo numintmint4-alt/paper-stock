@@ -1036,5 +1036,10 @@
   :root:not([data-theme="dark"]) body span.flatpickr-day.selected, :root:not([data-theme="dark"]) body span.flatpickr-day.selected *,
   :root:not([data-theme="dark"]) body .po-list-table th, :root:not([data-theme="dark"]) body .po-list-table th *,
   :root:not([data-theme="dark"]) body #poListBody .data-table th, :root:not([data-theme="dark"]) body #poListBody .data-table th * { font-weight: 700 !important; }
+  /* แถบฟิลเตอร์ทุกหน้า: ตัวอักษรใหญ่ขึ้นเล็กน้อย (12 -> 13.5) */
+  html body .filters label, html body .filters .grade-filter-btn, html body .filters .grade-filter-btn span,
+  html body .filters input, html body .filters select, html body .filters button,
+  html body .snapshot-save-bar, html body .snapshot-save-bar * { font-size: 13.5px !important; }
+  html body .filters button, html body .filters .grade-filter-btn { min-height: 34px; line-height: 1.5; }
 }
 @media print { .fc-rail, .fc-pgnav { display: none !important; } .fc-tbl-wrap.fc-pg-hide { display: block !important; } .szh-pop, .sz-hide-btn { display: none !important; } .report-title .dd-btn { display: none !important; } .calc-note { display: none !important; } .ss-share { display: none !important; } .ss-chip { background: none !important; padding: 0 !important; } }
