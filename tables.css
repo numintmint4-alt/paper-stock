@@ -969,5 +969,12 @@
   /* ทดลองฟอนต์ Noto Sans Thai: หน้าจัดทำประมาณการ + เมนูซ้าย */
   html body #tab-forecast, html body #tab-forecast *, html body #tab-forecast input, html body #tab-forecast button, html body #tab-forecast select, html body #tab-forecast textarea,
   html body #sidebar, html body #sidebar * { font-family: 'Noto Sans Thai', 'Sarabun', sans-serif !important; }
+  /* ทดลองเส้นบางลง: เฉพาะหน้าจัดทำประมาณการ — พื้นสว่าง 500 / พื้นเข้ม 700 ; เมนูซ้ายคงความหนาเดิม */
+  html body #tab-forecast * { font-weight: 500 !important; }
+  html body #tab-forecast thead th, html body #tab-forecast td.fc-v, html body #tab-forecast td.fc-v *,
+  html body #tab-forecast tr.fc-final td, html body #tab-forecast tr.fc-final td *,
+  html body #tab-forecast .fc-rail .it.on, html body #tab-forecast .fc-rev-tab.active, html body #tab-forecast .fc-rev-tab.active *,
+  html body #tab-forecast .fc-tb-right > button { font-weight: 700 !important; }
+  html body #tab-forecast .fc-divider td, html body #tab-forecast b, html body #tab-forecast strong { font-weight: 600 !important; }
 }
 @media print { .fc-rail, .fc-pgnav { display: none !important; } .fc-tbl-wrap.fc-pg-hide { display: block !important; } .szh-pop, .sz-hide-btn { display: none !important; } .report-title .dd-btn { display: none !important; } .calc-note { display: none !important; } .ss-share { display: none !important; } .ss-chip { background: none !important; padding: 0 !important; } }
