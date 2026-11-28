@@ -918,5 +918,23 @@
   html body .fc-table tr.fc-divider td.fc-gl { white-space: nowrap; }
   html body .fc-table tr.fc-divider.fc-hl2 td { background-color: #d3e6ff; }
   html body .fc-table td.fc-vA span { font-size: 9.5px !important; letter-spacing: -.2px; }
+  /* ประมาณการหลังหัก Stock: ติดลบ = แดง · มากกว่า 0 แต่น้อยกว่า 1 = เหลือง · ตั้งแต่ 1 ขึ้นไป = ปกติ */
+  html body .fc-table td.fc-low-val { color: #b45309 !important; background: #fff2c4 !important; font-weight: 800; }
+  /* ฟิลเตอร์กลุ่มเกรดแบบใหม่ + ตุ่มสีสถานะ */
+  html body .fc-gd { position: relative; display: inline-block; }
+  html body .fc-gd-btn { height: 32px; box-sizing: border-box; border: 1.5px solid #b9d0f2; border-radius: 99px; background: #fff; color: #0b3f95; font: 700 12.5px 'Sarabun', sans-serif; padding: 0 14px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+  html body .fc-gd-btn:hover { border-color: #1677ff; }
+  html body .fc-gd-btn em { font-style: normal; color: #1677ff; font-size: 11px; }
+  html body .fc-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+  html body .fc-dot.g { background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,.22); }
+  html body .fc-dot.y { background: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,.25); }
+  html body .fc-dot.n { background: #b6c2d3; box-shadow: 0 0 0 3px rgba(182,194,211,.3); }
+  html body .fc-gd-menu { display: none; position: absolute; left: 0; top: 38px; z-index: 60; width: 236px; background: #fff; border: 1.5px solid #cfe0f7; border-radius: 16px; box-shadow: 0 14px 34px rgba(27,79,209,.22); padding: 6px; }
+  html body .fc-gd-menu.open { display: block; }
+  html body .fc-gd-it { display: flex; align-items: center; gap: 10px; width: 100%; height: 34px; padding: 0 12px; border: 0; border-radius: 10px; background: transparent; color: #0b3f95; font: 700 13px 'Sarabun', sans-serif; cursor: pointer; text-align: left; }
+  html body .fc-gd-it small { margin-left: auto; font-size: 11px; font-weight: 600; color: #64748b; }
+  html body .fc-gd-it:hover:not(.on) { background: #eef5ff; }
+  html body .fc-gd-it.on { background: linear-gradient(90deg,#1677ff,#0b3f95); color: #fff; }
+  html body .fc-gd-it.on small { color: #dbeafe; }
 }
 @media print { .fc-rail, .fc-pgnav { display: none !important; } .fc-tbl-wrap.fc-pg-hide { display: block !important; } .szh-pop, .sz-hide-btn { display: none !important; } .report-title .dd-btn { display: none !important; } .calc-note { display: none !important; } .ss-share { display: none !important; } .ss-chip { background: none !important; padding: 0 !important; } }
